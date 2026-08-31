@@ -1,0 +1,162 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>C · Countdown</title>
+<link rel="stylesheet" href="base.css">
+<style>
+/* CONCEPT C — COUNTDOWN
+   The answer is the screen. One number at the size of a clock face, read
+   before the eye focuses; everything else is a ledger beneath a hairline.
+   Zero-tap taken literally: you do not read this screen, you receive it. */
+
+body { background: #0A0B0D; }
+
+.top { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px 0; }
+.top .trip { font-size: 13px; font-weight: 500; letter-spacing: -0.005em; color: var(--ink-2); }
+.top .trip b { color: var(--ink); font-weight: 500; }
+.top .tools { display: flex; gap: 16px; }
+.top button { background: none; border: 0; padding: 0; cursor: pointer; color: var(--ink-3); font-size: 15px; }
+
+/* The hero takes the free space and sits optically centred within it —
+   left-aligned, never a centred block. A giant number hard against the top
+   with a hole beneath it reads unresolved; air above and below reads composed. */
+.hero { padding: 6px 24px 0; position: relative;
+  flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0; }
+
+.hero .big {
+  font-size: 208px; font-weight: 200; letter-spacing: -0.072em; line-height: 0.8;
+  color: var(--ink); margin-left: -0.055em;
+}
+.hero .big.wide { font-size: 176px; }
+/* A timetable figure is not a measured one, and should not be set with the
+   same confidence as one. */
+.hero .big.sched { color: var(--ink-2); font-weight: 150; }
+.hero .big.word { font-size: 86px; letter-spacing: -0.045em; }
+.hero .unit {
+  font-size: 13px; font-weight: 600; letter-spacing: .2em; text-transform: uppercase;
+  color: var(--ink-3); margin-top: 16px;
+}
+/* the line accent: an underline the width of the number, nothing more */
+.hero .stem { height: 3px; width: 108px; background: var(--accent); margin-top: 20px; }
+
+.hero .facts {
+  display: flex; gap: 26px; margin-top: 20px; align-items: baseline; flex-wrap: wrap;
+}
+.fact .k { font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3); }
+.fact .v { font-size: 26px; font-weight: 300; letter-spacing: -0.02em; color: var(--ink); margin-top: 6px; }
+.fact .v small { font-size: 13px; color: var(--ink-3); font-weight: 400; margin-left: 6px; letter-spacing: 0; }
+
+.hero .dest {
+  margin-top: 18px; font-size: 13px; font-weight: 400; color: var(--ink-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hero .flag {
+  display: inline-block; margin-top: 14px;
+  font-size: 10.5px; font-weight: 600; letter-spacing: .15em; text-transform: uppercase;
+  color: var(--warn);
+}
+.hero .flag.quiet { color: var(--ink-3); }
+
+.after { padding: 0 24px 0; flex: none; }
+.after .cap { padding: 0 0 10px; border-bottom: 1px solid var(--rule-2); }
+.led {
+  display: grid; grid-template-columns: 52px 86px 1fr auto;
+  gap: 0 12px; align-items: baseline; padding: 16px 0 17px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 15px; color: var(--ink-2);
+}
+.led .m { font-size: 20px; font-weight: 400; color: var(--ink); letter-spacing: -0.02em; }
+.led .m u { text-decoration: none; font-size: 10px; letter-spacing: .1em; color: var(--ink-3); margin-left: 2px; }
+.led .t { color: var(--ink-2); }
+.led .t em { font-style: normal; color: var(--warn); font-size: 11px; font-weight: 600; margin-left: 5px; }
+.led .t s { text-decoration: line-through; }
+.led .p { font-size: 10px; font-weight: 600; letter-spacing: .15em; text-transform: uppercase; color: var(--ink-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Colour appears exactly once on this screen: the hero's stem. The ledger
+   names its lines in words, which is what you actually read. */
+.led .p i { font-style: normal; color: var(--ink-2); }
+.led .a { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+
+.led.late .m, .led.late .t b { color: var(--warn); }
+.led.sched .m { color: var(--ink-2); font-weight: 200; }
+.led.cx .m { color: var(--ink-3); }
+.led.cx .t, .led.cx .p { color: var(--ink-3); }
+.led.cx .a { color: var(--warn); }
+
+.ftr { display: flex; align-items: center; gap: 8px; padding: 14px 24px 18px;
+  font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3); }
+body.offline .ftr { color: var(--warn); }
+body.offline .hero, body.offline .after { opacity: .6; }
+
+@media (min-width: 900px) {
+  body { display: grid; grid-template-columns: 1.15fr 1fr; grid-template-rows: auto 1fr auto; }
+  .top { grid-column: 1 / -1; padding: 34px 60px 0; }
+  .top .trip { font-size: 16px; }
+  .hero { padding: 18px 40px 40px 60px; align-self: center; }
+  .hero .big { font-size: 380px; } .hero .big.wide { font-size: 316px; } .hero .big.word { font-size: 150px; }
+  .fact .v { font-size: 32px; }
+  .hero .stem { width: 150px; }
+  .after { margin: 0; padding: 40px 60px 0 20px; align-self: center; border-left: 1px solid var(--rule); }
+  .led { grid-template-columns: 72px 88px 1fr auto; padding: 15px 0 16px; }
+  .ftr { grid-column: 1 / -1; padding: 18px 60px 26px; }
+}
+</style></head>
+<body>
+<script src="data.js"></script>
+<div id="app"></div>
+<script>
+var S = currentScenario();
+if (S.offline) document.body.classList.add('offline');
+
+/* The hero is the first service that is actually running. A cancelled
+   lead service is never silently skipped — it is announced in the flag. */
+var lead = S.rows.find(function (r) { return !r.cancelled; });
+var skipped = S.rows.indexOf(lead) > 0;
+
+var bigTxt, bigCls = 'big';
+if (lead.mins <= 0) { bigTxt = 'Now'; bigCls += ' word'; }
+else { bigTxt = String(lead.mins); if (lead.mins > 9) bigCls += ' wide'; }
+if (!lead.realtime) bigCls += ' sched';
+
+var flag = '';
+if (skipped) flag = '<div class="flag">' + S.rows[0].dep + ' cancelled · next running service</div>';
+else if (lead.delayMin > 0) flag = '<div class="flag">Running ' + lead.delayMin + ' min late · timetabled ' + lead.dep + '</div>';
+else if (!lead.realtime) flag = '<div class="flag quiet">Timetable only · no live tracking</div>';
+
+function led(r) {
+  var cls = ['led'];
+  if (r.cancelled) cls.push('cx');
+  else if (r.delayMin > 0) cls.push('late');
+  else if (!r.realtime) cls.push('sched');
+  /* The ledger is one line per service and stays one line per service: a
+     delay is "+6" beside the new time, a cancellation takes over the arrival
+     slot it has made meaningless. */
+  var m = r.cancelled ? '—' : (r.mins <= 0 ? 'Now' : r.mins + '<u>m</u>');
+  var t = r.delayMin > 0
+    ? '<b>' + r.estDep + '</b><em>+' + r.delayMin + '</em>'
+    : '<b>' + (r.cancelled ? '<s>' + r.dep + '</s>' : r.dep) + '</b>';
+  return '<div class="' + cls.join(' ') + '" style="--code:' + r.L.color + '">' +
+    '<div class="m">' + m + '</div><div class="t">' + t + '</div>' +
+    '<div class="p"><i>' + r.L.code + '</i> · Plat ' + r.platform + (S.longNames ? ' · ' + r.L.name : '') + '</div>' +
+    '<div class="a">' + (r.cancelled ? 'Cancelled' : 'arr ' + r.effArr) + '</div></div>';
+}
+
+document.getElementById('app').outerHTML =
+  '<div class="top"><div class="trip"><b>' + TRIP.from + '</b> → <b>' + TRIP.to + '</b></div>' +
+    '<div class="tools"><button>⇄</button><button>⋯</button></div></div>' +
+  '<div class="hero" style="--accent:' + lead.L.color + '">' +
+    '<div class="' + bigCls + ' num">' + bigTxt + '</div>' +
+    '<div class="unit">' + (lead.mins === 1 ? 'minute' : 'minutes') + ' until departure</div>' +
+    '<div class="stem"></div>' +
+    '<div class="facts">' +
+      '<div class="fact"><div class="k">Platform</div><div class="v">' + lead.platform + '</div></div>' +
+      '<div class="fact"><div class="k">Departs</div><div class="v">' + lead.effDep + '</div></div>' +
+      '<div class="fact"><div class="k">Arrives</div><div class="v">' + lead.effArr + '<small>' + lead.dur + ' min</small></div></div>' +
+    '</div>' +
+    '<div class="dest">' + lead.L.name + ' · ' + lead.headsign + '</div>' +
+    flag +
+  '</div>' +
+  '<div class="after"><div class="cap lbl">Then</div>' +
+    S.rows.filter(function (r) { return r !== lead; }).map(led).join('') + '</div>' +
+  '<div class="ftr"><span class="pulse ' + (S.offline || S.age > 45 ? 'stale' : 'live') + '"></span>' +
+    ageLabel(S.age, S.offline) + '</div>';
+</script>
+</body></html>

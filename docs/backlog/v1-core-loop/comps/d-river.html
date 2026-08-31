@@ -1,0 +1,181 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>D · River</title>
+<link rel="stylesheet" href="base.css">
+<style>
+/* CONCEPT D — RIVER
+   Time is drawn to scale down a single rail. Departures sit at their true
+   position on the axis, so the 15-minute hole after 23:18 is a hole you can
+   see, and a delay is a physical displacement down the line — the same
+   gesture the network itself makes. */
+
+body { background: #0A0B0D; }
+
+.top { display: flex; align-items: baseline; justify-content: space-between; padding: 20px 22px 16px; }
+.top .trip { font-size: 20px; font-weight: 300; letter-spacing: -0.02em; color: var(--ink); }
+.top .trip em { font-style: normal; color: var(--ink-3); font-weight: 200; }
+.top .tools { display: flex; gap: 16px; }
+.top button { background: none; border: 0; padding: 0; cursor: pointer; color: var(--ink-3); font-size: 15px; }
+
+.canvas { position: relative; flex: 1; overflow: hidden;
+  --dotx: 58px; --stalkx: 80px; --cardx: 92px; --railx: 66px; }
+
+/* the rail */
+.rail { position: absolute; left: var(--railx); top: 0; bottom: 0; width: 1px; background: var(--rule-2); }
+/* quarter-hour ticks */
+.tick { position: absolute; left: 0; right: 0; display: flex; align-items: center; gap: 10px; }
+.tick .t { width: 58px; text-align: right; font-size: 9.5px; font-weight: 600; letter-spacing: .13em; color: rgba(244,245,247,.30); }
+.tick .r { flex: 1; height: 1px; background: rgba(244,245,247,0.045); }
+
+/* now */
+.now { position: absolute; left: 22px; right: 0; display: flex; align-items: center; gap: 8px; }
+.now .r { flex: 1; height: 1px; background: rgba(244,245,247,.30); }
+.now .t { font-size: 9.5px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-2); }
+
+.dep { position: absolute; left: 0; right: 18px; }
+.dep .dot {
+  position: absolute; left: var(--dotx); width: 13px; height: 13px; border-radius: 50%;
+  background: var(--c); border: 2px solid #0A0B0D; box-sizing: content-box;
+}
+.dep .leader.in  { left: calc(var(--dotx) + 15px); width: calc(var(--stalkx) - var(--dotx) - 15px); }
+.dep .leader.out { left: var(--stalkx); width: calc(var(--cardx) - var(--stalkx)); }
+/* Connector for a card that had to be pushed off its true position.
+   Deliberately neutral — a coloured stalk reads as a delay drag, which is a
+   different fact entirely. */
+.dep .stalk { position: absolute; left: 80px; width: 1px; background: rgba(244,245,247,.20); }
+.dep .leader { position: absolute; height: 1px; background: rgba(244,245,247,.20); }
+
+/* Every card carries its own measure down its left edge. Without it, a card
+   pushed clear of a crowded stretch of timetable reads as belonging to the
+   NEXT dot down — which is not an ugliness, it is a lie about which train
+   leaves from platform 7. */
+.dep .card { position: absolute; left: var(--cardx); right: 0; padding-left: 14px; }
+.dep .card::before {
+  content: ''; position: absolute; left: 0; top: 4px; bottom: 2px; width: 1px;
+  background: rgba(244,245,247,.13);
+}
+.dep.first .card::before { background: var(--c); opacity: .8; }
+.dep .m {
+  font-size: 30px; font-weight: 250; letter-spacing: -0.045em; line-height: .86; color: var(--ink);
+  display: flex; align-items: baseline; gap: 9px;
+}
+.dep .m u { text-decoration: none; font-size: 11px; font-weight: 600; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--ink-3); }
+.dep .meta {
+  margin-top: 7px; font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dep .meta b { color: var(--ink-2); }
+.dep .meta i { font-style: normal; color: var(--ink-2); }
+.dep.first .meta i { color: var(--c); }
+.dep .arr { margin-top: 5px; font-size: 11px; color: var(--ink-3); letter-spacing: .02em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.dep.first .m { font-size: 46px; }
+.dep.late .m { color: var(--warn); }
+/* A delay is drawn as what it is: the service dragged down the time axis
+   from where the timetable put it (hollow) to where it now is (solid). */
+.dep.late .drag { position: absolute; left: calc(var(--railx) - 0.5px); width: 2px; background: var(--warn); opacity: .85; }
+.dep.late .ghost {
+  position: absolute; left: calc(var(--dotx) + 1px); width: 11px; height: 11px; border-radius: 50%;
+  border: 1px dashed rgba(244,245,247,.45); background: none;
+}
+.dep.sched .dot { background: #0A0B0D; border: 1px solid var(--c); box-shadow: none; }
+.dep.sched .m { color: var(--ink-2); font-weight: 200; }
+.dep.cx .dot { background: none; border: 1px solid rgba(244,245,247,.28); }
+.dep.cx .m { font-size: 13px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--warn); }
+.dep.cx .m u { display: none; }
+.dep.cx .meta, .dep.cx .arr { color: rgba(244,245,247,.32); }
+.dep.cx .meta b { color: rgba(244,245,247,.32); text-decoration: line-through; }
+
+.ftr { display: flex; align-items: center; gap: 8px; padding: 13px 22px 17px;
+  border-top: 1px solid var(--rule);
+  font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3); }
+body.offline .ftr { color: var(--warn); }
+body.offline .canvas { opacity: .55; }
+
+@media (min-width: 900px) {
+  .top { padding: 34px 60px 22px; } .top .trip { font-size: 30px; }
+  .canvas { --dotx: 120px; --stalkx: 144px; --cardx: 158px; --railx: 128px; }
+  .tick .t { width: 118px; font-size: 11px; }
+  .now { left: 60px; }
+  .dep .m { font-size: 44px; } .dep.first .m { font-size: 68px; }
+  .dep .meta { font-size: 11px; } .dep .arr { font-size: 13px; }
+  .ftr { padding: 18px 60px 24px; }
+}
+</style></head>
+<body>
+<script src="data.js"></script>
+<div id="app"></div>
+<script>
+var S = currentScenario();
+if (S.offline) document.body.classList.add('offline');
+
+document.getElementById('app').outerHTML =
+  '<div class="top"><div class="trip">' + TRIP.from + ' <em>→</em> ' + TRIP.to + '</div>' +
+    '<div class="tools"><button>⇄</button><button>⋯</button></div></div>' +
+  '<div class="canvas" id="cv"><div class="rail"></div></div>' +
+  '<div class="ftr"><span class="pulse ' + (S.offline || S.age > 45 ? 'stale' : 'live') + '"></span>' +
+    ageLabel(S.age, S.offline) + '</div>';
+
+var cv = document.getElementById('cv');
+var H = cv.clientHeight, W = cv.clientWidth;
+/* PAD_BOT reserves one card's height so the last departure's card sits inside
+   the canvas rather than hanging off the bottom edge. */
+var PAD_TOP = 34, PAD_BOT = 104;
+var span = Math.max.apply(null, S.rows.map(function (r) { return r.mins; })) + 6; // minutes of window
+var y = function (min) { return PAD_TOP + (min / span) * (H - PAD_TOP - PAD_BOT); };
+
+/* quarter-hour ticks on the real clock */
+var html = '';
+for (var t = Math.ceil((NOW_MIN + 1) / 15) * 15; t < NOW_MIN + span; t += 15) {
+  html += '<div class="tick" style="top:' + y(t - NOW_MIN) + 'px"><div class="t num">' + fmt(t) + '</div><div class="r"></div></div>';
+}
+html += '<div class="now" style="top:' + y(0) + 'px"><div class="t">Now ' + fmt(NOW_MIN) + '</div><div class="r"></div></div>';
+
+/* True axis position always; the CARD is pushed down only when it would
+   collide, and a leader line keeps it tied to its true dot. */
+/* The tighter these get, the more departures keep their TRUE position on the
+   axis — which is the entire claim of this concept. They cannot go below the
+   height of a card, so the claim holds only while services are ~8+ min apart. */
+var MIN_GAP_FIRST = 112, MIN_GAP = 78, cursor = -1e9;
+S.rows.forEach(function (r, i) {
+  var yy = y(r.mins);
+  var cardY = Math.max(yy - 12, cursor);
+  cursor = cardY + (i === 0 ? MIN_GAP_FIRST : MIN_GAP);
+
+  var cls = ['dep']; if (i === 0) cls.push('first');
+  if (r.cancelled) cls.push('cx');
+  else if (r.delayMin > 0) cls.push('late');
+  else if (!r.realtime) cls.push('sched');
+
+  var m = r.cancelled ? 'Cancelled' : (r.mins <= 0 ? 'Now' : r.mins + '<u>min</u>');
+  var timeTxt = r.delayMin > 0
+    ? '<b>' + r.estDep + '</b> <span style="color:var(--warn)">+' + r.delayMin + '</span>'
+    : '<b>' + r.dep + '</b>';
+
+  var extras = '';
+  if (r.delayMin > 0) {
+    var y0 = y(r.mins - r.delayMin);
+    extras += '<div class="ghost" style="top:' + (y0 - 5) + 'px"></div>';
+    extras += '<div class="drag" style="top:' + y0 + 'px;height:' + (yy - y0) + 'px"></div>';
+  }
+  /* Elbow connector: the dot never lies about its time, so when the card is
+     pushed clear of its neighbour a hairline keeps the two tied together. */
+  var drop = cardY + 14 - yy;
+  if (drop > 4) extras +=
+    '<div class="leader in" style="top:' + yy + 'px"></div>' +
+    '<div class="stalk" style="top:' + yy + 'px;height:' + drop + 'px"></div>' +
+    '<div class="leader out" style="top:' + (cardY + 14) + 'px"></div>';
+
+  html += '<div class="' + cls.join(' ') + '" style="--c:' + r.L.color + '">' +
+    '<div class="dot" style="top:' + (yy - 6) + 'px"></div>' + extras +
+    '<div class="card" style="top:' + cardY + 'px">' +
+      '<div class="m num">' + m + '</div>' +
+      '<div class="meta">' + timeTxt + ' &nbsp;·&nbsp; Plat ' + r.platform + ' &nbsp;·&nbsp; <i>' + r.L.code + '</i></div>' +
+      '<div class="arr">' + (S.longNames ? r.L.name : r.headsign) + (r.cancelled ? '' : ' · arrives ' + r.effArr) + '</div>' +
+    '</div>' +
+  '</div>';
+});
+cv.insertAdjacentHTML('beforeend', html);
+</script>
+</body></html>

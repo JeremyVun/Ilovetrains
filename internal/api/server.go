@@ -28,12 +28,11 @@ const (
 	departuresTTL = 30 * time.Second
 	stopsTTL      = 24 * time.Hour
 
-	// staleWindow is the contract's "serve stale in-memory data up to 10
-	// minutes old" on upstream failure. It applies to both endpoints; for
-	// stops that is stricter than the endpoint's own
-	// stale-while-revalidate=604800, so a station list older than ten minutes
-	// past its TTL fails rather than being served stale.
-	staleWindow = 10 * time.Minute
+	// The contract's stale-on-upstream-failure windows (owner ruling
+	// 2026-08-31): departures data ages badly, the near-static station list
+	// does not, so a week-old search index beats a 502 during a long outage.
+	departuresStaleWindow = 10 * time.Minute
+	stopsStaleWindow      = 7 * 24 * time.Hour
 
 	// fetchBudget bounds one upstream fetch including its retry.
 	fetchBudget = 12 * time.Second
@@ -69,8 +68,8 @@ type Server struct {
 func New(upstream Upstream, webDir string) *Server {
 	return &Server{
 		upstream:   upstream,
-		departures: cache.New[*tfnsw.DeparturesResponse](departuresTTL, staleWindow),
-		stops:      cache.New[*tfnsw.StopsResponse](stopsTTL, staleWindow),
+		departures: cache.New[*tfnsw.DeparturesResponse](departuresTTL, departuresStaleWindow),
+		stops:      cache.New[*tfnsw.StopsResponse](stopsTTL, stopsStaleWindow),
 		webDir:     webDir,
 	}
 }

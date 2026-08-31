@@ -1,0 +1,170 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>A · Solari</title>
+<link rel="stylesheet" href="base.css">
+<style>
+/* CONCEPT A — SOLARI
+   The Sydney platform indicator, shrunk into your hand. Institutional
+   authority: a grid, hairlines, tabular figures, one amber. The only
+   heritage gesture is a single seam line across the digits — the flap
+   fold — never a fake mechanical box. */
+
+body { background: #08090A; }
+
+.hdr {
+  display: flex; align-items: baseline; gap: 12px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--rule-2);
+}
+.hdr .trip {
+  font-family: var(--mono);
+  font-size: 13px; font-weight: 600; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--t1);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hdr .spacer { flex: 1; }
+.hdr button {
+  background: none; border: 0; color: var(--ink-3); cursor: pointer;
+  font-family: var(--mono); font-size: 14px; letter-spacing: .1em;
+  padding: 0; line-height: 1;
+}
+
+/* Mono is reserved for FIGURES, where column alignment is the whole point.
+   Names are set in the sans — monospaced prose eats a third of a 390px
+   screen and buys nothing. */
+.colhead {
+  display: grid; grid-template-columns: var(--cols);
+  gap: 0 10px; padding: 9px 20px 8px;
+  border-bottom: 1px solid var(--rule);
+  --cols: 1fr 64px 40px 76px;
+}
+.colhead span:nth-child(n+2) { text-align: right; }
+
+/* Rows share the frame the way a real indicator board does: the board is
+   always full, never a short list with a void beneath it. */
+.rows { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+.row {
+  display: grid; grid-template-columns: var(--cols, 1fr 64px 40px 76px);
+  gap: 0 10px; align-items: center;
+  flex: 1; min-height: 0;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--rule);
+  position: relative;
+}
+.row .dest {
+  min-width: 0;
+  font-size: 15px; font-weight: 400;
+  letter-spacing: -0.005em; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.row .lineband {
+  display: block; font-size: 9.5px; font-weight: 600; letter-spacing: .14em;
+  text-transform: uppercase; margin-top: 6px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.row .time, .row .plat {
+  font-family: var(--mono); font-size: 17px; text-align: right; color: var(--ink-2);
+}
+.row .plat { color: var(--ink); font-size: 24px; }
+/* The line badge is the accent; the line's full name is grey type like any
+   other name. Six orange bands is a livery, not an accent. */
+.row .lineband i { font-style: normal; color: var(--code); }
+.row .lineband { color: var(--ink-3); }
+.row .time small { display: block; font-size: 11px; color: var(--ink-3); margin-top: 3px; }
+
+/* THE FLAP. One seam across the minutes, at the digits' optical middle. */
+.mins {
+  position: relative; text-align: right;
+  font-family: var(--mono); font-size: 52px; font-weight: 500;
+  letter-spacing: -0.04em; line-height: 0.92; color: var(--ink);
+}
+.mins::after {
+  content: ''; position: absolute; left: 0; right: 0; top: 50%;
+  height: 1px; background: #08090A; opacity: .85;
+}
+.mins u { text-decoration: none; font-size: 13px; letter-spacing: .1em; opacity: .45; }
+
+.row.lead { background: rgba(249,157,28,0.045); }
+.row.lead .mins, .row.lead .dest > span:first-child, .row.lead .plat { color: var(--t1); }
+.row.lead .mins::after { background: #0D0B08; }
+
+/* No live feed, no flap: the seam is the tell that a figure is being driven
+   by real data. A timetable-only service simply doesn't flip. */
+.row.sched .time small { color: var(--ink-3); }
+.row.sched .mins { color: var(--ink-2); font-weight: 300; }
+.row.sched .mins::after { display: none; }
+.row.sched .lineband { opacity: .55; }
+.row.late .time .est { color: var(--warn); }
+.row.late .mins { color: var(--warn); }
+.row.late.lead { background: rgba(255,122,92,0.05); }
+.row.late.lead .dest, .row.late.lead .plat { color: var(--ink); }
+
+.row.cx .dest, .row.cx .time, .row.cx .plat { color: var(--ink-3); }
+.row.cx .dest span, .row.cx .time b { text-decoration: line-through; }
+.row.cx .mins { font-size: 13px; letter-spacing: .14em; color: var(--warn); font-weight: 600; }
+.row.cx .mins::after { display: none; }
+
+.ftr {
+  display: flex; align-items: center; gap: 8px;
+  padding: 14px 20px; border-top: 1px solid var(--rule-2);
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+body.offline .ftr { color: var(--warn); }
+body.offline .rows { opacity: .58; }
+
+@media (min-width: 900px) {
+  .hdr { padding: 26px 56px 20px; } .hdr .trip { font-size: 16px; }
+  .colhead, .row { --cols: 1fr 120px 110px 150px; padding-left: 56px; padding-right: 56px; }
+  .row .dest { font-size: 20px; } .row .time { font-size: 21px; } .row .plat { font-size: 26px; }
+  .mins { font-size: 54px; }
+  .ftr { padding: 18px 56px; }
+}
+</style></head>
+<body>
+<script src="data.js"></script>
+<div id="app"></div>
+<script>
+var S = currentScenario();
+if (S.offline) document.body.classList.add('offline');
+
+function row(r, i) {
+  var cls = ['row'];
+  if (i === 0) cls.push('lead');
+  if (r.cancelled) cls.push('cx');
+  else if (r.delayMin > 0) cls.push('late');
+  else if (!r.realtime) cls.push('sched');
+
+  var timeCell = r.cancelled
+    ? '<b>' + r.dep + '</b>'
+    : (r.delayMin > 0
+        ? '<span class="est" style="color:var(--warn)">' + r.estDep + '</span><small class="strike">' + r.dep + '</small>'
+        : r.dep + '<small>arr ' + r.effArr + '</small>');
+
+  var minsCell = r.cancelled
+    ? 'CANC'
+    : (r.mins <= 0 ? 'NOW' : r.mins + '<u>′</u>');
+
+  return '<div class="' + cls.join(' ') + '">' +
+    '<div class="dest" style="--code:' + (r.cancelled ? 'rgba(244,245,247,.3)' : r.L.color) + '">' +
+      '<span>' + r.headsign + '</span>' +
+      '<span class="lineband"><i>' + r.L.code + '</i> · ' + r.L.name.replace(/^(T\d|M\d|BMT)\s*/, '') + '</span>' +
+    '</div>' +
+    '<div class="time">' + timeCell + '</div>' +
+    '<div class="plat">' + r.platform + '</div>' +
+    '<div class="mins">' + minsCell + '</div>' +
+  '</div>';
+}
+
+document.getElementById('app').outerHTML =
+  '<div class="hdr">' +
+    '<div class="trip">' + TRIP.from + ' →&nbsp;' + TRIP.to + '</div>' +
+    '<div class="spacer"></div>' +
+    '<button>⇄</button><button>⋯</button>' +
+  '</div>' +
+  '<div class="colhead lbl"><span>Service</span><span>Dep</span><span>Plat</span><span>Wait</span></div>' +
+  '<div class="rows">' + S.rows.map(row).join('') + '</div>' +
+  '<div class="ftr"><span class="pulse ' + (S.offline ? 'stale' : (S.age > 45 ? 'stale' : 'live')) + '"></span>' +
+    ageLabel(S.age, S.offline) + '</div>';
+</script>
+</body></html>

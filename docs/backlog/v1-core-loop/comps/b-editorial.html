@@ -1,0 +1,166 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>B · Editorial</title>
+<link rel="stylesheet" href="base.css">
+<style>
+/* CONCEPT B — EDITORIAL
+   A printed timetable page, set properly. One scale ladder, one column
+   measure, letterspaced small-caps labels, a single heavy rule under the
+   masthead and hairlines below. No boxes, no fills, no badges — the line
+   colour appears once per row as a 2px stem in the left margin. */
+
+body { background: #0A0B0D; }
+
+.mast { padding: 26px 22px 0; }
+.mast .kicker { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.mast h1 {
+  font-size: 29px; font-weight: 300; letter-spacing: -0.025em; line-height: 1.05;
+  color: var(--ink);
+}
+.mast h1 em { font-style: normal; color: var(--ink-3); font-weight: 200; padding: 0 2px; }
+.mast .tools { display: flex; gap: 20px; margin-top: 14px; padding-bottom: 14px; }
+.mast .tools button {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+.mast .rule { height: 2px; background: var(--ink); opacity: .82; }
+
+.rows { flex: 1; overflow: hidden; padding: 0 22px; }
+
+.row {
+  display: grid; grid-template-columns: 86px 1fr;
+  gap: 0 16px; align-items: start;
+  padding: 20px 0 21px 12px;
+  border-bottom: 1px solid var(--rule);
+  position: relative;
+}
+/* Colour is an accent, so it marks the one service you are actually about to
+   catch. The rest name their line in coloured small caps — enough to tell a
+   Blue Mountains train from a T1 at a glance, not enough to become stripes. */
+.row.first::before {
+  content: ''; position: absolute; left: 0; top: 26px; bottom: 27px;
+  width: 2px; background: var(--stem);
+}
+.mins {
+  font-size: 54px; font-weight: 250; letter-spacing: -0.045em; line-height: .84;
+  color: var(--ink); text-align: right; padding-top: 2px;
+}
+.mins span { font-size: 10px; font-weight: 600; letter-spacing: .13em; color: var(--ink-3); display: block; margin-top: 9px; text-transform: uppercase; }
+.mins span.warn { color: var(--warn); }
+.body { min-width: 0; }
+/* Departure and arrival sit on one line because they are the pair you
+   actually compare; the meta line is then free to carry the full line name. */
+.dep {
+  font-size: 20px; font-weight: 400; letter-spacing: -0.01em; color: var(--ink);
+  display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap;
+}
+.dep del { color: var(--ink-3); font-size: 15px; font-weight: 300; }
+.dep .to { color: var(--ink-3); font-size: 15px; font-weight: 300; letter-spacing: 0; }
+.dep .flag { font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--warn); }
+.meta i { font-style: normal; color: var(--stem); font-weight: 700; }
+.row.cx .meta i { color: var(--ink-3); }
+.meta {
+  margin-top: 9px; font-size: 10.5px; font-weight: 600; letter-spacing: .15em;
+  text-transform: uppercase; color: var(--ink-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.meta b { color: var(--ink-2); font-weight: 600; }
+.dest {
+  margin-top: 7px; font-size: 14px; font-weight: 300; letter-spacing: -0.005em;
+  color: var(--ink-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.row.first .mins { font-size: 78px; }
+.row.first { padding-top: 24px; padding-bottom: 26px; }
+.row.first .dep { font-size: 23px; }
+
+.row.late .mins, .row.late .dep > strong { color: var(--warn); }
+.row.sched .mins { color: var(--ink-2); font-weight: 200; }
+.row.sched .mins span { color: var(--ink-3); }
+/* No figure, because there is no wait — but the slot keeps its place in the
+   ladder so the eye still counts six services. */
+.row.cx .mins { color: var(--ink-3); font-weight: 200; font-size: 34px; }
+.row.first.cx .mins { font-size: 34px; }
+.row.cx .dep, .row.cx .dest { color: var(--ink-3); }
+.row.cx .dep strong { text-decoration: line-through; text-decoration-thickness: 1.5px; font-weight: 400; }
+.row.cx::before { background: var(--ink-3) !important; }
+
+.ftr {
+  display: flex; align-items: center; gap: 8px; padding: 15px 22px 18px;
+  font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+body.offline .ftr { color: var(--warn); }
+body.offline .rows { opacity: .55; }
+
+@media (min-width: 900px) {
+  /* A wider screen must show MORE of the board, not less: all six services
+     stay above the fold, and the measure is centred so the empty margin reads
+     as a printed page rather than as content that ran out. */
+  .mast { padding: 26px 64px 0; max-width: 940px; margin: 0 auto; }
+  .mast h1 { font-size: 36px; }
+  .mast .tools { margin-top: 12px; padding-bottom: 12px; }
+  .rows { padding: 0 64px; max-width: 940px; margin: 0 auto; }
+  .row { grid-template-columns: 132px 1fr; padding: 12px 0 13px 20px; }
+  .mins { font-size: 58px; }
+  .row.first { padding-top: 18px; padding-bottom: 19px; }
+  .row.first .mins { font-size: 76px; }
+  .dep { font-size: 23px; } .row.first .dep { font-size: 25px; }
+  .dest { font-size: 15px; }
+  .ftr { padding: 16px 64px 22px; max-width: 940px; margin: 0 auto; width: 100%; }
+}
+</style></head>
+<body>
+<script src="data.js"></script>
+<div id="app"></div>
+<script>
+var S = currentScenario();
+if (S.offline) document.body.classList.add('offline');
+
+function row(r, i) {
+  var cls = ['row']; if (i === 0) cls.push('first');
+  if (r.cancelled) cls.push('cx');
+  else if (r.delayMin > 0) cls.push('late');
+  else if (!r.realtime) cls.push('sched');
+
+  /* THE RULE: the slot under the figure always states that figure's
+     provenance — min / scheduled / late / cancelled. Every row is therefore
+     exactly three lines, so no state can push the sixth service past the fold,
+     and the sixth service is exactly the one you scroll for. */
+  var unit = 'min', unitCls = '';
+  if (r.cancelled) { unit = 'cancelled'; unitCls = ' warn'; }
+  else if (r.delayMin > 0) { unit = r.delayMin + ' min late'; unitCls = ' warn'; }
+  else if (!r.realtime) unit = 'scheduled';
+
+  var figure = r.cancelled ? '–' : (r.mins <= 0 ? 'Now' : r.mins);
+  var minsCell = figure + '<span class="' + unitCls + '">' + unit + '</span>';
+
+  var arr = r.cancelled ? '' : '<span class="to">arrives ' + r.effArr + '</span>';
+  var dep;
+  if (r.cancelled) dep = '<strong>' + r.dep + '</strong>';
+  else if (r.delayMin > 0) dep = '<strong>' + r.estDep + '</strong><del>' + r.dep + '</del>' + arr;
+  else dep = '<strong>' + r.dep + '</strong>' + arr;
+
+  return '<div class="' + cls.join(' ') + '" style="--stem:' + r.L.color + '">' +
+    '<div class="mins">' + minsCell + '</div>' +
+    '<div class="body">' +
+      '<div class="dep">' + dep + '</div>' +
+      '<div class="meta">Platform <b>' + r.platform + '</b> &nbsp;·&nbsp; <i>' + r.L.code + '</i></div>' +
+      '<div class="dest">' + (S.longNames ? r.L.name + ' · ' + r.headsign : r.headsign) + '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+document.getElementById('app').outerHTML =
+  '<div class="mast">' +
+    '<div class="kicker"><span class="lbl">Next departures</span></div>' +
+    '<h1>' + TRIP.from + ' <em>→</em> ' + TRIP.to + '</h1>' +
+    '<div class="tools"><button>Reverse</button><button>Switch trip</button></div>' +
+    '<div class="rule"></div>' +
+  '</div>' +
+  '<div class="rows">' + S.rows.map(row).join('') + '</div>' +
+  '<div class="ftr"><span class="pulse ' + (S.offline || S.age > 45 ? 'stale' : 'live') + '"></span>' +
+    ageLabel(S.age, S.offline) + '</div>';
+</script>
+</body></html>

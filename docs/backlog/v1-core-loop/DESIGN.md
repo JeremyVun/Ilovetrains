@@ -9,6 +9,15 @@ The daily-use loop, end to end: open the app → the departure board for your
 predicted saved trip is already there → glance → go. Plus the minimum around
 it: first-run trip setup and trip management. Trains and metro only.
 
+## Design (decided 2026-08-31)
+
+Comps round complete; owner verdict: **B · Editorial** is the calibration
+exemplar. Binding rules, palette, and the stale-board ruling are in
+`docs/STYLES.md`; the full exploration (four concepts, stress shots,
+instrument notes) is in `comps/OPTIONS.md` beside this file. Build the
+departure board against `comps/shots/b-editorial-390x844.png` and its stress
+variants — the exemplar image outranks any prose description of it.
+
 ## Screens
 
 1. **Departure board (home).** Header: trip name ("Central → Parramatta"),
@@ -54,4 +63,11 @@ it: first-run trip setup and trip management. Trains and metro only.
 - ~~Exact TfNSW params/paths~~ — resolved by Phase 0 probes 2026-08-31; see
   reference doc. Remaining **[verify]**: quota numbers, metro product class,
   cancellation signal shape (needs a real disruption to observe).
-- Whether metro journeys need any presentation difference beyond the badge.
+- Whether metro journeys need any presentation difference beyond the badge
+  (M1 teal never exercised against real data in the comps round).
+- Whether the headsign line ("Penrith via Parramatta") earns its place on a
+  station-pair board where every service goes via the destination by
+  construction — it is the string that forces every truncation decision.
+  v1 keeps it per the exemplar; revisit after living with it.
+- Stale-board behaviour: RESOLVED (owner 2026-08-31) — clock times only past
+  the staleness threshold; see STYLES.md binding rules.

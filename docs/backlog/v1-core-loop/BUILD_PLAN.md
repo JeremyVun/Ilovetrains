@@ -30,8 +30,8 @@ var. Never commit the key.
 
 ## Phase 2 — Client
 
-- Design round first: `design-comps` on the departure board with REAL fixture
-  data; verdict recorded in `docs/STYLES.md` before build.
+- Design round: DONE 2026-08-31 — exemplar `comps/shots/b-editorial-390x844.png`,
+  verdict + binding rules in `docs/STYLES.md`.
 - Static `web/`: departure board, first-run setup, trip management, storage +
   prediction per `docs/contracts/client-storage.md`.
 - Prediction heuristic as a pure module with unit tests (deterministic per

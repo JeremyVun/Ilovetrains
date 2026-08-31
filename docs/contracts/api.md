@@ -125,10 +125,10 @@ The stale response keeps its endpoint's normal `Cache-Control`; the header and
 is set so a cross-origin client can read it. Clients showing stale data must
 indicate its age.
 
-The 10-minute stale window applies to `/api/v1/stops` as well, where the TTL
-is 24h — so an expired station list is never served stale, and a TfNSW outage
-that outlasts the TTL returns 502 for station search while departures keep
-working. Widening the window for stops is an open question for the owner.
+The 10-minute stale window applies to departures only. For `/api/v1/stops`
+the stale window is 7 days (owner ruling 2026-08-31): the station list is
+near-static, so during a long TfNSW outage station search keeps working from
+a stale index rather than returning 502.
 
 ## Static files
 
