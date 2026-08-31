@@ -16,6 +16,10 @@ Installable, offline last-known departures, service worker, perf measured
 numbers: warm cached paint 12ms, live data 7ms (edge cache).
 
 ## M3+ — Candidates (unscheduled, decide after living with M2)
+- Baked station index: build the ~300-entry train/metro station list into the
+  server (from the GTFS stops bundle) so /api/v1/stops never touches TfNSW —
+  instant autocomplete, zero upstream calls. Motivated by live use 2026-09-01:
+  every distinct search prefix is a cold ~0.5–1.5s upstream call.
 - General A→B trip planner
 - Other modes: bus, ferry, light rail
 - Disruption/trackwork awareness (alerts surfaced on saved trips)
