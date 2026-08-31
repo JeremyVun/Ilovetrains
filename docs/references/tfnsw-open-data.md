@@ -40,20 +40,46 @@ by payload content, not systemMessages.
 `GET /v1/tp/trip?outputFormat=rapidJSON&coordOutputFormat=EPSG:4326&depArrMacro=dep&itdDate=YYYYMMDD&itdTime=HHMM&type_origin=any&name_origin=<stopId>&type_destination=any&name_destination=<stopId>&calcNumberOfTrips=6&TfNSWTR=true&<exclusions>`
 
 - Mode exclusions (verified working):
-  `excludedMeans=checkbox&exclMOT_4=1&exclMOT_5=1&exclMOT_7=1&exclMOT_9=1&exclMOT_11=1`
+  `excludedMeans=checkbox&exclMOT_4=1&exclMOT_5=1&exclMOT_7=1&exclMOT_9=1&exclMOT_10=1&exclMOT_11=1`
   → journeys came back all class 1.
+- **`exclMOT_N` takes the product class number** (verified 2026-09-01 for
+  class 10). Rhodes `213820` → Bondi Junction `202210` with the original five
+  exclusions returned 11 journeys (22 class-1 legs, 5 class-10 legs, 5
+  class-99 legs); adding `exclMOT_10=1` to the same query in the same minute
+  returned 6 journeys, 12 legs, all class 1. Fixture
+  `trip_rhodes_bondijunction.json` is the unfiltered response.
 - Product classes observed: 1 = train (Sydney Trains + Intercity),
   2 = metro ("Sydney Metro Network", verified Tallawong→Chatswood),
-  4 = light rail. 5 bus, 7 coach, 9 ferry, 11 school bus per EFA
-  convention. Verified metro-relevant IDs: Tallawong `2155384`,
-  Chatswood `206710`.
+  4 = light rail, **10 = On Demand** (`product.id` 23, e.g. "On Demand -
+  Inner West", line "D400" — a booked minibus, not a service you can walk up
+  to), **99 = footpath** (`product.name` "footpath"), 100 = connection per EFA
+  convention. 5 bus, 7 coach, 9 ferry, 11 school bus per EFA convention.
+  Verified metro-relevant IDs: Tallawong `2155384`, Chatswood `206710`.
+- Walking legs (class 99) carry a `transportation` object with only a
+  `product` — no `name`, `number` or `destination` — plus `footPathInfo` with
+  turn-by-turn `footPathElem` entries (ELEVATOR / LEVEL / RAMP). Their
+  endpoints are the concourse stop and the platform, so a walk shows as
+  Strathfield Station → Strathfield Station, Platform 4. **A platform-to-
+  platform change inside one station may have no walking leg at all**
+  (verified: Town Hall Platform 3 → Platform 5 is just a gap between two
+  service legs), so a client cannot rely on a walk leg to detect a transfer.
 - Journey shape: `interchanges` (transfer count), `legs[]`. Leg:
   - `origin.departureTimePlanned` / `departureTimeEstimated`,
     `destination.arrivalTimePlanned` / `arrivalTimeEstimated`
   - `origin.properties.platformName` ("Platform 12"); platform also embedded
     in `origin.name`
   - `isRealtimeControlled: true` + `realtimeStatus: ["MONITORED"]` when
-    live; both null/absent for schedule-only services.
+    live; both null/absent for schedule-only services. **Realtime is per leg,
+    not per journey** (verified 2026-09-01, `trip_rhodes_bondijunction.json`
+    journeys 8 and 10): a schedule-only T9 into Town Hall connects to a
+    MONITORED T4, so the same journey has a null departure estimate and a
+    real arrival estimate.
+  - Leg endpoints are `type: "platform"` with a `parent` of `type: "stop"`
+    carrying the station's global ID (Rhodes `213820`, Town Hall `200070`,
+    Bondi Junction `202210`). Both levels' `disassembledName` include the
+    platform ("Town Hall Station, Platform 3"), so the station name must be
+    taken from the parent AND stripped. `origin.properties.platformName`
+    holds the platform on its own.
   - **Estimated fields are always present, realtime or not** (verified
     2026-08-31 in `trip_central_parramatta.json` journeys 5–6 and again in a
     live Phase 1 smoke): schedule-only legs still carry

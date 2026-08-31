@@ -105,10 +105,14 @@ func (c *Client) Departures(ctx context.Context, from, to string, limit int) (*D
 	q.Set("name_destination", to)
 	q.Set("calcNumberOfTrips", strconv.Itoa(limit))
 	q.Set("TfNSWTR", "true")
-	// Keep train (1) and metro (2); exclude light rail, bus, coach, ferry and
-	// school bus. Verified working in Phase 0.
+	// Keep train (1) and metro (2); exclude light rail (4), bus (5), coach (7),
+	// ferry (9), On Demand (10) and school bus (11). exclMOT_10 was added
+	// 2026-09-01 after On Demand buses were seen routing Rhodes → Bondi
+	// Junction; the probe cut that response from 11 journeys to 6, all class 1.
+	// mapTrip still drops any journey carrying a class we do not serve, so a
+	// future leak degrades to fewer journeys rather than an untakeable one.
 	q.Set("excludedMeans", "checkbox")
-	for _, mot := range []string{"4", "5", "7", "9", "11"} {
+	for _, mot := range []string{"4", "5", "7", "9", "10", "11"} {
 		q.Set("exclMOT_"+mot, "1")
 	}
 

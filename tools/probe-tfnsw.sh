@@ -38,8 +38,12 @@ echo "resolved stop ids: central=$CENTRAL parramatta=$PARRA"
 NOW_DATE=$(date +%Y%m%d) NOW_TIME=$(date +%H%M)
 
 # Trains/metro only: EFA product classes — exclude light rail(4), bus(5),
-# coach(7), ferry(9), school bus(11). Probe verifies these class numbers.
-EXCL="excludedMeans=checkbox&exclMOT_4=1&exclMOT_5=1&exclMOT_7=1&exclMOT_9=1&exclMOT_11=1"
+# coach(7), ferry(9), On Demand(10), school bus(11). Probe verifies these class
+# numbers. Keep this list identical to internal/tfnsw/client.go, or the
+# fixtures stop describing what the server actually asks for.
+# (trip_rhodes_bondijunction.json is deliberately NOT from this script: it was
+# captured without exclMOT_10 so the golden tests keep a real On Demand leak.)
+EXCL="excludedMeans=checkbox&exclMOT_4=1&exclMOT_5=1&exclMOT_7=1&exclMOT_9=1&exclMOT_10=1&exclMOT_11=1"
 
 req trip_central_parramatta \
   "$BASE/trip?outputFormat=rapidJSON&coordOutputFormat=EPSG%3A4326&depArrMacro=dep&itdDate=$NOW_DATE&itdTime=$NOW_TIME&type_origin=any&name_origin=$CENTRAL&type_destination=any&name_destination=$PARRA&calcNumberOfTrips=6&$EXCL&TfNSWTR=true"

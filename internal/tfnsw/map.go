@@ -16,6 +16,15 @@ const (
 	classMetro = 2
 )
 
+// EFA product classes for walking segments: a footpath between platforms
+// (class 99, verified) or a guaranteed connection (class 100). They are not
+// services, so they neither count as legs nor exclude a journey — the walk is
+// folded into the gap between the legs either side of it.
+const (
+	classFootpath   = 99
+	classConnection = 100
+)
+
 // cancelPattern is deliberately loose. The upstream cancellation shape is
 // UNVERIFIED (no disruption was observed during Phase 0 probing); the
 // documented expectation is a realtimeStatus entry such as "TRIP_CANCELLED".
@@ -120,8 +129,10 @@ func mapTrip(body []byte, fromID, toID string, limit int, generatedAt time.Time,
 	var rows []sortable
 
 	for _, j := range raw.Journeys {
-		legs := transitLegs(j)
-		if len(legs) == 0 {
+		legs, serveable := serviceLegs(j)
+		// Dropped here, before the limit below, so the client still receives up
+		// to `limit` journeys it can actually take.
+		if !serveable || len(legs) == 0 {
 			continue
 		}
 		first, last := legs[0], legs[len(legs)-1]
@@ -156,6 +167,7 @@ func mapTrip(body []byte, fromID, toID string, limit int, generatedAt time.Time,
 				StopsAway: nil,
 				Cancelled: cancelled(legs),
 				Legs:      len(legs),
+				LegDetail: legDetail(legs, loc),
 			},
 			effective: effective(estDep, schedDep),
 		}
@@ -181,20 +193,68 @@ func mapTrip(body []byte, fromID, toID string, limit int, generatedAt time.Time,
 	return resp, nil
 }
 
-// transitLegs drops footpath/transfer-walk legs so `legs` counts services, not
-// walking segments: legs > 1 means a real interchange.
-func transitLegs(j journey) []leg {
-	var out []leg
+// serviceLegs returns the train/metro legs of a journey, dropping walking
+// segments so `legs` counts services and legs > 1 means a real interchange.
+//
+// serveable is false when the journey rides something we neither serve nor
+// walk — On Demand buses (class 10) leak past the exclMOT exclusions, and a
+// journey you cannot take by train is not an answer to this board's question,
+// so the caller drops the whole journey rather than pretending the bus leg
+// away and offering a trip that starts at the wrong station.
+func serviceLegs(j journey) (legs []leg, serveable bool) {
 	for _, l := range j.Legs {
 		if l.Transportation == nil {
 			continue
 		}
-		if _, ok := modeName(l.Transportation.Product.Class); !ok {
-			continue
+		switch l.Transportation.Product.Class {
+		case classTrain, classMetro:
+			legs = append(legs, l)
+		case classFootpath, classConnection:
+			// Folded into the gap between the legs either side.
+		default:
+			return nil, false
 		}
-		out = append(out, l)
+	}
+	return legs, true
+}
+
+// legDetail maps the service legs of one journey in order, so a client can
+// show the transfers. Transfer wait is the gap between consecutive legs, which
+// is where any walking time lives.
+func legDetail(legs []leg, loc *time.Location) []Leg {
+	out := make([]Leg, 0, len(legs))
+	for _, l := range legs {
+		mode, _ := modeName(l.Transportation.Product.Class)
+		schedDep, _ := parseTime(l.Origin.DepartureTimePlanned)
+		schedArr, _ := parseTime(l.Destination.ArrivalTimePlanned)
+		out = append(out, Leg{
+			Line:     Line{Name: lineName(l.Transportation), Mode: mode},
+			Headsign: headsign(l.Transportation),
+			From:     legPlace(l.Origin),
+			To:       legPlace(l.Destination),
+			Departure: LegTime{
+				Scheduled: formatTime(schedDep, loc),
+				Estimated: formatTimePtr(realtime(l, l.Origin.DepartureTimeEstimated), loc),
+			},
+			Arrival: LegTime{
+				Scheduled: formatTime(schedArr, loc),
+				Estimated: formatTimePtr(realtime(l, l.Destination.ArrivalTimeEstimated), loc),
+			},
+			Cancelled: legCancelled(l),
+		})
 	}
 	return out
+}
+
+// legPlace names the station a leg ends at while keeping its platform, which
+// the station name itself never carries.
+func legPlace(p place) LegPlace {
+	station := endpointStation(p)
+	return LegPlace{
+		ID:       station.ID,
+		Name:     stationName(station),
+		Platform: platformName(p),
+	}
 }
 
 // realtime returns the estimated timestamp only when the leg is actually
@@ -216,12 +276,21 @@ func isRealtime(l leg) bool {
 	return l.IsRealtimeControlled || len(l.RealtimeStatus) > 0
 }
 
+// cancelled reports a journey as cancelled when any of its services is: a
+// rider who cannot complete the second leg cannot make the trip.
 func cancelled(legs []leg) bool {
 	for _, l := range legs {
-		for _, status := range l.RealtimeStatus {
-			if cancelPattern.MatchString(status) {
-				return true
-			}
+		if legCancelled(l) {
+			return true
+		}
+	}
+	return false
+}
+
+func legCancelled(l leg) bool {
+	for _, status := range l.RealtimeStatus {
+		if cancelPattern.MatchString(status) {
+			return true
 		}
 	}
 	return false
