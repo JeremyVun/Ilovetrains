@@ -22,7 +22,7 @@ makes a network call, and the client has no build step and no npm deps.
 
 - `docs/PROJECT.md` — what/why, principles, key decisions, core flows
 - `docs/ROADMAP.md` — milestones
-- `docs/STYLES.md` — design intent (comps verdict pending)
+- `docs/STYLES.md` — BINDING design verdict (B·Editorial exemplar) + intent
 - `docs/contracts/api.md` — backend JSON API (binding)
 - `docs/contracts/client-storage.md` — localStorage schema + prediction
   heuristic (binding)

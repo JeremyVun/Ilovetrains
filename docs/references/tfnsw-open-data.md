@@ -30,6 +30,11 @@ by payload content, not systemMessages.
   `type=="stop"`; rank by `isBest` / `matchQuality`.
 - Stop fields: `id` (global stop ID), `name`, `modes` (product classes
   served). Verified IDs: Central `200060`, Parramatta `215020`.
+- Prefix matching works (`parra`, `strathf` → the right stations, verified
+  2026-09-01) but very short queries can lose to exact word matches on
+  streets/bus stops (`parr` → only "Parr Pde" bus stops, which the
+  train/metro filter then removes → empty result). Client autocomplete
+  should not treat an empty result on a short query as "no such station".
 
 ### trip
 `GET /v1/tp/trip?outputFormat=rapidJSON&coordOutputFormat=EPSG:4326&depArrMacro=dep&itdDate=YYYYMMDD&itdTime=HHMM&type_origin=any&name_origin=<stopId>&type_destination=any&name_destination=<stopId>&calcNumberOfTrips=6&TfNSWTR=true&<exclusions>`
