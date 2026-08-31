@@ -48,8 +48,14 @@ by payload content, not systemMessages.
   - `origin.properties.platformName` ("Platform 12"); platform also embedded
     in `origin.name`
   - `isRealtimeControlled: true` + `realtimeStatus: ["MONITORED"]` when
-    live; both null/absent for schedule-only services. Estimated fields are
-    present-and-equal-to-planned when on time.
+    live; both null/absent for schedule-only services.
+  - **Estimated fields are always present, realtime or not** (verified
+    2026-08-31 in `trip_central_parramatta.json` journeys 5–6 and again in a
+    live Phase 1 smoke): schedule-only legs still carry
+    `departureTimeEstimated` / `arrivalTimeEstimated`, usually equal to
+    planned but sometimes seconds apart. Field presence is therefore *not*
+    evidence of realtime data — gate on `isRealtimeControlled` /
+    `realtimeStatus`, or the API fabricates live estimates.
   - Cancellation signal **[verify — none observed]**: expect
     `realtimeStatus` to carry e.g. `TRIP_CANCELLED`; confirm during a real
     disruption before relying on it.
