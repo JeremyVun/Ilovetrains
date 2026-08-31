@@ -1,6 +1,6 @@
 {
-  "name": "Next departures",
-  "short_name": "Departures",
+  "name": "ilovetrains",
+  "short_name": "ilovetrains",
   "description": "Your next Sydney train, before you ask.",
   "id": "/",
   "start_url": "/",

@@ -1,7 +1,8 @@
-# trains_app
+# trains_app — "ilovetrains"
 
 Sydney next-train PWA: zero-tap departure board for saved trips, no ads.
 Thin-client PWA + stateless Go caching proxy over TfNSW Open Data.
+Live at https://ilovetrains.jeremyvun.com.
 
 ## Status
 
@@ -46,6 +47,27 @@ is bumped. Develop with DevTools' "Update on reload", or in a throwaway profile
 - `cmd/server` — backend entrypoint; `internal/tfnsw` — upstream client and
   response mapping; `internal/cache` — TTL + single-flight + stale-on-error;
   `internal/api` — handlers, cache headers, error contract
+
+## Deploy (syd1 VM, via the infra repo at ../projects)
+
+The app ships as ONE image (Go binary + `web/` baked in), built here and RUN
+by the infra repo's `stacks/ilovetrains/` compose stack behind the shared
+Caddy edge-proxy at ilovetrains.jeremyvun.com.
+
+1. Build + push the image (multi-arch, to the self-hosted registry):
+   `docker buildx bake --push` (see `docker-bake.hcl`; registry
+   registry.jeremyvun.com). Remember the sw.js `VERSION` bump rule below.
+2. If the stack/config changed: edit `../projects/stacks/ilovetrains/`
+   (compose + `config.env`; the secret `TFNSW_API_KEY` lives in that stack's
+   gitignored `secrets.env` — the infra repo's pre-commit hook seals it to
+   the committed `secrets.env.age`, and the VM decrypts it at reconcile).
+   Commit AND PUSH the infra repo — the VM pulls it from origin.
+3. Deploy: `cd ../projects && cli/deploy.sh ilovetrains`
+   (deployctl client → syd1 webhook; binary: `make build` in that repo or
+   `DEPLOYCTL_BIN=agent/deployctl/deployctl`).
+4. Verify: https://ilovetrains.jeremyvun.com/healthz then the board itself;
+   re-run `node tools/measure-open.js --url https://ilovetrains.jeremyvun.com/`
+   for real-origin numbers.
 
 ## Rules
 
