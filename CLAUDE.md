@@ -2,7 +2,9 @@
 
 Sydney next-train PWA: zero-tap departure board for saved trips, no ads.
 Thin-client PWA + stateless Go caching proxy over TfNSW Open Data.
-Live at https://ilovetrains.jeremyvun.com.
+Live at https://ilovetrains.jeremyvun.com. Source on GitHub:
+git@github.com:JeremyVun/Ilovetrains.git (push after landing work; deploys do
+NOT go through GitHub — the image is built and pushed from this machine).
 
 ## Status
 
