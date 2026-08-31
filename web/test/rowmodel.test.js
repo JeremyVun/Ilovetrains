@@ -162,6 +162,59 @@ test('a missing generatedAt is treated as stale, not as fresh', () => {
   assert.equal(m.stale, true);
 });
 
+/* Found in the browser 2026-09-01: a first open with an empty cache printed
+   "OFFLINE · LAST UPDATED 0S AGO" under "no board saved for this trip yet" —
+   dating a board that had never been loaded, and calling a client that was
+   still waiting for its first answer offline. */
+test('a board that was never loaded reports no age', () => {
+  const waiting = boardModel({}, NOW);
+  assert.equal(waiting.footer.text, '', 'nothing has been updated yet');
+  assert.equal(waiting.footer.dot, 'idle', 'and nothing is wrong yet either');
+
+  const offline = boardModel({}, NOW, { forceStale: true });
+  assert.equal(offline.footer.text, 'Offline');
+  assert.equal(offline.footer.dot, 'stale');
+});
+
+test('a board that WAS loaded still reports its age', () => {
+  const fresh = boardModel(departuresBody(), NOW);
+  assert.equal(fresh.footer.text, 'Updated 0s ago');
+  assert.equal(fresh.footer.dot, 'live');
+
+  const old = boardModel(departuresBody({ generatedAt: new Date(NOW - 4 * 3600_000).toISOString() }), NOW);
+  assert.equal(old.footer.text, 'Offline · last updated 4 h ago');
+  assert.equal(old.footer.dot, 'stale');
+});
+
+/* Found live on the late-night board 2026-09-01: the next train was 187
+   minutes away and the hero figure, which has no clip and no ellipsis, was
+   drawn straight through the departure time beside it. Three characters do not
+   fit the figure column at the headline size, so the row has to say so. */
+test('a figure of three characters marks itself wide', () => {
+  const at = (mins) => {
+    const t = new Date(NOW + mins * 60000).toISOString();
+    return { departure: { scheduled: t, estimated: t, platform: '1' }, arrival: {}, line: { name: 'T1' }, legs: 1 };
+  };
+  const widths = (mins) => boardModel({ generatedAt: new Date(NOW).toISOString(), journeys: mins.map(at) }, NOW)
+    .rows.map((r) => ({ figure: r.figure, wide: r.wide }));
+
+  assert.deepEqual(widths([9, 99, 100, 187]), [
+    { figure: '9', wide: false },
+    { figure: '99', wide: false },
+    { figure: '100', wide: true },
+    { figure: '187', wide: true }
+  ]);
+
+  // "Now" is three characters too, and letters are wider than digits.
+  assert.deepEqual(widths([0]), [{ figure: 'Now', wide: true }]);
+
+  // A cancelled row's dash and a stale row's empty slot are not wide.
+  const cancelled = boardModel({ generatedAt: new Date(NOW).toISOString(), journeys: [cancel(at(187))] }, NOW);
+  assert.deepEqual(cancelled.rows.map((r) => [r.figure, r.wide]), [['–', false]]);
+  const staleBoard = boardModel({ generatedAt: new Date(NOW - 4 * 3600_000).toISOString(), journeys: [at(187)] }, NOW);
+  assert.deepEqual(staleBoard.rows.map((r) => [r.figure, r.wide]), [['', false]]);
+});
+
 /* THE INVARIANT (docs/STYLES.md): three lines per row, in every state, so no
    state change can reflow a row or push the sixth service below the fold. */
 test('every row is exactly three non-empty lines in every state', () => {

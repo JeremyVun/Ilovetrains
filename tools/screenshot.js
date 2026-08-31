@@ -11,6 +11,17 @@
  *                     before the page boots, then load the app
  *   --key NAME        localStorage key for --seed (default trains.v1)
  *   --eval "JS"       evaluate JS after load, before the shot
+ *   --media K:V       emulate a media feature, repeatable
+ *                     (e.g. --media prefers-reduced-motion:reduce)
+ *   --profile DIR     reuse (and keep) a browser profile directory instead of
+ *                     a throwaway one — the only way to measure a genuinely
+ *                     WARM open: run once to install the service worker and
+ *                     fill its caches, then again against the same profile
+ *                     (optionally with the server stopped, which is the real
+ *                     offline test rather than a simulated one)
+ *   --manifest        print the web app manifest AS CHROME PARSED IT, with its
+ *                     parse errors — the installability check that a fetch of
+ *                     the JSON cannot make
  *   --full            capture beyond the viewport (whole scroll height)
  *   --quiet           suppress page console errors
  *
@@ -36,6 +47,11 @@
  *
  * 4. ORPHAN CHROME. Chrome is killed in a `finally` with SIGKILL and its temp
  *    profile removed, so a killed agent never leaves a browser tree behind.
+ *
+ * 5. STORAGE LOST ON KILL. Chrome flushes localStorage lazily; SIGKILL alone
+ *    discards it. With --profile that turns the second run into a cold app
+ *    with warm service-worker caches. The browser is asked to close first and
+ *    given a moment to flush, with SIGKILL still the backstop (trap 4).
  *
  * Seeding note: localStorage is origin-scoped, so --seed navigates to the URL
  * once to acquire the origin, writes the key, then navigates again. Anything
@@ -63,7 +79,8 @@ function parseArgs(argv) {
   const positional = [];
   const opt = {
     size: '390x844', dsf: 2, mobile: true, wait: 500,
-    seed: null, key: 'trains.v1', evalJs: null, full: false, quiet: false
+    seed: null, key: 'trains.v1', evalJs: null, full: false, quiet: false,
+    media: [], profile: null, manifest: false
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -74,6 +91,13 @@ function parseArgs(argv) {
     else if (a === '--seed') opt.seed = argv[++i];
     else if (a === '--key') opt.key = argv[++i];
     else if (a === '--eval') opt.evalJs = argv[++i];
+    else if (a === '--media') {
+      const [name, value] = String(argv[++i]).split(':');
+      if (!name || value === undefined) throw new Error('bad --media, want name:value');
+      opt.media.push({ name, value });
+    }
+    else if (a === '--profile') opt.profile = path.resolve(argv[++i]);
+    else if (a === '--manifest') opt.manifest = true;
     else if (a === '--full') opt.full = true;
     else if (a === '--quiet') opt.quiet = true;
     else if (a.startsWith('--')) throw new Error(`unknown option ${a}`);
@@ -93,7 +117,9 @@ function chromeBinary() {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'shot-prof-'));
+  const keepProfile = Boolean(args.profile);
+  const profile = args.profile || fs.mkdtempSync(path.join(os.tmpdir(), 'shot-prof-'));
+  if (keepProfile) fs.mkdirSync(profile, { recursive: true });
   const chrome = spawn(chromeBinary(), [
     '--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run',
     '--no-default-browser-check', '--disable-extensions',
@@ -124,6 +150,13 @@ async function main() {
       width: args.w, height: args.h, deviceScaleFactor: args.dsf, mobile: args.mobile
     });
 
+    // A media query you cannot emulate is a media query you cannot verify:
+    // prefers-reduced-motion was in the CSS long before anything proved it
+    // applied. Features must be set before the page evaluates its styles.
+    if (args.media.length) {
+      await page.send('Emulation.setEmulatedMedia', { media: '', features: args.media });
+    }
+
     if (args.seed) {
       const doc = fs.readFileSync(args.seed, 'utf8');
       JSON.parse(doc); // fail loudly here, not inside the page
@@ -138,6 +171,15 @@ async function main() {
     if (args.evalJs) {
       await page.send('Runtime.evaluate', { expression: args.evalJs, awaitPromise: true });
       await sleep(120);
+    }
+
+    if (args.manifest) {
+      const m = await page.send('Page.getAppManifest');
+      console.log('  manifest ' + JSON.stringify({
+        url: m.url,
+        errors: (m.errors || []).map((e) => e.message),
+        parsed: m.parsed || null
+      }));
     }
 
     const probe = JSON.parse((await page.send('Runtime.evaluate', {
@@ -164,9 +206,30 @@ async function main() {
       (probe.over ? `  OVERFLOW +${probe.over}px (${probe.tag})` : ''));
     if (!args.quiet) for (const p of problems) console.log('  page ' + p);
   } finally {
-    if (ws) try { ws.close(); } catch (_) {}
+    // TRAP 5: SIGKILL alone loses localStorage. Chrome writes it lazily, so a
+    // killed browser takes the page's storage with it and the NEXT run against
+    // a --profile directory opens on an empty app while its service-worker
+    // caches (written eagerly) are still there — a warm open that looks cold
+    // for no visible reason. Ask the browser to close first, wait briefly for
+    // it to flush, and keep SIGKILL as the backstop that guarantees no orphan.
+    if (ws) {
+      try {
+        const exited = new Promise((r) => chrome.once('exit', r));
+        await ws.send('Browser.close');
+        await Promise.race([exited, sleep(2500)]);
+      } catch (_) { /* closing is best-effort; the kill below is not */ }
+      try { ws.close(); } catch (_) {}
+    }
     chrome.kill('SIGKILL');
-    fs.rmSync(profile, { recursive: true, force: true });
+    // A dying Chrome writes into its profile while the directory is being
+    // walked, so the remove can lose a race and throw ENOTEMPTY — which would
+    // fail the process AFTER a perfectly good screenshot was written. A temp
+    // profile left in /tmp is not worth a false red in a scripted loop.
+    try {
+      if (!keepProfile) fs.rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 60 });
+    } catch (e) {
+      console.error('  (left temp profile behind: ' + e.code + ' ' + profile + ')');
+    }
   }
 }
 

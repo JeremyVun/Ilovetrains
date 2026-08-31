@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<!-- Without this, Chrome lays this page out at 980px in mobile emulation and
+     the icon renders at the wrong scale. See tools/screenshot.js trap 2. -->
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>App icon</title>
+<style>
+  * { margin: 0; padding: 0; }
+  html, body { height: 100%; background: #0A0B0D; overflow: hidden; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+/* The app icon, generated. The masthead's heavy rule with the trip arrow set
+   under it in coral — the one glyph the product already uses to mean "to",
+   and the one accent colour it allows itself. System font stack, no invented
+   artwork, no asset to keep in sync with the design language.
+
+   Drawn on a canvas rather than laid out in CSS because a glyph's side
+   bearings are not its ink: centring the ELEMENT leaves the arrow visibly
+   right of centre. `measureText().actualBoundingBox*` gives the ink box, so
+   the mark is centred on what you can actually see.
+
+   ?safe=N scales the mark about the centre for the maskable variant, whose
+   art must survive a launcher cropping everything outside the central circle.
+
+   Regenerate with tools/make-icons.sh. */
+
+const BG = '#0A0B0D';
+const INK = '#F4F5F7';
+const CORAL = '#FF7A5C';
+const STACK = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+const ARROW = '→';
+
+/* Proportions are query-tunable so the composition can be judged from real
+   renders instead of guessed at: ?fs=&rule=&gap=&safe= (all fractions of the
+   icon's side). The defaults are the ones that were chosen. */
+const q = new URLSearchParams(location.search);
+const num = (name, fallback) => (q.has(name) ? Number(q.get(name)) : fallback);
+const safe = num('safe', 1);
+const FS = num('fs', 0.46);
+const RULE_W = num('rule', 1.75);   // × the arrow's ink width
+const GAP = num('gap', 0.07);
+const S = Math.min(document.documentElement.clientWidth, document.documentElement.clientHeight);
+const dpr = window.devicePixelRatio || 1;
+
+const canvas = document.getElementById('c');
+canvas.width = Math.round(S * dpr);
+canvas.height = Math.round(S * dpr);
+canvas.style.width = S + 'px';
+canvas.style.height = S + 'px';
+
+const ctx = canvas.getContext('2d');
+ctx.scale(dpr, dpr);
+ctx.fillStyle = BG;
+ctx.fillRect(0, 0, S, S);
+
+ctx.font = '300 ' + (FS * S) + 'px ' + STACK;
+ctx.textBaseline = 'alphabetic';
+const m = ctx.measureText(ARROW);
+const inkW = m.actualBoundingBoxLeft + m.actualBoundingBoxRight;
+const inkH = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent;
+
+const ruleW = inkW * RULE_W;
+// Thick enough that the rule still reads at a 48px launcher size (1.7px).
+const ruleH = Math.max(2, 0.036 * S);
+const gap = GAP * S;
+const groupH = ruleH + gap + inkH;
+
+// A hair above true centre: a mark that measures centre reads low.
+// (Not named `top`: that identifier is already taken by window.top.)
+const markTop = (S - groupH) / 2 - 0.012 * S;
+
+ctx.translate(S / 2, S / 2);
+ctx.scale(safe, safe);
+ctx.translate(-S / 2, -S / 2);
+
+ctx.fillStyle = INK;
+ctx.globalAlpha = 0.92;
+ctx.fillRect((S - ruleW) / 2, markTop, ruleW, ruleH);
+ctx.globalAlpha = 1;
+
+ctx.fillStyle = CORAL;
+ctx.fillText(
+  ARROW,
+  (S - inkW) / 2 + m.actualBoundingBoxLeft,
+  markTop + ruleH + gap + m.actualBoundingBoxAscent
+);
+</script>
+</body>
+</html>

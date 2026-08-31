@@ -31,6 +31,12 @@ export function boardModel(body, nowMs, opts = {}) {
 
   markLeadAndCancelledLead(rows);
 
+  // A board that was never loaded has no age. Reporting one ("last updated 0s
+  // ago") would date a board that does not exist, and on a cold open with no
+  // cache it flashed OFFLINE at a client that was merely still asking.
+  const hasData = generatedAt !== null;
+  const waiting = !hasData && !opts.forceStale;
+
   return {
     stale,
     ageSec,
@@ -38,12 +44,24 @@ export function boardModel(body, nowMs, opts = {}) {
     empty: rows.length === 0,
     sparse: rows.length > 0 && rows.length < 6,
     footer: {
-      text: ageLabel(ageSec, stale),
+      text: hasData ? ageLabel(ageSec, stale) : (waiting ? '' : 'Offline'),
       // `degraded` is the server's X-Data-Stale header: the data is fresh
       // enough to count down, but nobody should see a confident green dot.
-      dot: stale || opts.degraded || ageSec * 1000 > LIVE_DOT_MS ? 'stale' : 'live'
+      // `idle` is not a colour: it leaves the dot its resting grey while the
+      // first answer is still in the post.
+      dot: waiting ? 'idle'
+        : stale || opts.degraded || ageSec * 1000 > LIVE_DOT_MS ? 'stale' : 'live'
     }
   };
+}
+
+/** The figure in the big slot: a dash for a cancellation, nothing at all off
+    stale data (owner ruling: a countdown from an old cache is a lie), else the
+    minutes — or "Now" for the minute a service is leaving in. */
+function figureFor(cancelled, stale, mins) {
+  if (cancelled) return '–';
+  if (stale) return '';
+  return mins <= 0 ? 'Now' : String(mins);
 }
 
 function journeyRow(journey, nowMs, stale, opts) {
@@ -73,16 +91,18 @@ function journeyRow(journey, nowMs, stale, opts) {
   else if (!realtime || stale) { kind = 'sched'; provenance = 'SCHEDULED'; }
   else { kind = 'live'; provenance = 'MIN'; }
 
-  let figure;
-  if (cancelled) figure = '–';
-  else if (stale) figure = ''; // owner ruling: no countdown off stale data
-  else figure = mins <= 0 ? 'Now' : String(mins);
+  const figure = figureFor(cancelled, stale, mins);
 
   const lineCode = (journey.line && journey.line.name) || '';
 
   return {
     key: (dep.scheduled || dep.estimated) + '|' + lineCode + '|' + (dep.platform || ''),
     first: false,
+    // Three characters ("187", "Now") do not fit the figure column at the
+    // board's headline size — measured 129px in an 86px column, which put the
+    // hero figure through the departure time on the late-night board. The row
+    // says so and the stylesheet sizes it down; nothing is ever clipped.
+    wide: figure.length >= 3,
     cancelled,
     scheduledOnly: !realtime,
     delayMin,

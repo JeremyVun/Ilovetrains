@@ -135,3 +135,11 @@ a stale index rather than returning 502.
 `/` serves `./web/` when that directory exists (`WEB_DIR` overrides). The API
 routes always take precedence, and unknown `/api/` paths return the JSON error
 envelope rather than falling through to the file server.
+
+The client is a PWA, so two of those files are load-bearing:
+`/manifest.webmanifest` must be served as `application/manifest+json` (the
+server registers the type; Go's MIME table does not know it, and a manifest
+served as `text/plain` is not installable), and `/sw.js` must be served from
+the root so its scope covers the whole origin. Neither is cached by the server
+beyond the file server's normal `Last-Modified` handling — the worker's own
+`VERSION` is what governs client-side shell freshness.

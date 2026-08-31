@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -351,6 +352,24 @@ func TestStaticFilesAreServedWithoutShadowingTheAPI(t *testing.T) {
 	}
 	if health := get(t, handler, "/healthz"); health.Code != http.StatusOK {
 		t.Errorf("GET /healthz = %d, want 200", health.Code)
+	}
+}
+
+// Chrome will not offer to install a PWA whose manifest arrives as text/plain,
+// which is what Go's MIME table does with .webmanifest left to itself.
+func TestWebManifestIsServedAsManifestJSON(t *testing.T) {
+	webDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(webDir, "manifest.webmanifest"), []byte(`{"name":"Next departures"}`), 0o600); err != nil {
+		t.Fatalf("writing manifest: %v", err)
+	}
+	handler := New(&fakeUpstream{}, webDir).Handler()
+
+	got := get(t, handler, "/manifest.webmanifest")
+	if got.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", got.Code)
+	}
+	if ct := got.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/manifest+json") {
+		t.Errorf("Content-Type = %q, want application/manifest+json", ct)
 	}
 }
 

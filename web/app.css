@@ -134,15 +134,31 @@ button { cursor: pointer; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 /* The cancelled-lead note takes the third line's slot rather than adding a
-   fourth, so the row is three lines in every state. Same line box height. */
+   fourth, so the row is three lines in every state. Same line box height.
+
+   Set two steps below the label idiom (10px/.14em) because that is what it
+   costs to print the sentence whole: measured 2026-09-01, the binding string
+   "22:48 CANCELLED · NEXT RUNNING SERVICE" needs 282px at the idiom and the
+   body column is 232px at 390px — it was arriving as "NEXT RUNNIN…", which is
+   the one line on the board that must not be guessed at. Shortening the copy
+   instead is the alternative flagged for a ruling in VERIFICATION.md. */
 .dest.note {
-  font-size: 10px; font-weight: 600; letter-spacing: .14em; line-height: 19px;
+  font-size: 9px; font-weight: 600; letter-spacing: .05em; line-height: 19px;
   text-transform: uppercase; color: var(--warn);
 }
 
 .row.first .mins { font-size: 78px; }
 .row.first { padding-top: 24px; padding-bottom: 26px; }
 .row.first .dep { font-size: 23px; }
+
+/* A three-character figure — "187" on the last-train board, or "Now" — is
+   wider than the column at the headline size: measured 129px against 86px on
+   2026-09-01, which ran the hero figure straight through the departure time
+   beside it. It steps down one size rather than being clipped or allowed to
+   eat the body column. Whether three digits of minutes is the right unit at
+   all is a separate question, flagged in VERIFICATION.md. */
+.row.wide .mins { font-size: 44px; }
+.row.first.wide .mins { font-size: 48px; }
 
 .row.late .mins, .row.late .dep > strong { color: var(--warn); }
 .row.sched .mins { color: var(--ink-2); font-weight: 200; }
@@ -184,6 +200,10 @@ button { cursor: pointer; }
 }
 .field input::placeholder { color: var(--ink-3); font-weight: 300; }
 .field input:focus { outline: none; }
+/* type=search brings its own clear button: a heavy white glyph that is the
+   loudest thing on a page whose whole language is hairlines. The field is
+   cleared by picking a station or by the keyboard. */
+.field input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
 .field.done { color: var(--ink); }
 
 .results { padding-bottom: 8px; }
@@ -222,7 +242,9 @@ button { cursor: pointer; }
 }
 .trip .name em { font-style: normal; color: var(--ink-3); font-weight: 200; padding: 0 2px; }
 .trip.current .name { color: var(--ink); }
-.trip.current .name::after { content: ' ●'; color: var(--live); font-size: 8px; vertical-align: middle; }
+/* A non-breaking space: the ordinary one collapses against the ellipsis
+   clamp and the dot lands touching the station name. */
+.trip.current .name::after { content: '\00a0\00a0●'; color: var(--live); font-size: 8px; vertical-align: middle; }
 .trip .acts { display: flex; gap: 14px; flex: none; }
 .trip .acts button {
   font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
@@ -234,19 +256,31 @@ button { cursor: pointer; }
 @media (min-width: 900px) {
   /* A wider screen must show MORE of the board, not less: all six services
      stay above the fold, and the empty margin reads as a printed page rather
-     than as content that ran out. */
-  .mast { padding: 26px 64px 0; max-width: 940px; margin: 0 auto; }
+     than as content that ran out.
+
+     Scoped through #app because the overflow guard above (`#app > *`) carries
+     an ID and so out-specifies a bare class: `max-width: 100%` was quietly
+     beating `max-width: 940px`, and every desktop shot ran the full 1280px
+     measure. Verified 2026-09-01 by measuring .rows, not by reading the CSS. */
+  #app > .mast, #app > .rows, #app > .sheet, #app > .ftr {
+    max-width: 940px; margin: 0 auto;
+  }
+  .mast { padding: 26px 64px 0; }
   .mast h1 { font-size: 36px; }
   .mast .tools { margin-top: 12px; padding-bottom: 12px; }
-  .rows, .sheet { padding: 0 64px; max-width: 940px; margin: 0 auto; width: 100%; }
+  .rows, .sheet { padding: 0 64px; width: 100%; }
   .row { grid-template-columns: 132px 1fr; padding: 12px 0 13px 20px; }
   .mins { font-size: 58px; }
   .row.first { padding-top: 18px; padding-bottom: 19px; }
   .row.first .mins { font-size: 76px; }
+  /* The 132px column takes three characters at full size, so the phone's
+     step-down would only make a wide desktop board smaller for nothing. */
+  .row.wide .mins { font-size: 58px; }
+  .row.first.wide .mins { font-size: 76px; }
   .dep { font-size: 23px; }
   .row.first .dep { font-size: 25px; }
   .dest { font-size: 15px; }
-  .ftr { padding: 16px 64px 22px; max-width: 940px; margin: 0 auto; width: 100%; }
+  .ftr { padding: 16px 64px 22px; width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
