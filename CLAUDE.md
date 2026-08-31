@@ -5,10 +5,14 @@ Thin-client PWA + stateless Go caching proxy over TfNSW Open Data.
 
 ## Status
 
-Phase 0 (probe & verify) done 2026-08-31; TfNSW behavior verified, fixtures
-in `tools/fixtures/`. Next: Phase 1 (Go backend) in
+Phase 1 (Go backend) done 2026-08-31; `docs/contracts/api.md` is implemented
+and smoke-tested against live TfNSW. Next: Phase 2 (client) in
 `docs/backlog/v1-core-loop/BUILD_PLAN.md`. `TFNSW_API_KEY` lives in `.env`
 (gitignored) — never commit or print it.
+
+Run the backend: `set -a; source .env; set +a; go run ./cmd/server`
+(env: `TFNSW_API_KEY` required, `PORT` default 8080, `WEB_DIR` default
+`./web`). Test: `go test ./...` — no test makes a network call.
 
 ## Structure
 
@@ -21,7 +25,10 @@ in `tools/fixtures/`. Next: Phase 1 (Go backend) in
 - `docs/references/tfnsw-open-data.md` — upstream API notes; **[verify]**
   items must be resolved by live probes before being relied on
 - `docs/backlog/v1-core-loop/` — v1 design + phased build plan
-- `tools/` — probe/verification scripts (created from Phase 0)
+- `tools/` — probe/verification scripts + captured TfNSW fixtures
+- `cmd/server` — backend entrypoint; `internal/tfnsw` — upstream client and
+  response mapping; `internal/cache` — TTL + single-flight + stale-on-error;
+  `internal/api` — handlers, cache headers, error contract
 
 ## Rules
 

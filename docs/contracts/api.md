@@ -23,14 +23,16 @@ Next journeys from origin station to destination station. Backed by the TfNSW
 Trip Planner `trip` endpoint (not `departure_mon`, which cannot filter to
 services that actually reach the destination).
 
-- `from`, `to`: TfNSW global stop IDs (e.g. Central = `200060`). Required.
-- `limit`: max journeys, default 6, max 10.
+- `from`, `to`: TfNSW global stop IDs (e.g. Central = `200060`). Required, and
+  must differ from each other.
+- `limit`: max journeys, default 6, max 10. Non-numeric or outside 1–10 is a
+  `400`, not silently clamped.
 - Cache: `s-maxage=30, stale-while-revalidate=60`.
 
 ```json
 {
-  "from": {"id": "200060", "name": "Central"},
-  "to":   {"id": "215020", "name": "Parramatta"},
+  "from": {"id": "200060", "name": "Central Station"},
+  "to":   {"id": "215020", "name": "Parramatta Station"},
   "generatedAt": "2026-08-31T17:42:00+10:00",
   "journeys": [
     {
@@ -55,14 +57,28 @@ services that actually reach the destination).
 
 Semantics:
 - `estimated` is `null` when no realtime data; clients must fall back to
-  `scheduled` and may indicate "scheduled only".
+  `scheduled` and may indicate "scheduled only". A service counts as realtime
+  only when the upstream leg is realtime-controlled — upstream fills the
+  estimated fields with (near-)copies of the planned times for schedule-only
+  services too, and serving those would fake a live estimate.
 - `estimated` reflects realtime even when it equals `scheduled` (on time).
 - `platform` is `null` when unknown. `mode` is `"train"` or `"metro"`.
+- `name` on `from`/`to` is the station name without its platform or suburb
+  suffix ("Central Station"), matching the names `/api/v1/stops` returns. It
+  is `""` when no journey was found to take it from.
+- `stopsAway` is always `null` in v1: the Trip Planner carries no live vehicle
+  position. Reserved for a later data source.
 - `legs > 1` means a transfer is required; v1 clients may show a transfer
-  badge but journeys are still ordered by departure time.
+  badge but journeys are still ordered by departure time. `legs` counts
+  services only — a walking transfer between platforms is not a leg.
 - Cancelled services are included with `cancelled: true` (clients render
-  struck-through), never silently dropped.
+  struck-through), never silently dropped. Detection is deliberately loose
+  (any upstream realtime status containing "cancel"): the exact upstream shape
+  is still unverified, and over-reporting a cancellation is safer than
+  showing a train that will not run.
 - Journeys are sorted by effective departure (estimated, else scheduled).
+- `generatedAt` is when the data was fetched from TfNSW, not when the response
+  was written, so a client can always compute the age of what it is showing.
 
 ## GET /api/v1/stops?q={text}
 
@@ -72,6 +88,9 @@ to train/metro stations only.
 - `q`: search text, min 2 chars.
 - Cache: `s-maxage=86400, stale-while-revalidate=604800` (station list is
   near-static).
+- Results are ordered best match first. `modes` lists only `"train"` and/or
+  `"metro"`; a station's other modes (bus, light rail, ferry) are not reported
+  because v1 cannot plan them.
 
 ```json
 {
@@ -93,9 +112,26 @@ routed through the CDN cache.
 ```
 
 - `400 bad_request` — missing/invalid params. Cacheable (`s-maxage=60`).
+- `404 not_found` — no such endpoint under `/api/`. Cacheable (`s-maxage=60`).
 - `502 upstream_unavailable` — TfNSW down/erroring after retry. `no-store`.
 - `504 upstream_timeout` — TfNSW too slow. `no-store`.
 
+Error `message` is our own text; upstream error text is never echoed back.
+
 On upstream failure the backend serves stale in-memory data up to 10 minutes
 old (marked by response header `X-Data-Stale: true`) before returning 502.
-Clients showing stale data must indicate its age.
+The stale response keeps its endpoint's normal `Cache-Control`; the header and
+`generatedAt` carry the truth. `Access-Control-Expose-Headers: X-Data-Stale`
+is set so a cross-origin client can read it. Clients showing stale data must
+indicate its age.
+
+The 10-minute stale window applies to `/api/v1/stops` as well, where the TTL
+is 24h — so an expired station list is never served stale, and a TfNSW outage
+that outlasts the TTL returns 502 for station search while departures keep
+working. Widening the window for stops is an open question for the owner.
+
+## Static files
+
+`/` serves `./web/` when that directory exists (`WEB_DIR` overrides). The API
+routes always take precedence, and unknown `/api/` paths return the JSON error
+envelope rather than falling through to the file server.
