@@ -10,10 +10,10 @@ platforms, direction flip, station search for setup. Comps round + verdict
 (B·Editorial) before UI build. Empirically verified: see
 `docs/backlog/v1-core-loop/VERIFICATION.md`.
 
-## M2 — PWA polish — DONE except deploy
+## M2 — PWA polish — DONE 2026-09-01
 Installable, offline last-known departures, service worker, perf measured
-(warm cached paint 32ms, live < 1s on localhost). REMAINING: deploy behind a
-CDN + re-run `tools/measure-open.js` against the real origin.
+(warm cached paint 32ms, live < 1s on localhost). Deployed behind Cloudflare+Caddy on syd1 (see CLAUDE.md Deploy); real-origin
+numbers: warm cached paint 12ms, live data 7ms (edge cache).
 
 ## M3+ — Candidates (unscheduled, decide after living with M2)
 - General A→B trip planner
