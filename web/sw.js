@@ -25,8 +25,12 @@
 
 /* v2: the light scheme, the shortened cancelled-lead copy and the hours figure
    (owner rulings 2026-09-01) all live in index.html, app.css and js/ — every
-   one of them a cache-first shell file. */
-const VERSION = 'v3';
+   one of them a cache-first shell file.
+   v4: the scrolling board (app.css) and the station-search policy (a new
+   module, js/search.js, plus setup.js and board.js) — same reason. A phone
+   that has already visited keeps the old, unscrollable shell until this
+   number changes. */
+const VERSION = 'v4';
 const SHELL_CACHE = 'shell-' + VERSION;
 const DATA_CACHE = 'data-' + VERSION;
 
@@ -45,6 +49,7 @@ const SHELL = [
   '/js/main.js',
   '/js/predict.js',
   '/js/rowmodel.js',
+  '/js/search.js',
   '/js/setup.js',
   '/js/storage.js',
   '/js/time.js',

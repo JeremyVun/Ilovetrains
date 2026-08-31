@@ -72,9 +72,20 @@ Seeds the client's localStorage document, pins the clock through
 `window.__trains`, freezes the network so the live fetch cannot overwrite the
 state mid-shot, and photographs the result. `--probe` runs (awaited) JS in the
 page and prints what it returns, so a state can be *measured* in the same drive
-that shoots it. Three invariants are checked on every state and reported at
+that shoots it. Six invariants are checked on every state and reported at
 `console.error` under the shot: three full lines per row, the figure fits its
-column, our own copy is never ellipsised.
+column, our own copy is never ellipsised, no part of the board is cut off with
+no way to scroll to it, the last row is whole at the end of the scroll, and the
+footer is never painted over a service or pushed below the frame.
+
+The `short-*` states shoot the board at **412x732** — a 412px Android with its
+browser chrome on screen, which is the frame the owner's phone actually gets and
+the one six three-line rows do not fit. Each is shot twice, before and after a
+driven scroll to the end, because "the sixth service is reachable" is a claim
+about a gesture and not about a still image. The scroll-reachability invariant
+above is the one that would have caught the defect they exist for: run it
+against `overflow: hidden` and it reports `129px of board is cut off with no way
+to scroll to it` at 412x732, and 17px at 390x844.
 
 ## measure-open.js and make-icons.sh
 

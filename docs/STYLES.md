@@ -39,7 +39,18 @@ Binding rules from the round (each found by breaking it):
   the live one. Optional experiment (from D): a coral margin hairline whose
   length is proportional to the delay.
 - **The board fills the frame** (from A): fewer than six services distribute,
-  never a short list in a void.
+  never a short list in a void. **The frame does not get to eat a service,
+  though** — refined 2026-09-01 after the owner lost the sixth train on a real
+  phone. The rule as built assumed a frame tall enough for six three-line rows,
+  and a 412px Android with its browser chrome on screen is not one: 696px of
+  board in 567px of frame, with the sixth row cut through the middle of its
+  figure and no way to reach it. So: where the board fits, nothing scrolls and
+  nothing moves; where it does not, the rows scroll — the way the trips sheet
+  scrolls — and the footer keeps its own line beneath them, never painted over
+  a service. The frame is measured in dynamic viewport units so that collapsing
+  browser chrome cannot fold part of the board somewhere unreachable. The hero
+  viewport was quietly losing 17px of the sixth row's hairline to the same
+  cause, which no screenshot ever showed.
 - **Stale board tells the truth** (owner ruling 2026-08-31): past ~2 min
   beyond refresh cadence, countdown figures are dropped — absolute clock
   times only, rows already departed removed, board dimmed with
