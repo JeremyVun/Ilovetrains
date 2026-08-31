@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { boardModel, rowLines, STALE_MS } from '../js/rowmodel.js';
+import { emptyCopy } from '../js/board.js';
 import { NOW, departuresBody, baseJourneys, journey, delay, cancel } from './fixture.js';
 
 const body = (journeys, generatedAt) => departuresBody({ journeys, generatedAt });
@@ -318,4 +319,33 @@ test('every row is exactly three non-empty lines in every state', () => {
       assert.ok(row.provenance !== '', name + ': the figure always states its provenance');
     }
   }
+});
+
+/* --- the line that stands in for the whole board -------------------------- */
+
+/* When there are no rows there is one sentence on the screen, and on a cold
+   pair the user reads it for one to two seconds while TfNSW answers. It has to
+   say which of the four possible nothings this is. */
+test('an empty board names what it is waiting for, not what the machine is doing', () => {
+  const waiting = boardModel({}, NOW);
+  waiting.status = 'loading';
+  const copy = emptyCopy(waiting);
+
+  assert.match(copy, /trains/i, 'the wait is named in the product\'s own noun');
+  assert.notEqual(copy.toLowerCase(), 'loading');
+  assert.doesNotMatch(copy, /error|fetch|request|API|null/i);
+  assert.ok(copy.length <= 30, 'one letterspaced line');
+});
+
+test('the four empty boards are four different sentences', () => {
+  const loading = boardModel({}, NOW);
+  loading.status = 'loading';
+  const offline = boardModel({}, NOW, { forceStale: true });
+  offline.status = 'offline';
+  const staleEmpty = boardModel(body([], new Date(NOW - 4 * 3600_000).toISOString()), NOW);
+  const fresh = boardModel(body([]), NOW);
+
+  const copies = [loading, offline, staleEmpty, fresh].map(emptyCopy);
+  assert.equal(new Set(copies).size, 4, 'each nothing says which nothing it is');
+  for (const copy of copies) assert.ok(copy.trim().length > 0);
 });

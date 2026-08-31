@@ -1,17 +1,24 @@
 /* First run and add-a-trip: origin search → destination search → save.
    Same page furniture as the board — masthead, heavy rule, hairlines.
 
-   Every distinct query string is an upstream call to TfNSW, so keystrokes are
-   debounced and queries shorter than the API's 2-character minimum are never
-   sent. */
+   Every distinct query string is an upstream call to TfNSW that takes up to a
+   second and a half, so this screen asks as little as it can and says what it
+   is doing while it waits: keystrokes are debounced, nothing shorter than
+   MIN_QUERY is ever sent, and a query already asked this session is answered
+   from the memo without touching the network. The policy and the copy live in
+   search.js, where they are tested. */
 
 import { esc, mount, onAction } from './dom.js';
 import { getStops } from './api.js';
 import { shortName } from './board.js';
 import { newTripId } from './storage.js';
+import { MIN_QUERY, createSearcher, hintFor, queryKey } from './search.js';
 
 export const SEARCH_DEBOUNCE_MS = 300;
-const MIN_QUERY = 2;
+
+/* Module scope, so it outlives the screen: adding a second trip after the first
+   asks nothing the first one already answered. */
+const searcher = createSearcher((query, opts) => getStops(query, opts));
 
 export function renderSetup(root, ctx) {
   const firstRun = ctx.doc.trips.length === 0;
@@ -75,12 +82,16 @@ export function renderSetup(root, ctx) {
     if (inflight) inflight.abort();
     inflight = new AbortController();
     try {
-      results = await getStops(query, { signal: inflight.signal });
-      hint = results.length ? null : { text: 'No stations match', warn: false };
+      const stops = await searcher.search(query, { signal: inflight.signal });
+      // A memoised answer resolves in a microtask, which can land after the
+      // user has typed on: only the query still in the field gets painted.
+      if (queryKey(query) !== queryKey(inputs[active].value)) return;
+      results = stops;
+      hint = hintFor({ query, phase: 'done', count: results.length });
     } catch (e) {
       if (e.name === 'AbortError') return;
       results = [];
-      hint = { text: 'Station search is unavailable', warn: true };
+      hint = hintFor({ query, phase: 'error' });
     }
     paintResults();
   }
@@ -98,13 +109,33 @@ export function renderSetup(root, ctx) {
       paintSave();
       clearTimeout(debounce);
       const query = input.value.trim();
+
+      // Too short to ask: say so rather than sending a call that upstream
+      // answers with street names, or nothing at all.
       if (query.length < MIN_QUERY) {
         if (inflight) inflight.abort();
         results = [];
-        hint = null;
+        hint = hintFor({ query, phase: 'idle' });
         paintResults();
         return;
       }
+
+      // Already asked this session — backspacing to it costs nothing, so it
+      // answers now, with no wait to announce.
+      const remembered = searcher.peek(query);
+      if (remembered) {
+        if (inflight) inflight.abort();
+        results = remembered;
+        hint = hintFor({ query, phase: 'done', count: results.length });
+        paintResults();
+        return;
+      }
+
+      // The wait starts at this keystroke, so the screen says so at this
+      // keystroke, not when the request finally leaves.
+      results = [];
+      hint = hintFor({ query, phase: 'pending' });
+      paintResults();
       debounce = setTimeout(() => search(query), SEARCH_DEBOUNCE_MS);
     });
   }

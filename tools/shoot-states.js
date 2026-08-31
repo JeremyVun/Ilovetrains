@@ -48,6 +48,22 @@ const DEFAULT_URL = 'http://localhost:8092/';
 const NOW_ISO = '2026-08-31T22:45:00+10:00';
 const NOW = Date.parse(NOW_ISO);
 
+/* The SHORT frame: a 412px Android with the browser's own chrome on screen,
+   which is what the owner's phone actually shows — the address bar and the
+   status bar take about 170px of a 900px-tall device, and six three-line rows
+   do not fit what is left. Measured on 2026-09-01: 696px of board in 567px of
+   frame. Every state shot at 390x844 fits; this is the size that does not, and
+   the size the board has to stay whole in. */
+const SHORT = '412x732';
+
+/* Drive the board to the end of its scroll. Not smooth — the shot is taken
+   right after, and a 240ms animation would photograph the middle of it. */
+const SCROLL_TO_END = `
+  const rowsEl = document.querySelector('.rows');
+  rowsEl.scrollTop = rowsEl.scrollHeight;
+  await sleep(80);
+`;
+
 const TRIP = {
   id: 'trip-central-parramatta',
   from: { id: '200060', name: 'Central Station' },
@@ -170,6 +186,21 @@ async function states() {
 
     // No cache, no network: the honest nothing-to-show state.
     { name: 'cold-offline', seed: doc({ trips: [TRIP] }), now: NOW, body: null, offline: true },
+    // No cache and the first call still in the post: a cold station pair is one
+    // to two seconds of TfNSW, and this line is the whole screen for all of it.
+    { name: 'cold-loading', seed: doc({ trips: [TRIP] }), now: NOW, body: null },
+
+    /* The short frame, where the board does not fit. Shot before and after a
+       scroll: the sixth service has to be reachable, and the footer has to keep
+       its own line under the rows in both. The invariants below assert it —
+       these shots are how a person confirms what they assert. */
+    board('short-on-time', departuresBody(), { size: SHORT }),
+    board('short-on-time-scrolled', departuresBody(), { size: SHORT, after: SCROLL_TO_END }),
+    board('short-delayed', departuresBody({ journeys: delayed }), { size: SHORT }),
+    board('short-long-names', departuresBody({ journeys: long }), { size: SHORT }),
+    board('short-long-names-scrolled', departuresBody({ journeys: long }), {
+      size: SHORT, after: SCROLL_TO_END
+    }),
 
     { name: 'first-run', seed: doc({ trips: [], hist: [] }), now: NOW, route: '#/setup' },
     {
@@ -178,6 +209,24 @@ async function states() {
       now: NOW,
       route: '#/setup',
       type: { role: 'from', text: 'central' }
+    },
+    // Two characters: too short to ask TfNSW anything worth waiting for, so the
+    // screen asks for another letter instead of claiming there is no station.
+    {
+      name: 'first-run-short-query',
+      seed: doc({ trips: [], hist: [] }),
+      now: NOW,
+      route: '#/setup',
+      type: { role: 'from', text: 'ce', freeze: true }
+    },
+    // The call is away and nothing has come back yet — up to a second and a
+    // half of it. The network stays frozen so this state holds still.
+    {
+      name: 'first-run-searching',
+      seed: doc({ trips: [], hist: [] }),
+      now: NOW,
+      route: '#/setup',
+      type: { role: 'from', text: 'cen', freeze: true }
     },
     { name: 'trips-list', seed: doc({ trips: [TRIP, TRIP_2], body: departuresBody() }), now: NOW, route: '#/trips' },
 
@@ -220,7 +269,8 @@ function pageScript(state) {
   ${state.route ? `if (location.hash !== ${JSON.stringify(state.route)}) { location.hash = ${JSON.stringify(state.route)}; await sleep(60); }` : ''}
 
   ${state.type ? `
-  window.fetch = async () => new Response(${JSON.stringify(JSON.stringify(STOPS))}, { headers: { 'Content-Type': 'application/json' } });
+  // A frozen fetch photographs the WAIT; the mock photographs the answer.
+  ${state.type.freeze ? '' : `window.fetch = async () => new Response(${JSON.stringify(JSON.stringify(STOPS))}, { headers: { 'Content-Type': 'application/json' } });`}
   const input = document.querySelector('[data-role="${state.type ? state.type.role : ''}"]');
   input.focus();
   input.value = ${JSON.stringify(state.type ? state.type.text : '')};
@@ -242,7 +292,8 @@ function pageScript(state) {
   // shot, so a broken invariant cannot hide inside a plausible-looking image.
   try {
     const problems = [];
-    for (const row of document.querySelectorAll('[data-t="row"]')) {
+    const rowEls = [...document.querySelectorAll('[data-t="row"]')];
+    for (const row of rowEls) {
       // docs/STYLES.md, binding: three lines per row, in every state.
       const lines = ['.dep', '.meta', '.dest'].map((s) => row.querySelector(s));
       if (lines.some((el) => !el || !el.textContent.trim())) problems.push('row is not three full lines');
@@ -261,6 +312,35 @@ function pageScript(state) {
     }
     const ftr = document.querySelector('[data-t="footer"]');
     if (ftr && ftr.scrollWidth > ftr.clientWidth) problems.push('footer truncated');
+
+    /* Every service is reachable. The board fills the frame, and when the frame
+       is too short for six three-line rows it has to SCROLL — a frame that
+       simply clips the sixth service is how the owner's phone lost it on
+       2026-09-01, and no screenshot showed it, because a clipped row looks like
+       a row that is nearly on screen. */
+    const rowsEl = document.querySelector('.rows');
+    if (rowsEl) {
+      const box = rowsEl.getBoundingClientRect();
+      const beyond = rowsEl.scrollHeight - rowsEl.clientHeight;
+      const scrolls = /auto|scroll/.test(getComputedStyle(rowsEl).overflowY);
+      if (beyond > 1 && !scrolls) {
+        problems.push(beyond + 'px of board is cut off with no way to scroll to it');
+      }
+      // At the bottom of the scroll — which for a board that fits is where it
+      // already is — the last service must be whole.
+      const last = rowEls[rowEls.length - 1];
+      if (last && rowsEl.scrollTop >= beyond - 1) {
+        const over = Math.round(last.getBoundingClientRect().bottom - box.bottom);
+        if (over > 1) problems.push('the last row is still ' + over + 'px short of visible at the end of the scroll');
+      }
+      // The footer states how old the board is; it never states it on top of a
+      // service. It sits under the rows, in the frame, always.
+      if (ftr) {
+        const ftrBox = ftr.getBoundingClientRect();
+        if (box.bottom > ftrBox.top + 0.5) problems.push('the footer is painted over the board');
+        if (ftrBox.bottom > innerHeight + 0.5) problems.push('the footer is below the frame');
+      }
+    }
     if (problems.length) console.error('INVARIANT ' + ${JSON.stringify(state.name)} + ': ' + problems.join('; '));
   } catch (e) { console.error('invariant check failed: ' + e.message); }
 

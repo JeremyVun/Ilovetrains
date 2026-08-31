@@ -39,8 +39,13 @@ export function rowsHtml(model) {
   return `<div class="${cls}" data-t="rows">${model.rows.map(rowHtml).join('')}</div>`;
 }
 
-function emptyCopy(model) {
-  if (model.status === 'loading') return 'Loading';
+/* The one line that stands in for the whole board, so it is the most
+   load-bearing sentence in the app. A cold pair — one nobody has asked for in
+   the last thirty seconds — is one to two seconds of upstream call, and for all
+   of it this line is the only thing on the screen. "Loading" named the
+   machine's activity; this names what the user is waiting for. */
+export function emptyCopy(model) {
+  if (model.status === 'loading') return 'Getting the next trains…';
   if (model.status === 'offline') return 'No board saved for this trip yet';
   if (model.stale) return 'No services on the last board we could load';
   return 'No services in the next few hours';
