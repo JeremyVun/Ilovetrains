@@ -3,6 +3,7 @@ package tfnsw
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -37,6 +38,66 @@ func mustParse(t *testing.T, value string) time.Time {
 		t.Fatalf("parsing %q: %v", value, err)
 	}
 	return parsed
+}
+
+func ptr(value string) *string { return &value }
+
+// legDiff compares two legs by their wire form, so a pointer field that should
+// be null is judged the way a client sees it.
+func legDiff(want, got Leg) string {
+	encodedWant, err := json.Marshal(want)
+	if err != nil {
+		return fmt.Sprintf("marshalling want: %v", err)
+	}
+	encodedGot, err := json.Marshal(got)
+	if err != nil {
+		return fmt.Sprintf("marshalling got: %v", err)
+	}
+	if bytes.Equal(encodedWant, encodedGot) {
+		return ""
+	}
+	return fmt.Sprintf("\n got  %s\n want %s", encodedGot, encodedWant)
+}
+
+// withFootpathAtTransfer moves the fixture's real class-99 footpath leg (from
+// the On Demand journey 1, Strathfield concourse to Platform 4) into the Town
+// Hall transfer of journey 0. Upstream did not give us a walking leg inside a
+// train-only journey, and a hand-written one would only test the shape we
+// imagined.
+func withFootpathAtTransfer(t *testing.T, body []byte) []byte {
+	t.Helper()
+	var raw struct {
+		Journeys []struct {
+			Legs []json.RawMessage `json:"legs"`
+		} `json:"journeys"`
+	}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	footpath := raw.Journeys[1].Legs[1]
+	var walk struct {
+		Transportation struct {
+			Product struct {
+				Class int `json:"class"`
+			} `json:"product"`
+		} `json:"transportation"`
+	}
+	if err := json.Unmarshal(footpath, &walk); err != nil {
+		t.Fatalf("unmarshal footpath: %v", err)
+	}
+	if walk.Transportation.Product.Class != classFootpath {
+		t.Fatalf("fixture leg is class %d, want the class-%d footpath",
+			walk.Transportation.Product.Class, classFootpath)
+	}
+
+	legs := raw.Journeys[0].Legs
+	spliced, err := json.Marshal(map[string]any{"journeys": []any{
+		map[string]any{"interchanges": 1, "legs": []json.RawMessage{legs[0], footpath, legs[1]}},
+	}})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	return spliced
 }
 
 func TestMapStopsCentral(t *testing.T) {
@@ -337,6 +398,261 @@ func TestMapTripCountsOnlyTransitLegs(t *testing.T) {
 	}
 	if journey.Line.Name != "T1" {
 		t.Errorf("line = %q, want the first service", journey.Line.Name)
+	}
+}
+
+// rhodes maps the Rhodes → Bondi Junction fixture, captured 2026-09-01 with a
+// genuine T9 → Town Hall → T4 transfer, five On Demand journeys and the
+// class-99 footpaths inside them.
+func rhodes(t *testing.T, limit int) *DeparturesResponse {
+	t.Helper()
+	got, err := mapTrip(fixture(t, "trip_rhodes_bondijunction.json"), "213820", "202210", limit,
+		mustParse(t, "2026-08-31T23:20:00Z"), sydney(t))
+	if err != nil {
+		t.Fatalf("mapTrip: %v", err)
+	}
+	return got
+}
+
+func TestMapTripLegDetailForRealTransfer(t *testing.T) {
+	got := rhodes(t, 6)
+	if got.From.Name != "Rhodes Station" || got.To.Name != "Bondi Junction Station" {
+		t.Errorf("from/to = %+v / %+v", got.From, got.To)
+	}
+	journey := got.Journeys[0]
+	if journey.Legs != 2 || len(journey.LegDetail) != 2 {
+		t.Fatalf("legs = %d, legDetail = %d, want 2 and 2", journey.Legs, len(journey.LegDetail))
+	}
+
+	// Both legs are MONITORED, so every estimate is real, not a copy of the
+	// planned time served as if it were live.
+	want := []Leg{{
+		Line:     Line{Name: "T9", Mode: "train"},
+		Headsign: "Gordon via Lindfield",
+		From:     LegPlace{ID: "213820", Name: "Rhodes Station", Platform: ptr("Platform 1")},
+		To:       LegPlace{ID: "200070", Name: "Town Hall Station", Platform: ptr("Platform 3")},
+		Departure: LegTime{
+			Scheduled: "2026-09-01T09:24:18+10:00", Estimated: ptr("2026-09-01T09:24:18+10:00"),
+		},
+		Arrival: LegTime{
+			Scheduled: "2026-09-01T09:51:36+10:00", Estimated: ptr("2026-09-01T09:51:36+10:00"),
+		},
+	}, {
+		Line:     Line{Name: "T4", Mode: "train"},
+		Headsign: "Bondi Junction",
+		From:     LegPlace{ID: "200070", Name: "Town Hall Station", Platform: ptr("Platform 5")},
+		To:       LegPlace{ID: "202210", Name: "Bondi Junction Station", Platform: ptr("Platform 2")},
+		Departure: LegTime{
+			Scheduled: "2026-09-01T09:58:00+10:00", Estimated: ptr("2026-09-01T09:58:00+10:00"),
+		},
+		Arrival: LegTime{
+			Scheduled: "2026-09-01T10:08:00+10:00", Estimated: ptr("2026-09-01T10:08:00+10:00"),
+		},
+	}}
+	for i := range want {
+		if diff := legDiff(want[i], journey.LegDetail[i]); diff != "" {
+			t.Errorf("leg %d: %s", i, diff)
+		}
+	}
+
+	// The journey level mirrors the first and last leg, so a client can show a
+	// row without reading legDetail at all.
+	if journey.Departure.Scheduled != want[0].Departure.Scheduled {
+		t.Errorf("journey departure = %q, want the first leg's %q",
+			journey.Departure.Scheduled, want[0].Departure.Scheduled)
+	}
+	if journey.Arrival.Scheduled != want[1].Arrival.Scheduled {
+		t.Errorf("journey arrival = %q, want the last leg's %q",
+			journey.Arrival.Scheduled, want[1].Arrival.Scheduled)
+	}
+	if journey.Line != want[0].Line || journey.DestinationHeadsign != want[0].Headsign {
+		t.Errorf("journey line/headsign = %+v / %q, want the first leg's",
+			journey.Line, journey.DestinationHeadsign)
+	}
+	if journey.Departure.Platform == nil || *journey.Departure.Platform != "Platform 1" {
+		t.Errorf("journey platform = %v, want Platform 1", journey.Departure.Platform)
+	}
+}
+
+func TestMapTripExcludesOnDemandJourneys(t *testing.T) {
+	// Five of the fixture's eleven journeys ride a class-10 "On Demand" bus to
+	// Strathfield before any train. exclMOT_10 now keeps them out upstream;
+	// this is the guard for the next thing that leaks past the exclusions.
+	got := rhodes(t, 10)
+	if len(got.Journeys) != 6 {
+		t.Fatalf("journeys = %d, want the 6 train journeys of 11", len(got.Journeys))
+	}
+	for i, journey := range got.Journeys {
+		for _, leg := range journey.LegDetail {
+			if leg.Line.Mode != "train" && leg.Line.Mode != "metro" {
+				t.Errorf("journey %d carries a %q leg", i, leg.Line.Mode)
+			}
+		}
+		// Every surviving journey starts where the rider is; the On Demand ones
+		// start at Rhodes by bus and board a train at Strathfield.
+		if journey.LegDetail[0].From.ID != "213820" {
+			t.Errorf("journey %d starts at %+v, want Rhodes Station",
+				i, journey.LegDetail[0].From)
+		}
+	}
+}
+
+func TestMapTripExclusionHappensBeforeLimit(t *testing.T) {
+	// The On Demand journeys leave a minute after each train, so dropping them
+	// after the limit would fill half the board with journeys the rider cannot
+	// take and hide the trains behind them.
+	got := rhodes(t, 4)
+	want := []string{
+		"2026-09-01T09:24:18+10:00",
+		"2026-09-01T09:39:18+10:00",
+		"2026-09-01T09:54:18+10:00",
+		"2026-09-01T10:09:18+10:00",
+	}
+	if len(got.Journeys) != len(want) {
+		t.Fatalf("journeys = %d, want %d takeable journeys", len(got.Journeys), len(want))
+	}
+	for i, scheduled := range want {
+		if got.Journeys[i].Departure.Scheduled != scheduled {
+			t.Errorf("journey %d departs %q, want the train at %q",
+				i, got.Journeys[i].Departure.Scheduled, scheduled)
+		}
+	}
+}
+
+func TestMapTripLegDetailFoldsWalkingLegsIntoTheGap(t *testing.T) {
+	// The real class-99 footpath from the fixture, moved into the Town Hall
+	// transfer of the T9 → T4 journey: it must not be listed, and the gap
+	// between the two services must still be the whole change window.
+	got, err := mapTrip(withFootpathAtTransfer(t, fixture(t, "trip_rhodes_bondijunction.json")),
+		"213820", "202210", 6, mustParse(t, "2026-08-31T23:20:00Z"), sydney(t))
+	if err != nil {
+		t.Fatalf("mapTrip: %v", err)
+	}
+	journey := got.Journeys[0]
+	if journey.Legs != 2 || len(journey.LegDetail) != 2 {
+		t.Fatalf("legs = %d, legDetail = %d, want 2 and 2 (footpath not listed)",
+			journey.Legs, len(journey.LegDetail))
+	}
+	if journey.LegDetail[0].Line.Name != "T9" || journey.LegDetail[1].Line.Name != "T4" {
+		t.Errorf("legs = %q, %q; want T9, T4",
+			journey.LegDetail[0].Line.Name, journey.LegDetail[1].Line.Name)
+	}
+	if journey.LegDetail[0].Arrival.Scheduled != "2026-09-01T09:51:36+10:00" ||
+		journey.LegDetail[1].Departure.Scheduled != "2026-09-01T09:58:00+10:00" {
+		t.Errorf("transfer gap = %q → %q, want the walk folded inside it",
+			journey.LegDetail[0].Arrival.Scheduled, journey.LegDetail[1].Departure.Scheduled)
+	}
+}
+
+func TestMapTripLegDetailRealtimeIsPerLeg(t *testing.T) {
+	// Fixture journeys 8 and 10 (5th and 6th after the On Demand ones are
+	// dropped) are mixed: a schedule-only T9 into Town Hall, then a MONITORED
+	// T4. Gating on the journey would either hide a real estimate or fabricate
+	// one from the planned time.
+	got := rhodes(t, 6)
+	for _, i := range []int{4, 5} {
+		journey := got.Journeys[i]
+		if len(journey.LegDetail) != 2 {
+			t.Fatalf("journey %d: legDetail = %d, want 2", i, len(journey.LegDetail))
+		}
+		if journey.LegDetail[0].Departure.Estimated != nil {
+			t.Errorf("journey %d leg 0 departure.estimated = %q, want null (schedule only)",
+				i, *journey.LegDetail[0].Departure.Estimated)
+		}
+		if journey.LegDetail[0].Arrival.Estimated != nil {
+			t.Errorf("journey %d leg 0 arrival.estimated = %q, want null (schedule only)",
+				i, *journey.LegDetail[0].Arrival.Estimated)
+		}
+		if journey.LegDetail[0].Departure.Scheduled == "" {
+			t.Errorf("journey %d leg 0 lost its scheduled time", i)
+		}
+		if journey.LegDetail[1].Departure.Estimated == nil {
+			t.Errorf("journey %d leg 1 departure.estimated = null, want the realtime value", i)
+		}
+	}
+}
+
+func TestMapTripLegDetailMatchesLegCountOnEveryFixture(t *testing.T) {
+	cases := []struct{ file, from, to string }{
+		{"trip_central_parramatta.json", "200060", "215020"},
+		{"trip_tallawong_chatswood.json", "2155384", "206710"},
+		{"trip_rhodes_bondijunction.json", "213820", "202210"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.file, func(t *testing.T) {
+			got, err := mapTrip(fixture(t, tc.file), tc.from, tc.to, 10,
+				mustParse(t, "2026-08-31T12:47:00Z"), sydney(t))
+			if err != nil {
+				t.Fatalf("mapTrip: %v", err)
+			}
+			if len(got.Journeys) == 0 {
+				t.Fatal("no journeys mapped")
+			}
+			for i, journey := range got.Journeys {
+				if journey.Legs != len(journey.LegDetail) {
+					t.Errorf("journey %d: legs = %d, legDetail = %d",
+						i, journey.Legs, len(journey.LegDetail))
+				}
+				for k, leg := range journey.LegDetail {
+					if leg.Line.Name == "" || leg.Line.Mode == "" {
+						t.Errorf("journey %d leg %d: unnamed line %+v", i, k, leg.Line)
+					}
+					if leg.From.ID == "" || leg.From.Name == "" || leg.To.ID == "" || leg.To.Name == "" {
+						t.Errorf("journey %d leg %d: %+v → %+v", i, k, leg.From, leg.To)
+					}
+					if leg.Departure.Scheduled == "" || leg.Arrival.Scheduled == "" {
+						t.Errorf("journey %d leg %d: missing scheduled time", i, k)
+					}
+				}
+				if journey.LegDetail[0].Departure.Scheduled != journey.Departure.Scheduled {
+					t.Errorf("journey %d: departure %q, first leg %q",
+						i, journey.Departure.Scheduled, journey.LegDetail[0].Departure.Scheduled)
+				}
+				last := journey.LegDetail[len(journey.LegDetail)-1]
+				if last.Arrival.Scheduled != journey.Arrival.Scheduled {
+					t.Errorf("journey %d: arrival %q, last leg %q",
+						i, journey.Arrival.Scheduled, last.Arrival.Scheduled)
+				}
+			}
+		})
+	}
+}
+
+func TestMapTripLegCancellationIsPerLeg(t *testing.T) {
+	// Only the second service is cancelled: the journey is cancelled, but a
+	// client must be able to say which leg fell over.
+	body := []byte(`{"journeys":[{"interchanges":1,"legs":[
+	 {"isRealtimeControlled":true,"realtimeStatus":["MONITORED"],
+	  "origin":{"departureTimePlanned":"2026-08-31T12:00:00Z"},"destination":{"arrivalTimePlanned":"2026-08-31T12:10:00Z"},
+	  "transportation":{"disassembledName":"T1","product":{"class":1},"destination":{"name":"X"}}},
+	 {"isRealtimeControlled":true,"realtimeStatus":["TRIP_CANCELLED"],
+	  "origin":{"departureTimePlanned":"2026-08-31T12:20:00Z"},"destination":{"arrivalTimePlanned":"2026-08-31T12:40:00Z"},
+	  "transportation":{"disassembledName":"T4","product":{"class":1},"destination":{"name":"Y"}}}]}]}`)
+	got, err := mapTrip(body, "a", "b", 6, mustParse(t, "2026-08-31T12:00:00Z"), sydney(t))
+	if err != nil {
+		t.Fatalf("mapTrip: %v", err)
+	}
+	journey := got.Journeys[0]
+	if !journey.Cancelled {
+		t.Error("journey cancelled = false, want true")
+	}
+	if journey.LegDetail[0].Cancelled {
+		t.Error("leg 0 cancelled = true, want false")
+	}
+	if !journey.LegDetail[1].Cancelled {
+		t.Error("leg 1 cancelled = false, want true")
+	}
+}
+
+func TestLegJSONKeepsUnknownValuesExplicitlyNull(t *testing.T) {
+	encoded, err := json.Marshal(Leg{})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	for _, want := range []string{`"platform":null`, `"estimated":null`} {
+		if !bytes.Contains(encoded, []byte(want)) {
+			t.Errorf("body = %s, want it to contain %s", encoded, want)
+		}
 	}
 }
 

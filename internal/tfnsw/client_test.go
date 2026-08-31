@@ -56,12 +56,15 @@ func TestClientSendsAuthAndRequiredTripParams(t *testing.T) {
 		"name_destination":  "215020",
 		"calcNumberOfTrips": "4",
 		"TfNSWTR":           "true",
-		// Exclusions that leave train (1) and metro (2) only.
+		// Exclusions that leave train (1) and metro (2) only. exclMOT_10 keeps
+		// On Demand buses out; without it upstream routes them (verified live
+		// 2026-09-01, Rhodes → Bondi Junction).
 		"excludedMeans": "checkbox",
 		"exclMOT_4":     "1",
 		"exclMOT_5":     "1",
 		"exclMOT_7":     "1",
 		"exclMOT_9":     "1",
+		"exclMOT_10":    "1",
 		"exclMOT_11":    "1",
 	}
 	for key, value := range want {

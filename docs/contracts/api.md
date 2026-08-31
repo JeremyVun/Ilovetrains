@@ -88,9 +88,13 @@ Semantics:
   }
   ```
 
-  Same time semantics as the journey level (`estimated` null without
-  realtime). Transfer wait is derivable: next leg's effective departure minus
-  previous leg's effective arrival (any walking time is inside that gap).
+  Same time semantics as the journey level, gated per leg: `estimated` is
+  null unless THAT leg is realtime-controlled, so one journey can have a
+  scheduled-only first leg and a live second one. `platform` is null when
+  upstream does not say. Transfer wait is derivable: next leg's effective
+  departure minus previous leg's effective arrival (any walking time is
+  inside that gap — often there is no walking leg at all for a
+  platform-to-platform change, so the gap is the only transfer signal).
   For single-leg journeys `legDetail` has one entry mirroring the journey's
   own fields. This is an additive change: existing fields are unchanged and
   the response stays a pure cached function of the query string — leg detail
@@ -99,8 +103,11 @@ Semantics:
   "On Demand" buses, observed leaking past the exclMOT exclusions on
   2026-09-01, fixture `trip_rhodes_bondijunction.json` journey 2) are
   EXCLUDED entirely — v1 plans trains and metro only, and a journey you
-  cannot take by train is not an answer to this board's question. The
-  upstream request should also send the matching exclMOT for On Demand.
+  cannot take by train is not an answer to this board's question. They are
+  dropped before `limit` is applied, so a board still fills with up to
+  `limit` takeable journeys. The upstream request also sends `exclMOT_10=1`
+  (verified 2026-09-01 to remove them at the source); the server-side drop is
+  the guard for the next class that leaks.
 - Cancelled services are included with `cancelled: true` (clients render
   struck-through), never silently dropped. Detection is deliberately loose
   (any upstream realtime status containing "cancel"): the exact upstream shape

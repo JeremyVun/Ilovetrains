@@ -30,7 +30,36 @@ type Line struct {
 	Mode string `json:"mode"`
 }
 
-// Journey is one departure from origin to destination.
+// LegPlace is one end of a service leg: the station, plus the platform the
+// service uses there (null when upstream does not say).
+type LegPlace struct {
+	ID       string  `json:"id"`
+	Name     string  `json:"name"`
+	Platform *string `json:"platform"`
+}
+
+// LegTime is a scheduled/estimated pair at one end of a leg. Estimated is null
+// unless that leg is realtime-controlled, exactly as at the journey level.
+type LegTime struct {
+	Scheduled string  `json:"scheduled"`
+	Estimated *string `json:"estimated"`
+}
+
+// Leg is one train or metro service inside a journey. Walking between legs is
+// not a leg; it lives in the gap between one leg's arrival and the next leg's
+// departure.
+type Leg struct {
+	Line      Line     `json:"line"`
+	Headsign  string   `json:"headsign"`
+	From      LegPlace `json:"from"`
+	To        LegPlace `json:"to"`
+	Departure LegTime  `json:"departure"`
+	Arrival   LegTime  `json:"arrival"`
+	Cancelled bool     `json:"cancelled"`
+}
+
+// Journey is one departure from origin to destination. LegDetail always has
+// Legs entries; the journey-level fields mirror the first and last of them.
 type Journey struct {
 	Departure           Departure `json:"departure"`
 	Arrival             Arrival   `json:"arrival"`
@@ -39,6 +68,7 @@ type Journey struct {
 	StopsAway           *int      `json:"stopsAway"`
 	Cancelled           bool      `json:"cancelled"`
 	Legs                int       `json:"legs"`
+	LegDetail           []Leg     `json:"legDetail"`
 }
 
 // DeparturesResponse is the body of GET /api/v1/departures.
