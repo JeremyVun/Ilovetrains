@@ -39,6 +39,29 @@ read/write atomic and migration simple):
 - `cache` holds the last successful departures response per pair, used for
   instant first paint and offline; capped at saved pairs only.
 
+## Focused journey (added 2026-09-01)
+
+The document gains an optional `focus` field — "I'm on this train":
+
+```json
+"focus": {
+  "tripId": "uuid",
+  "direction": "forward",
+  "focusedAt": "2026-09-01T09:07:00+10:00",
+  "journey": { "…": "verbatim snapshot of the focused journey object" }
+}
+```
+
+- Set when the user focuses a journey from its detail view; cleared by the
+  user, or automatically once now > the journey's effective arrival + 30 min.
+- `journey` is a full snapshot so the focused journey stays viewable after
+  it departs (and offline) — the board no longer carries it, the snapshot
+  does. On each refresh the client re-matches the focused journey in fresh
+  data by (first leg's line.name, departure.scheduled) and updates the
+  snapshot when matched (live delays keep flowing); unmatched (departed)
+  keeps the last snapshot.
+- At most one focused journey. Focusing another replaces it.
+
 ## Prediction heuristic (v1 — keep it this simple)
 
 On app open, score every (trip, direction) candidate:

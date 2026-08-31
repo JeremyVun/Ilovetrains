@@ -71,6 +71,36 @@ Semantics:
 - `legs > 1` means a transfer is required; v1 clients may show a transfer
   badge but journeys are still ordered by departure time. `legs` counts
   services only — a walking transfer between platforms is not a leg.
+- `legDetail` (added 2026-09-01) lists the service legs in order, one entry
+  per train/metro service; same length as `legs`. Walking legs (upstream
+  product class 99/100) are folded into the gap between service legs, never
+  listed. Each leg:
+
+  ```json
+  {
+    "line": {"name": "T9", "mode": "train"},
+    "headsign": "Gordon via Lindfield",
+    "from": {"id": "213820", "name": "Rhodes Station", "platform": "Platform 1"},
+    "to":   {"id": "200070", "name": "Town Hall Station", "platform": "Platform 3"},
+    "departure": {"scheduled": "…", "estimated": "…"},
+    "arrival":   {"scheduled": "…", "estimated": "…"},
+    "cancelled": false
+  }
+  ```
+
+  Same time semantics as the journey level (`estimated` null without
+  realtime). Transfer wait is derivable: next leg's effective departure minus
+  previous leg's effective arrival (any walking time is inside that gap).
+  For single-leg journeys `legDetail` has one entry mirroring the journey's
+  own fields. This is an additive change: existing fields are unchanged and
+  the response stays a pure cached function of the query string — leg detail
+  comes from the same upstream `trip` call, no extra upstream cost.
+- Journeys containing any non-train/metro SERVICE leg (e.g. product class 10
+  "On Demand" buses, observed leaking past the exclMOT exclusions on
+  2026-09-01, fixture `trip_rhodes_bondijunction.json` journey 2) are
+  EXCLUDED entirely — v1 plans trains and metro only, and a journey you
+  cannot take by train is not an answer to this board's question. The
+  upstream request should also send the matching exclMOT for On Demand.
 - Cancelled services are included with `cancelled: true` (clients render
   struck-through), never silently dropped. Detection is deliberately loose
   (any upstream realtime status containing "cancel"): the exact upstream shape
