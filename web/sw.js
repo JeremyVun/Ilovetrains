@@ -23,7 +23,10 @@
  * Bump VERSION on every deploy that changes any file in SHELL.
  */
 
-const VERSION = 'v1';
+/* v2: the light scheme, the shortened cancelled-lead copy and the hours figure
+   (owner rulings 2026-09-01) all live in index.html, app.css and js/ — every
+   one of them a cache-first shell file. */
+const VERSION = 'v2';
 const SHELL_CACHE = 'shell-' + VERSION;
 const DATA_CACHE = 'data-' + VERSION;
 

@@ -64,7 +64,7 @@ test('a cancelled lead never silently skips: the next running service says so', 
   assert.equal(m.rows[0].figure, '–');
   assert.equal(m.rows[0].provenance, 'CANCELLED');
   assert.equal(m.rows[0].arrTime, null);
-  assert.equal(m.rows[1].note, '22:48 cancelled · next running service');
+  assert.equal(m.rows[1].note, '22:48 cancelled · next train');
   // The note belongs to the next RUNNING service, and only to it.
   assert.equal(m.rows[0].note, null);
   assert.equal(m.rows[3].note, null);
@@ -131,13 +131,84 @@ test('departed services close the list upward; a shorter board distributes', () 
   assert.equal(m.rows[0].first, true);
 });
 
-test('a service leaving this minute reads Now', () => {
+/* Owner ruling 2026-09-01 (D): "Now / MIN" printed a unit under a figure that
+   is not a number of minutes. The slot names the event instead. */
+test('a service leaving this minute reads Now, and the slot under it says DEPARTING', () => {
   const m = boardModel(
     body(baseJourneys(), '2026-08-31T22:48:00+10:00'),
     Date.parse('2026-08-31T22:48:30+10:00')
   );
   assert.equal(m.rows[0].figure, 'Now');
-  assert.equal(m.rows[0].provenance, 'MIN');
+  assert.equal(m.rows[0].provenance, 'DEPARTING');
+  // ...and only that row: the ones with a wait still count in minutes.
+  assert.equal(m.rows[1].figure, '15');
+  assert.equal(m.rows[1].provenance, 'MIN');
+});
+
+test('DEPARTING never displaces a more specific provenance', () => {
+  const now = Date.parse('2026-08-31T22:48:30+10:00');
+  const at = '2026-08-31T22:48:00+10:00';
+
+  // A service leaving now, six minutes late, is late — that is the news.
+  const late = delay(journey('22:42', '23:11', '12', 'T1', 'Penrith', true), 6);
+  const lateModel = boardModel(body([late], at), now);
+  assert.equal(lateModel.rows[0].figure, 'Now');
+  assert.equal(lateModel.rows[0].provenance, '6 MIN LATE');
+
+  // A service leaving now with no realtime control is still only scheduled to.
+  const sched = journey('22:48', '23:17', '12', 'T1', 'Penrith', false);
+  const schedModel = boardModel(body([sched], at), now);
+  assert.equal(schedModel.rows[0].figure, 'Now');
+  assert.equal(schedModel.rows[0].provenance, 'SCHEDULED');
+
+  // A cancelled service does not depart at all.
+  const cx = cancel(journey('22:48', '23:17', '12', 'T1', 'Penrith', true));
+  const cxModel = boardModel(body([cx], at), now);
+  assert.equal(cxModel.rows[0].provenance, 'CANCELLED');
+});
+
+/* Owner ruling 2026-09-01 (B): past 99 minutes the figure changes unit. "187"
+   is true and unreadable; the clock time beside it already says 03:53 better. */
+test('past 99 minutes the figure is rounded hours, not three digits', () => {
+  const at = (mins) => {
+    const t = new Date(NOW + mins * 60000).toISOString();
+    return { departure: { scheduled: t, estimated: t, platform: '1' }, arrival: {}, line: { name: 'T1' }, legs: 1 };
+  };
+  const figures = (mins) => boardModel(
+    { generatedAt: new Date(NOW).toISOString(), journeys: mins.map(at) }, NOW
+  ).rows.map((r) => r.figure);
+
+  // The boundary: 99 is the last minute figure, 100 is the first hour figure.
+  assert.deepEqual(figures([98, 99, 100, 101]), ['98', '99', '2H', '2H']);
+
+  // Rounding is to the NEAREST hour, not truncation: 187 is 3h 7m -> 3H, and
+  // 209 (3h 29m) still rounds down while 210 (3h 30m) rounds up.
+  assert.deepEqual(figures([187, 209, 210, 240]), ['3H', '3H', '4H', '4H']);
+
+  // The last-train board that found this: every figure is now two characters.
+  assert.deepEqual(figures([187, 216, 221, 240, 251, 266]),
+    ['3H', '4H', '4H', '4H', '4H', '4H']);
+});
+
+/* The rounding rule and the "MIN" vocabulary disagree for a service that is
+   both hours away AND under realtime control — "3H / MIN". The owner ruled the
+   provenance slot unchanged (2026-09-01 B), noting such a service will
+   virtually always be SCHEDULED, which is what the fixture's own late-night
+   board shows. Pinned here so the next reader knows it is a decision, not a
+   miss. */
+test('a far-future service keeps the provenance its data earns', () => {
+  const t = new Date(NOW + 187 * 60000).toISOString();
+  const unmonitored = { departure: { scheduled: t, estimated: null, platform: '1' }, arrival: {}, line: { name: 'T1' }, legs: 1 };
+  const monitored = { departure: { scheduled: t, estimated: t, platform: '1' }, arrival: {}, line: { name: 'T1' }, legs: 1 };
+  const gen = new Date(NOW).toISOString();
+
+  const a = boardModel({ generatedAt: gen, journeys: [unmonitored] }, NOW).rows[0];
+  assert.equal(a.figure, '3H');
+  assert.equal(a.provenance, 'SCHEDULED');
+
+  const b = boardModel({ generatedAt: gen, journeys: [monitored] }, NOW).rows[0];
+  assert.equal(b.figure, '3H');
+  assert.equal(b.provenance, 'MIN');
 });
 
 test('unknown platform and empty headsign still fill their lines', () => {
@@ -189,7 +260,10 @@ test('a board that WAS loaded still reports its age', () => {
 /* Found live on the late-night board 2026-09-01: the next train was 187
    minutes away and the hero figure, which has no clip and no ellipsis, was
    drawn straight through the departure time beside it. Three characters do not
-   fit the figure column at the headline size, so the row has to say so. */
+   fit the figure column at the headline size, so the row has to say so.
+
+   Ruling B retired the three-DIGIT case, not the rule: "Now" is three
+   characters, and so is any service that rounds to ten hours or more. */
 test('a figure of three characters marks itself wide', () => {
   const at = (mins) => {
     const t = new Date(NOW + mins * 60000).toISOString();
@@ -198,14 +272,18 @@ test('a figure of three characters marks itself wide', () => {
   const widths = (mins) => boardModel({ generatedAt: new Date(NOW).toISOString(), journeys: mins.map(at) }, NOW)
     .rows.map((r) => ({ figure: r.figure, wide: r.wide }));
 
-  assert.deepEqual(widths([9, 99, 100, 187]), [
+  // The unit change means no wait between one minute and nine hours is wide.
+  assert.deepEqual(widths([9, 99, 100, 187, 569]), [
     { figure: '9', wide: false },
     { figure: '99', wide: false },
-    { figure: '100', wide: true },
-    { figure: '187', wide: true }
+    { figure: '2H', wide: false },
+    { figure: '3H', wide: false },
+    { figure: '9H', wide: false }
   ]);
 
-  // "Now" is three characters too, and letters are wider than digits.
+  // Still reachable, and still stepped down: ten hours, and "Now" — three
+  // characters, and letters are wider than digits.
+  assert.deepEqual(widths([570]), [{ figure: '10H', wide: true }]);
   assert.deepEqual(widths([0]), [{ figure: 'Now', wide: true }]);
 
   // A cancelled row's dash and a stale row's empty slot are not wide.

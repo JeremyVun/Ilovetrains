@@ -5,8 +5,12 @@
 <!-- Without this, Chrome lays a "mobile" page out at 980px and scales it down:
      every mobile screenshot becomes a lie. See tools/screenshot.js. -->
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#0A0B0D">
+<!-- Dark first (commuters at 6am and 6pm), light printed from the same plates:
+     see the light palette in app.css. Order matters — a browser that ignores
+     the media attribute takes the first theme-color it understands. -->
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0A0B0D" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#FAF9F5" media="(prefers-color-scheme: light)">
 <meta name="description" content="Your next Sydney train, before you ask.">
 <title>Next departures</title>
 <link rel="manifest" href="/manifest.webmanifest">

@@ -12,6 +12,7 @@ Reproduce:
 ```
 set -a; source .env; set +a; PORT=8092 go run ./cmd/server     # then, elsewhere:
 node tools/shoot-states.js            # every state -> docs/backlog/v1-core-loop/shots
+node tools/shoot-states.js --media prefers-color-scheme:light --prefix light-
 node tools/measure-open.js            # the experience bar, in milliseconds
 go test ./... && (cd web && npm test)
 ```
@@ -156,7 +157,12 @@ Short queries returning nothing is upstream behaviour, not a defect
 
 ### Flagged for an owner ruling (not auto-fixed)
 
-**A. The cancelled-lead copy does not fit a 360px phone.** `docs/STYLES.md`
+All four were ruled on 2026-09-01 and are shipped — see the addendum at the
+foot of this file, and `docs/STYLES.md` for the binding wording. The evidence
+below is kept as it was found.
+
+**A. The cancelled-lead copy does not fit a 360px phone.** RESOLVED: shortened
+to `22:48 CANCELLED · NEXT TRAIN` at the full label idiom. `docs/STYLES.md`
 quotes the string `22:48 CANCELLED · NEXT RUNNING SERVICE`. Measured widths
 against the body column:
 
@@ -175,7 +181,7 @@ in a binding doc, so it is the owner's call, not the verification wave's.
 Evidence: `cancelled-390x844.png` (shipped, fits) and `cancelled-360x800.png`
 (360px, still truncating).
 
-**B. Is `187` the right figure at all?** The board's whole premise is one number
+**B. Is `187` the right figure at all?** RESOLVED: past 99 minutes the figure is rounded hours. The board's whole premise is one number
 — minutes until the next train — but on the late-night board that number is
 three digits and means "just over three hours", while the clock time beside it
 (03:53) already says it better. The fix above makes it fit; it does not make it
@@ -183,14 +189,14 @@ read. The alternative is switching unit past 99 minutes (`3h`), which changes
 the provenance vocabulary `docs/STYLES.md` fixes as `MIN / SCHEDULED / N MIN
 LATE / CANCELLED`, so it needs a ruling. Evidence: `late-night-390x844.png`.
 
-**C. Light mode does not exist.** `docs/STYLES.md` says "dark-mode first …
+**C. Light mode does not exist.** RESOLVED: built, 2026-09-01. `docs/STYLES.md` says "dark-mode first …
 light mode supported"; the client ships `<meta name="color-scheme"
 content="dark">` and no `prefers-color-scheme` rules at all, so a light-mode
 device gets the dark board. That is a scope decision made in Phase 2 rather
 than a regression, but the binding doc currently promises something the app
 does not do: either build it or amend the doc.
 
-**D. Observation, no action taken.** With the figure `Now`, the provenance slot
+**D. Observation, no action taken.** RESOLVED: the slot now says `DEPARTING`. With the figure `Now`, the provenance slot
 still reads `MIN` ("Now / MIN"). It is not wrong — the column is "minutes until"
 — but it reads oddly. See `now-leaving-390x844.png`.
 
@@ -200,3 +206,47 @@ still reads `MIN` ("Now / MIN"). It is not wrong — the column is "minutes unti
 - A real disruption: `cancelled: true` has still never been observed from
   upstream, so the cancelled states remain seeded from the contract's shape.
 - Anything below 360px wide, and any real light-mode device (see ruling C).
+
+## Addendum — the four rulings applied (2026-09-01)
+
+Rulings A–D above were answered by the owner and are shipped; the wording that
+binds is in `docs/STYLES.md` ("Owner rulings, 2026-09-01"). What was rerun:
+
+| check | invocation | result |
+|---|---|---|
+| Client unit tests | `cd web && npm test` | **60 pass, 0 fail** (was 50). Ten new: three on the hours figure and its 99/100 boundary, two on `DEPARTING`, seven in the new `web/test/theme.test.js`, which recomputes every palette ratio from `app.css` itself |
+| A new test actually bites | `figureFor` boundary flipped to `>` | red on the boundary case, green again on restore |
+| Backend | `go test ./...` | **pass**, untouched by this change |
+| Full state sweep, dark | `node tools/shoot-states.js` | 19 states, **zero invariant violations** |
+| Full state sweep, light | `… --media prefers-color-scheme:light --prefix light-` | 19 states, **zero invariant violations**; shots are `shots/light-*.png` |
+| Narrow phone, ruling A | `… cancelled --size 360x800` (both schemes) | **pass** — `22:48 CANCELLED · NEXT TRAIN` prints whole at the full 10px/.14em idiom: 205px of copy in a 210px column. `cancelled-360x800.png` is regenerated and now shows the fix, not the truncation |
+
+Two defects the sweep found while applying the rulings, both fixed here:
+
+1. **`3H` overflowed the figure column at the hero size** — 91px in 86px, caught
+   by the in-browser figure invariant on `late-night` the first time ruling B
+   was rendered. Two characters, but `H` is far wider than a digit. Fixed by
+   setting the unit small on the numeral's baseline rather than by stepping the
+   whole figure down, which would have cost the hero its scale.
+2. **The light board washed out its own offline sentence.** `.rows.stale`'s 55%
+   dim sat on the container, so it also dimmed the hint that *replaces* the
+   rows — and 55% of the light coral over paper is 2.6:1, a pale salmon
+   (`light-cold-offline`). The dim moved onto the rows. Invisible in dark mode,
+   where 55% toward black still leaves ~4.6:1: an opacity is as
+   scheme-dependent as a colour.
+
+Still open after these rulings:
+
+- **`3H / MIN`.** The ruling holds the provenance vocabulary fixed, so a
+  service that is both hours away *and* under realtime control prints an hours
+  figure over the word `MIN`. The owner ruled this deliberately, noting such a
+  service is virtually always `SCHEDULED` — which is what the real late-night
+  board shows. Pinned by the test `a far-future service keeps the provenance
+  its data earns` so the next reader sees a decision, not a miss.
+- **Six rows do not fit a 360×800 phone.** The sixth service's third line falls
+  below the fold (`cancelled-360x800.png`). Pre-existing and unrelated to the
+  rulings — 800px of height, not 360px of width — and the row heights are
+  unchanged by this work. Not a ruling question yet; it wants a shorter row or
+  five services on a short phone.
+- Light mode has still never been seen on a real device, only under Chrome's
+  `prefers-color-scheme` emulation.
