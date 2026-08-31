@@ -2,10 +2,10 @@
    render-ready board out. No DOM, no fetch, no clock reads.
 
    THE RULE (docs/STYLES.md, binding): the slot under the figure always states
-   that figure's provenance — MIN / SCHEDULED / N MIN LATE / CANCELLED — and
-   every row is exactly three lines in every state, so no delay, cancellation
-   or missing feed can push the sixth service past the fold. `rowLines()` is
-   that invariant, written down. */
+   that figure's provenance — MIN / DEPARTING / SCHEDULED / N MIN LATE /
+   CANCELLED — and every row is exactly three lines in every state, so no delay,
+   cancellation or missing feed can push the sixth service past the fold.
+   `rowLines()` is that invariant, written down. */
 
 import { parseIso, clock, minutesUntil, ageLabel } from './time.js';
 import { lineColour } from './lines.js';
@@ -15,7 +15,15 @@ import { lineColour } from './lines.js';
 export const STALE_MS = 90_000;
 const LIVE_DOT_MS = 45_000;
 
-export const CANCELLED_LEAD_NOTE = (time) => time + ' cancelled · next running service';
+/* Owner ruling 2026-09-01 (A): the note is set at the full label idiom on every
+   width, so the copy is the length the idiom can print — "train" is also the
+   product's own noun where "running service" is operator vocabulary. */
+export const CANCELLED_LEAD_NOTE = (time) => time + ' cancelled · next train';
+
+/* Owner ruling 2026-09-01 (B): past 99 minutes the figure changes unit rather
+   than growing a third digit. "187" is arithmetically true and unreadable —
+   the clock time beside it already says 03:53 better than three digits do. */
+export const HOURS_FROM_MIN = 100;
 
 export function boardModel(body, nowMs, opts = {}) {
   const staleMs = opts.staleMs ?? STALE_MS;
@@ -56,12 +64,16 @@ export function boardModel(body, nowMs, opts = {}) {
 }
 
 /** The figure in the big slot: a dash for a cancellation, nothing at all off
-    stale data (owner ruling: a countdown from an old cache is a lie), else the
-    minutes — or "Now" for the minute a service is leaving in. */
+    stale data (owner ruling: a countdown from an old cache is a lie), "Now" for
+    the minute a service is leaving in, minutes up to 99, and rounded hours
+    beyond that (owner ruling B) — the unit changes so the figure stays one
+    glance wide. */
 function figureFor(cancelled, stale, mins) {
   if (cancelled) return '–';
   if (stale) return '';
-  return mins <= 0 ? 'Now' : String(mins);
+  if (mins <= 0) return 'Now';
+  if (mins >= HOURS_FROM_MIN) return Math.round(mins / 60) + 'H';
+  return String(mins);
 }
 
 function journeyRow(journey, nowMs, stale, opts) {
@@ -89,7 +101,9 @@ function journeyRow(journey, nowMs, stale, opts) {
   if (cancelled) { kind = 'cx'; provenance = 'CANCELLED'; }
   else if (delayMin > 0) { kind = 'late'; provenance = delayMin + ' MIN LATE'; }
   else if (!realtime || stale) { kind = 'sched'; provenance = 'SCHEDULED'; }
-  else { kind = 'live'; provenance = 'MIN'; }
+  // Owner ruling 2026-09-01 (D): the figure "Now" is not a count of minutes,
+  // so the slot under it names what is happening instead of its unit.
+  else { kind = 'live'; provenance = mins <= 0 ? 'DEPARTING' : 'MIN'; }
 
   const figure = figureFor(cancelled, stale, mins);
 
@@ -98,10 +112,12 @@ function journeyRow(journey, nowMs, stale, opts) {
   return {
     key: (dep.scheduled || dep.estimated) + '|' + lineCode + '|' + (dep.platform || ''),
     first: false,
-    // Three characters ("187", "Now") do not fit the figure column at the
-    // board's headline size — measured 129px in an 86px column, which put the
-    // hero figure through the departure time on the late-night board. The row
-    // says so and the stylesheet sizes it down; nothing is ever clipped.
+    // Three characters do not fit the figure column at the board's headline
+    // size — measured 129px in an 86px column, which put the hero figure
+    // through the departure time on the late-night board. Ruling B retired the
+    // three-DIGIT case ("187" is "3H" now), but three characters are still
+    // reachable two ways: "Now", and a service far enough out to round to ten
+    // hours or more ("10H"). The row says so and the stylesheet sizes it down.
     wide: figure.length >= 3,
     cancelled,
     scheduledOnly: !realtime,

@@ -57,7 +57,15 @@ the JSON yourself cannot make.
 
 ```
 node tools/shoot-states.js [state...] [--list] [--url URL] [--out DIR]
-        [--size WxH] [--media name:value] [--probe "JS returning a value"]
+        [--size WxH] [--media name:value] [--prefix light-]
+        [--probe "JS returning a value"]
+```
+
+The whole sweep under an emulated media feature is one line, and `--prefix`
+keeps it from overwriting the default set:
+
+```
+node tools/shoot-states.js --media prefers-color-scheme:light --prefix light-
 ```
 
 Seeds the client's localStorage document, pins the clock through

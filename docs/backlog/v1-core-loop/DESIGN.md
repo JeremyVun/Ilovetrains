@@ -56,11 +56,15 @@ The images in `comps/shots/` still outrank this prose; these are the choices
 the prose did not cover.
 
 - **Cancelled lead.** The cancelled row stays in place, exactly as the
-  exemplar draws it. C's copy (`22:48 CANCELLED · NEXT RUNNING SERVICE`) is
-  carried by the *next running service*, in that row's third-line slot in
-  coral, replacing the headsign for that row only. A fourth line would break
-  the three-lines invariant, and the headsign is the least load-bearing line
-  on a station-pair board.
+  exemplar draws it. C's copy is carried by the *next running service*, in that
+  row's third-line slot in coral, replacing the headsign for that row only. A
+  fourth line would break the three-lines invariant, and the headsign is the
+  least load-bearing line on a station-pair board. The string is
+  `22:48 CANCELLED · NEXT TRAIN` at the full label idiom (owner ruling
+  2026-09-01 A). It was `… NEXT RUNNING SERVICE` set at 9px/.05em — the only
+  type on the board outside the ladder, and it still did not fit a 360px phone.
+  Below 375px the page margin flexes 22px → 18px, which is what buys the last
+  few pixels: the type is the design, the margin is the sheet.
 - **Stale board.** The figure slot empties (no countdown off stale data) but
   keeps its height, so the board reads as "the figures are gone" rather than
   as a new layout. The provenance slot then says `SCHEDULED`; a cancelled row
@@ -75,18 +79,38 @@ the prose did not cover.
   wall-clock subtraction, so the figure can never disagree with the two clock
   times printed beside it, and a service holds its row (`Now`) for the whole
   minute in which it leaves.
-- **Three-character figures step down a size.** `187` (the last-train board)
-  and `Now` are 129px and 91px wide against an 86px column at the headline
-  size, and nothing clips them: the hero figure was drawn through the
-  departure time beside it. `rowmodel` marks such a row `wide` and the
-  stylesheet sets it one step smaller. Whether three digits of *minutes* is
-  the right unit at all — against "3h" — is open; see `VERIFICATION.md`.
+- **Past 99 minutes the figure changes unit** (owner ruling 2026-09-01 B):
+  `187` is `3H`, rounded to the nearest hour. `rowmodel.figureFor` owns the
+  rule; `HOURS_FROM_MIN` is the boundary. The `H` is markup, not just a
+  character — `board.splitFigure` puts it in a `.unit` span set at 0.40em on
+  the numeral's baseline, because flat at the hero size `3H` is 91px in an 86px
+  column and reads as a code rather than as a quantity. `patch()` adds and
+  removes that span as a row counts down across the boundary.
+- **Three-character figures still step down a size.** `187` and `Now` are 129px
+  and 91px wide against an 86px column at the headline size, and nothing clips
+  them: the hero figure was drawn through the departure time beside it.
+  `rowmodel` marks such a row `wide` and the stylesheet sets it one step
+  smaller. Ruling B retired the three-DIGIT case but not the rule — `Now` is
+  three characters, and so is any service that rounds to `10H` or beyond — so
+  the step-down stays, guarded by the in-browser figure-overflow invariant.
+- **The `Now` row's provenance is `DEPARTING`** (owner ruling 2026-09-01 D),
+  not `MIN`: the figure is not a count of minutes, so the slot names the event.
+  It never displaces a more specific word — late, scheduled-only and cancelled
+  rows keep theirs.
 - **A board that was never loaded reports no age.** With no `generatedAt` at
   all there is no "last updated": the footer is empty with a resting grey dot
   while the first answer is in the post, and reads `OFFLINE` (no age) when the
   answer never comes. It used to say `OFFLINE · LAST UPDATED 0S AGO`, which
   dated a board that did not exist and called a client that was still asking
   offline.
+- **Light mode** (owner ruling 2026-09-01 C) is one `prefers-color-scheme`
+  block of custom properties in `app.css` plus two things that are not colours:
+  the default font smoothing (`antialiased` thins dark-on-light type), and the
+  stale board's dim, which moved from the rows container onto the rows so it
+  stops washing out the one-line hint that stands in for them. Line badges are
+  painted through `var(--line-XX)` rather than a hex from `lines.js`, because
+  the badge colour is scheme-dependent and the inline style is not. Values,
+  measured ratios and the rejected filled-chip alternative: `docs/STYLES.md`.
 - **`X-Data-Stale`** dims the freshness dot but does not drop the figures:
   the server serving from its own stale window can still be seconds old, and
   `generatedAt` age already governs the stale treatment.

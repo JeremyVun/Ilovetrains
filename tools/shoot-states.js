@@ -4,6 +4,7 @@
  *   node tools/shoot-states.js stale sparse    # just these
  *   node tools/shoot-states.js --list
  *   node tools/shoot-states.js --url http://localhost:8092 --out /tmp/look
+ *   node tools/shoot-states.js --media prefers-color-scheme:light --prefix light-
  *
  * This is not a mock of the app: it loads the app the server serves, seeds
  * localStorage exactly as the client writes it, pins the clock through the
@@ -285,6 +286,7 @@ async function main() {
   let out = DEFAULT_OUT;
   let probe = null;
   let sizeOverride = null;
+  let prefix = '';
   const media = [];
   const wanted = [];
   for (let i = 0; i < argv.length; i++) {
@@ -298,6 +300,9 @@ async function main() {
     else if (argv[i] === '--size') sizeOverride = argv[++i];
     // Passed straight through: --media prefers-reduced-motion:reduce
     else if (argv[i] === '--media') media.push(argv[++i]);
+    // A whole sweep shot under an emulated media feature has to land beside the
+    // default one without overwriting it: --prefix light- names the set.
+    else if (argv[i] === '--prefix') prefix = argv[++i];
     else if (argv[i] === '--list') wanted.push('--list');
     else wanted.push(argv[i]);
   }
@@ -323,7 +328,7 @@ async function main() {
       fs.writeFileSync(seedFile, JSON.stringify(state.seed));
       const args = [
         path.join(ROOT, 'tools/screenshot.js'), url,
-        path.join(out, `${state.name}-${size}.png`),
+        path.join(out, `${prefix}${state.name}-${size}.png`),
         '--size', size, '--dsf', '2', '--wait', '600',
         '--seed', seedFile, '--eval', pageScript(state)
       ];

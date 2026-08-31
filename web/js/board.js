@@ -53,10 +53,25 @@ function rowClass(row) {
     row.kind === 'live' ? '' : row.kind].filter(Boolean).join(' ');
 }
 
+/* An hours figure (owner ruling 2026-09-01 B) is a quantity and its unit, not a
+   two-character code: "3H" set flat at the hero size is 91px in an 86px column
+   — the in-browser figure invariant catches it — and reads as a label rather
+   than as a number. The numeral keeps the headline size and the H is set small
+   beside it, which is how a printed timetable sets a unit. */
+export function splitFigure(figure) {
+  const m = /^(\d+)(H)$/.exec(String(figure));
+  return m ? { num: m[1], unit: m[2] } : { num: String(figure), unit: '' };
+}
+
+function figureHtml(figure) {
+  const { num, unit } = splitFigure(figure);
+  return esc(num) + (unit ? `<span class="unit">${esc(unit)}</span>` : '');
+}
+
 function rowHtml(row) {
   const cls = rowClass(row);
   return `<div class="${cls}" style="--stem:${esc(row.lineColour)}" data-t="row" data-key="${esc(row.key)}">
-  <div class="mins" data-t="figure">${esc(row.figure)}<span class="${row.provenanceWarn ? 'warn' : ''}" data-t="provenance">${esc(row.provenance)}</span></div>
+  <div class="mins" data-t="figure">${figureHtml(row.figure)}<span class="prov${row.provenanceWarn ? ' warn' : ''}" data-t="provenance">${esc(row.provenance)}</span></div>
   <div class="body">
     <div class="dep">${depHtml(row)}</div>
     <div class="meta">Platform <b>${esc(row.platform || '—')}</b> &nbsp;·&nbsp; <i>${esc(row.lineCode || '—')}</i></div>
@@ -97,9 +112,20 @@ export function patch(root, model) {
       text = document.createTextNode('');
       figure.insertBefore(text, figure.firstChild);
     }
-    if (text.nodeValue !== row.figure) text.nodeValue = row.figure;
+    // The figure counts down in place, and a row can cross the 99-minute
+    // boundary while it is on screen, so the unit mark comes and goes too.
+    const { num, unit } = splitFigure(row.figure);
+    if (text.nodeValue !== num) text.nodeValue = num;
+    let unitEl = figure.querySelector('.unit');
+    if (unit && !unitEl) {
+      unitEl = document.createElement('span');
+      unitEl.className = 'unit';
+      figure.insertBefore(unitEl, provenance);
+    }
+    if (unit) unitEl.textContent = unit;
+    else if (unitEl) unitEl.remove();
     if (provenance.textContent !== row.provenance) provenance.textContent = row.provenance;
-    provenance.className = row.provenanceWarn ? 'warn' : '';
+    provenance.className = 'prov' + (row.provenanceWarn ? ' warn' : '');
     const cls = rowClass(row);
     if (el.className !== cls) el.className = cls;
   });

@@ -12,12 +12,65 @@
   --ink:      #F4F5F7;                 /* 17.6:1 on --bg */
   --ink-2:    rgba(244,245,247,0.66);  /* ~8:1   secondary reads */
   --ink-3:    rgba(244,245,247,0.46);  /* ~4.3:1 labels only */
-  --rule:     rgba(244,245,247,0.10);
-  --rule-2:   rgba(244,245,247,0.20);
+  --rule:     rgba(244,245,247,0.10);  /* 1.24:1 hairline */
+  --rule-2:   rgba(244,245,247,0.20);  /* 1.73:1 */
   --warn:     #FF7A5C;                 /* delay / cancellation. 7.4:1 */
   --live:     #4ADE80;
 
+  /* TfNSW line colours, as badge accents. The board paints var(--line-XX);
+     web/js/lines.js maps the API's badge code to the variable and
+     web/test/theme.test.js fails if the two lists ever disagree. */
+  --line-T1: #F99D1C; --line-T2: #0098CD; --line-T3: #F37021; --line-T4: #005AA3;
+  --line-T5: #C4258F; --line-T7: #6F818E; --line-T8: #00954C; --line-T9: #D11F2F;
+  --line-M1: #168388;
+  --line-BMT: #F99D1C; --line-CCN: #D11F2F; --line-SCO: #0098CD;
+  --line-SHL: #00954C; --line-HUN: #833134;
+
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* ---- light scheme (owner ruling 2026-09-01 C) --------------------------- */
+
+/* Not an inversion — a second printing of the same page. The dark palette's
+   CONTRAST STRUCTURE is what carries over, and dark ink on paper does not
+   reach it at the same alphas as light ink on black: ink-2 needs 0.75 here
+   where it needs 0.66 there, ink-3 needs 0.60 against 0.46. Every value below
+   was measured (WCAG relative luminance), not eyeballed; the ratios are in
+   docs/STYLES.md beside the reasoning.
+
+   The ground is warm paper (#FAF9F5), not #FFF: a language made entirely of
+   hairlines and 250-weight numerals glares off pure white, and the exemplar's
+   claim is a printed timetable page, which is never white either. */
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:     #FAF9F5;                 /* warm paper */
+    --ink:    #14120E;                 /* 17.76:1 on --bg */
+    --ink-2:  rgba(20,18,14,0.75);     /* #4E4C48, 8.13:1 */
+    --ink-3:  rgba(20,18,14,0.60);     /* #706E6A, 4.83:1 — labels clear 4.5 */
+    --rule:   rgba(20,18,14,0.11);     /* 1.25:1 — the dark hairline's weight */
+    --rule-2: rgba(20,18,14,0.25);     /* 1.74:1 */
+    --warn:   #BF3418;                 /* 5.36:1. Same hue as #FF7A5C (10° vs
+                                          11°), which is 2.3:1 here and unusable */
+    --live:   #0F7A4A;                 /* 5.11:1 */
+
+    /* Darkened per line, hue and saturation held, lightness dropped only until
+       the badge clears 4.5:1 as text. Four lines were already dark enough to
+       print unchanged. Measured ratios in docs/STYLES.md. */
+    --line-T1: #A46204; /* 4.61 */  --line-T2: #0079A3; /* 4.68 */
+    --line-T3: #BD4D0A; /* 4.71 */  --line-T4: #005AA3; /* 6.66, unchanged */
+    --line-T5: #C4258F; /* 4.97, unchanged */
+    --line-T7: #62727E; /* 4.72 */  --line-T8: #008041; /* 4.79 */
+    --line-T9: #D11F2F; /* 5.05, unchanged */
+    --line-M1: #157B7F; /* 4.78 */
+    --line-BMT: #A46204; --line-CCN: #D11F2F; --line-SCO: #0079A3;
+    --line-SHL: #008041; --line-HUN: #833134; /* 8.12, unchanged */
+  }
+
+  /* Antialiasing is the one rule that must NOT carry over. `antialiased`
+     stops light-on-dark type fattening; applied to dark-on-light it thins it,
+     and this page is set in 250- and 300-weight. The default smoothing is
+     what makes the light board weigh the same as the dark one. */
+  html, body { -webkit-font-smoothing: auto; }
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -105,11 +158,15 @@ button { cursor: pointer; }
   font-size: 54px; font-weight: 250; letter-spacing: -0.045em; line-height: .84;
   color: var(--ink); text-align: right; padding-top: 2px;
 }
-.mins span {
+.mins .prov {
   font-size: 10px; font-weight: 600; letter-spacing: .13em; color: var(--ink-3);
   display: block; margin-top: 9px; text-transform: uppercase;
 }
-.mins span.warn { color: var(--warn); }
+.mins .prov.warn { color: var(--warn); }
+/* The hours figure's unit (ruling B): the numeral keeps the headline size and
+   the H is set small beside it, on the same baseline, in the figure's own
+   colour. Flat at the hero size "3H" is 91px in an 86px column. */
+.mins .unit { font-size: .40em; font-weight: 300; letter-spacing: 0; padding-left: .04em; }
 
 .body { min-width: 0; }
 /* Departure and arrival sit on one line because they are the pair you
@@ -136,14 +193,13 @@ button { cursor: pointer; }
 /* The cancelled-lead note takes the third line's slot rather than adding a
    fourth, so the row is three lines in every state. Same line box height.
 
-   Set two steps below the label idiom (10px/.14em) because that is what it
-   costs to print the sentence whole: measured 2026-09-01, the binding string
-   "22:48 CANCELLED · NEXT RUNNING SERVICE" needs 282px at the idiom and the
-   body column is 232px at 390px — it was arriving as "NEXT RUNNIN…", which is
-   the one line on the board that must not be guessed at. Shortening the copy
-   instead is the alternative flagged for a ruling in VERIFICATION.md. */
+   Full label idiom, at every width (owner ruling 2026-09-01 A). The stopgap it
+   replaces set this one line at 9px/.05em — the only type on the board outside
+   the ladder — to fit the longer copy "…NEXT RUNNING SERVICE". The ruling
+   shortened the copy instead: "22:48 CANCELLED · NEXT TRAIN" measures 205px at
+   10px/.14em, against a 210px body column on the narrowest phone we support. */
 .dest.note {
-  font-size: 9px; font-weight: 600; letter-spacing: .05em; line-height: 19px;
+  font-size: 10px; font-weight: 600; letter-spacing: .14em; line-height: 19px;
   text-transform: uppercase; color: var(--warn);
 }
 
@@ -151,18 +207,21 @@ button { cursor: pointer; }
 .row.first { padding-top: 24px; padding-bottom: 26px; }
 .row.first .dep { font-size: 23px; }
 
-/* A three-character figure — "187" on the last-train board, or "Now" — is
-   wider than the column at the headline size: measured 129px against 86px on
-   2026-09-01, which ran the hero figure straight through the departure time
-   beside it. It steps down one size rather than being clipped or allowed to
-   eat the body column. Whether three digits of minutes is the right unit at
-   all is a separate question, flagged in VERIFICATION.md. */
+/* A three-character figure is wider than the column at the headline size:
+   measured 129px against 86px on 2026-09-01, which ran the hero figure
+   straight through the departure time beside it. It steps down one size rather
+   than being clipped or allowed to eat the body column.
+
+   Ruling B retired the case that found this ("187" is "3H" now), but not the
+   rule: "Now" is three characters, and so is a service that rounds to ten
+   hours or more. Reachable, so kept — and the in-browser figure-overflow
+   invariant would catch it going the other way. */
 .row.wide .mins { font-size: 44px; }
 .row.first.wide .mins { font-size: 48px; }
 
 .row.late .mins, .row.late .dep > strong { color: var(--warn); }
 .row.sched .mins { color: var(--ink-2); font-weight: 200; }
-.row.sched .mins span { color: var(--ink-3); }
+.row.sched .mins .prov { color: var(--ink-3); }
 /* No figure, because there is no wait — but the slot keeps its place in the
    ladder so the eye still counts six services. */
 .row.cx .mins { color: var(--ink-3); font-weight: 200; font-size: 34px; }
@@ -176,7 +235,14 @@ button { cursor: pointer; }
    board reads as "the figures are gone", not as a different layout. */
 .rows.stale .mins { min-height: 66px; }
 .rows.stale .row.first .mins { min-height: 87px; }
-.rows.stale { opacity: .55; }
+/* The dimming belongs to the ROWS, not to the container. On the container it
+   also dimmed the one-line hint that stands in for them ("no board saved for
+   this trip yet") — and 55% of the coral over paper is 2.6:1, a washed salmon
+   (found in light-cold-offline, 2026-09-01). Nothing is more load-bearing than
+   the only sentence on the screen. */
+.rows.stale .row { opacity: .55; }
+/* ...and a row on its way out still goes all the way out. */
+.rows .row.gone { opacity: 0; }
 
 .ftr {
   display: flex; align-items: center; gap: 8px; padding: 15px 22px 18px;
@@ -252,6 +318,17 @@ button { cursor: pointer; }
 }
 .trip .acts button[disabled] { opacity: .3; cursor: default; }
 .trip .acts button.del:active { color: var(--warn); }
+
+/* The narrow phone (360px) gets a narrower page margin, not smaller type: the
+   type ladder and the label idiom are the design, the margin is the sheet it
+   is printed on. 22px of margin at 390px is 18px at 360px in the same
+   proportion, and those 8px are what let the cancelled-lead note print whole
+   at the full idiom (205px of copy in a 210px column, measured). */
+@media (max-width: 375px) {
+  .mast { padding-left: 18px; padding-right: 18px; }
+  .rows, .sheet { padding-left: 18px; padding-right: 18px; }
+  .ftr { padding-left: 18px; padding-right: 18px; }
+}
 
 @media (min-width: 900px) {
   /* A wider screen must show MORE of the board, not less: all six services
