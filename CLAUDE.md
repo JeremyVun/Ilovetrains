@@ -6,13 +6,17 @@ Thin-client PWA + stateless Go caching proxy over TfNSW Open Data.
 ## Status
 
 Phase 1 (Go backend) done 2026-08-31; `docs/contracts/api.md` is implemented
-and smoke-tested against live TfNSW. Next: Phase 2 (client) in
-`docs/backlog/v1-core-loop/BUILD_PLAN.md`. `TFNSW_API_KEY` lives in `.env`
-(gitignored) — never commit or print it.
+and smoke-tested against live TfNSW. Phase 2 (web client in `web/`) built
+2026-09-01: board, first run, trip management, storage + prediction, unit
+tested and smoke-driven; the empirical/visual verification pass is still
+outstanding. `TFNSW_API_KEY` lives in `.env` (gitignored) — never commit or
+print it.
 
-Run the backend: `set -a; source .env; set +a; go run ./cmd/server`
-(env: `TFNSW_API_KEY` required, `PORT` default 8080, `WEB_DIR` default
-`./web`). Test: `go test ./...` — no test makes a network call.
+Run the whole app: `set -a; source .env; set +a; go run ./cmd/server`, then
+open http://localhost:8080 — the server serves `web/` at `/` (env:
+`TFNSW_API_KEY` required, `PORT` default 8080, `WEB_DIR` default `./web`).
+Test: `go test ./...` and `cd web && node --test 'test/*.test.js'` — no test
+makes a network call, and the client has no build step and no npm deps.
 
 ## Structure
 
@@ -25,7 +29,9 @@ Run the backend: `set -a; source .env; set +a; go run ./cmd/server`
 - `docs/references/tfnsw-open-data.md` — upstream API notes; **[verify]**
   items must be resolved by live probes before being relied on
 - `docs/backlog/v1-core-loop/` — v1 design + phased build plan
-- `tools/` — probe/verification scripts + captured TfNSW fixtures
+- `tools/` — probe/verification scripts (`screenshot.js`) + TfNSW fixtures
+- `web/` — the client: `index.html`, `app.css`, ES modules in `web/js`
+  (`rowmodel`, `storage`, `predict` are pure and unit tested in `web/test`)
 - `cmd/server` — backend entrypoint; `internal/tfnsw` — upstream client and
   response mapping; `internal/cache` — TTL + single-flight + stale-on-error;
   `internal/api` — handlers, cache headers, error contract
