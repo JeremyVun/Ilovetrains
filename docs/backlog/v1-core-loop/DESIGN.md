@@ -49,6 +49,36 @@ variants — the exemplar image outranks any prose description of it.
 - **Rejected for v1:** general trip planner, other modes, push notifications,
   alerts UI (alerts surface only as `cancelled` flags for now).
 
+## Client implementation notes (Phase 2, 2026-09-01)
+
+Where the exemplar and the owner rulings needed a decision to become code.
+The images in `comps/shots/` still outrank this prose; these are the choices
+the prose did not cover.
+
+- **Cancelled lead.** The cancelled row stays in place, exactly as the
+  exemplar draws it. C's copy (`22:48 CANCELLED · NEXT RUNNING SERVICE`) is
+  carried by the *next running service*, in that row's third-line slot in
+  coral, replacing the headsign for that row only. A fourth line would break
+  the three-lines invariant, and the headsign is the least load-bearing line
+  on a station-pair board.
+- **Stale board.** The figure slot empties (no countdown off stale data) but
+  keeps its height, so the board reads as "the figures are gone" rather than
+  as a new layout. The provenance slot then says `SCHEDULED`; a cancelled row
+  still says `CANCELLED` and keeps its `–`. Departed rows are dropped, the
+  rows dim to 55%, the footer goes coral: `OFFLINE · LAST UPDATED X AGO`.
+  A dash in the figure slot was rejected: it is the cancelled row's glyph.
+- **Masthead words.** `REVERSE` always; `SWITCH TRIP` only with more than one
+  saved trip (per the frozen IA); `EDIT` always, as the unobtrusive route to
+  trip management. With one trip the masthead keeps the exemplar's two words.
+  Both words lead to the same screen, which is both picker and editor.
+- **Minutes arithmetic** is the difference between clock *minutes*, not
+  wall-clock subtraction, so the figure can never disagree with the two clock
+  times printed beside it, and a service holds its row (`Now`) for the whole
+  minute in which it leaves.
+- **`X-Data-Stale`** dims the freshness dot but does not drop the figures:
+  the server serving from its own stale window can still be seconds old, and
+  `generatedAt` age already governs the stale treatment.
+
 ## Experience bar (acceptance)
 
 - Warm open → correct predicted board visible < 500ms (cached paint), live
