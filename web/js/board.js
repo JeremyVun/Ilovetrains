@@ -46,8 +46,15 @@ function emptyCopy(model) {
   return 'No services in the next few hours';
 }
 
+/** One place, because `patch` rewrites the class the same way `boardHtml`
+    wrote it — a row that changes state must not change shape. */
+function rowClass(row) {
+  return ['row', row.first ? 'first' : '', row.wide ? 'wide' : '',
+    row.kind === 'live' ? '' : row.kind].filter(Boolean).join(' ');
+}
+
 function rowHtml(row) {
-  const cls = ['row', row.first ? 'first' : '', row.kind === 'live' ? '' : row.kind].filter(Boolean).join(' ');
+  const cls = rowClass(row);
   return `<div class="${cls}" style="--stem:${esc(row.lineColour)}" data-t="row" data-key="${esc(row.key)}">
   <div class="mins" data-t="figure">${esc(row.figure)}<span class="${row.provenanceWarn ? 'warn' : ''}" data-t="provenance">${esc(row.provenance)}</span></div>
   <div class="body">
@@ -93,7 +100,7 @@ export function patch(root, model) {
     if (text.nodeValue !== row.figure) text.nodeValue = row.figure;
     if (provenance.textContent !== row.provenance) provenance.textContent = row.provenance;
     provenance.className = row.provenanceWarn ? 'warn' : '';
-    const cls = ['row', row.first ? 'first' : '', row.kind === 'live' ? '' : row.kind].filter(Boolean).join(' ');
+    const cls = rowClass(row);
     if (el.className !== cls) el.className = cls;
   });
 

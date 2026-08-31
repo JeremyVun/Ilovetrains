@@ -4,6 +4,6 @@
   "type": "module",
   "description": "Marks web/**/*.js as ES modules for `node --test`. No dependencies, no build step: the browser loads these files as written.",
   "scripts": {
-    "test": "node --test test/"
+    "test": "node --test 'test/*.test.js'"
   }
 }

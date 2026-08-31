@@ -5,6 +5,7 @@ package api
 import (
 	"context"
 	"errors"
+	"mime"
 	"net/http"
 	"os"
 	"strconv"
@@ -88,6 +89,11 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) staticHandler() http.Handler {
+	// Go's MIME table has no entry for .webmanifest, so the file server sniffs
+	// it as text/plain and the install prompt never appears. Registering the
+	// type is idempotent.
+	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
+
 	if info, err := os.Stat(s.webDir); err != nil || !info.IsDir() {
 		// The client is built in a later phase; until then / is simply empty.
 		return http.HandlerFunc(handleNotFound)
