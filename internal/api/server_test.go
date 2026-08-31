@@ -355,6 +355,26 @@ func TestStaticFilesAreServedWithoutShadowingTheAPI(t *testing.T) {
 	}
 }
 
+// Without an explicit Cache-Control, Cloudflare edge-caches static extensions
+// for 4h and a deployed service-worker bump does not reach returning phones
+// until it expires (observed live 2026-09-01). no-cache = revalidate; the
+// service worker owns client-side speed.
+func TestStaticFilesCarryNoCache(t *testing.T) {
+	webDir := t.TempDir()
+	for _, name := range []string{"sw.js", "app.css", "index.html"} {
+		if err := os.WriteFile(filepath.Join(webDir, name), []byte("x"), 0o600); err != nil {
+			t.Fatalf("writing %s: %v", name, err)
+		}
+	}
+	handler := New(&fakeUpstream{}, webDir).Handler()
+
+	for _, path := range []string{"/sw.js", "/app.css", "/", "/index.html"} {
+		if cc := get(t, handler, path).Header().Get("Cache-Control"); cc != "no-cache" {
+			t.Errorf("GET %s Cache-Control = %q, want no-cache", path, cc)
+		}
+	}
+}
+
 // Chrome will not offer to install a PWA whose manifest arrives as text/plain,
 // which is what Go's MIME table does with .webmanifest left to itself.
 func TestWebManifestIsServedAsManifestJSON(t *testing.T) {

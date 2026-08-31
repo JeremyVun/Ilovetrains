@@ -98,7 +98,18 @@ func (s *Server) staticHandler() http.Handler {
 		// The client is built in a later phase; until then / is simply empty.
 		return http.HandlerFunc(handleNotFound)
 	}
-	return http.FileServer(http.Dir(s.webDir))
+	fs := http.FileServer(http.Dir(s.webDir))
+	// Explicit no-cache on every shell file: without it Cloudflare imposes its
+	// default 4h edge TTL on static extensions and a deploy does not reach
+	// returning phones until it expires (observed live 2026-09-01: sw.js served
+	// as a cf-cache-status HIT 47 minutes after the v4 deploy). no-cache means
+	// revalidate, not don't-store — Last-Modified 304s keep it cheap, the
+	// service worker keeps clients fast, and sw.js freshness is what governs
+	// shell updates, so it above all must never be served stale by a proxy.
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache")
+		fs.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) handleDepartures(w http.ResponseWriter, r *http.Request) {

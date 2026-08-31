@@ -166,6 +166,12 @@ a stale index rather than returning 502.
 routes always take precedence, and unknown `/api/` paths return the JSON error
 envelope rather than falling through to the file server.
 
+Every static response carries `Cache-Control: no-cache` (added 2026-09-01):
+absent an explicit header Cloudflare edge-caches static extensions for 4h,
+which held back a deployed service-worker bump. no-cache = revalidate
+(Last-Modified 304s), not don't-store; client-side speed comes from the
+service worker, and `sw.js` must never be served stale by a proxy.
+
 The client is a PWA, so two of those files are load-bearing:
 `/manifest.webmanifest` must be served as `application/manifest+json` (the
 server registers the type; Go's MIME table does not know it, and a manifest
