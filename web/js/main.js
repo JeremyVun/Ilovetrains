@@ -1,60 +1,67 @@
-/* App controller: routing, timers, and the fetch/cache loop.
-
-   Order of events on a warm open: predicted trip → paint from the localStorage
-   cache → fetch live → replace without layout shift. Between fetches the
-   figures count down in place once a second. */
+/* App controller. Home is the open state; board and detail are one tap deeper. */
 
 import {
-  loadDoc, saveDoc, addTrip, findTrip, leg, cacheKey, putCache, getCache, recordView
+  loadDoc, saveDoc, addTrip, findTrip, leg, cacheKey, putCache, getCache, recordView,
+  recordRide, updateStop, setHome
 } from './storage.js';
-import { predict } from './predict.js';
+import { distanceKm, predict } from './predict.js';
 import { boardModel } from './rowmodel.js';
-import { journeyDetail, journeyKey } from './journey.js';
+import { journeyDetail, journeyKey, arrivalMs, departureMs } from './journey.js';
 import {
-  focusOf, setFocus, clearFocus, isFocused, focusExpired, matchJourney, refreshFocus, stripModel
+  focusOf, setFocus, clearFocus, isFocused, focusExpired, matchJourney, refreshFocus
 } from './focus.js';
 import * as Board from './board.js';
 import * as Detail from './detail.js';
+import * as Home from './home.js';
 import { renderSetup } from './setup.js';
-import { renderTrips } from './trips.js';
-import { getDepartures } from './api.js';
+import { getDepartures, getStops } from './api.js';
 import { onAction } from './dom.js';
 
-const REFRESH_MS = 30_000;   // matches the server's s-maxage=30
+const REFRESH_MS = 30_000;
 const TICK_MS = 1_000;
 const VIEW_QUALIFIES_MS = 5_000;
 const LIMIT = 6;
+const PAST_STEP_MS = 60 * 60_000;
+const PAST_BOUND_MS = 24 * 60 * 60_000;
+const FIX_MAX_AGE_MS = 5 * 60_000;
 
-/* Indirection so a test harness can pin the clock: window.__trains.now = () => ms */
 let nowFn = () => Date.now();
 const now = () => nowFn();
 
 const state = {
   doc: loadDoc(),
-  selection: null,      // {tripId, direction}
-  body: null,           // last departures response for the current selection
+  selection: null,
+  body: null,
+  pastBodies: [],
   serverStale: false,
   offline: false,
   viewRecorded: false,
   root: null,
-  onBoard: false,       // a data-backed view is live: the board or a journey
-  view: null,           // 'board' | 'detail'
-  journey: null         // the journey the detail view is showing (a snapshot)
+  view: null,
+  journey: null,
+  initialBoardLanding: true,
+  loadingPast: false,
+  pastExhausted: false,
+  fix: null,
+  locationDismissed: false,
+  offerDismissed: false,
+  coordsBackfillStarted: false
 };
+Object.defineProperty(state, 'onBoard', {
+  get() { return ['home', 'board', 'detail'].includes(state.view); }
+});
 
 const timers = { tick: null, refresh: null, view: null };
 let inflight = null;
-
-/* --- routing ------------------------------------------------------------ */
+let pastInflight = null;
 
 function freshRoot() {
-  // Replacing the node drops every listener the previous screen attached.
   const old = document.getElementById('app');
-  const el = document.createElement('div');
-  el.id = 'app';
-  old.replaceWith(el);
-  state.root = el;
-  return el;
+  const element = document.createElement('div');
+  element.id = 'app';
+  old.replaceWith(element);
+  state.root = element;
+  return element;
 }
 
 const ctx = {
@@ -63,161 +70,291 @@ const ctx = {
   go(hash) { if (location.hash === hash) route(); else location.hash = hash; },
   update(doc) { state.doc = doc; saveDoc(doc); },
   saveTrip(trip) {
-    ctx.update(addTrip(state.doc, trip));
-    state.selection = { tripId: trip.id, direction: 'forward' };
+    const next = addTrip(state.doc, trip);
+    ctx.update(next);
+    const saved = next.trips.find((item) => item.from.id === trip.from.id && item.to.id === trip.to.id)
+      || next.trips.find((item) => item.from.id === trip.to.id && item.to.id === trip.from.id);
+    state.selection = { tripId: saved.id, direction: saved.from.id === trip.from.id ? 'forward' : 'reverse' };
     ctx.go('#/');
-  },
-  selectTrip(tripId) {
-    state.selection = { tripId, direction: 'forward' };
-    ctx.go('#/');
-  },
-  tripRemoved(tripId) {
-    if (state.selection && state.selection.tripId === tripId) state.selection = null;
-    if (!state.doc.trips.length) ctx.go('#/setup');
   }
 };
 
 function route() {
   stopTimers();
-  state.onBoard = false;
-  state.view = null;
+  if (inflight) inflight.abort();
+  if (pastInflight) pastInflight.abort();
   const hash = location.hash || '#/';
   const root = freshRoot();
+  state.view = null;
 
   if (hash === '#/setup' || hash === '#/trips/new') return renderSetup(root, ctx);
-  if (hash === '#/trips') return renderTrips(root, ctx);
-  if (!state.doc.trips.length) { location.hash = '#/setup'; return; }
+  if (!state.doc.trips.length) {
+    if (location.hash !== '#/setup') location.hash = '#/setup';
+    else renderSetup(root, ctx);
+    return;
+  }
   if (hash === '#/journey') return showDetail(root);
-  showBoard(root);
+  if (hash === '#/board') return showBoard(root);
+  showHome(root);
 }
 
-/* --- board -------------------------------------------------------------- */
+function selectedTrip() {
+  return state.selection && findTrip(state.doc, state.selection.tripId);
+}
 
 function currentLeg() {
-  const trip = findTrip(state.doc, state.selection.tripId);
-  return leg(trip, state.selection.direction);
+  return leg(selectedTrip(), state.selection.direction);
 }
 
 function currentKey() {
-  const { from, to } = currentLeg();
-  return cacheKey(from.id, to.id);
+  const ends = currentLeg();
+  return cacheKey(ends.from.id, ends.to.id);
 }
 
-function showBoard(root) {
-  if (!state.selection || !findTrip(state.doc, state.selection.tripId)) {
-    state.selection = predict(state.doc, now());
+function chooseSelection() {
+  const focus = focusOf(state.doc);
+  if (focus && !focusExpired(focus, now()) && findTrip(state.doc, focus.tripId)) {
+    return { tripId: focus.tripId, direction: focus.direction };
   }
-  state.onBoard = true;
-  state.view = 'board';
-  state.viewRecorded = false;
-  state.offline = false;
-  state.serverStale = false;
+  if (state.selection && findTrip(state.doc, state.selection.tripId)) return state.selection;
+  return predict(state.doc, now(), { fix: validFix() });
+}
 
+function validFix() {
+  if (!state.fix || !Number.isFinite(state.fix.at) || now() - state.fix.at > FIX_MAX_AGE_MS) return null;
+  return state.fix;
+}
+
+function loadSelectedCache() {
   const cached = getCache(state.doc, currentKey());
   state.body = cached ? cached.body : null;
+  state.serverStale = false;
+  state.offline = false;
+}
 
-  render();
-  onAction(root, boardAction);
-  startTimers();
+function showHome(root) {
+  state.view = 'home';
+  state.selection = chooseSelection();
+  loadSelectedCache();
+  renderHome();
+  onAction(root, homeAction);
+  startTimers(false);
   fetchLive();
+  backfillCoordinates();
 }
 
 function currentModel() {
-  const trip = findTrip(state.doc, state.selection.tripId);
-  const { to } = leg(trip, state.selection.direction);
+  const ends = currentLeg();
   const model = boardModel(state.body || {}, now(), {
     forceStale: state.offline,
     degraded: state.serverStale,
-    fallbackHeadsign: to.name
+    fallbackHeadsign: ends.to.name,
+    pastBodies: state.pastBodies
   });
   if (!state.body) model.status = state.offline ? 'offline' : 'loading';
   return model;
 }
 
-/* The strip is drawn from the SNAPSHOT, not from the board, which is what
-   lets it outlive the journey's departure. An expired focus stops being drawn
-   here and is deleted on the next refresh (`refreshFocus`): rendering has no
-   business writing to storage, and a render that does can be run at a clock
-   nobody meant — the app paints once with the real one before anything pins
-   it. */
-function currentStrip(model) {
-  const focus = focusOf(state.doc);
-  if (!focus || focusExpired(focus, now())) return null;
-  const trip = findTrip(state.doc, focus.tripId);
-  const ends = trip ? leg(trip, focus.direction) : null;
-  return stripModel(focus, now(), {
+function renderHome() {
+  if (state.view !== 'home') return;
+  const model = currentModel();
+  const askLocation = state.doc.trips.length >= 2 && !state.fix && !state.locationDismissed;
+  const home = Home.homeModel(state.doc, state.selection, state.body, now(), {
+    fix: validFix(),
     stale: model.stale,
-    fromName: ends ? ends.from.name : '',
-    toName: ends ? ends.to.name : ''
+    offline: state.offline,
+    askLocation,
+    leave: leaveDistance()
   });
+  if (state.offerDismissed) {
+    home.over = false;
+    home.home.moved = null;
+  }
+  const list = state.root.querySelector('[data-t="trip-list"]');
+  const scrollTop = list ? list.scrollTop : 0;
+  state.root.innerHTML = Home.homeHtml(home);
+  const nextList = state.root.querySelector('[data-t="trip-list"]');
+  if (nextList) nextList.scrollTop = scrollTop;
+  Home.finishHomeRender(state.root);
 }
 
-function render() {
-  if (state.view === 'detail') return renderDetail();
-  const trip = findTrip(state.doc, state.selection.tripId);
-  const model = currentModel();
+function leaveDistance() {
+  const fix = validFix();
+  if (!fix || !selectedTrip()) return '';
+  const origin = currentLeg().from;
+  const distanceKmFromOrigin = distanceKm(fix, origin.location);
+  const focus = focusOf(state.doc);
+  const journey = focus && focus.tripId === state.selection.tripId
+    && focus.direction === state.selection.direction ? focus.journey
+    : state.body && (state.body.journeys || []).find((item) => !item.cancelled);
+  const departure = departureMs(journey);
+  if (!Number.isFinite(distanceKmFromOrigin) || departure === null || departure <= now()) return '';
+  // A conservative five-kilometre-per-hour walk plus three minutes to reach
+  // the platform. Location is a prompt to act only when leaving is actually
+  // due; it must not turn every future service into “Leave now”.
+  const walkMs = (distanceKmFromOrigin / 5 * 60 + 3) * 60_000;
+  if (departure - now() > walkMs) return '';
+  const distance = Home.formatDistance(distanceKmFromOrigin);
+  return distance ? distance.replace(/ away$/, '') : '';
+}
+
+function showBoard(root) {
+  state.view = 'board';
+  state.selection = chooseSelection();
+  state.viewRecorded = false;
+  state.pastBodies = [];
+  state.pastExhausted = false;
+  state.initialBoardLanding = true;
+  loadSelectedCache();
+  renderBoard();
+  onAction(root, boardAction);
+  wireTimeline();
+  startTimers(true);
+  fetchLive();
+  fetchPast(true);
+}
+
+function renderBoard({ addedAbove = false } = {}) {
+  if (state.view !== 'board') return;
+  const saved = Board.preserveTimeline(state.root);
   state.root.innerHTML = Board.boardHtml({
-    trip,
+    trip: selectedTrip(),
     direction: state.selection.direction,
-    tripCount: state.doc.trips.length,
-    model,
-    strip: currentStrip(model)
+    model: currentModel(),
+    nowMs: now()
+  });
+  if (state.initialBoardLanding) {
+    Board.landAtNow(state.root);
+    state.initialBoardLanding = false;
+  } else {
+    Board.restoreTimeline(state.root, saved, addedAbove);
+  }
+  wireTimeline();
+}
+
+function wireTimeline() {
+  const timeline = state.root.querySelector('[data-t="timeline"]');
+  if (!timeline || timeline.dataset.wired) return;
+  timeline.dataset.wired = '1';
+  timeline.addEventListener('scroll', () => {
+    if (timeline.scrollTop < 80) fetchPast(false);
+  }, { passive: true });
+}
+
+function homeAction(action, element) {
+  if (action === 'board') return ctx.go('#/board');
+  if (action === 'trip-list') {
+    state.root.querySelector('[data-t="trip-list"]')?.scrollTo({ top: 0, behavior: 'smooth' });
+    state.root.querySelector('.tripr')?.focus();
+    return;
+  }
+  if (action === 'new-trip') return ctx.go('#/trips/new');
+  if (action === 'select-trip') {
+    state.selection = { tripId: element.dataset.id, direction: element.dataset.direction || 'forward' };
+    state.offerDismissed = false;
+    loadSelectedCache();
+    renderHome();
+    fetchLive();
+    return;
+  }
+  if (action === 'way-back') {
+    state.doc = clearFocus(state.doc);
+    state.selection = {
+      tripId: state.selection.tripId,
+      direction: state.selection.direction === 'reverse' ? 'forward' : 'reverse'
+    };
+    ctx.update(state.doc);
+    state.offerDismissed = false;
+    loadSelectedCache();
+    renderHome();
+    fetchLive();
+    return;
+  }
+  if (action === 'dismiss-offer') {
+    state.offerDismissed = true;
+    renderHome();
+    return;
+  }
+  if (action === 'skip-location') {
+    state.locationDismissed = true;
+    renderHome();
+    return;
+  }
+  if (action === 'use-location') return requestLocation();
+  if (action === 'accept-home') {
+    const station = state.doc.trips.flatMap((trip) => [trip.from, trip.to])
+      .find((stop) => stop.id === element.dataset.id);
+    if (station) ctx.update(setHome(state.doc, station, 3, now()));
+    state.offerDismissed = true;
+    renderHome();
+  }
+}
+
+function requestLocation() {
+  state.locationDismissed = true;
+  if (!navigator.geolocation) { renderHome(); return; }
+  navigator.geolocation.getCurrentPosition((position) => {
+    state.fix = {
+      lat: position.coords.latitude,
+      lon: position.coords.longitude,
+      at: position.timestamp || Date.now()
+    };
+    state.selection = predict(state.doc, now(), { fix: validFix() });
+    loadSelectedCache();
+    renderHome();
+    fetchLive();
+  }, () => renderHome(), {
+    enableHighAccuracy: false,
+    timeout: 8000,
+    maximumAge: 5 * 60_000
   });
 }
 
-function onTick() {
-  if (!state.onBoard) return;
-  if (state.view === 'detail') {
-    const model = detailModel();
-    if (!model || !Detail.patch(state.root, model, isFocused(state.doc, state.journey))) render();
-    return;
+function boardAction(action, element) {
+  if (action === 'home') {
+    qualifyView();
+    return ctx.go('#/');
   }
-  const model = currentModel();
-  if (Board.sameRowSet(state.root, model)) {
-    Board.patch(state.root, model, currentStrip(model));
-    return;
+  if (action !== 'detail') return;
+  qualifyView();
+  const journeys = [
+    ...((state.body && state.body.journeys) || []),
+    ...state.pastBodies.flatMap((page) => page.journeys || [])
+  ];
+  const journey = journeys.find((item) => journeyKey(item) === element.dataset.match);
+  if (journey) {
+    state.journey = journey;
+    ctx.go('#/journey');
   }
-  Board.dissolveDeparted(state.root, model, render);
 }
 
-/* --- journey detail ----------------------------------------------------- */
-
-/** The journey the detail view is about: the one just tapped, or — on a cold
-    open straight into #/journey — the focused one. */
 function showDetail(root) {
   const focus = focusOf(state.doc);
   if (!state.journey && focus && !focusExpired(focus, now())) {
     state.journey = focus.journey;
     state.selection = { tripId: focus.tripId, direction: focus.direction };
   }
-  if (!state.journey || !state.selection || !findTrip(state.doc, state.selection.tripId)) {
+  if (!state.journey || !state.selection || !selectedTrip()) {
     location.hash = '#/';
     return;
   }
-  state.onBoard = true;
   state.view = 'detail';
-  state.offline = false;
-  state.serverStale = false;
-
-  const cached = getCache(state.doc, currentKey());
-  if (!state.body) state.body = cached ? cached.body : null;
-
-  render();
+  loadSelectedCache();
+  renderDetail();
   onAction(root, detailAction);
-  startTimers();
+  startTimers(false);
   fetchLive();
 }
 
 function detailModel() {
   if (!state.journey) return null;
-  const trip = findTrip(state.doc, state.selection.tripId);
-  const { from, to } = leg(trip, state.selection.direction);
-  const model = boardModel(state.body || {}, now(), {
-    forceStale: state.offline, degraded: state.serverStale
-  });
+  const ends = currentLeg();
+  const model = currentModel();
   return {
     ...journeyDetail(state.journey, now(), {
-      stale: model.stale, fromName: from.name, toName: to.name
+      stale: model.stale,
+      fromName: ends.from.name,
+      toName: ends.to.name
     }),
     footer: model.footer,
     boardStale: model.stale
@@ -230,131 +367,167 @@ function renderDetail() {
   state.root.innerHTML = Detail.detailHtml({
     model,
     focused: isFocused(state.doc, state.journey)
-  }) + Board.footerHtml(model);
+  }) + footerHtml(model);
+}
+
+function footerHtml(model) {
+  return `<div class="ftr${model.stale ? ' offline' : ''}"><span class="pulse ${model.footer.dot}"></span>${model.footer.text}</div>`;
 }
 
 function detailAction(action) {
-  if (action === 'board') return ctx.go('#/');
+  if (action === 'board') return ctx.go('#/board');
   if (action === 'focus') {
     ctx.update(setFocus(state.doc, state.selection, state.journey, now()));
-    return render();
+    return ctx.go('#/');
   }
   if (action === 'unfocus') {
     ctx.update(clearFocus(state.doc));
-    return render();
+    return ctx.go('#/');
   }
 }
-
-function openJourney(journey) {
-  state.journey = journey;
-  ctx.go('#/journey');
-}
-
-function boardAction(action, el) {
-  if (action === 'detail') {
-    qualifyView();
-    // The strip carries the snapshot; a board row names a journey in the body.
-    const key = el.dataset.match;
-    if (key === undefined) {
-      const focus = focusOf(state.doc);
-      if (focus) openJourney(focus.journey);
-      return;
-    }
-    const journeys = (state.body && state.body.journeys) || [];
-    const journey = journeys.find((j) => journeyKey(j) === key);
-    if (journey) openJourney(journey);
-    return;
-  }
-  if (action === 'edit' || action === 'switch') {
-    qualifyView();
-    return ctx.go('#/trips');
-  }
-  if (action === 'reverse') {
-    qualifyView();
-    state.selection = {
-      tripId: state.selection.tripId,
-      direction: state.selection.direction === 'reverse' ? 'forward' : 'reverse'
-    };
-    state.viewRecorded = false;
-    state.offline = false;
-    state.serverStale = false;
-    const cached = getCache(state.doc, currentKey());
-    state.body = cached ? cached.body : null;
-    render();
-    startTimers();
-    fetchLive();
-  }
-}
-
-/* --- data --------------------------------------------------------------- */
 
 async function fetchLive() {
-  if (!state.onBoard || document.hidden) return;
-  const { from, to } = currentLeg();
-  const key = cacheKey(from.id, to.id);
+  if (!['home', 'board', 'detail'].includes(state.view) || document.hidden) return;
+  const ends = currentLeg();
+  const key = currentKey();
   if (inflight) inflight.abort();
   inflight = new AbortController();
   try {
-    const { body, serverStale } = await getDepartures(from.id, to.id, { limit: LIMIT, signal: inflight.signal });
-    if (!state.onBoard || key !== currentKey()) return; // the user moved on
+    const { body, serverStale } = await getDepartures(ends.from.id, ends.to.id, {
+      limit: LIMIT,
+      signal: inflight.signal
+    });
+    if (!['home', 'board', 'detail'].includes(state.view) || key !== currentKey()) return;
     state.body = body;
     state.serverStale = serverStale;
     state.offline = false;
-    ctx.update(refreshFocus(putCache(state.doc, key, body, now()), state.selection, body, now()));
-    /* The journey on screen is re-matched in the fresh data by the same rule
-       the focus uses, so live delays keep flowing through the detail view. An
-       unmatched journey (it has departed, or this is another board) keeps the
-       copy it has — which is what makes the detail view work offline. */
+    let doc = putCache(state.doc, key, body, now());
+    doc = recordCompletedFocus(doc);
+    doc = refreshFocus(doc, state.selection, body, now());
+    ctx.update(doc);
     if (state.journey) state.journey = matchJourney(body.journeys, state.journey) || state.journey;
-  } catch (e) {
-    if (e.name === 'AbortError') return;
+  } catch (error) {
+    if (error.name === 'AbortError') return;
     state.offline = true;
   }
-  if (state.onBoard) render();
+  renderCurrent();
 }
 
-/* --- timers ------------------------------------------------------------- */
+function recordCompletedFocus(doc) {
+  const focus = focusOf(doc);
+  if (!focus || arrivalMs(focus.journey) === null || now() < arrivalMs(focus.journey)) return doc;
+  const trip = findTrip(doc, focus.tripId);
+  if (!trip) return doc;
+  const ends = leg(trip, focus.direction);
+  let next = recordRide(doc, { tripId: focus.tripId, direction: focus.direction },
+    focus.journey, ends.from, ends.to);
+  if (!next.home) {
+    const inferred = Home.inferHome(next, now()).inferred;
+    if (inferred) next = setHome(next, inferred.station, inferred.confidence, now());
+  }
+  return next;
+}
 
-function startTimers() {
+async function fetchPast(initial) {
+  if (state.view !== 'board' || state.loadingPast || state.pastExhausted) return;
+  state.loadingPast = true;
+  const ends = currentLeg();
+  const key = currentKey();
+  const all = state.pastBodies.flatMap((page) => page.journeys || []);
+  const earliest = all.map((journey) => Date.parse((journey.departure || {}).scheduled))
+    .filter(Number.isFinite).sort((a, b) => a - b)[0];
+  const at = initial || !Number.isFinite(earliest) ? now() - PAST_STEP_MS : earliest - PAST_STEP_MS;
+  if (now() - at > PAST_BOUND_MS) {
+    state.pastExhausted = true;
+    state.loadingPast = false;
+    return;
+  }
+  pastInflight = new AbortController();
+  try {
+    const { body } = await getDepartures(ends.from.id, ends.to.id, {
+      limit: LIMIT,
+      at,
+      signal: pastInflight.signal
+    });
+    if (state.view !== 'board' || key !== currentKey()) return;
+    const before = new Set(state.pastBodies.flatMap((page) => page.journeys || []).map(journeyKey));
+    const gained = (body.journeys || []).some((journey) => !before.has(journeyKey(journey)));
+    if (!gained) state.pastExhausted = true;
+    else state.pastBodies.unshift(body);
+    if (initial) state.initialBoardLanding = true;
+    renderBoard({ addedAbove: !initial });
+  } catch (error) {
+    // A transient page failure is not evidence that history has ended. The
+    // next near-top scroll may retry it; only an empty/deduplicated answer or
+    // the explicit 24-hour bound exhausts pagination.
+  } finally {
+    state.loadingPast = false;
+  }
+}
+
+function renderCurrent() {
+  if (state.view === 'home') renderHome();
+  else if (state.view === 'board') renderBoard();
+  else if (state.view === 'detail') renderDetail();
+}
+
+function startTimers(recordBoardView) {
   stopTimers();
-  timers.tick = setInterval(onTick, TICK_MS);
+  timers.tick = setInterval(renderCurrent, TICK_MS);
   timers.refresh = setInterval(() => { if (!document.hidden) fetchLive(); }, REFRESH_MS);
-  timers.view = setTimeout(qualifyView, VIEW_QUALIFIES_MS);
+  if (recordBoardView) timers.view = setTimeout(qualifyView, VIEW_QUALIFIES_MS);
 }
 
 function stopTimers() {
-  clearInterval(timers.tick); clearInterval(timers.refresh); clearTimeout(timers.view);
+  clearInterval(timers.tick);
+  clearInterval(timers.refresh);
+  clearTimeout(timers.view);
   timers.tick = timers.refresh = timers.view = null;
 }
 
-/* A view counts once it has been looked at for five seconds or acted on —
-   otherwise a mispredicted board the user flips straight off would teach the
-   predictor that it guessed right. */
 function qualifyView() {
-  if (!state.onBoard || state.viewRecorded || !state.selection) return;
+  if (state.view !== 'board' || state.viewRecorded || !state.selection) return;
   state.viewRecorded = true;
   ctx.update(recordView(state.doc, state.selection.tripId, state.selection.direction, now()));
 }
 
+async function backfillCoordinates() {
+  if (state.coordsBackfillStarted) return;
+  const missing = state.doc.trips.flatMap((trip) => [trip.from, trip.to])
+    .filter((stop) => !stop.location);
+  const unique = [...new Map(missing.map((stop) => [stop.id, stop])).values()];
+  if (!unique.length) return;
+  state.coordsBackfillStarted = true;
+  for (const stop of unique) {
+    try {
+      const results = await getStops(stop.name);
+      const match = results.find((candidate) => candidate.id === stop.id && candidate.location);
+      if (match) ctx.update(updateStop(state.doc, match));
+    } catch (_) {
+      // Station coordinates are an optional prediction term; time/history
+      // continues to work when the backfill endpoint is unavailable.
+    }
+  }
+  if (state.view === 'home') renderHome();
+}
+
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { stopTimers(); return; }
-  if (!state.onBoard) return;
-  startTimers();
+  if (!['home', 'board', 'detail'].includes(state.view)) return;
+  startTimers(state.view === 'board');
   fetchLive();
 });
-
 window.addEventListener('hashchange', route);
 
-/* Handles for the verification harness: pin the clock, force a refresh, or
-   read the model without scraping the DOM. */
 window.__trains = {
   get state() { return state; },
-  get model() { return state.onBoard ? currentModel() : null; },
+  get model() { return selectedTrip() ? currentModel() : null; },
   set now(fn) { nowFn = fn; },
   get now() { return nowFn; },
   refresh: fetchLive,
-  rerender: () => { if (state.onBoard) render(); },
-  tick: onTick,
+  older: () => fetchPast(false),
+  rerender: renderCurrent,
+  tick: renderCurrent,
   route
 };
 

@@ -87,3 +87,46 @@ export function createSearcher(fetchStops) {
     }
   };
 }
+
+function editDistance(a, b) {
+  const prev = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= a.length; i++) {
+    let diagonal = prev[0];
+    prev[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const above = prev[j];
+      prev[j] = Math.min(
+        prev[j] + 1,
+        prev[j - 1] + 1,
+        diagonal + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+      diagonal = above;
+    }
+  }
+  return prev[b.length];
+}
+
+/** Stable client ranking over the candidates returned by stop_finder. Prefixes
+    win, then word prefixes, then small edit distances. Thus “Rhode” ranks
+    “Rhodes” first without hiding other stations TfNSW returned. */
+export function fuzzyScore(name, query) {
+  const n = queryKey(String(name).replace(/\bstation\b/gi, ''));
+  const q = queryKey(query);
+  if (!q) return 0;
+  if (n === q) return 1000;
+  if (n.startsWith(q)) return 900 - (n.length - q.length);
+  const word = n.split(/\s+/).findIndex((part) => part.startsWith(q));
+  if (word >= 0) return 800 - word * 10;
+  if (n.includes(q)) return 700 - n.indexOf(q);
+  const distance = editDistance(n, q);
+  return distance <= Math.max(2, Math.floor(q.length / 3)) ? 500 - distance * 25 : 0;
+}
+
+export function rankStops(stops, query) {
+  return (Array.isArray(stops) ? stops : []).map((stop, index) => ({
+    stop,
+    index,
+    score: fuzzyScore(stop.name, query)
+  })).sort((a, b) => b.score - a.score || a.index - b.index)
+    .map((item) => item.stop);
+}

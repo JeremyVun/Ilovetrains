@@ -7,6 +7,7 @@
 //	PORT            listen port, default 8080
 //	WEB_DIR         static client directory, default ./web (optional)
 //	TFNSW_BASE_URL  upstream base, default the TfNSW gateway
+//	MIN_CONNECTION_TIME minimum planned transfer, default 3m (Go duration)
 package main
 
 import (
@@ -50,6 +51,13 @@ func run() error {
 	}
 	if base := os.Getenv("TFNSW_BASE_URL"); base != "" {
 		client.BaseURL = base
+	}
+	if value := os.Getenv("MIN_CONNECTION_TIME"); value != "" {
+		minimum, parseErr := time.ParseDuration(value)
+		if parseErr != nil || minimum < 0 {
+			return errors.New("MIN_CONNECTION_TIME must be a non-negative Go duration")
+		}
+		client.MinimumConnectionTime = minimum
 	}
 
 	webDir := envOr("WEB_DIR", "./web")

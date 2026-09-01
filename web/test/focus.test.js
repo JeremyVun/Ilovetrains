@@ -4,13 +4,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  setFocus, clearFocus, isFocused, focusExpired, matchJourney, refreshFocus, stripModel,
+  setFocus, clearFocus, isFocused, focusExpired, matchJourney, refreshFocus,
   FOCUS_CLEAR_MS
 } from '../js/focus.js';
 import { parseDoc, serializeDoc, emptyDoc, removeTrip } from '../js/storage.js';
 import {
-  TRANSFER_NOW, TRANSFER_DEPARTED_NOW, transferBody, transferJourneys, delayLeg, cancelLeg,
-  baseJourneys
+  TRANSFER_NOW, TRANSFER_DEPARTED_NOW, transferBody, transferJourneys, delayLeg
 } from './fixture.js';
 
 const TRIP = {
@@ -100,77 +99,4 @@ test('the focus clears itself half an hour past arrival, and not a minute before
   assert.equal(focusExpired(doc.focus, arrival + FOCUS_CLEAR_MS + 1000), true);
   assert.equal(refreshFocus(doc, SELECTION, transferBody(), arrival + FOCUS_CLEAR_MS + 1000).focus, undefined);
   assert.equal(clearFocus(doc).focus, undefined);
-});
-
-/* --- the strip ----------------------------------------------------------- */
-
-const strip = (journey, now, opts) => stripModel(docWithFocus(journey).focus, now, opts);
-
-test('before departure the strip counts to the arrival, not to the departure', () => {
-  const s = strip(transferJourneys()[0], TRANSFER_NOW);
-
-  assert.equal(s.figure, '47');           // 09:21 → 10:08
-  assert.equal(s.provenance, 'MIN TO GO');
-  assert.equal(s.arrTime, '10:08');
-  assert.equal(s.arrStation, 'Bondi Junction');
-  assert.equal(s.arrives, 'arrives');
-  assert.equal(s.riding, false);
-  assert.equal(s.depTime, '09:24');
-  assert.equal(s.changeCount, 1);
-  assert.equal(s.third, 'Change 09:58 · Platform 5');
-  assert.equal(s.note, null);
-  assert.equal(s.warn, false);
-});
-
-test('after departure the strip speaks in the second person (B3\'s copy)', () => {
-  const s = strip(transferJourneys()[0], TRANSFER_DEPARTED_NOW);
-
-  assert.equal(s.figure, '21');
-  assert.equal(s.provenance, 'MIN TO GO');
-  assert.equal(s.riding, true);
-  assert.equal(s.arrives, 'you arrive');
-  assert.equal(s.lineCode, 'T9');
-  assert.equal(s.offTime, '09:51');
-});
-
-test('once you are there the strip stops counting', () => {
-  const s = strip(transferJourneys()[0], Date.parse('2026-09-01T10:15:00+10:00'));
-
-  assert.equal(s.figure, '');
-  assert.equal(s.provenance, '');
-  assert.equal(s.arrives, 'you arrived');
-  assert.equal(s.riding, false);
-});
-
-test('off old data the strip drops its figure, the way the board does', () => {
-  const s = strip(transferJourneys()[0], TRANSFER_NOW, { stale: true });
-
-  assert.equal(s.figure, '');
-  assert.equal(s.provenance, '');
-  assert.equal(s.arrTime, '10:08');
-});
-
-test('a tight change is what the strip says instead of the change time', () => {
-  const s = strip(delayLeg(transferJourneys()[0], 0, 5), TRANSFER_NOW);
-
-  assert.equal(s.warn, true);
-  assert.equal(s.note, '2 min to change · Town Hall');
-  assert.equal(s.third, null);
-});
-
-test('a cancelled leg outranks everything else the strip could say', () => {
-  const s = strip(cancelLeg(transferJourneys()[0], 1), TRANSFER_NOW);
-
-  assert.equal(s.warn, true);
-  assert.equal(s.note, '09:58 cancelled');
-});
-
-test('a direct journey has no change to report, so it names its destination', () => {
-  const s = strip(baseJourneys()[0], Date.parse('2026-08-31T22:45:00+10:00'),
-    { toName: 'Parramatta Station' });
-
-  assert.equal(s.changeCount, 0);
-  assert.equal(s.third, 'Penrith via Parramatta');
-  assert.equal(s.figure, '32');           // 22:45 → 23:17
-  assert.equal(s.arrStation, 'Parramatta');
 });

@@ -26,7 +26,7 @@ export function minutesUntil(ms, nowMs) {
     "Now" for the minute a thing happens in, minutes up to 99, rounded hours
     beyond that — three digits of minutes is arithmetic, and the clock time
     beside the figure already said it better. Shared by the board's rows, the
-    journey's legs and the focused strip so the three can never disagree. */
+    journey's legs and smart directions so the screens can never disagree. */
 export function countdownFigure(mins) {
   if (mins <= 0) return 'Now';
   if (mins >= 100) return Math.round(mins / 60) + 'H';

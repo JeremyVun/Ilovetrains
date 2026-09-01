@@ -136,6 +136,11 @@ func serveableModes(classes []int) []string {
 // echoed back as requested so the response is a pure function of the query;
 // station names come from the journeys themselves.
 func mapTrip(body []byte, fromID, toID string, limit int, generatedAt time.Time, loc *time.Location) (*DeparturesResponse, error) {
+	return mapTripWithMinimum(body, fromID, toID, limit, generatedAt, loc, DefaultMinimumConnectionTime)
+}
+
+func mapTripWithMinimum(body []byte, fromID, toID string, limit int, generatedAt time.Time,
+	loc *time.Location, minimumConnection time.Duration) (*DeparturesResponse, error) {
 	var raw tripResponse
 	if err := json.Unmarshal(body, &raw); err != nil {
 		return nil, fmt.Errorf("%w: decoding trip: %v", ErrUpstream, err)
@@ -159,6 +164,9 @@ func mapTrip(body []byte, fromID, toID string, limit int, generatedAt time.Time,
 		// Dropped here, before the limit below, so the client still receives up
 		// to `limit` journeys it can actually take.
 		if !serveable || len(legs) == 0 {
+			continue
+		}
+		if !connectionFloorMet(legs, minimumConnection) {
 			continue
 		}
 		first, last := legs[0], legs[len(legs)-1]
@@ -217,6 +225,23 @@ func mapTrip(body []byte, fromID, toID string, limit int, generatedAt time.Time,
 		resp.Journeys = append(resp.Journeys, row.journey)
 	}
 	return resp, nil
+}
+
+// connectionFloorMet uses the printed plan, not a transient realtime delay.
+// The floor decides whether the planner may offer the route; live shrinkage is
+// still shown honestly by the client's tight-change treatment.
+func connectionFloorMet(legs []leg, minimum time.Duration) bool {
+	if len(legs) < 2 || minimum <= 0 {
+		return true
+	}
+	for i := 1; i < len(legs); i++ {
+		arrival, arrivalOK := parseTime(legs[i-1].Destination.ArrivalTimePlanned)
+		departure, departureOK := parseTime(legs[i].Origin.DepartureTimePlanned)
+		if !arrivalOK || !departureOK || departure.Sub(arrival) < minimum {
+			return false
+		}
+	}
+	return true
 }
 
 // serviceLegs returns the train/metro legs of a journey, dropping walking

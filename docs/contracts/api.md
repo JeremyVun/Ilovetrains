@@ -161,6 +161,13 @@ Semantics:
   is still unverified, and over-reporting a cancellation is safer than
   showing a train that will not run.
 - Journeys are sorted by effective departure (estimated, else scheduled).
+- Multi-service journeys must meet the server's planned connection floor at
+  every transfer. The default is 3 minutes and deployment may tune it with
+  `MIN_CONNECTION_TIME` (a non-negative Go duration such as `4m`). The floor
+  uses scheduled arrival→departure times: a journey that was sane when planned
+  may still shrink in realtime, which the client shows with its tight-change
+  treatment. The proxy asks upstream for spare candidates, drops unsafe
+  journeys before applying the public `limit`, and never rewrites times.
 - `generatedAt` is when the data was fetched from TfNSW, not when the response
   was written, so a client can always compute the age of what it is showing.
   It is the fetch time even for a past window, so it is unrelated to `at`: a

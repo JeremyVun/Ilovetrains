@@ -53,11 +53,37 @@ export function scoreCandidate(history, tripId, direction, nowMs) {
 }
 
 /** All (trip, direction) candidates with their scores, board order preserved. */
-export function scoreAll(doc, nowMs) {
+export function distanceKm(a, b) {
+  if (!a || !b || !Number.isFinite(a.lat) || !Number.isFinite(a.lon)
+      || !Number.isFinite(b.lat) || !Number.isFinite(b.lon)) return null;
+  const rad = (degrees) => degrees * Math.PI / 180;
+  const dLat = rad(b.lat - a.lat);
+  const dLon = rad(b.lon - a.lon);
+  const x = Math.sin(dLat / 2) ** 2
+    + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+}
+
+export function locationFactor(fix, origin) {
+  const distance = distanceKm(fix, origin && origin.location);
+  if (distance === null || (distance > 2 && distance <= 10)) return 1;
+  if (distance <= 2) return 2.5;
+  return 0.3;
+}
+
+export function scoreAll(doc, nowMs, opts = {}) {
   const out = [];
   for (const trip of doc.trips) {
     for (const direction of DIRECTIONS) {
-      out.push({ tripId: trip.id, direction, score: scoreCandidate(doc.history, trip.id, direction, nowMs) });
+      const origin = direction === 'reverse' ? trip.to : trip.from;
+      const baseScore = scoreCandidate(doc.history, trip.id, direction, nowMs);
+      out.push({
+        tripId: trip.id,
+        direction,
+        baseScore,
+        score: baseScore * locationFactor(opts.fix, origin),
+        distanceKm: distanceKm(opts.fix, origin && origin.location)
+      });
     }
   }
   return out;
@@ -68,10 +94,10 @@ export function scoreAll(doc, nowMs) {
  * are saved. Tie or all-zero falls back to lastViewed, then the first saved
  * trip forward.
  */
-export function predict(doc, nowMs) {
+export function predict(doc, nowMs, opts = {}) {
   if (!doc.trips.length) return null;
 
-  const candidates = scoreAll(doc, nowMs);
+  const candidates = scoreAll(doc, nowMs, opts);
   const best = candidates.reduce((a, c) => (c.score > a ? c.score : a), 0);
   const leaders = candidates.filter((c) => c.score === best);
   if (best > 0 && leaders.length === 1) {
@@ -83,4 +109,20 @@ export function predict(doc, nowMs) {
     return { tripId: last.tripId, direction: last.direction };
   }
   return { tripId: doc.trips[0].id, direction: 'forward' };
+}
+
+/** Saved trips ordered by their strongest direction, with the selected trip at
+    the top. The original array is never mutated. */
+export function rankTrips(doc, nowMs, opts = {}) {
+  const selected = opts.selection || predict(doc, nowMs, opts);
+  const candidates = scoreAll(doc, nowMs, opts);
+  return doc.trips.map((trip, index) => {
+    const directions = candidates.filter((candidate) => candidate.tripId === trip.id);
+    const best = directions.sort((a, b) => b.score - a.score)[0] || {
+      direction: 'forward', score: 0, distanceKm: null
+    };
+    const direction = selected && selected.tripId === trip.id ? selected.direction : best.direction;
+    const candidate = directions.find((item) => item.direction === direction) || best;
+    return { trip, index, ...candidate, selected: Boolean(selected && selected.tripId === trip.id) };
+  }).sort((a, b) => Number(b.selected) - Number(a.selected) || b.score - a.score || a.index - b.index);
 }

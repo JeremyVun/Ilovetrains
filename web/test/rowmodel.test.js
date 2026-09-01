@@ -17,7 +17,7 @@ test('hero board: six services, the lead counts down in minutes', () => {
   assert.equal(m.sparse, false);
   assert.deepEqual(m.rows.map((r) => r.figure), ['3', '18', '27', '33', '48', '63']);
   assert.equal(m.rows[0].first, true);
-  assert.equal(m.rows[0].provenance, 'MIN');
+  assert.equal(m.rows[0].provenance, '', 'ordinary live service needs no exception word');
   assert.equal(m.rows[0].depTime, '22:48');
   assert.equal(m.rows[0].arrTime, '23:17');
   assert.equal(m.rows[0].platform, '12');
@@ -51,7 +51,7 @@ test('a delay is shown as both numbers and named under the figure', () => {
 
 test('estimated equal to scheduled means on time and monitored, not scheduled-only', () => {
   const m = boardModel(body(baseJourneys()), NOW);
-  assert.equal(m.rows[0].provenance, 'MIN');
+  assert.equal(m.rows[0].provenance, '');
   assert.equal(m.rows[0].scheduledOnly, false);
 });
 
@@ -143,7 +143,7 @@ test('a service leaving this minute reads Now, and the slot under it says DEPART
   assert.equal(m.rows[0].provenance, 'DEPARTING');
   // ...and only that row: the ones with a wait still count in minutes.
   assert.equal(m.rows[1].figure, '15');
-  assert.equal(m.rows[1].provenance, 'MIN');
+  assert.equal(m.rows[1].provenance, '');
 });
 
 test('DEPARTING never displaces a more specific provenance', () => {
@@ -209,7 +209,7 @@ test('a far-future service keeps the provenance its data earns', () => {
 
   const b = boardModel({ generatedAt: gen, journeys: [monitored] }, NOW).rows[0];
   assert.equal(b.figure, '3H');
-  assert.equal(b.provenance, 'MIN');
+  assert.equal(b.provenance, '');
 });
 
 test('unknown platform and empty headsign still fill their lines', () => {
@@ -316,9 +316,50 @@ test('every row is exactly three non-empty lines in every state', () => {
       for (const line of lines) {
         assert.ok(typeof line === 'string' && line.trim() !== '', name + ': no line is empty');
       }
-      assert.ok(row.provenance !== '', name + ': the figure always states its provenance');
+      assert.equal(typeof row.provenance, 'string', name + ': the reserved state slot is always present');
     }
   }
+});
+
+test('past punctuality and elapsed figures require an actuals record', () => {
+  const actual = journey('22:30', '22:42', '12', 'T1', 'Penrith', true);
+  delay(actual, 4);
+  actual.legDetail = [{
+    line: actual.line,
+    headsign: actual.destinationHeadsign,
+    from: { name: 'Central', platform: 'Platform 12' },
+    to: { name: 'Parramatta', platform: 'Platform 1' },
+    departure: { scheduled: actual.departure.scheduled, estimated: actual.departure.estimated },
+    arrival: { scheduled: actual.arrival.scheduled, estimated: actual.arrival.estimated }
+  }];
+
+  const timetable = structuredClone(actual);
+  // Simulate the exact stale-cache defect: the journey-level delta survived,
+  // but the per-leg realtime gate says this is timetable-only.
+  timetable.legDetail[0].departure.estimated = null;
+  timetable.legDetail[0].arrival.estimated = null;
+  timetable.line = { ...timetable.line, name: 'T2' };
+  timetable.legDetail[0].line = timetable.line;
+
+  const model = boardModel(departuresBody({ journeys: [] }), NOW, {
+    pastBodies: [{ journeys: [actual, timetable] }]
+  });
+  const rows = model.pastRows;
+  const actualRow = rows.find((row) => row.actual);
+  const timetableRow = rows.find((row) => !row.actual);
+
+  assert.ok(actualRow.figure, 'actuals may state elapsed time');
+  assert.equal(actualRow.provenance, 'AGO');
+  assert.equal(actualRow.depTime, '22:34');
+  assert.equal(actualRow.schedTime, '22:30');
+  assert.equal(actualRow.kind, 'late');
+
+  assert.equal(timetableRow.figure, '', 'timetable-only may not state elapsed time');
+  assert.equal(timetableRow.provenance, 'TIMETABLE ONLY');
+  assert.equal(timetableRow.depTime, '22:30', 'the stale delta is not printed as an actual');
+  assert.equal(timetableRow.schedTime, null);
+  assert.equal(timetableRow.kind, 'sched');
+  assert.equal(timetableRow.provenanceWarn, false);
 });
 
 /* --- the line that stands in for the whole board -------------------------- */

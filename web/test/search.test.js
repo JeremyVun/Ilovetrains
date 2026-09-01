@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  MIN_QUERY, SHORT_QUERY, COPY, queryKey, hintFor, createSearcher
+  MIN_QUERY, SHORT_QUERY, COPY, queryKey, hintFor, createSearcher, fuzzyScore, rankStops
 } from '../js/search.js';
 
 /* --- how little we ask --------------------------------------------------- */
@@ -133,4 +133,16 @@ test('a failed call is not remembered, so the next attempt really tries again', 
   assert.equal(searcher.peek('central'), undefined);
   await assert.rejects(() => searcher.search('central'));
   assert.deepEqual(calls, ['central', 'central']);
+});
+
+test('fuzzy ranking puts Rhodes first for the partial Rhode', () => {
+  const stops = [
+    { id: '1', name: 'North Strathfield Station' },
+    { id: '2', name: 'Rhodes Station' },
+    { id: '3', name: 'Roseville Station' }
+  ];
+  assert.ok(fuzzyScore('Rhodes Station', 'Rhode') > fuzzyScore('Roseville Station', 'Rhode'));
+  assert.equal(rankStops(stops, 'Rhode')[0].id, '2');
+  assert.deepEqual(rankStops(stops, 'Rhode').map((stop) => stop.id).sort(), ['1', '2', '3'],
+    'upstream station answers are ranked, not hidden');
 });

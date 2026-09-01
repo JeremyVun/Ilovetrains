@@ -1,23 +1,20 @@
 /* "I'm on this train" — the focused journey, per
    docs/contracts/client-storage.md. Pure: a storage document, a journey and
-   `now` in, a new document (or a render-ready strip) out.
+   `now` in, a new document or render-ready directions model out.
 
    The whole point of the snapshot is that a focused journey stays viewable
    after the board has dropped it: rowmodel.js removes departed services and is
-   right to, so once you are on the train the only copy of it left is the one
+   right to, so once you are on the train the durable copy is the one
    in localStorage. On every refresh the client re-matches it in fresh data by
    (first leg's line, timetabled departure) and replaces the snapshot when it
    matches, so live delays keep flowing; when it no longer matches — it has
-   departed, or the network is gone — the last snapshot stands.
-
-   The strip is a port of comps/b2-footerrail.html with B3's departed copy
-   transplanted in (docs/STYLES.md). */
+   departed, or the network is gone — the last snapshot stands. */
 
 import { clock, minutesUntil, countdownFigure } from './time.js';
 import { journeyKey, legsOf, arrivalMs, departureMs, effective, TIGHT_CHANGE_MIN } from './journey.js';
 import { shortName } from './dom.js';
 
-/* Half an hour past arrival the journey is over and the strip is clutter
+/* Half an hour past arrival the journey is over and directions are clutter
    (client-storage.md). Clearing is automatic so nobody has to remember to. */
 export const FOCUS_CLEAR_MS = 30 * 60_000;
 
@@ -50,8 +47,8 @@ export function isFocused(doc, journey) {
 }
 
 /** Past the arrival plus the grace window. A snapshot whose arrival we never
-    learned falls back to when it was focused, so nothing can pin the strip to
-    the screen forever. */
+    learned falls back to when it was focused, so nothing can pin directions
+    to the screen forever. */
 export function focusExpired(focus, nowMs) {
   if (!focus) return false;
   const arrival = arrivalMs(focus.journey);
@@ -68,7 +65,7 @@ export function matchJourney(journeys, snapshot) {
  * Called on every successful refresh: expire the focus if the journey is long
  * over, otherwise refresh its snapshot from the new data when this board is
  * the one carrying it. An unmatched journey keeps the snapshot it has — that
- * is what makes the strip survive its own departure.
+ * is what makes directions survive the journey's own departure.
  */
 export function refreshFocus(doc, selection, body, nowMs) {
   const focus = focusOf(doc);
@@ -80,87 +77,145 @@ export function refreshFocus(doc, selection, body, nowMs) {
   return { ...doc, focus: { ...focus, journey: match } };
 }
 
-/**
- * The strip: one band at the bottom edge of the board, in thumb reach,
- * absorbing the footer rather than adding to it.
- *
- * Its figure is always minutes TO ARRIVAL — before departure and after it —
- * because the question a focused journey answers is "when do I get there".
- * The board above it still answers "when does it leave".
- */
-export function stripModel(focus, nowMs, opts = {}) {
-  const stale = Boolean(opts.stale);
-  const journey = focus.journey;
+/** Smart-header directions state. This is deliberately pure: changing the
+    business thresholds never changes the renderer or its percentage axis. */
+export function directionsModel(value, nowMs, opts = {}) {
+  const journey = value && value.journey ? value.journey : value;
   const legs = legsOf(journey, opts);
   const first = legs[0] || {};
-  const arrMs = arrivalMs(journey);
+  const last = legs[legs.length - 1] || {};
   const depMs = departureMs(journey);
-
-  const toGo = arrMs === null ? null : minutesUntil(arrMs, nowMs);
-  const departed = depMs !== null && minutesUntil(depMs, nowMs) < 0;
-  const arrived = toGo !== null && toGo <= 0;
-
-  // A countdown off an old cache is a lie (owner ruling 2026-08-31), and a
-  // countdown to something that has already happened is not a number either.
-  // The slot empties and keeps its height, the way the stale board's does.
-  const figure = stale || arrived || toGo === null ? '' : countdownFigure(toGo);
+  const arrMs = arrivalMs(journey);
+  const scheduledDep = Date.parse((first.departure || {}).scheduled || '');
+  const estimatedDep = Date.parse((first.departure || {}).estimated || '');
+  const departureDelay = Number.isFinite(scheduledDep) && Number.isFinite(estimatedDep)
+    ? Math.floor(estimatedDep / 60000) - Math.floor(scheduledDep / 60000) : 0;
+  const total = depMs === null || arrMs === null
+    ? 1 : Math.max(1, Math.floor(arrMs / 60000) - Math.floor(depMs / 60000));
+  const elapsed = depMs === null ? 0
+    : Math.floor(nowMs / 60000) - Math.floor(depMs / 60000);
+  const at = depMs === null ? 0 : Math.max(0, Math.min(1, elapsed / total));
+  const stale = Boolean(opts.stale);
+  const cancelled = legs.find((leg) => leg.cancelled === true) || (journey && journey.cancelled ? first : null);
 
   const changes = [];
   for (let i = 1; i < legs.length; i++) {
-    const prevArr = effective(legs[i - 1].arrival);
-    const dep = effective(legs[i].departure);
+    const before = legs[i - 1];
+    const after = legs[i];
+    const arrival = effective(before.arrival);
+    const departure = effective(after.departure);
+    const scheduledArrival = Date.parse((before.arrival || {}).scheduled || '');
+    const scheduledDeparture = Date.parse((after.departure || {}).scheduled || '');
+    const minutes = arrival === null || departure === null ? null : minutesUntil(departure, arrival);
+    const printed = Number.isFinite(scheduledArrival) && Number.isFinite(scheduledDeparture)
+      ? minutesUntil(scheduledDeparture, scheduledArrival) : null;
     changes.push({
-      station: shortName((legs[i - 1].to && legs[i - 1].to.name) || ''),
-      platform: legs[i].from && legs[i].from.platform
-        ? String(legs[i].from.platform).replace(/^platform\s+/i, '') : null,
-      depTime: dep === null ? null : clock(dep),
-      minutes: prevArr === null || dep === null ? null : minutesUntil(dep, prevArr)
+      index: i,
+      arrival,
+      departure,
+      minutes,
+      printed,
+      tight: minutes !== null && (minutes < TIGHT_CHANGE_MIN || (printed !== null && minutes < printed)),
+      station: shortName((before.to && before.to.name) || (after.from && after.from.name) || ''),
+      fromPlatform: cleanPlatform(before.to && before.to.platform),
+      toPlatform: cleanPlatform(after.from && after.from.platform)
     });
   }
 
-  const cancelled = legs.find((l) => l.cancelled === true) || null;
-  const nextChange = changes.find((c) => c.minutes !== null) || null;
-  const tight = !cancelled && nextChange !== null && nextChange.minutes < TIGHT_CHANGE_MIN;
+  const model = {
+    journey,
+    from: shortName((first.from && first.from.name) || opts.fromName || ''),
+    to: shortName((last.to && last.to.name) || opts.toName || ''),
+    depTime: depMs === null ? '—' : clock(depMs),
+    arrTime: arrMs === null ? '—' : clock(arrMs),
+    figure: '',
+    provenance: '',
+    instruction: first.headsign || (journey && journey.destinationHeadsign) || '',
+    phase: 'pre',
+    progress: { at, phase: 'pre' },
+    showBoardingPlatform: true,
+    warn: false,
+    provenanceWarn: false,
+    receipt: opts.receipt || '',
+    changes
+  };
 
-  /* Third line, in priority order: what is wrong, then what you have to do,
-     then where you are going. Every one of them fits the 232px body column at
-     390px — the strip is a glance, and a truncated glance is not one. */
-  let note = null;
-  let third = null;
-  if (cancelled) {
-    const at = effective(cancelled.departure);
-    note = (at === null ? '' : clock(at) + ' ') + 'cancelled';
-  } else if (tight) {
-    note = nextChange.minutes + ' min to change · ' + nextChange.station;
-  } else if (nextChange && nextChange.depTime) {
-    third = 'Change ' + nextChange.depTime
-      + (nextChange.platform ? ' · Platform ' + nextChange.platform : '');
-  } else {
-    third = first.headsign || (journey && journey.destinationHeadsign) || '';
+  if (opts.cancelledTime || cancelled) {
+    model.warn = true;
+    model.figure = depMs === null || stale ? '' : countdownFigure(minutesUntil(depMs, nowMs));
+    model.provenance = '';
+    model.instruction = `${opts.cancelledTime || model.depTime} CANCELLED · NEXT TRAIN`;
+    return model;
+  }
+  if (depMs === null || arrMs === null) {
+    model.provenance = 'SCHEDULED';
+    return model;
+  }
+  if (nowMs < depMs) {
+    const minutes = minutesUntil(depMs, nowMs);
+    model.figure = stale ? '' : countdownFigure(minutes);
+    model.provenance = departureDelay > 0
+      ? `${departureDelay} MIN LATE`
+      : first.departure && first.departure.estimated ? '' : 'SCHEDULED';
+    model.provenanceWarn = departureDelay > 0;
+    if (opts.leave) {
+      model.instruction = `Leave now for Platform ${cleanPlatform(first.from && first.from.platform) || '—'}`;
+      model.receipt = opts.receipt || `You’re ${opts.leave} from ${model.from}.`;
+      model.act = true;
+    }
+    return model;
+  }
+  if (nowMs >= arrMs) {
+    model.phase = 'done';
+    model.progress = { at: 1, phase: 'done' };
+    model.figure = stale ? '' : countdownFigure(Math.max(0, -minutesUntil(arrMs, nowMs)));
+    model.provenance = 'AGO';
+    model.instruction = `You arrived at ${model.to}.`;
+    model.showBoardingPlatform = false;
+    model.act = true;
+    return model;
   }
 
-  const lineCode = (first.line && first.line.name) || '';
-  const offMs = legs.length > 1 ? effective(first.arrival) : null;
+  model.showBoardingPlatform = false;
+  model.act = true;
+  let phase = 'ride';
+  for (let i = 0; i < legs.length; i++) {
+    const legArrival = effective(legs[i].arrival);
+    const next = changes[i];
+    if (legArrival !== null && nowMs < legArrival) {
+      const hasChange = Boolean(next);
+      model.figure = stale ? '' : countdownFigure(minutesUntil(legArrival, nowMs));
+      model.provenance = hasChange ? 'TO CHANGE' : 'TO GO';
+      model.instruction = `Off at ${hasChange ? next.station : model.to}`
+        + (cleanPlatform(legs[i].to && legs[i].to.platform)
+          ? ` · Platform ${cleanPlatform(legs[i].to.platform)}` : '');
+      phase = i === 0 ? 'ride' : 'ride2';
+      break;
+    }
+    if (next && next.departure !== null && nowMs < next.departure) {
+      model.figure = stale ? '' : countdownFigure(minutesUntil(next.departure, nowMs));
+      model.provenance = 'TO CHANGE';
+      model.instruction = (next.toPlatform ? `Platform ${next.toPlatform} · ` : '')
+        + `${clock(next.departure)} to ${model.to}`;
+      phase = 'dwell';
+      break;
+    }
+  }
+  model.phase = phase;
+  model.progress = { at, phase };
+  const risk = changes.find((change) => change.tight
+    && (change.departure === null || nowMs < change.departure));
+  if (risk) {
+    model.warn = true;
+    model.instruction = `Tight change · ${risk.minutes} min`
+      + (risk.toPlatform ? ` · Platform ${risk.toPlatform}` : '');
+    if (risk.printed !== null && risk.minutes < risk.printed) {
+      model.receipt = `Printed change was ${risk.printed} min.`;
+    }
+  }
+  return model;
+}
 
-  return {
-    figure,
-    wide: figure.length >= 3,
-    provenance: figure ? 'MIN TO GO' : '',
-    warn: Boolean(cancelled || tight),
-    arrTime: arrMs === null ? '' : clock(arrMs),
-    arrStation: shortName((legs[legs.length - 1]?.to || {}).name || opts.toName || ''),
-    // B3's departed-lead copy, transplanted (docs/STYLES.md): before it leaves
-    // the strip states the journey, after it leaves it states you.
-    arrives: !departed ? 'arrives' : arrived ? 'you arrived' : 'you arrive',
-    // "ON BOARD T9 · OFF 09:51" while riding; "THE 09:24 · 1 CHANGE" otherwise
-    // — which is the neutral statement of which journey this is, and true in
-    // every tense.
-    riding: departed && !arrived,
-    lineCode,
-    offTime: offMs === null ? null : clock(offMs),
-    depTime: depMs === null ? '' : clock(depMs),
-    changeCount: changes.length,
-    note,
-    third
-  };
+function cleanPlatform(value) {
+  return value ? String(value).replace(/^platform\s+/i, '') : '';
 }

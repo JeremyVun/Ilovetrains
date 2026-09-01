@@ -31,8 +31,10 @@
    that has already visited keeps the old, unscrollable shell until this
    number changes.
    v5: the journey detail view and focus (js/journey.js, js/detail.js,
-   js/focus.js, plus app.css, board.js, main.js, storage.js). */
-const VERSION = 'v5';
+   js/focus.js, plus app.css, board.js, main.js, storage.js).
+   v6: board v2 timeline, home/directions, the shared journey time axis,
+   recent search and location-aware prediction. */
+const VERSION = 'v6';
 const SHELL_CACHE = 'shell-' + VERSION;
 const DATA_CACHE = 'data-' + VERSION;
 
@@ -49,7 +51,9 @@ const SHELL = [
   '/js/detail.js',
   '/js/dom.js',
   '/js/focus.js',
+  '/js/home.js',
   '/js/journey.js',
+  '/js/journeybar.js',
   '/js/lines.js',
   '/js/main.js',
   '/js/predict.js',

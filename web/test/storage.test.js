@@ -4,8 +4,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  STORAGE_KEY, HISTORY_CAP, emptyDoc, parseDoc, serializeDoc, cacheKey, leg,
-  addTrip, removeTrip, moveTrip, recordView, putCache, getCache, loadDoc, saveDoc
+  STORAGE_KEY, HISTORY_CAP, TRIPS_CAP, emptyDoc, parseDoc, serializeDoc, cacheKey, leg,
+  addTrip, removeTrip, moveTrip, recordView, recordSearch, recordRide, updateStop,
+  putCache, getCache, loadDoc, saveDoc
 } from '../js/storage.js';
 
 const CENTRAL = { id: '200060', name: 'Central Station' };
@@ -80,12 +81,16 @@ test('a view event also becomes lastViewed', () => {
   assert.deepEqual(doc.lastViewed, { tripId: 't2', direction: 'reverse' });
 });
 
-test('deleting a trip takes its history, cache and lastViewed with it', () => {
+test('deleting a trip takes its live pointers but preserves completed-ride evidence', () => {
   let doc = docWithTrips();
   doc = recordView(doc, 't1', 'forward', Date.now());
   doc = recordView(doc, 't2', 'forward', Date.now());
   doc = putCache(doc, cacheKey('200060', '215020'), { a: 1 }, Date.now());
   doc = putCache(doc, cacheKey('215020', '200060'), { a: 2 }, Date.now());
+  doc = recordRide(doc, { tripId: 't1', direction: 'forward' }, {
+    departure: { scheduled: '2026-08-31T08:12:00+10:00' },
+    arrival: { scheduled: '2026-08-31T08:41:00+10:00' }
+  }, CENTRAL, PARRA);
   doc = recordView(doc, 't1', 'forward', Date.now());
 
   const after = removeTrip(doc, 't1');
@@ -93,6 +98,7 @@ test('deleting a trip takes its history, cache and lastViewed with it', () => {
   assert.equal(after.history.every((e) => e.tripId === 't2'), true);
   assert.deepEqual(after.cache, {});
   assert.equal(after.lastViewed, null);
+  assert.equal(after.rides.length, 1);
 });
 
 test('reorder moves a trip one place and refuses to fall off either end', () => {
@@ -134,4 +140,49 @@ test('a storage write that throws is survivable', () => {
   const store = { getItem: () => null, setItem: () => { throw new Error('quota'); } };
   assert.equal(saveDoc(emptyDoc(), store), false);
   assert.deepEqual(loadDoc(store), emptyDoc());
+});
+
+test('recent station choices are per field, deduplicated and capped at three', () => {
+  let doc = emptyDoc();
+  for (const stop of [CENTRAL, PARRA, TOWNHALL, { id: '213820', name: 'Rhodes Station' }, CENTRAL]) {
+    doc = recordSearch(doc, 'from', stop);
+  }
+  doc = recordSearch(doc, 'to', PARRA);
+  assert.deepEqual(doc.searches.from.map((stop) => stop.id), ['200060', '213820', '200070']);
+  assert.deepEqual(doc.searches.to.map((stop) => stop.id), ['215020']);
+});
+
+test('station coordinates survive parse and can be lazily backfilled', () => {
+  const located = { ...CENTRAL, location: { lat: -33.883, lon: 151.207 } };
+  let doc = addTrip(emptyDoc(), T1);
+  doc = updateStop(doc, located);
+  assert.deepEqual(parseDoc(serializeDoc(doc)).trips[0].from, located);
+});
+
+test('saved trips use a ten-item LRU cap', () => {
+  let doc = emptyDoc();
+  const start = Date.parse('2026-09-01T08:00:00+10:00');
+  for (let i = 0; i < TRIPS_CAP; i++) {
+    doc = addTrip(doc, trip(`t${i}`, { id: `a${i}`, name: `A ${i}` }, { id: `b${i}`, name: `B ${i}` }));
+  }
+  doc = recordView(doc, 't0', 'forward', start + 60_000);
+  doc = addTrip(doc, trip('new', { id: 'new-a', name: 'New A' }, { id: 'new-b', name: 'New B' }));
+  assert.equal(doc.trips.length, TRIPS_CAP);
+  assert.ok(doc.trips.some((saved) => saved.id === 't0'), 'a recently used old trip is retained');
+  assert.ok(!doc.trips.some((saved) => saved.id === 't1'), 'the least recently used trip is evicted');
+  assert.ok(doc.trips.some((saved) => saved.id === 'new'));
+});
+
+test('completed rides deduplicate on planned departure when realtime changes', () => {
+  const scheduled = '2026-09-01T09:24:00+10:00';
+  const base = {
+    departure: { scheduled, estimated: '2026-09-01T09:26:00+10:00' },
+    arrival: { scheduled: '2026-09-01T10:08:00+10:00', estimated: '2026-09-01T10:10:00+10:00' }
+  };
+  let doc = recordRide(docWithTrips(), { tripId: 't1', direction: 'forward' }, base, CENTRAL, PARRA);
+  const refreshed = structuredClone(base);
+  refreshed.departure.estimated = '2026-09-01T09:27:00+10:00';
+  doc = recordRide(doc, { tripId: 't1', direction: 'forward' }, refreshed, CENTRAL, PARRA);
+  assert.equal(doc.rides.length, 1);
+  assert.equal(doc.rides[0].scheduledDeparture, scheduled);
 });

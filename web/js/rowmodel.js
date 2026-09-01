@@ -25,7 +25,7 @@ export const CANCELLED_LEAD_NOTE = (time) => time + ' cancelled · next train';
    than growing a third digit. "187" is arithmetically true and unreadable —
    the clock time beside it already says 03:53 better than three digits do.
    The rule itself is `countdownFigure` in time.js, shared with the journey
-   detail view and the focused strip so the three can never disagree. */
+   detail view and the smart directions header so they can never disagree. */
 
 export function boardModel(body, nowMs, opts = {}) {
   const staleMs = opts.staleMs ?? STALE_MS;
@@ -34,12 +34,24 @@ export function boardModel(body, nowMs, opts = {}) {
   const stale = Boolean(opts.forceStale) || ageMs === null || ageMs > staleMs;
   const ageSec = ageMs === null ? 0 : ageMs / 1000;
 
-  const journeys = Array.isArray(body && body.journeys) ? body.journeys : [];
-  const rows = journeys
-    .map((j) => journeyRow(j, nowMs, stale, opts))
-    .filter((r) => r !== null);
+  const liveJourneys = Array.isArray(body && body.journeys) ? body.journeys : [];
+  const liveKeys = new Set(liveJourneys.map(journeyKey));
+  const futureRows = liveJourneys
+    .map((j) => journeyRow(j, nowMs, stale, { ...opts, pastSource: false }))
+    .filter((r) => r !== null && !r.past);
 
-  markLeadAndCancelledLead(rows);
+  const pastRows = (Array.isArray(opts.pastBodies) ? opts.pastBodies : [])
+    .flatMap((page) => Array.isArray(page && page.journeys) ? page.journeys : [])
+    // A live answer is newer than a settled past page. It wins even when the
+    // past cache still carries an older estimate for the same service.
+    .filter((journey) => !liveKeys.has(journeyKey(journey)))
+    .map((j) => journeyRow(j, nowMs, false, { ...opts, pastSource: true }))
+    .filter((r) => r !== null && r.past);
+
+  const uniquePast = [...new Map(pastRows.map((row) => [row.matchKey, row])).values()]
+    .sort((a, b) => a.effectiveMs - b.effectiveMs);
+
+  markLeadAndCancelledLead(futureRows);
 
   // A board that was never loaded has no age. Reporting one ("last updated 0s
   // ago") would date a board that does not exist, and on a cold open with no
@@ -50,9 +62,11 @@ export function boardModel(body, nowMs, opts = {}) {
   return {
     stale,
     ageSec,
-    rows,
-    empty: rows.length === 0,
-    sparse: rows.length > 0 && rows.length < 6,
+    rows: futureRows,
+    futureRows,
+    pastRows: uniquePast,
+    empty: futureRows.length === 0 && uniquePast.length === 0,
+    sparse: futureRows.length > 0 && futureRows.length < 6,
     footer: {
       text: hasData ? ageLabel(ageSec, stale) : (waiting ? '' : 'Offline'),
       // `degraded` is the server's X-Data-Stale header: the data is fresh
@@ -82,12 +96,21 @@ function journeyRow(journey, nowMs, stale, opts) {
   const estimated = parseIso(dep.estimated);
   if (scheduled === null && estimated === null) return null;
 
-  const effective = estimated === null ? scheduled : estimated;
-  const mins = minutesUntil(effective, nowMs);
-  if (mins < 0) return null; // departed: the list closes upward
+  const candidateEffective = estimated === null ? scheduled : estimated;
+  const candidateMins = minutesUntil(candidateEffective, nowMs);
+  const past = candidateMins < 0;
+  if (past && !opts.pastSource) return null;
 
   const cancelled = journey.cancelled === true;
   const realtime = estimated !== null;
+  const firstLeg = Array.isArray(journey.legDetail) && journey.legDetail.length
+    ? journey.legDetail[0] : null;
+  // A past page's estimate is an actual only while upstream still carries the
+  // realtime record. Row age and position never manufacture that claim.
+  const actual = past && opts.pastSource && realtime
+    && (!firstLeg || parseIso((firstLeg.departure || {}).estimated) !== null);
+  const effective = past && !actual && scheduled !== null ? scheduled : candidateEffective;
+  const mins = minutesUntil(effective, nowMs);
   // Delay is measured between the minutes actually displayed, so the label can
   // never disagree with the two clock times beside it.
   const delayMin = realtime && scheduled !== null
@@ -95,17 +118,23 @@ function journeyRow(journey, nowMs, stale, opts) {
     : 0;
 
   const arrival = journey.arrival || {};
-  const arrivalMs = parseIso(arrival.estimated) ?? parseIso(arrival.scheduled);
+  const arrivalMs = past && !actual
+    ? parseIso(arrival.scheduled)
+    : parseIso(arrival.estimated) ?? parseIso(arrival.scheduled);
 
   let kind, provenance;
-  if (cancelled) { kind = 'cx'; provenance = 'CANCELLED'; }
-  else if (delayMin > 0) { kind = 'late'; provenance = delayMin + ' MIN LATE'; }
+  if (past && !actual) { kind = 'sched'; provenance = 'TIMETABLE ONLY'; }
+  else if (cancelled) { kind = 'cx'; provenance = 'CANCELLED'; }
+  else if (delayMin > 0) { kind = 'late'; provenance = past ? 'AGO' : delayMin + ' MIN LATE'; }
+  else if (past) { kind = 'live'; provenance = 'AGO'; }
   else if (!realtime || stale) { kind = 'sched'; provenance = 'SCHEDULED'; }
   // Owner ruling 2026-09-01 (D): the figure "Now" is not a count of minutes,
   // so the slot under it names what is happening instead of its unit.
-  else { kind = 'live'; provenance = mins <= 0 ? 'DEPARTING' : 'MIN'; }
+  else { kind = 'live'; provenance = mins <= 0 ? 'DEPARTING' : ''; }
 
-  const figure = figureFor(cancelled, stale, mins);
+  const figure = past
+    ? (actual && !cancelled ? countdownFigure(Math.max(0, -mins)) : (cancelled ? '–' : ''))
+    : figureFor(cancelled, stale, mins);
 
   const lineCode = (journey.line && journey.line.name) || '';
 
@@ -115,6 +144,7 @@ function journeyRow(journey, nowMs, stale, opts) {
     // (client-storage.md). The row key above also carries the platform, which
     // upstream can revise; this one is the pair that cannot move.
     matchKey: journeyKey(journey),
+    effectiveMs: effective,
     journey,
     first: false,
     // Three characters do not fit the figure column at the board's headline
@@ -125,15 +155,20 @@ function journeyRow(journey, nowMs, stale, opts) {
     // hours or more ("10H"). The row says so and the stylesheet sizes it down.
     wide: figure.length >= 3,
     cancelled,
-    scheduledOnly: !realtime,
+    past,
+    actual,
+    pastKind: past ? (actual ? 'actual' : 'timetable') : null,
+    scheduledOnly: !realtime || (past && !actual),
     delayMin,
     mins,
     kind,
     figure,
     provenance,
-    provenanceWarn: cancelled || delayMin > 0,
+    provenanceWarn: cancelled || (!past && delayMin > 0),
     depTime: clock(effective),
-    schedTime: delayMin > 0 && scheduled !== null ? clock(scheduled) : null,
+    // A timetable-only row may carry a stale delta in malformed/cached input;
+    // neither number is allowed to become a punctuality claim without actuals.
+    schedTime: delayMin > 0 && scheduled !== null && (!past || actual) ? clock(scheduled) : null,
     arrTime: cancelled || arrivalMs === null ? null : clock(arrivalMs),
     platform: dep.platform ? String(dep.platform).replace(/^platform\s+/i, '') : null,
     lineCode,

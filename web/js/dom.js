@@ -18,7 +18,7 @@ export function mount(root, html) {
 }
 
 /** One delegated click handler per screen, matched on [data-act].
-    Enter and Space too: the board row and the focused strip are tap targets
+    Enter and Space too: full board rows are tap targets
     that are not <button>s (a button cannot contain the row's own headings),
     so the keyboard has to be handed to them explicitly. */
 export function onAction(root, handler) {

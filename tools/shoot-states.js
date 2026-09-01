@@ -59,7 +59,7 @@ const SHORT = '412x732';
 /* Drive the board to the end of its scroll. Not smooth — the shot is taken
    right after, and a 240ms animation would photograph the middle of it. */
 const SCROLL_TO_END = `
-  const rowsEl = document.querySelector('.rows');
+  const rowsEl = document.querySelector('.sy-tl');
   rowsEl.scrollTop = rowsEl.scrollHeight;
   await sleep(80);
 `;
@@ -119,7 +119,7 @@ function doc({ trips = [TRIP], body = null, fetchedAt = NOW_ISO, hist = history(
   };
   if (body) d.cache[trips[0].from.id + '-' + trips[0].to.id] = { fetchedAt, body };
   // Exactly as the client writes it (docs/contracts/client-storage.md): the
-  // focused journey is a verbatim snapshot, which is what lets the strip
+  // focused journey is a verbatim snapshot, which is what lets directions
   // outlive the journey's departure from the board.
   if (focus) {
     d.focus = {
@@ -145,6 +145,7 @@ async function states() {
     seed: doc({ body, trips: opts.trips || [TRIP] }),
     now: opts.now || NOW,
     body,
+    route: '#/board',
     ...opts
   });
 
@@ -161,6 +162,25 @@ async function states() {
       }),
       now: opts.now || TRANSFER_NOW,
       body,
+      route: '#/board',
+      after: opts.after
+    };
+  };
+
+  const home = (name, journeys, opts = {}) => {
+    const body = transferBody({ journeys, generatedAt: opts.generatedAt || TRANSFER_AT });
+    return {
+      name,
+      seed: doc({
+        trips: opts.trips || [TRIP_TRANSFER],
+        body,
+        hist: opts.hist || [],
+        fetchedAt: opts.generatedAt || TRANSFER_AT,
+        focus: opts.focus || null
+      }),
+      now: opts.now || TRANSFER_NOW,
+      body,
+      route: '#/',
       after: opts.after
     };
   };
@@ -215,6 +235,64 @@ async function states() {
     ...baseJourneys().slice(2)
   ];
 
+  const shiftJourney = (value, minutes) => {
+    const shifted = structuredClone(value);
+    const walk = (node) => {
+      if (!node || typeof node !== 'object') return;
+      for (const [key, child] of Object.entries(node)) {
+        if ((key === 'scheduled' || key === 'estimated') && typeof child === 'string') {
+          node[key] = new Date(Date.parse(child) + minutes * 60_000).toISOString();
+        } else walk(child);
+      }
+    };
+    walk(shifted);
+    return shifted;
+  };
+  const pastBody = departuresBody({
+    generatedAt: NOW_ISO,
+    journeys: baseJourneys().map((value) => shiftJourney(value, -75))
+  });
+  const reverseJourney = {
+    departure: {
+      scheduled: '2026-09-01T10:18:00+10:00',
+      estimated: '2026-09-01T10:18:00+10:00',
+      platform: 'Platform 2'
+    },
+    arrival: {
+      scheduled: '2026-09-01T11:02:00+10:00',
+      estimated: '2026-09-01T11:02:00+10:00'
+    },
+    line: { name: 'T4', mode: 'train' },
+    destinationHeadsign: 'Waterfall',
+    stopsAway: null,
+    cancelled: false,
+    legs: 2,
+    legDetail: [
+      {
+        line: { name: 'T4', mode: 'train' }, headsign: 'Waterfall',
+        from: { id: '200080', name: 'Bondi Junction Station', platform: 'Platform 2' },
+        to: { id: '200070', name: 'Town Hall Station', platform: 'Platform 4' },
+        departure: { scheduled: '2026-09-01T10:18:00+10:00', estimated: '2026-09-01T10:18:00+10:00' },
+        arrival: { scheduled: '2026-09-01T10:28:00+10:00', estimated: '2026-09-01T10:28:00+10:00' },
+        cancelled: false
+      },
+      {
+        line: { name: 'T9', mode: 'train' }, headsign: 'Hornsby via Gordon',
+        from: { id: '200070', name: 'Town Hall Station', platform: 'Platform 1' },
+        to: { id: '213820', name: 'Rhodes Station', platform: 'Platform 1' },
+        departure: { scheduled: '2026-09-01T10:35:00+10:00', estimated: '2026-09-01T10:35:00+10:00' },
+        arrival: { scheduled: '2026-09-01T11:02:00+10:00', estimated: '2026-09-01T11:02:00+10:00' },
+        cancelled: false
+      }
+    ]
+  };
+  const reverseBody = {
+    from: { id: '200080', name: 'Bondi Junction Station' },
+    to: { id: '213820', name: 'Rhodes Station' },
+    generatedAt: '2026-09-01T10:11:00+10:00',
+    journeys: [reverseJourney]
+  };
+
   /* The late-night board, which is what Sydney actually shows between the last
      service and the first: waits of three digits, no realtime control on any
      of them. Found live 2026-09-01 at 00:47 — every seeded state until then
@@ -234,7 +312,31 @@ async function states() {
   }));
 
   return [
+    home('home-before', transferJourneys()),
+    home('home-delayed', tighten(transferJourneys())),
+    home('home-cancelled', (() => {
+      const value = transferJourneys();
+      value[0].cancelled = true;
+      value[0].legDetail[0].cancelled = true;
+      return value;
+    })()),
+    home('home-change', transferJourneys(), {
+      now: Date.parse('2026-09-01T09:53:00+10:00'),
+      generatedAt: '2026-09-01T09:53:00+10:00',
+      focus: transferJourneys()[0]
+    }),
+    home('home-final', transferJourneys(), {
+      now: Date.parse('2026-09-01T10:01:00+10:00'),
+      generatedAt: '2026-09-01T10:01:00+10:00',
+      focus: transferJourneys()[0]
+    }),
     board('on-time', departuresBody()),
+    board('past-register', departuresBody(), {
+      after: `t.state.pastBodies = [${JSON.stringify(pastBody)}]; t.state.initialBoardLanding = true; t.rerender(); await sleep(80);`
+    }),
+    board('past-register-scrolled', departuresBody(), {
+      after: `t.state.pastBodies = [${JSON.stringify(pastBody)}]; t.state.initialBoardLanding = true; t.rerender(); await sleep(80); document.querySelector('.sy-tl').scrollTop = 0; await sleep(80);`
+    }),
     board('late-night', departuresBody({ journeys: lateNight })),
     board('delayed', departuresBody({ journeys: delayed })),
     board('cancelled', departuresBody({ journeys: cancelled })),
@@ -309,13 +411,21 @@ async function states() {
       after: OPEN_ROW(0)
     },
 
-    // The board with a focus active: the strip absorbs the footer, and the
-    // sixth service is paid for by scrolling, never by hiding it.
+    transfer('focus-returns-home', transferJourneys(), {
+      after: `${OPEN_ROW(0)} document.querySelector('[data-act="focus"]').click(); await sleep(160);`
+    }),
+
+    home('reverse-real-platforms', transferJourneys(), {
+      now: Date.parse('2026-09-01T10:11:00+10:00'),
+      generatedAt: '2026-09-01T10:11:00+10:00',
+      focus: transferJourneys()[0],
+      after: `window.fetch = async () => new Response(${JSON.stringify(JSON.stringify(reverseBody))}, { headers: { 'Content-Type': 'application/json' } }); document.querySelector('[data-act="way-back"]').click(); await sleep(220);`
+    }),
+
+    // A focus never adds a board strip: the board remains exactly six slots.
     transfer('board-focused', transferJourneys(), { focus: transferJourneys()[0] }),
 
-    // ...and the proof, because "the sixth service is reachable" is a claim
-    // about a gesture and not about a still image: driven to the end of the
-    // scroll, the last service is whole and the strip has not eaten it.
+    // ...and the proof, driven to the end of the board.
     transfer('board-focused-scrolled', transferJourneys(), {
       focus: transferJourneys()[0], after: SCROLL_TO_END
     }),
@@ -362,6 +472,11 @@ async function states() {
       seed: doc({ body: departuresBody({ journeys: delayed }) }),
       now: NOW,
       body: departuresBody({ journeys: delayed }),
+      size: '1280x800',
+      desktop: true
+    },
+    {
+      ...transfer('desktop-detail', transferJourneys(), { after: OPEN_ROW(0) }),
       size: '1280x800',
       desktop: true
     }
@@ -437,25 +552,89 @@ function pageScript(state) {
 
     for (const row of rowEls) {
       // docs/STYLES.md, binding: three lines per row, in every state.
-      const lines = ['.dep', '.meta', '.dest'].map((s) => row.querySelector(s));
+      const lines = ['.sy-t', '.sy-j', '.sy-sign'].map((s) => row.querySelector(s));
       if (lines.some((el) => !el || !el.textContent.trim())) problems.push('row is not three full lines');
       // The figure must fit its column: it has no ellipsis and nothing clips
       // it, so an overlong one is drawn straight through the departure time.
-      const mins = row.querySelector('.mins');
+      const mins = row.querySelector('.sy-n');
       if (mins && mins.scrollWidth > mins.clientWidth) {
         problems.push('figure "' + (mins.firstChild && mins.firstChild.nodeValue) + '" overflows its column: '
           + mins.scrollWidth + ' > ' + mins.clientWidth);
       }
       // Our own copy must never be ellipsised. An upstream headsign may be.
-      const note = row.querySelector('.dest.note');
+      const note = row.querySelector('.sy-sign.note');
       if (note && note.scrollWidth > note.clientWidth) {
         problems.push('cancelled-lead note truncated: ' + note.scrollWidth + ' > ' + note.clientWidth);
       }
     }
+
+    for (const target of document.querySelectorAll('button,[role="button"]')) {
+      const rect = target.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0 && rect.height < 43.5) {
+        problems.push('tap target under 44px: ' + (target.className || target.textContent.trim())
+          + ' (' + Math.round(rect.height * 10) / 10 + 'px)');
+      }
+    }
+
+    // Segment geometry is checked against the arithmetic carried in the DOM.
+    // Platform boxes are overlays, so they never enter this sum.
+    for (const bar of document.querySelectorAll('.sy-bar')) {
+      const spec = bar.querySelector('.sy-spec');
+      if (!spec) continue;
+      const mins = spec.dataset.mins.split('/').map(Number);
+      const total = mins.reduce((sum, value) => sum + value, 0);
+      const segments = [...bar.querySelectorAll('.sy-r,.sy-g0')];
+      const width = bar.getBoundingClientRect().width;
+      segments.forEach((segment, index) => {
+        const want = width * mins[index] / total;
+        const got = segment.getBoundingClientRect().width;
+        if (Math.abs(got - want) > 0.51) {
+          problems.push('time axis is ' + Math.abs(got - want).toFixed(2) + 'px off scale');
+        }
+      });
+    }
+
+    const fromStation = document.querySelector('.hm-e.from .hm-stn');
+    const toStation = document.querySelector('.hm-e.to .hm-stn');
+    const fromTime = document.querySelector('.hm-e.from .hm-t');
+    const toTime = document.querySelector('.hm-e.to .hm-t');
+    if (fromStation && toStation
+        && Math.abs(fromStation.getBoundingClientRect().top - toStation.getBoundingClientRect().top) > 0.1) {
+      problems.push('home station names are vertically misaligned');
+    }
+    if (fromTime && toTime
+        && Math.abs(fromTime.getBoundingClientRect().top - toTime.getBoundingClientRect().top) > 0.1) {
+      problems.push('home endpoint times are vertically misaligned');
+    }
+    if (document.querySelector('.rail')) problems.push('deleted B2 focus strip is still rendered');
+
+    const timeline = document.querySelector('.sy-tl');
+    const futureRows = timeline ? [...timeline.querySelectorAll('.sy-fwd > .sy-row')] : [];
+    if (timeline && futureRows.length === 6 && !timeline.querySelector(':scope > .sy-row')) {
+      const box = timeline.getBoundingClientRect();
+      const heights = futureRows.map((row) => row.getBoundingClientRect().height);
+      if (futureRows[0].getBoundingClientRect().top < box.top - 0.5
+          || futureRows[5].getBoundingClientRect().bottom > box.bottom + 0.5
+          || Math.max(...heights) - Math.min(...heights) > 0.2) {
+        problems.push('six future services are not six whole equal slots');
+      }
+    }
+    if (${JSON.stringify(state.name)} === 'past-register' && timeline) {
+      const anchor = timeline.querySelector('[data-t="now"]');
+      if (anchor && Math.abs(timeline.scrollTop - anchor.offsetTop) > 1) {
+        problems.push('board with past pages did not land at now');
+      }
+    }
+    if (${JSON.stringify(state.name)} === 'focus-returns-home' && location.hash !== '#/') {
+      problems.push('focusing a journey did not return home');
+    }
+    if (${JSON.stringify(state.name)} === 'reverse-real-platforms') {
+      const platforms = [...document.querySelectorAll('.hm-hd .sy-p')].map((node) => node.textContent.trim());
+      if (platforms.join('/') !== '4/1') problems.push('real reverse transfer platforms did not render: ' + platforms.join('/'));
+    }
     const ftr = document.querySelector('[data-t="footer"]');
     if (ftr && ftr.scrollWidth > ftr.clientWidth) problems.push('footer truncated');
-    // Wherever it ends up — its own line, or absorbed into the focused strip —
-    // the freshness line is in the frame.
+    // Wherever it ends up, the freshness line is in the frame.
     if (ftr && ftr.getBoundingClientRect().bottom > innerHeight + 0.5) {
       problems.push('the footer is below the frame');
     }
@@ -469,9 +648,7 @@ function pageScript(state) {
        A scrolling region and the chrome beneath it: nothing in the region may
        be unreachable, the last thing in it must be whole at the end of the
        scroll, and the chrome never paints over it or hangs below the frame.
-       The focused board's chrome is the STRIP, which absorbs the footer — the
-       board pays for it by scrolling (owner ruling), never by hiding a
-       service. The detail view's chrome is its closing rule. */
+       The detail view's chrome is its closing rule. */
     const region = (sel, itemSel, chromeEl, what) => {
       const el = document.querySelector(sel);
       if (!el) return;
@@ -494,7 +671,7 @@ function pageScript(state) {
       }
     };
 
-    region('.rows', '[data-t="row"]', document.querySelector('.rail') || ftr, 'board');
+    region('.sy-tl', '[data-t="row"]', null, 'board');
     region('.legs', '[data-t="leg"],[data-t="change"]', document.querySelector('.tail'), 'journey');
     if (problems.length) console.error('INVARIANT ' + ${JSON.stringify(state.name)} + ': ' + problems.join('; '));
   } catch (e) { console.error('invariant check failed: ' + e.message); }

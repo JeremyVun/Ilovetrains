@@ -5,14 +5,39 @@
 export const STORAGE_KEY = 'trains.v1';
 export const SCHEMA_VERSION = 1;
 export const HISTORY_CAP = 500;
+export const RIDES_CAP = 100;
+export const TRIPS_CAP = 10;
+export const SEARCH_CAP = 3;
 export const DIRECTIONS = ['forward', 'reverse'];
 
 export function emptyDoc() {
-  return { schemaVersion: SCHEMA_VERSION, trips: [], history: [], lastViewed: null, cache: {} };
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    trips: [],
+    history: [],
+    rides: [],
+    searches: { from: [], to: [] },
+    home: null,
+    lastViewed: null,
+    cache: {}
+  };
 }
 
 function isStop(s) {
   return !!s && typeof s.id === 'string' && s.id !== '' && typeof s.name === 'string';
+}
+
+function locationOf(stop) {
+  const value = stop && stop.location;
+  return value && Number.isFinite(value.lat) && Number.isFinite(value.lon)
+    ? { lat: value.lat, lon: value.lon } : null;
+}
+
+function stopOf(stop) {
+  const out = { id: stop.id, name: stop.name };
+  const location = locationOf(stop);
+  if (location) out.location = location;
+  return out;
 }
 
 /** Tolerant parse: a corrupt or foreign value must never brick the app. */
@@ -27,8 +52,8 @@ export function parseDoc(raw) {
       .filter((t) => t && typeof t.id === 'string' && isStop(t.from) && isStop(t.to))
       .map((t) => ({
         id: t.id,
-        from: { id: t.from.id, name: t.from.name },
-        to: { id: t.to.id, name: t.to.name },
+        from: stopOf(t.from),
+        to: stopOf(t.to),
         createdAt: typeof t.createdAt === 'string' ? t.createdAt : new Date(0).toISOString()
       }));
   }
@@ -38,13 +63,51 @@ export function parseDoc(raw) {
       .map((e) => ({ tripId: e.tripId, direction: e.direction, t: e.t }))
       .slice(-HISTORY_CAP);
   }
+  if (doc.trips.length > TRIPS_CAP) {
+    const usedAt = (trip) => {
+      const viewed = doc.history.filter((event) => event.tripId === trip.id)
+        .map((event) => Date.parse(event.t)).filter(Number.isFinite);
+      return viewed.length ? Math.max(...viewed) : Date.parse(trip.createdAt) || 0;
+    };
+    const keep = new Set(doc.trips.slice().sort((a, b) => usedAt(b) - usedAt(a))
+      .slice(0, TRIPS_CAP).map((trip) => trip.id));
+    doc.trips = doc.trips.filter((trip) => keep.has(trip.id));
+  }
+  if (Array.isArray(v.rides)) {
+    doc.rides = v.rides.filter((ride) => ride && typeof ride.tripId === 'string'
+      && DIRECTIONS.includes(ride.direction) && typeof ride.departedAt === 'string'
+      && typeof ride.arrivedAt === 'string' && isStop(ride.from) && isStop(ride.to))
+      .map((ride) => ({
+        tripId: ride.tripId,
+        direction: ride.direction,
+        scheduledDeparture: typeof ride.scheduledDeparture === 'string'
+          ? ride.scheduledDeparture : ride.departedAt,
+        departedAt: ride.departedAt,
+        arrivedAt: ride.arrivedAt,
+        from: stopOf(ride.from),
+        to: stopOf(ride.to)
+      })).slice(-RIDES_CAP);
+  }
+  if (v.searches && typeof v.searches === 'object') {
+    for (const role of ['from', 'to']) {
+      if (!Array.isArray(v.searches[role])) continue;
+      doc.searches[role] = v.searches[role].filter(isStop).map(stopOf).slice(0, SEARCH_CAP);
+    }
+  }
+  if (v.home && isStop(v.home.station) && typeof v.home.inferredAt === 'string') {
+    doc.home = {
+      station: stopOf(v.home.station),
+      inferredAt: v.home.inferredAt,
+      confidence: Number.isFinite(v.home.confidence) ? v.home.confidence : 0
+    };
+  }
   if (v.lastViewed && typeof v.lastViewed.tripId === 'string' && DIRECTIONS.includes(v.lastViewed.direction)) {
     doc.lastViewed = { tripId: v.lastViewed.tripId, direction: v.lastViewed.direction };
   }
   /* The focused journey (added 2026-09-01). Optional and self-describing, so
      the migration is the absence of the key: a document written before this
      shipped simply has no focus. A malformed one is dropped rather than
-     repaired — the strip it would draw is a claim about a train. */
+     repaired — the directions it would draw are a claim about a train. */
   const f = v.focus;
   if (f && typeof f.tripId === 'string' && DIRECTIONS.includes(f.direction)
       && typeof f.focusedAt === 'string' && f.journey && typeof f.journey === 'object') {
@@ -65,6 +128,9 @@ export function serializeDoc(doc) {
     schemaVersion: SCHEMA_VERSION,
     trips: doc.trips,
     history: doc.history,
+    rides: doc.rides || [],
+    searches: doc.searches || { from: [], to: [] },
+    home: doc.home || null,
     lastViewed: doc.lastViewed,
     cache: doc.cache
   };
@@ -86,11 +152,26 @@ export function findTrip(doc, tripId) {
 }
 
 export function addTrip(doc, trip) {
-  return { ...doc, trips: [...doc.trips, trip] };
+  const duplicate = doc.trips.find((saved) =>
+    (saved.from.id === trip.from.id && saved.to.id === trip.to.id)
+    || (saved.from.id === trip.to.id && saved.to.id === trip.from.id));
+  if (duplicate) return doc;
+  const trips = [...doc.trips, { ...trip, from: stopOf(trip.from), to: stopOf(trip.to) }];
+  if (trips.length <= TRIPS_CAP) return { ...doc, trips };
+
+  const usedAt = (candidate) => {
+    const times = doc.history.filter((event) => event.tripId === candidate.id)
+      .map((event) => Date.parse(event.t)).filter(Number.isFinite);
+    return times.length ? Math.max(...times) : Date.parse(candidate.createdAt) || 0;
+  };
+  const evict = trips.slice(0, -1).reduce((oldest, candidate) =>
+    usedAt(candidate) < usedAt(oldest) ? candidate : oldest, trips[0]);
+  return removeTrip({ ...doc, trips }, evict.id);
 }
 
-/** Deleting a trip takes its history, its cached boards and any lastViewed
-    pointer with it — nothing should outlive the trip it describes. */
+/** Deleting a trip takes its prediction history, cached boards and any
+    lastViewed/focus pointer with it. Completed rides deliberately survive:
+    their endpoint snapshots are the home heuristic's historical evidence. */
 export function removeTrip(doc, tripId) {
   const trip = findTrip(doc, tripId);
   const trips = doc.trips.filter((t) => t.id !== tripId);
@@ -98,6 +179,7 @@ export function removeTrip(doc, tripId) {
     ...doc,
     trips,
     history: doc.history.filter((e) => e.tripId !== tripId),
+    rides: doc.rides || [],
     lastViewed: doc.lastViewed && doc.lastViewed.tripId === tripId ? null : doc.lastViewed,
     cache: { ...doc.cache }
   };
@@ -127,6 +209,62 @@ export function recordView(doc, tripId, direction, atMs) {
     ...doc,
     history: history.length > HISTORY_CAP ? history.slice(history.length - HISTORY_CAP) : history,
     lastViewed: { tripId, direction }
+  };
+}
+
+/** The selected station, not raw keystrokes: recent search is a one-tap answer
+    and stays useful when spelling or capitalisation changes. */
+export function recordSearch(doc, role, stop) {
+  if (!['from', 'to'].includes(role) || !isStop(stop)) return doc;
+  const searches = { ...(doc.searches || { from: [], to: [] }) };
+  searches[role] = [stopOf(stop), ...(searches[role] || []).filter((item) => item.id !== stop.id)]
+    .slice(0, SEARCH_CAP);
+  return { ...doc, searches };
+}
+
+export function recordRide(doc, selection, journey, from, to) {
+  if (!selection || !journey || !from || !to) return doc;
+  const departedAt = (journey.departure || {}).estimated || (journey.departure || {}).scheduled;
+  const scheduledDeparture = (journey.departure || {}).scheduled || departedAt;
+  const arrivedAt = (journey.arrival || {}).estimated || (journey.arrival || {}).scheduled;
+  if (!departedAt || !arrivedAt) return doc;
+  const key = `${selection.tripId}|${selection.direction}|${scheduledDeparture}`;
+  const current = doc.rides || [];
+  if (current.some((ride) =>
+    `${ride.tripId}|${ride.direction}|${ride.scheduledDeparture || ride.departedAt}` === key)) return doc;
+  const rides = [...current, {
+    tripId: selection.tripId,
+    direction: selection.direction,
+    scheduledDeparture,
+    departedAt,
+    arrivedAt,
+    from: stopOf(from),
+    to: stopOf(to)
+  }].slice(-RIDES_CAP);
+  return { ...doc, rides };
+}
+
+export function updateStop(doc, stop) {
+  if (!isStop(stop) || !locationOf(stop)) return doc;
+  const trips = doc.trips.map((trip) => ({
+    ...trip,
+    from: trip.from.id === stop.id ? stopOf({ ...trip.from, location: stop.location }) : trip.from,
+    to: trip.to.id === stop.id ? stopOf({ ...trip.to, location: stop.location }) : trip.to
+  }));
+  const home = doc.home && doc.home.station.id === stop.id
+    ? { ...doc.home, station: stopOf({ ...doc.home.station, location: stop.location }) } : doc.home;
+  return { ...doc, trips, home };
+}
+
+export function setHome(doc, station, confidence, atMs) {
+  if (!isStop(station)) return doc;
+  return {
+    ...doc,
+    home: {
+      station: stopOf(station),
+      confidence: Number.isFinite(confidence) ? confidence : 0,
+      inferredAt: new Date(atMs).toISOString()
+    }
   };
 }
 

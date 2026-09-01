@@ -675,6 +675,23 @@ func TestMapTripLegDetailFoldsWalkingLegsIntoTheGap(t *testing.T) {
 	}
 }
 
+func TestConnectionFloorRejectsUnreasonablyTightPlans(t *testing.T) {
+	legs := []leg{
+		{Destination: place{ArrivalTimePlanned: "2026-09-01T09:51:00Z"}},
+		{Origin: place{DepartureTimePlanned: "2026-09-01T09:53:00Z"}},
+	}
+	if connectionFloorMet(legs, 3*time.Minute) {
+		t.Error("2-minute planned connection passed a 3-minute floor")
+	}
+	legs[1].Origin.DepartureTimePlanned = "2026-09-01T09:54:00Z"
+	if !connectionFloorMet(legs, 3*time.Minute) {
+		t.Error("3-minute planned connection did not meet the floor")
+	}
+	if !connectionFloorMet(legs, 0) {
+		t.Error("zero disables the tuneable floor")
+	}
+}
+
 func TestMapTripLegDetailRealtimeIsPerLeg(t *testing.T) {
 	// Fixture journeys 8 and 10 (5th and 6th after the On Demand ones are
 	// dropped) are mixed: a schedule-only T9 into Town Hall, then a MONITORED

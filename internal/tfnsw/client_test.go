@@ -54,7 +54,9 @@ func TestClientSendsAuthAndRequiredTripParams(t *testing.T) {
 		"name_origin":       "200060",
 		"type_destination":  "any",
 		"name_destination":  "215020",
-		"calcNumberOfTrips": "4",
+		// Spare upstream candidates let the connection floor drop unsafe
+		// routes without under-filling the four-service public answer.
+		"calcNumberOfTrips": "10",
 		"TfNSWTR":           "true",
 		// Exclusions that leave train (1) and metro (2) only. exclMOT_10 keeps
 		// On Demand buses out; without it upstream routes them (verified live

@@ -8,19 +8,18 @@ NOT go through GitHub — the image is built and pushed from this machine).
 
 ## Status
 
-Phase 1 (Go backend) done 2026-08-31; `docs/contracts/api.md` is implemented
-and smoke-tested against live TfNSW. Phase 2 (web client in `web/`) built
-2026-09-01: board, first run, trip management, storage + prediction. Phase 3
-(2026-09-01): PWA (manifest, icons, service worker) plus the empirical
-verification wave — every state driven in a real browser and judged against the
-exemplar, the experience bar measured, offline proven with the server killed.
-Results, defects and two open owner rulings:
+The v1 backend, web client and installable/offline PWA shipped 2026-08-31/09-01.
+Board v2 was built and locally verified against the locked comps8 on 2026-09-02:
+home is the open state, board is a now-anchored timeline, and focused journeys
+become smart-header directions. Evidence and exact geometry are in
+`docs/backlog/board-v2/VERIFICATION.md`; the earlier v1 report is
 `docs/backlog/v1-core-loop/VERIFICATION.md`. `TFNSW_API_KEY` lives in `.env`
 (gitignored) — never commit or print it.
 
 Run the whole app: `set -a; source .env; set +a; go run ./cmd/server`, then
 open http://localhost:8080 — the server serves `web/` at `/` (env:
-`TFNSW_API_KEY` required, `PORT` default 8080, `WEB_DIR` default `./web`).
+`TFNSW_API_KEY` required, `PORT` default 8080, `WEB_DIR` default `./web`,
+`MIN_CONNECTION_TIME` default `3m`).
 Test: `go test ./...` and `cd web && npm test` — no test makes a network call,
 and the client has no build step and no npm deps.
 
@@ -42,14 +41,17 @@ is bumped. Develop with DevTools' "Update on reload", or in a throwaway profile
 - `docs/backlog/v1-core-loop/` — v1 design + phased build plan
 - `docs/backlog/journey-focus/` — journey detail + focus: design, comps and
   verdict, and the built screens' shots in `shots/`
+- `docs/backlog/board-v2/` — locked home/board design, comps8 sources and the
+  implementation verification report
 - `tools/` — verification instruments (`screenshot.js`, `shoot-states.js`,
   `measure-open.js`, `make-icons.sh`) + the TfNSW probe and fixtures; read
   `tools/README.md` before trusting or changing any of them
 - `web/` — the client: `index.html`, `app.css`, ES modules in `web/js`
   (`rowmodel`, `journey`, `focus`, `storage`, `predict` are pure and unit
   tested in `web/test`), plus the PWA shell: `manifest.webmanifest`, `sw.js`,
-  `icons/`. Screens: the board (`board.js`), the journey detail view
-  (`detail.js`, route `#/journey`), setup, trips.
+  `icons/`. Screens: home/directions (`home.js`, route `#/`), the timeline
+  board (`board.js`, route `#/board`), journey detail (`detail.js`, route
+  `#/journey`), and setup.
 - `cmd/server` — backend entrypoint; `internal/tfnsw` — upstream client and
   response mapping; `internal/cache` — TTL + single-flight + stale-on-error;
   `internal/api` — handlers, cache headers, error contract

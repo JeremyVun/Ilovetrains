@@ -1,107 +1,109 @@
-/* First run and add-a-trip: origin search → destination search → save.
-   Same page furniture as the board — masthead, heavy rule, hairlines.
+/* Add a trip in the locked home-sheet grammar, with recent stations and fuzzy
+   ranking. */
 
-   Every distinct query string is an upstream call to TfNSW that takes up to a
-   second and a half, so this screen asks as little as it can and says what it
-   is doing while it waits: keystrokes are debounced, nothing shorter than
-   MIN_QUERY is ever sent, and a query already asked this session is answered
-   from the memo without touching the network. The policy and the copy live in
-   search.js, where they are tested. */
-
-import { esc, mount, onAction } from './dom.js';
+import { esc, mount, onAction, shortName } from './dom.js';
 import { getStops } from './api.js';
-import { shortName } from './board.js';
-import { newTripId } from './storage.js';
-import { MIN_QUERY, createSearcher, hintFor, queryKey } from './search.js';
+import { newTripId, recordSearch } from './storage.js';
+import { MIN_QUERY, createSearcher, hintFor, queryKey, rankStops, fuzzyScore } from './search.js';
 
 export const SEARCH_DEBOUNCE_MS = 300;
-
-/* Module scope, so it outlives the screen: adding a second trip after the first
-   asks nothing the first one already answered. */
 const searcher = createSearcher((query, opts) => getStops(query, opts));
 
 export function renderSetup(root, ctx) {
-  const firstRun = ctx.doc.trips.length === 0;
   const picked = { from: null, to: null };
   let active = 'from';
   let results = [];
+  let group = '';
   let hint = null;
   let debounce = null;
   let inflight = null;
 
-  mount(root, `
-<div class="mast">
-  <div class="kicker"><span class="lbl">${firstRun ? 'Next departures' : 'Saved trips'}</span></div>
-  <h1>${firstRun ? 'Save the trip you take.' : 'Add a trip'}</h1>
-  ${firstRun ? '<p class="lede">Open it again and the board is already there.</p>' : ''}
-  <div class="tools">${firstRun ? '' : '<button data-act="cancel">Back</button>'}</div>
-  <div class="rule"></div>
-</div>
-<div class="sheet">
-  <label class="field">
-    <span class="lbl">From</span>
-    <input data-role="from" type="search" autocomplete="off" autocorrect="off"
-           spellcheck="false" enterkeyhint="search" placeholder="Origin station">
-  </label>
-  <label class="field">
-    <span class="lbl">To</span>
-    <input data-role="to" type="search" autocomplete="off" autocorrect="off"
-           spellcheck="false" enterkeyhint="search" placeholder="Destination station">
-  </label>
-  <div class="results" data-t="results"></div>
-  <div class="act"><button data-act="save" data-t="save" disabled>Save trip</button></div>
-</div>`);
+  mount(root, `<div class="hm-c home-screen">
+    <div class="hm-top">${ctx.doc.trips.length
+      ? '<button class="hm-back" data-act="home"><span class="g">←</span>Home</button>' : ''}</div>
+    <div class="hm-mast"><h1>New trip</h1><div class="r"></div></div>
+    <div class="hm-sheet">
+      ${fieldHtml('from', 'From', 'Origin station')}
+      ${fieldHtml('to', 'To', 'Destination station')}
+      <div data-t="results"></div>
+      <p class="hm-lede">Save <b>one direction only</b>. When today’s ride is done, the way back is ready.</p>
+    </div>
+    <div class="hm-bar save"><button data-act="save" data-t="save" disabled>Choose where you start</button></div>
+  </div>`);
 
-  const inputs = { from: root.querySelector('[data-role="from"]'), to: root.querySelector('[data-role="to"]') };
+  const inputs = {
+    from: root.querySelector('[data-role="from"]'),
+    to: root.querySelector('[data-role="to"]')
+  };
   const resultsEl = root.querySelector('[data-t="results"]');
   const saveEl = root.querySelector('[data-t="save"]');
 
+  function fieldHtml(role, label, placeholder) {
+    return `<label class="hm-field"><span class="lbl">${label}</span>
+      <input class="v" data-role="${role}" type="search" autocomplete="off" autocorrect="off"
+        spellcheck="false" enterkeyhint="search" placeholder="${placeholder}">
+    </label>`;
+  }
+
+  function recentFor(role, query = '') {
+    return ((ctx.doc.searches && ctx.doc.searches[role]) || [])
+      .filter((stop) => !query || fuzzyScore(stop.name, query) > 0);
+  }
+
   function paintResults() {
     if (hint) {
-      resultsEl.innerHTML = `<div class="hint${hint.warn ? ' warn' : ''}" data-t="hint">${esc(hint.text)}</div>`;
+      resultsEl.innerHTML = `<div class="hint${hint.warn ? ' warn' : ''}">${esc(hint.text)}</div>`;
       return;
     }
-    resultsEl.innerHTML = results.map((s) => `
-      <button data-act="pick" data-id="${esc(s.id)}" data-name="${esc(s.name)}" data-t="stop">
-        <span>${esc(shortName(s.name))}</span>
-        <span class="lbl">${esc((s.modes || []).join(' · '))}</span>
-      </button>`).join('');
+    if (!results.length) { resultsEl.innerHTML = ''; return; }
+    resultsEl.innerHTML = `<div class="hm-grp">${esc(group)}</div><div class="hm-res">${results.map((stop, index) =>
+      `<button data-act="pick" data-index="${index}"><span class="n">${esc(shortName(stop.name))}</span>
+        <span class="w">${esc((stop.modes || []).join(' · '))}</span></button>`).join('')}</div>`;
+  }
+
+  function showRecents(role, query = '') {
+    results = recentFor(role, query);
+    group = results.length ? 'You searched before' : '';
+    hint = null;
+    paintResults();
   }
 
   function paintSave() {
     const ready = picked.from && picked.to && picked.from.id !== picked.to.id;
     saveEl.disabled = !ready;
+    saveEl.textContent = ready
+      ? `Save ${shortName(picked.from.name)} → ${shortName(picked.to.name)}`
+      : picked.from ? 'Choose where you’re going' : 'Choose where you start';
     if (picked.from && picked.to && picked.from.id === picked.to.id) {
-      hint = { text: 'Pick two different stations', warn: true };
       results = [];
+      hint = { text: 'Pick two different stations', warn: true };
       paintResults();
     }
   }
 
-  async function search(query) {
+  async function search(query, role) {
     if (inflight) inflight.abort();
     inflight = new AbortController();
     try {
       const stops = await searcher.search(query, { signal: inflight.signal });
-      // A memoised answer resolves in a microtask, which can land after the
-      // user has typed on: only the query still in the field gets painted.
-      if (queryKey(query) !== queryKey(inputs[active].value)) return;
-      results = stops;
+      if (role !== active || queryKey(query) !== queryKey(inputs[role].value)) return;
+      const combined = [...stops, ...recentFor(role, query)];
+      results = rankStops([...new Map(combined.map((stop) => [stop.id, stop])).values()], query);
+      group = results.length ? 'Matches' : '';
       hint = hintFor({ query, phase: 'done', count: results.length });
-    } catch (e) {
-      if (e.name === 'AbortError') return;
-      results = [];
-      hint = hintFor({ query, phase: 'error' });
+    } catch (error) {
+      if (error.name === 'AbortError') return;
+      results = recentFor(role, query);
+      group = results.length ? 'You searched before' : '';
+      hint = results.length ? null : hintFor({ query, phase: 'error' });
     }
     paintResults();
   }
 
-  for (const [role, input] of Object.entries(inputs)) {
+  Object.entries(inputs).forEach(([role, input]) => {
     input.addEventListener('focus', () => {
       active = role;
-      results = [];
-      hint = null;
-      paintResults();
+      if (!input.value.trim()) showRecents(role);
     });
     input.addEventListener('input', () => {
       active = role;
@@ -109,43 +111,44 @@ export function renderSetup(root, ctx) {
       paintSave();
       clearTimeout(debounce);
       const query = input.value.trim();
-
-      // Too short to ask: say so rather than sending a call that upstream
-      // answers with street names, or nothing at all.
       if (query.length < MIN_QUERY) {
         if (inflight) inflight.abort();
-        results = [];
-        hint = hintFor({ query, phase: 'idle' });
-        paintResults();
+        if (query) {
+          results = recentFor(role, query);
+          group = results.length ? 'You searched before' : '';
+          hint = results.length ? null : hintFor({ query, phase: 'idle' });
+          paintResults();
+        } else showRecents(role);
         return;
       }
-
-      // Already asked this session — backspacing to it costs nothing, so it
-      // answers now, with no wait to announce.
       const remembered = searcher.peek(query);
       if (remembered) {
-        if (inflight) inflight.abort();
-        results = remembered;
+        const combined = [...remembered, ...recentFor(role, query)];
+        results = rankStops([...new Map(combined.map((stop) => [stop.id, stop])).values()], query);
+        group = results.length ? 'Matches' : '';
         hint = hintFor({ query, phase: 'done', count: results.length });
         paintResults();
         return;
       }
-
-      // The wait starts at this keystroke, so the screen says so at this
-      // keystroke, not when the request finally leaves.
       results = [];
+      group = '';
       hint = hintFor({ query, phase: 'pending' });
       paintResults();
-      debounce = setTimeout(() => search(query), SEARCH_DEBOUNCE_MS);
+      debounce = setTimeout(() => search(query, role), SEARCH_DEBOUNCE_MS);
     });
-  }
+  });
 
-  onAction(root, (action, el) => {
-    if (action === 'cancel') { ctx.go('#/trips'); return; }
-
+  onAction(root, (action, element) => {
+    if (action === 'home') {
+      if (ctx.doc.trips.length) ctx.go('#/');
+      return;
+    }
     if (action === 'pick') {
-      picked[active] = { id: el.dataset.id, name: el.dataset.name };
-      inputs[active].value = shortName(el.dataset.name);
+      const stop = results[Number(element.dataset.index)];
+      if (!stop) return;
+      picked[active] = stop;
+      ctx.update(recordSearch(ctx.doc, active, stop));
+      inputs[active].value = shortName(stop.name);
       results = [];
       hint = null;
       paintResults();
@@ -154,16 +157,13 @@ export function renderSetup(root, ctx) {
       else inputs[active].blur();
       return;
     }
-
-    if (action === 'save') {
-      if (saveEl.disabled) return;
-      const trip = {
+    if (action === 'save' && !saveEl.disabled) {
+      ctx.saveTrip({
         id: newTripId(),
         from: picked.from,
         to: picked.to,
         createdAt: new Date().toISOString()
-      };
-      ctx.saveTrip(trip);
+      });
     }
   });
 

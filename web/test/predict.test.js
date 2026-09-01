@@ -4,7 +4,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  predict, scoreCandidate, scoreAll, dayTypeMatch, hourProximity, recencyDecay
+  predict, scoreCandidate, scoreAll, dayTypeMatch, hourProximity, recencyDecay,
+  distanceKm, locationFactor, rankTrips
 } from '../js/predict.js';
 import { emptyDoc, addTrip, recordView } from '../js/storage.js';
 
@@ -139,4 +140,31 @@ test('prediction is deterministic given the same document and clock', () => {
   d = recordView(d, 'other', 'reverse', MON_0800 - 3600_000);
   assert.deepEqual(predict(d, MON_0800), predict(structuredClone(d), MON_0800));
   assert.deepEqual(predict(d, MON_0800), { tripId: 'other', direction: 'reverse' });
+});
+
+test('location boosts a nearby origin without breaking candidates lacking coordinates', () => {
+  const near = { lat: -33.883, lon: 151.207 };
+  const fix = { lat: -33.884, lon: 151.206 };
+  assert.ok(distanceKm(fix, near) < 2);
+  assert.equal(locationFactor(fix, { location: near }), 2.5);
+  assert.equal(locationFactor(fix, CENTRAL), 1);
+
+  let d = doc([
+    ['home', 'forward', MON_0800 - 86_400_000],
+    ['other', 'forward', MON_0800 - 86_400_000]
+  ]);
+  d = {
+    ...d,
+    trips: d.trips.map((saved) => saved.id === 'other'
+      ? { ...saved, from: { ...saved.from, location: near } } : saved)
+  };
+  assert.deepEqual(predict(d, MON_0800, { fix }), { tripId: 'other', direction: 'forward' });
+});
+
+test('an explicit trip switch outranks the prediction in the home list', () => {
+  const d = doc([['home', 'forward', MON_0800 - 86_400_000]]);
+  const ranked = rankTrips(d, MON_0800, {
+    selection: { tripId: 'other', direction: 'reverse' }
+  });
+  assert.deepEqual([ranked[0].trip.id, ranked[0].direction, ranked[0].selected], ['other', 'reverse', true]);
 });

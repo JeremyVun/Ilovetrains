@@ -32,15 +32,19 @@ const (
 	defaultAttemptTimeout = 8 * time.Second
 	defaultMaxAttempts    = 2
 	maxResponseBytes      = 8 << 20
+	// DefaultMinimumConnectionTime is the planning floor, not a warning
+	// threshold. A journey below it is never offered.
+	DefaultMinimumConnectionTime = 3 * time.Minute
 )
 
 // Client talks to the TfNSW Trip Planner. The API key is held only here and is
 // never logged or echoed into a response.
 type Client struct {
-	BaseURL        string
-	HTTPClient     *http.Client
-	AttemptTimeout time.Duration
-	MaxAttempts    int
+	BaseURL               string
+	HTTPClient            *http.Client
+	AttemptTimeout        time.Duration
+	MaxAttempts           int
+	MinimumConnectionTime time.Duration
 
 	apiKey string
 	loc    *time.Location
@@ -58,13 +62,14 @@ func NewClient(apiKey string) (*Client, error) {
 		return nil, fmt.Errorf("tfnsw: loading %s: %w", TimeZone, err)
 	}
 	return &Client{
-		BaseURL:        DefaultBaseURL,
-		HTTPClient:     &http.Client{},
-		AttemptTimeout: defaultAttemptTimeout,
-		MaxAttempts:    defaultMaxAttempts,
-		apiKey:         apiKey,
-		loc:            loc,
-		now:            time.Now,
+		BaseURL:               DefaultBaseURL,
+		HTTPClient:            &http.Client{},
+		AttemptTimeout:        defaultAttemptTimeout,
+		MaxAttempts:           defaultMaxAttempts,
+		MinimumConnectionTime: DefaultMinimumConnectionTime,
+		apiKey:                apiKey,
+		loc:                   loc,
+		now:                   time.Now,
 	}, nil
 }
 
@@ -115,7 +120,13 @@ func (c *Client) Departures(ctx context.Context, from, to string, limit int, at 
 	q.Set("name_origin", from)
 	q.Set("type_destination", "any")
 	q.Set("name_destination", to)
-	q.Set("calcNumberOfTrips", strconv.Itoa(limit))
+	// Ask for spare candidates because unsafe connections are dropped before
+	// the public limit is applied.
+	upstreamLimit := limit * 2
+	if upstreamLimit < 10 {
+		upstreamLimit = 10
+	}
+	q.Set("calcNumberOfTrips", strconv.Itoa(upstreamLimit))
 	q.Set("TfNSWTR", "true")
 	// Keep train (1) and metro (2); exclude light rail (4), bus (5), coach (7),
 	// ferry (9), On Demand (10) and school bus (11). exclMOT_10 was added
@@ -135,7 +146,7 @@ func (c *Client) Departures(ctx context.Context, from, to string, limit int, at 
 	// generatedAt stays the fetch time, not the window: a client must always be
 	// able to compute how old the data it is showing is, including for a past
 	// window whose rows are hours older than the response.
-	resp, err := mapTrip(body, from, to, limit, now, c.loc)
+	resp, err := mapTripWithMinimum(body, from, to, limit, now, c.loc, c.MinimumConnectionTime)
 	if err != nil {
 		return nil, err
 	}
