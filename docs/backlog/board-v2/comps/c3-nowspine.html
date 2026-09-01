@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>C3 · Now spine</title>
+<link rel="stylesheet" href="base.css">
+<style>
+/* ============================================================== C3 · NOW SPINE
+   The board is drawn as one continuous line down the page, painted in the line's
+   own colour, and NOW is a place on it. Above the crossing the rail is hollow —
+   nothing is carrying you through there any more, the round-2 donation — and the
+   services strung on it are in the past register. Below it the rail is solid.
+   The confusion is answered by moving the platform ONTO the rail: every service
+   is marked by a filled disc in its line's colour with its platform number
+   knocked out of it, which is the roundel grammar the network already uses on
+   its own signs. The minutes figure keeps the right-hand column, so the two
+   numbers are on opposite edges of the row in different species and cannot be
+   read as each other.
+
+   NOT proportional. Round 1 measured that: 844px over a 69-minute window is
+   ~9px/min, the true-position claim survives only above ~8-minute headways, and
+   it collapses at peak (see d-river-390x844-long.png). The axis here is nominal;
+   the clock times in the body carry the truth.
+   ================================================================================ */
+
+.mast { padding: 22px 22px 0; }
+.mast .tools { display: none; }
+.mast .rule { display: none; }
+.mast h1 { font-size: 27px; }
+
+.tl {
+  flex: 1; min-height: 0; padding: 0 22px;
+  display: flex; flex-direction: column; position: relative;
+  overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+}
+
+/* ---- the crossing ---------------------------------------------------------- */
+.cross {
+  flex: none; position: relative; border-top: 2px solid var(--ink);
+  padding: 9px 0 10px 56px;
+  display: flex; align-items: baseline; justify-content: space-between;
+  font-size: 11px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--ink);
+}
+.cross .up { color: var(--ink-3); letter-spacing: .14em; }
+
+/* ---- a service on the rail -------------------------------------------------- */
+.n {
+  flex: none; position: relative;
+  display: grid; grid-template-columns: 56px 1fr 74px; gap: 0 12px;
+  align-items: start; padding: 14px 0 15px;
+}
+/* the rail: one object per row, joined edge to edge so the whole page is one line */
+.n .spine {
+  position: absolute; left: 15px; top: 0; bottom: 0; width: 4px;
+  background: var(--stem);
+}
+.n.two .spine { background: linear-gradient(var(--stem) 0 73%, var(--stem2) 73% 100%); }
+
+.n.past .spine { background: none; border-left: 4px dashed var(--stem); opacity: .4; width: 0; }
+
+/* the node: the platform, in the line's colour, on the axis */
+.n .node {
+  position: relative; z-index: 1; width: 34px; height: 34px; border-radius: 50%;
+  background: var(--stem); color: var(--on-stem);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 700; letter-spacing: -.02em;
+  margin-left: 0;
+}
+.n.first .node { width: 40px; height: 40px; font-size: 21px; }
+.n.past .node {
+  background: var(--bg); border: 2px solid var(--stem); color: var(--ink-3);
+  opacity: .5; width: 14px; height: 14px; margin-left: 10px;
+}
+.n.past.timetable .node { border-style: dotted; opacity: .34; }
+.n.sched .node { background: none; border: 2px solid var(--stem); color: var(--ink-2); }
+.n.cx .node { background: none; border: 2px dashed var(--ink-3); color: var(--ink-3); }
+.n .plabel {
+  display: block; margin-top: 6px; text-align: center; width: 34px;
+  position: relative; z-index: 2; background: var(--bg); padding: 1px 0;
+  font-size: 8.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+.n.first .plabel { width: 40px; }
+
+.n .b { min-width: 0; padding-top: 2px; }
+.n .b .t { font-size: 21px; font-weight: 400; letter-spacing: -.015em; color: var(--ink);
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.n.first .b .t { font-size: 24px; }
+.n .b .t del { font-size: 15px; font-weight: 300; color: var(--ink-3); }
+.n .b .t .to { font-size: 14px; font-weight: 300; color: var(--ink-3); }
+.n .b .m { margin-top: 8px; font-size: 10.5px; font-weight: 600; letter-spacing: .15em;
+  text-transform: uppercase; color: var(--ink-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.n:last-of-type .spine { bottom: 50%; }
+.n .b .m i { font-style: normal; font-weight: 700; color: var(--stem); }
+.n .b .m i.two { color: var(--stem2); }
+.n .b .d { margin-top: 7px; font-size: 14px; font-weight: 300; line-height: 19px;
+  color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.n .b .d.note { font-size: 10px; font-weight: 600; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--warn); }
+
+.n .f { text-align: right; padding-top: 0; }
+.n .f .v { font-size: 46px; font-weight: 250; letter-spacing: -.045em; line-height: .86;
+  color: var(--ink); display: block; }
+.n.first .f .v { font-size: 62px; }
+.n .f .u { display: block; margin-top: 7px; font-size: 10px; font-weight: 600;
+  letter-spacing: .13em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap; }
+.n .f .u.warn { color: var(--warn); }
+.n.wide .f .v { font-size: 38px; }
+.n.first.wide .f .v { font-size: 46px; }
+.n.sched .f .v { color: var(--ink-2); font-weight: 200; }
+.n.late .f .v, .n.late .b .t > strong { color: var(--warn); }
+.n.cx .f .v { font-size: 30px; color: var(--ink-3); font-weight: 200; }
+.n.cx .b .t, .n.cx .b .d { color: var(--ink-3); }
+.n.cx .b .t strong { text-decoration: line-through; text-decoration-thickness: 1.5px; }
+
+/* the past: one dense line strung on a hollow rail */
+.n.past { grid-template-columns: 56px 1fr 118px; padding: 9px 0 10px; align-items: center; }
+.n.past .b .t { font-size: 16px; color: var(--ink-2); }
+.n.past .b .t::after { content: '\00a0\00a0Plat 1'; font-size: 10px; font-weight: 600;
+  letter-spacing: .15em; text-transform: uppercase; color: var(--ink-3); }
+.n.past.timetable .b .t { color: var(--ink-3); font-weight: 200; }
+.n.past.timetable .node { opacity: .3; }
+.n.past .f { text-align: right; }
+.n.past .f .u { font-size: 9.5px; line-height: 14px; }
+.n.past .b .t .to, .n.past .b .m, .n.past .b .d { display: none; }
+.n.past .f .v { font-size: 0; }
+.n.past .f .u { margin-top: 0; }
+.n.past .plabel { display: none; }
+.n.past .node { margin-top: 0; }
+
+.endmk { flex: none; padding: 14px 0 0 56px; font-size: 10px; font-weight: 600;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3); }
+
+/* ---- focused strip ---------------------------------------------------------- */
+.strip { flex: none; padding: 11px 22px 11px 56px; border-top: 1px solid var(--rule-2);
+  position: relative; }
+.strip::before { content: ''; position: absolute; left: 37px; top: 0; width: 4px; height: 14px;
+  background: var(--line-T9); }
+.strip .a { display: flex; align-items: baseline; gap: 10px; }
+.strip .a .v { font-size: 30px; font-weight: 250; letter-spacing: -.04em; color: var(--ink); }
+.strip .a .t { font-size: 17px; color: var(--ink); }
+.strip .a .d { font-size: 13px; font-weight: 300; color: var(--ink-3); min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.strip .z { margin-top: 5px; font-size: 10px; font-weight: 600; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-3); }
+.strip .z b { color: var(--ink-2); font-weight: 600; }
+
+/* ---- the terminus: the rail runs into the controls -------------------------- */
+.term {
+  flex: none; position: relative; border-top: 2px solid var(--ink);
+  display: flex; align-items: stretch; padding: 0 22px max(8px, env(safe-area-inset-bottom, 0px));
+}
+.term button {
+  display: flex; align-items: center; gap: 7px; min-height: 54px;
+  font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink);
+}
+.term button .g { font-size: 16px; font-weight: 300; letter-spacing: 0; color: var(--ink-2); }
+.term .sp { flex: 1; }
+.term .puck {
+  position: absolute; left: 15px; top: -9px; width: 4px; height: 16px; background: var(--ink);
+}
+
+/* ---- trips + ask ------------------------------------------------------------ */
+.sh { flex: 1; min-height: 0; overflow-y: auto; padding: 0 22px;
+      display: flex; flex-direction: column; }
+.hd { padding: 18px 0 6px; font-size: 10px; font-weight: 600; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--ink); display: flex; align-items: center; gap: 8px; }
+.hd.q { color: var(--ink-3); padding-top: 22px; }
+.tr { display: grid; grid-template-columns: 40px 1fr auto; gap: 0 14px; align-items: center;
+  padding: 14px 0 15px; border-bottom: 1px solid var(--rule); }
+.tr .node { width: 34px; height: 34px; border-radius: 50%; background: var(--stem);
+  color: var(--on-stem); display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; letter-spacing: .02em; }
+.tr .nm { font-size: 21px; font-weight: 300; letter-spacing: -.015em; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tr .nm em { font-style: normal; color: var(--ink-3); font-weight: 200; padding: 0 3px; }
+.tr .sub { margin-top: 5px; font-size: 10px; font-weight: 600; letter-spacing: .15em;
+  text-transform: uppercase; color: var(--ink-3); }
+.tr.top { border-bottom: 2px solid var(--ink); padding-bottom: 18px; }
+.tr.top .nm { font-size: 23px; }
+.tr.top .sub { color: var(--ink-2); }
+.tr .ed { font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-3); padding: 16px 0 16px 14px; flex: none; white-space: nowrap; }
+.tr > div:nth-child(2) { min-width: 0; }
+
+.ask { flex: none; padding: 17px 22px 0; border-top: 2px solid var(--ink); }
+.ask .k { font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--ink-3); }
+.ask p { margin-top: 10px; font-size: 16px; font-weight: 300; line-height: 1.45; color: var(--ink); }
+.ask .acts { display: flex; gap: 26px; margin-top: 2px;
+  padding-bottom: max(4px, env(safe-area-inset-bottom, 0px)); }
+.ask .acts button { min-height: 52px; font-size: 12px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--ink); }
+.ask .acts button.q { color: var(--ink-3); }
+
+/* MEASURED, and it does not carry over between schemes. On the dark ground the
+   knocked-out ink has to be chosen per line (white on T1 is 1.95:1; black on T4
+   is 2.80:1), which is why INK_ON exists. On PAPER every one of the darkened
+   light-scheme line values was already tuned to clear 4.5:1 against #FAF9F5, so
+   the correct ink there is the ground, for every line, with no table. Carrying
+   the dark table into light printed near-black on red at 3.52:1 — caught in
+   c4-answerledger-390x844-hero-light.png, not by reading the CSS. */
+@media (prefers-color-scheme: light) {
+  .n .node, .tr .node { color: var(--bg) !important; }
+}
+</style>
+</head>
+<body><div id="app"></div>
+<script src="data.js"></script>
+<script>
+(function () {
+  var m = model(scenarioName());
+  var app = document.getElementById('app');
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+
+  /* A filled disc carries LARGE type only, so the ink can be chosen per line by
+     contrast and still clear WCAG. Measured against #F4F5F7 and #0A0B0D:
+     white loses on T1/T2/T3/T7/T8/M1, wins on T4/T5/T9/HUN. */
+  var INK_ON = { T1: 'bg', T2: 'bg', T3: 'bg', T7: 'bg', T8: 'bg', M1: 'bg',
+                 BMT: 'bg', SCO: 'bg', SHL: 'bg',
+                 T4: 'ink', T5: 'ink', T9: 'ink', CCN: 'ink', HUN: 'ink' };
+  function vars(r) {
+    return '--stem:var(--line-' + r.line + ');--stem2:var(--line-' + (r.line2 || r.line) + ');'
+      + '--on-stem:var(--' + (INK_ON[r.line] === 'ink' ? 'ink' : 'bg') + ')';
+  }
+
+  function node(r, first, note) {
+    var cls = 'n' + (first ? ' first' : '') + (r.past ? ' past ' + r.pastKind : '')
+      + (r.cx ? ' cx' : '') + (r.lateBy && r.pastKind !== 'timetable' ? ' late' : '') + (r.sched ? ' sched' : '')
+      + (r.line2 ? ' two' : '') + (r.fig.length > 2 ? ' wide' : '');
+    var body = r.past
+      ? '<div class="b"><div class="t"><strong>' + r.pastDep + '</strong>'
+        + (r.pastStruck ? '<del>' + r.pastStruck + '</del>' : '') + '</div></div>'
+      : '<div class="b"><div class="t"><strong>' + r.dep + '</strong>'
+        + (r.planned ? '<del>' + r.planned + '</del>' : '')
+        + '<span class="to">arrives ' + r.arr + '</span></div>'
+        + '<div class="m"><i>' + r.line + '</i>'
+        + (r.line2 ? ' <span style="color:var(--ink-3)">&rarr;</span> <i class="two">' + r.line2
+            + '</i> &middot; 1 change' : '') + '</div>'
+        + (note ? '<div class="d note">' + note + '</div>'
+                : '<div class="d">' + esc(r.head) + '</div>') + '</div>';
+    var fig = r.past
+      ? '<div class="f"><span class="v"></span><span class="u' + (r.lateBy ? ' warn' : '') + '">'
+        + r.pastProv + (r.agoText ? '<br>' + r.agoText : '') + '</span></div>'
+      : '<div class="f"><span class="v">' + r.fig + '</span>'
+        + '<span class="u' + (r.cx || r.lateBy ? ' warn' : '') + '">' + r.prov + '</span></div>';
+    return '<div data-svc ' + (r.past ? 'data-past ' : '') + 'class="' + cls + '" style="' + vars(r) + '">'
+      + '<div class="spine"></div>'
+      /* A past node carries no platform: you are not catching that train, and a
+         digit inside a 26px hollow ring with the rail behind it was unreadable
+         anyway. It becomes a plain stop on the line. */
+      + '<div><div class="node">' + (r.past ? '' : r.plat) + '</div>'
+      + (r.past ? '' : '<span class="plabel">Plat</span>') + '</div>'
+      + body + fig + '</div>';
+  }
+
+  function board() {
+    var note = null;
+    if (m.rows[0] && m.rows[0].cx) note = m.rows[0].dep + ' cancelled &middot; next train';
+    var out = '<div class="mast"><div class="kicker"><span class="pulse live"></span>'
+      + '<span class="lbl" style="color:var(--ink)">Nearest &middot; ' + esc(m.from) + '</span></div>'
+      + '<h1>' + esc(m.from) + ' <em>&rarr;</em> ' + esc(m.to) + '</h1></div>'
+      + '<div class="tl">'
+      + (m.scrolled ? '<div style="flex:none;height:2px;background:var(--ink);opacity:.82"></div>' : '')
+      + m.past.map(function (r) { return node(r, false, null); }).join('')
+      + '<div class="cross"><span>Now &middot; ' + m.now + '</span><span class="up">&uarr; Earlier</span></div>'
+      + m.next.map(function (r, i) { return node(r, i === 0, i === 1 ? note : null); }).join('')
+      + '<div class="endmk">&mdash; end of board</div></div>';
+    var strip = m.focus ? ('<div class="strip">'
+      + '<div class="a"><span class="v">47</span><span class="t">10:08</span>'
+      + '<span class="d">you arrive Bondi Junction</span></div>'
+      + '<div class="z">Min to go &middot; on the <b>09:24</b> &middot; change <b>09:58</b> platform 5</div>'
+      + '</div>') : '';
+    return out + strip
+      + '<div class="term"><div class="puck"></div>'
+      + '<button><span class="g">&#8646;</span>Reverse</button><span class="sp"></span>'
+      + (m.scrolled ? '<button><span class="g">&darr;</span>Now</button><span class="sp"></span>' : '')
+      + '<button>Trips</button></div>';
+  }
+
+  function trips() {
+    var t = TRIPS;
+    function row(x, top) {
+      return '<div class="tr' + (top ? ' top' : '') + '" style="--stem:var(--line-' + x.line
+        + ');--on-stem:var(--' + (INK_ON[x.line] === 'ink' ? 'ink' : 'bg') + ')">'
+        + '<div class="node">' + x.line + '</div>'
+        + '<div><div class="nm">' + x.from + ' <em>&rarr;</em> ' + x.to + '</div>'
+        + '<div class="sub">' + (top ? '120 m away &middot; next train ' + x.next
+            : x.dist + ' away &middot; ' + x.next) + '</div></div>'
+        + '<span class="ed">Edit</span></div>';
+    }
+    return '<div class="mast"><div class="kicker"><span class="lbl">3 trips on this phone</span></div>'
+      + '<h1>Trips</h1></div><div class="sh">'
+      + '<div class="hd"><span class="pulse live"></span>Nearest you</div>'
+      + row(t[0], true)
+      + '<div class="hd q">The others</div>'
+      + t.slice(1).map(function (x) { return row(x, false); }).join('')
+      + '</div>'
+      + '<div class="term"><button><span class="g">&larr;</span>Board</button>'
+      + '<span class="sp"></span><button>New trip</button></div>';
+  }
+
+  function ask() {
+    return board().replace(/<div class="term">/,
+      '<div class="ask"><span class="k">Open on the right trip</span>'
+      + '<p>You have three trips saved. If the app can see where you are, it opens on the one you are standing near.</p>'
+      + '<div class="acts"><button>Use my location</button><button class="q">Not now</button></div></div>'
+      + '<div class="term" style="display:none">');
+  }
+
+  app.innerHTML = m.screen === 'trips' ? trips() : m.screen === 'ask' ? ask() : board();
+})();
+</script>
+</body></html>

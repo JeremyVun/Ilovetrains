@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>C2 · Departure clock</title>
+<link rel="stylesheet" href="base.css">
+<style>
+/* ========================================================= C2 · DEPARTURE CLOCK
+   Answers the confusion by removing the thing that can be confused: the headline
+   figure becomes the DEPARTURE TIME. A clock time has a colon in it and can never
+   be read as a platform, and it is the grammar the user already imported from the
+   station board that taught them the mistake. Minutes-until survive as the phrase
+   beside it, which is the fact the app adds over the station's board.
+   Two consequences fall out for free:
+     - past and future are the SAME row, because a clock time does not expire.
+       The register changes ("in 3 min" -> "33 min ago"), the object does not.
+     - the figure column is gone, so the row runs the full measure and nothing
+       truncates.
+   Line colour is not added: the hairline BETWEEN rows becomes the line's colour
+   at 3px, split left-to-right where the journey changes trains.
+   The masthead moves to the BOTTOM EDGE: the top of the screen is nothing but
+   timeline, and the trip name — the switch-trip target — lands under the thumb.
+   ================================================================================ */
+
+body { padding-top: env(safe-area-inset-top, 0px); }
+
+/* ---- the timeline runs to the top edge ------------------------------------- */
+.tl {
+  flex: 1; min-height: 0; padding: 0 22px;
+  display: flex; flex-direction: column;
+  overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+}
+
+.nowline {
+  flex: none; display: flex; align-items: baseline; justify-content: space-between;
+  border-top: 2px solid var(--ink); margin-top: 2px;
+  padding: 10px 0 11px;
+  font-size: 11px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--ink);
+}
+.nowline .up { color: var(--ink-3); letter-spacing: .14em; }
+.nowline.head { border-top: 0; padding-top: 16px; }
+
+/* ---- one row grammar, past and future -------------------------------------- */
+.r {
+  flex: none; padding: 13px 0 11px;
+  border-bottom: 3px solid var(--stem);
+}
+/* Where the journey changes trains the rule is the two lines in ride order —
+   left to right is time, so the rule under the row is the journey itself. */
+.r.two { border-bottom: 0; }
+.r .lines { display: flex; height: 3px; margin-top: 12px; }
+.r .lines span { display: block; }
+
+.l1 { display: flex; align-items: baseline; gap: 11px; flex-wrap: wrap; }
+.l1 .t {
+  font-size: 34px; font-weight: 300; letter-spacing: -.03em; line-height: 1;
+  color: var(--ink);
+}
+.l1 del { font-size: 19px; font-weight: 300; color: var(--ink-3); }
+.l1 .in {
+  font-size: 18px; font-weight: 400; letter-spacing: -.005em; color: var(--ink-2);
+}
+.l1 .in b { font-weight: 500; color: var(--ink); }
+.r.first .l1 .t { font-size: 50px; }
+.r.first .l1 .in { font-size: 27px; }
+.r.first .l1 .in b { font-weight: 400; }
+.r.first { padding-top: 15px; padding-bottom: 13px; }
+
+.l2 {
+  margin-top: 9px; display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap;
+  font-size: 16.5px; font-weight: 300; letter-spacing: -.01em; color: var(--ink-2);
+}
+.l2 .p { color: var(--ink); font-weight: 400; }
+.l2 .bd { font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--stem); }
+.l2 .bd.two { color: var(--stem2); }
+.l2 .sep { color: var(--ink-3); }
+.l2 .st { font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--warn); }
+.l3 {
+  margin-top: 7px; font-size: 13.5px; font-weight: 300; line-height: 18px; color: var(--ink-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.l3.note { font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--warn); }
+
+/* Past: the same row, receded, and the phrase beside the clock changes tense.
+   No countdown, because there is nothing left to count. */
+.r.gone { padding: 11px 0 10px; border-bottom-color: var(--rule); }
+.r.gone .lines span { opacity: .28; }
+.r.gone .l1 .t { font-size: 26px; color: var(--ink-2); }
+/* Timetable-only: the SCHEDULED idiom, because nothing has confirmed this ran. */
+.r.gone.timetable .l1 .t { color: var(--ink-3); font-weight: 200; }
+.r.gone.timetable .lines span { opacity: .16; }
+.r.gone.actual .l1 .in { color: var(--ink-2); }
+.r.gone .l1 .in { font-size: 13px; font-weight: 600; letter-spacing: .13em;
+  text-transform: uppercase; color: var(--ink-3); }
+.r.gone.actual.late .l1 .in { color: var(--warn); }
+.r.gone.timetable .l1 .in { color: var(--ink-3); }
+.r.gone .l2 { margin-top: 6px; font-size: 13px; color: var(--ink-3); }
+.r.gone .l2 .p { color: var(--ink-3); font-weight: 400; }
+.r.gone .l2 .bd { color: var(--ink-3); }
+.r.gone .l3 { display: none; }
+.r.gone .lines { margin-top: 10px; }
+
+.r.late .l1 .t, .r.late .l1 .in b { color: var(--warn); }
+.r.sched .l1 .t { color: var(--ink-2); font-weight: 200; }
+.r.cx .l1 .t { color: var(--ink-3); text-decoration: line-through;
+  text-decoration-thickness: 2px; font-weight: 200; }
+.r.cx .l1 .in { color: var(--warn); font-size: 15px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; }
+.r.cx .l2, .r.cx .l3 { color: var(--ink-3); }
+.r.cx .lines span { opacity: .3; }
+
+.endmk { flex: none; padding: 15px 0 0; font-size: 10px; font-weight: 600;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3); }
+
+/* ---- the focused journey rides directly above the masthead ------------------ */
+.strip { flex: none; padding: 12px 22px 12px; border-top: 1px solid var(--rule-2); }
+.strip .a { display: flex; align-items: baseline; gap: 10px; }
+.strip .a .t { font-size: 26px; font-weight: 300; letter-spacing: -.02em; color: var(--ink); }
+.strip .a .in { font-size: 15px; color: var(--ink-2); }
+.strip .a .d { font-size: 13px; font-weight: 300; color: var(--ink-3); min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.strip .b { margin-top: 6px; font-size: 10px; font-weight: 600; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-3); }
+.strip .b b { color: var(--ink-2); font-weight: 600; }
+
+/* ---- the masthead, on the bottom edge, where the thumb is ------------------- */
+.foot {
+  flex: none; border-top: 2px solid var(--ink); padding: 0 22px;
+}
+.foot .top { display: flex; align-items: center; gap: 14px; padding: 11px 0 0; }
+.foot h1 {
+  flex: 1; min-width: 0; text-align: left;
+  font-size: 25px; font-weight: 300; letter-spacing: -.025em; line-height: 1.05; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.foot h1 em { font-style: normal; color: var(--ink-3); font-weight: 200; padding: 0 3px; }
+.foot .rev {
+  flex: none; display: flex; align-items: center; justify-content: flex-end;
+  min-width: 56px; min-height: 52px; font-size: 26px; font-weight: 200; color: var(--ink);
+}
+.foot .bot {
+  display: flex; align-items: center; gap: 9px; min-height: 46px; white-space: nowrap;
+  padding-bottom: max(6px, env(safe-area-inset-bottom, 0px));
+  font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+.foot .bot .sp { flex: 1; }
+.foot .bot button {
+  min-height: 46px; display: flex; align-items: center; gap: 7px;
+  font-size: 11px; font-weight: 600; letter-spacing: .15em; text-transform: uppercase;
+  color: var(--ink);
+}
+.foot .bot .tap { color: var(--ink-3); }
+
+/* ---- trips + ask ----------------------------------------------------------- */
+.sh { flex: 1; min-height: 0; overflow-y: auto; padding: 0 22px;
+      display: flex; flex-direction: column; }
+.hd { padding: 18px 0 0; font-size: 10px; font-weight: 600; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--ink); display: flex; align-items: center; gap: 8px; }
+.hd.q { color: var(--ink-3); padding-top: 22px; }
+.tr { padding: 15px 0 16px; border-bottom: 3px solid var(--stem); }
+.tr.top { border-bottom-width: 3px; padding-bottom: 20px; }
+.tr .nm { font-size: 22px; font-weight: 300; letter-spacing: -.015em; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tr.top .nm { font-size: 23px; }
+.tr .nm em { font-style: normal; color: var(--ink-3); font-weight: 200; padding: 0 3px; }
+.tr .sub { margin-top: 7px; display: flex; align-items: baseline; gap: 8px;
+  font-size: 11px; font-weight: 600; letter-spacing: .15em; text-transform: uppercase;
+  color: var(--ink-3); }
+.tr.top .sub { color: var(--ink-2); }
+.tr .sub .ed { margin-left: auto; color: var(--ink-3); padding-left: 14px; }
+
+.ask { flex: none; padding: 17px 22px 0; border-top: 2px solid var(--ink); }
+.ask .k { font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--ink-3); }
+.ask p { margin-top: 10px; font-size: 16px; font-weight: 300; line-height: 1.45; color: var(--ink); }
+.ask .acts { display: flex; gap: 26px; margin-top: 2px;
+  padding-bottom: max(4px, env(safe-area-inset-bottom, 0px)); }
+.ask .acts button { min-height: 52px; font-size: 12px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--ink); }
+.ask .acts button.q { color: var(--ink-3); }
+</style>
+</head>
+<body><div id="app"></div>
+<script src="data.js"></script>
+<script>
+(function () {
+  var m = model(scenarioName());
+  var app = document.getElementById('app');
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+
+  /* the rule under a row IS the journey: ride order left to right, split at the
+     real ride split (T9 27 min, T4 10 min on this corridor) */
+  function rule(r) {
+    if (!r.line2) return '';
+    return '<div class="lines"><span style="flex:27;background:var(--stem)"></span>'
+      + '<span style="flex:10;background:var(--stem2)"></span></div>';
+  }
+
+  function row(r, first, note) {
+    var cls = 'r' + (first ? ' first' : '') + (r.past ? ' gone ' + r.pastKind : '')
+      + (r.cx ? ' cx' : '') + (r.lateBy && r.pastKind !== 'timetable' ? ' late' : '') + (r.sched ? ' sched' : '')
+      + (r.line2 ? ' two' : '');
+    var phrase = r.cx ? 'Cancelled'
+      : r.past ? (r.pastProv + (r.agoText ? ' \u00b7 ' + r.agoText : ''))
+      : r.m === 0 ? '<b>departing</b>'
+      : 'in <b>' + r.m + ' min</b>';
+    var l2 = '<span class="p">Platform ' + r.plat + '</span>'
+      + '<span class="sep">&middot;</span><span class="bd">' + r.line + '</span>'
+      + (r.line2 ? '<span class="sep">&rarr;</span><span class="bd two">' + r.line2 + '</span>' : '')
+      /* A row whose realtime record has aged out (or never existed) may not
+         carry a punctuality chip: "the timetable says it ran" is not "it ran
+         6 minutes late". Only an ACTUALS row gets one. */
+      + (r.lateBy && r.pastKind !== 'timetable'
+          ? '<span class="sep">&middot;</span><span class="st">' + r.lateBy + ' min late</span>' : '')
+      + (r.sched && !r.past ? '<span class="sep">&middot;</span><span class="st" style="color:var(--ink-3)">scheduled</span>' : '');
+    var l3 = note
+      ? '<div class="l3 note">' + note + '</div>'
+      : '<div class="l3">' + esc(r.head) + ' &middot; arrives ' + r.arr + '</div>';
+    return '<div data-svc ' + (r.past ? 'data-past ' : '') + 'class="' + cls + '" style="--stem:var(--line-' + r.line
+      + ');--stem2:var(--line-' + (r.line2 || r.line) + ')">'
+      + '<div class="l1"><span class="t">' + (r.past ? r.pastDep : r.dep) + '</span>'
+      + ((r.past ? r.pastStruck : r.planned) ? '<del>' + (r.past ? r.pastStruck : r.planned) + '</del>' : '')
+      + '<span class="in">' + phrase + '</span></div>'
+      + '<div class="l2">' + l2 + '</div>' + l3
+      + rule(r) + '</div>';
+  }
+
+  function foot() {
+    return '<div class="foot"><div class="top">'
+      + '<button class="rev" title="reverse">&#8646;</button>'
+      + '<h1 style="order:-1">' + esc(m.from) + ' <em>&rarr;</em> ' + esc(m.to) + '</h1>'
+      + '</div><div class="bot">'
+      + '<button>Trips</button>'
+      + '<span class="sp"></span>'
+      + (m.scrolled
+          ? '<button>&darr; Back to now</button>'
+          : '<span class="tap"><span class="pulse live" style="display:inline-block;vertical-align:middle;margin-right:7px"></span>Updated 4s ago</span>')
+      + '</div></div>';
+  }
+
+  function board() {
+    var note = null;
+    if (m.rows[0] && m.rows[0].cx) note = m.rows[0].dep + ' cancelled &middot; next train';
+    var out = '<div class="tl">';
+    out += m.past.map(function (r) { return row(r, false, null); }).join('');
+    out += '<div class="nowline' + (m.scrolled ? '' : ' head') + '">'
+      + '<span>Now &middot; ' + m.now + '</span><span class="up">&uarr; Earlier</span></div>';
+    out += m.next.map(function (r, i) { return row(r, i === 0, i === 1 ? note : null); }).join('');
+    out += '<div class="endmk">&mdash; end of board</div></div>';
+    var strip = m.focus ? ('<div class="strip">'
+      + '<div class="a"><span class="t">10:08</span><span class="in">in 47 min</span>'
+      + '<span class="d">you arrive Bondi Junction</span></div>'
+      + '<div class="b">On the <b>09:24</b> &middot; change Town Hall <b>09:58</b> platform 5</div>'
+      + '</div>') : '';
+    return out + strip + foot();
+  }
+
+  function trips() {
+    var t = TRIPS;
+    return '<div class="sh">'
+      + '<div class="hd"><span class="pulse live"></span>Nearest you &middot; ' + t[0].dist + '</div>'
+      + '<div class="tr top" style="--stem:var(--line-' + t[0].line + ')">'
+      + '<div class="nm">' + t[0].from + ' <em>&rarr;</em> ' + t[0].to + '</div>'
+      + '<div class="sub"><span>' + t[0].line + '</span><span>next train ' + t[0].next + '</span>'
+      + '<span class="ed">Edit</span></div></div>'
+      + '<div class="hd q">Your other trips</div>'
+      + t.slice(1).map(function (x) {
+        return '<div class="tr" style="--stem:var(--line-' + x.line + ')">'
+          + '<div class="nm">' + x.from + ' <em>&rarr;</em> ' + x.to + '</div>'
+          + '<div class="sub"><span>' + x.line + '</span><span>' + x.dist + ' away</span>'
+          + '<span>' + x.next + '</span><span class="ed">Edit</span></div></div>';
+      }).join('')
+      + '</div>'
+      + '<div class="foot"><div class="top"><h1>Trips</h1>'
+      + '<button class="rev" style="font-size:19px">+</button></div>'
+      + '<div class="bot"><button>&larr; Board</button><span class="sp"></span>'
+      + '<span>3 trips on this phone</span></div></div>';
+  }
+
+  function ask() {
+    return board().replace(/<div class="foot">/,
+      '<div class="ask"><span class="k">Open on the right trip</span>'
+      + '<p>You have three trips saved. If the app can see where you are, it opens on the one you are standing near.</p>'
+      + '<div class="acts"><button>Use my location</button><button class="q">Not now</button></div></div>'
+      + '<div class="foot" style="display:none">');
+  }
+
+  app.innerHTML = m.screen === 'trips' ? trips() : m.screen === 'ask' ? ask() : board();
+})();
+</script>
+</body></html>
