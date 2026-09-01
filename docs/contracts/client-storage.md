@@ -85,6 +85,28 @@ recencyDecay: 0.97 ^ ageInDays
 Pick the highest score. Tie/all-zero fallback: `lastViewed`, then first
 saved trip `forward`.
 
+### Geolocation term (added 2026-09-01, board-v2)
+
+Saved trip stations MAY carry `location: {lat, lon}` (captured from
+`/api/v1/stops` at save time; older trips are backfilled lazily by
+re-querying the stops API and matching on id). When the user has granted
+geolocation and a fix ≤5 min old exists:
+
+```
+locationFactor(candidate) =
+  2.5  if distance(fix, origin(candidate)) ≤ 2 km
+  1.0  if 2–10 km (or origin has no coords, or no fix/permission)
+  0.3  if > 10 km
+score = base score × locationFactor
+```
+
+Deterministic given (storage document, current time, fix). The fix never
+leaves the device and is never persisted beyond the session. Permission is
+requested contextually (user has ≥2 saved trips), never on first load;
+denial degrades silently to time+history. Wherever trips are listed
+(switcher, trip management), they are ordered by current score with the
+predicted one visually highlighted at the top.
+
 Invariants:
 - Deterministic given (storage document, current time) — testable.
 - Any change to the formula bumps no schema version (history format is

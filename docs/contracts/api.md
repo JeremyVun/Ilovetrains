@@ -17,7 +17,20 @@ Invariants:
 - Timestamps are ISO 8601 with offset (e.g. `2026-08-31T17:42:00+10:00`),
   always in `Australia/Sydney` local offset.
 
-## GET /api/v1/departures?from={stopId}&to={stopId}&limit={n}
+## GET /api/v1/departures?from={stopId}&to={stopId}&limit={n}&at={t}
+
+`at` (added 2026-09-01, board-v2; DRAFT until the backend round verifies
+upstream accepts past times — that round updates this paragraph with what it
+proved): optional ISO 8601 time. Absent = now (existing behaviour and cache
+policy, unchanged). Present = journeys departing from time `t`, which the
+server rounds DOWN to a 10-minute bucket — the rounded value is echoed as
+`at` in the response so clients page on stable keys. Bucketing keeps the
+response a pure function of the query string. Cache: buckets in the past by
+more than 20 min get `s-maxage=3600, stale-while-revalidate=86400` (what ran
+is settled); buckets near/ahead of now keep the live policy. Past journeys
+may lack realtime — normal semantics apply (`estimated` null). Paging into
+the past = requesting earlier buckets; clients dedupe rows across pages by
+(line.name, departure.scheduled).
 
 Next journeys from origin station to destination station. Backed by the TfNSW
 Trip Planner `trip` endpoint (not `departure_mon`, which cannot filter to
@@ -132,10 +145,16 @@ to train/metro stations only.
 ```json
 {
   "stops": [
-    {"id": "200060", "name": "Central Station", "modes": ["train", "metro"]}
+    {"id": "200060", "name": "Central Station", "modes": ["train", "metro"],
+     "location": {"lat": -33.8832, "lon": 151.2069}}
   ]
 }
 ```
+
+`location` (added 2026-09-01, board-v2): the station's WGS84 coordinates,
+from upstream's `coord` field; `null` if upstream omits it. Powers the
+client-side geolocation term in trip prediction — the server never receives
+a user location.
 
 ## GET /healthz
 
