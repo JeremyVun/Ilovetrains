@@ -45,6 +45,10 @@ type place struct {
 	Parent           *place      `json:"parent"`
 	Properties       *properties `json:"properties"`
 
+	// Coord is [latitude, longitude] under coordOutputFormat=EPSG:4326 — see
+	// coordLat/coordLon in map.go for the evidence that fixes the axis order.
+	Coord []float64 `json:"coord"`
+
 	DepartureTimePlanned   string `json:"departureTimePlanned"`
 	DepartureTimeEstimated string `json:"departureTimeEstimated"`
 	ArrivalTimePlanned     string `json:"arrivalTimePlanned"`

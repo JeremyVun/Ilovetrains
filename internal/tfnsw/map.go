@@ -34,6 +34,17 @@ var cancelPattern = regexp.MustCompile(`(?i)cancel`)
 
 var platformSuffix = regexp.MustCompile(`,\s*Platform\s.*$`)
 
+// Axis order of upstream's EPSG:4326 `coord` pair, verified 2026-09-01 against
+// real stop_finder responses rather than assumed from the CRS: Central Station
+// is [-33.884024, 151.206203] and the Adelaide coach stop G50001 is
+// [-34.927477, 138.595501]. Read the other way round those are a point in
+// Lebanon and one in the Southern Ocean, so latitude is first.
+const (
+	coordLat = 0
+	coordLon = 1
+	coordLen = 2
+)
+
 func modeName(class int) (string, bool) {
 	switch class {
 	case classTrain:
@@ -70,7 +81,12 @@ func mapStops(body []byte) (*StopsResponse, error) {
 		}
 		seen[loc.ID] = true
 		candidates = append(candidates, scored{
-			stop:    Stop{ID: loc.ID, Name: stationName(loc), Modes: modes},
+			stop: Stop{
+				ID:       loc.ID,
+				Name:     stationName(loc),
+				Modes:    modes,
+				Location: stopLocation(loc),
+			},
 			isBest:  loc.IsBest,
 			quality: loc.MatchQuality,
 		})
@@ -88,6 +104,16 @@ func mapStops(body []byte) (*StopsResponse, error) {
 		stops = append(stops, c.stop)
 	}
 	return &StopsResponse{Stops: stops}, nil
+}
+
+// stopLocation reads a station's coordinates. Upstream is not obliged to carry
+// them, and a fabricated position would send the client's nearest-station
+// prediction to the wrong platform, so a missing pair maps to null.
+func stopLocation(p place) *Location {
+	if len(p.Coord) < coordLen {
+		return nil
+	}
+	return &Location{Lat: p.Coord[coordLat], Lon: p.Coord[coordLon]}
 }
 
 // serveableModes maps EFA product classes to our mode names, keeping only

@@ -6,15 +6,32 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"trains/internal/tfnsw"
 )
+
+// sydney is the offset every served timestamp uses; `at` round-trips through it.
+var sydney = mustLoadSydney()
+
+func mustLoadSydney() *time.Location {
+	loc, err := time.LoadLocation(tfnsw.TimeZone)
+	if err != nil {
+		panic(err)
+	}
+	return loc
+}
+
+// testNow is a fixed 17:52 Sydney, so bucket arithmetic in these tests is
+// readable as wall-clock times rather than offsets from whenever they ran.
+var testNow = time.Date(2026, 9, 1, 17, 52, 0, 0, sydney)
 
 // fakeUpstream stands in for the TfNSW client so handler tests never touch the
 // network.
@@ -26,11 +43,17 @@ type fakeUpstream struct {
 	departureCalls atomic.Int32
 	stopCalls      atomic.Int32
 	lastLimit      atomic.Int32
+
+	mu     sync.Mutex
+	lastAt time.Time
 }
 
-func (f *fakeUpstream) Departures(_ context.Context, from, to string, limit int) (*tfnsw.DeparturesResponse, error) {
+func (f *fakeUpstream) Departures(_ context.Context, from, to string, limit int, at time.Time) (*tfnsw.DeparturesResponse, error) {
 	call := f.departureCalls.Add(1)
 	f.lastLimit.Store(int32(limit))
+	f.mu.Lock()
+	f.lastAt = at
+	f.mu.Unlock()
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -39,7 +62,19 @@ func (f *fakeUpstream) Departures(_ context.Context, from, to string, limit int)
 	}
 	response := *f.departures
 	response.From.ID, response.To.ID = from, to
+	// The real client echoes the window it queried; the fake must too, or the
+	// handler tests cannot see what reached upstream.
+	if !at.IsZero() {
+		echoed := at.In(sydney).Format(time.RFC3339)
+		response.At = &echoed
+	}
 	return &response, nil
+}
+
+func (f *fakeUpstream) at() time.Time {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.lastAt
 }
 
 func (f *fakeUpstream) Stops(_ context.Context, _ string) (*tfnsw.StopsResponse, error) {
@@ -72,13 +107,31 @@ func sampleDepartures() *tfnsw.DeparturesResponse {
 
 func sampleStops() *tfnsw.StopsResponse {
 	return &tfnsw.StopsResponse{Stops: []tfnsw.Stop{
-		{ID: "200060", Name: "Central Station", Modes: []string{"train", "metro"}},
+		{ID: "200060", Name: "Central Station", Modes: []string{"train", "metro"},
+			Location: &tfnsw.Location{Lat: -33.884024, Lon: 151.206203}},
+		{ID: "200070", Name: "Town Hall Station", Modes: []string{"train"}},
 	}}
 }
 
 func newTestServer(t *testing.T, upstream Upstream) http.Handler {
 	t.Helper()
 	return New(upstream, filepath.Join(t.TempDir(), "no-web-dir")).Handler()
+}
+
+// pinnedServer returns a server whose clock is fixed at testNow, so `at`
+// windows read as wall-clock times instead of offsets from whenever the test ran.
+func pinnedServer(t *testing.T, upstream Upstream) (*Server, http.Handler) {
+	t.Helper()
+	server := New(upstream, filepath.Join(t.TempDir(), "no-web-dir"))
+	server.now = func() time.Time { return testNow }
+	return server, server.Handler()
+}
+
+// departuresAt builds a request for a window `offset` from testNow, with the
+// timestamp percent-encoded the way a correct client sends it.
+func departuresAt(offset time.Duration) string {
+	return "/api/v1/departures?from=200060&to=215020&at=" +
+		url.QueryEscape(testNow.Add(offset).Format(time.RFC3339))
 }
 
 func get(t *testing.T, handler http.Handler, target string) *httptest.ResponseRecorder {
@@ -199,6 +252,314 @@ func TestDeparturesAcceptsLimitBounds(t *testing.T) {
 	}
 }
 
+func TestBucketRoundsDown(t *testing.T) {
+	// Rounding down, never to nearest: a bucket must never name a window that
+	// has not happened yet, and the boundary minute belongs to the bucket it
+	// opens.
+	cases := []struct{ at, want string }{
+		{"2026-09-01T17:30:00+10:00", "2026-09-01T17:30:00+10:00"}, // on the boundary
+		{"2026-09-01T17:30:01+10:00", "2026-09-01T17:30:00+10:00"}, // one second in
+		{"2026-09-01T17:39:59+10:00", "2026-09-01T17:30:00+10:00"}, // last instant
+		{"2026-09-01T17:40:00+10:00", "2026-09-01T17:40:00+10:00"}, // next bucket
+		{"2026-09-01T17:00:00+10:00", "2026-09-01T17:00:00+10:00"}, // on the hour
+		{"2026-09-01T17:59:59+10:00", "2026-09-01T17:50:00+10:00"}, // last of the hour
+		{"2026-09-01T00:00:00+10:00", "2026-09-01T00:00:00+10:00"}, // midnight
+		{"2026-09-01T00:09:59+10:00", "2026-09-01T00:00:00+10:00"}, // day boundary
+	}
+	for _, tc := range cases {
+		parsed, err := time.Parse(time.RFC3339, tc.at)
+		if err != nil {
+			t.Fatalf("parsing %q: %v", tc.at, err)
+		}
+		got := floorToBucket(parsed).In(sydney).Format(time.RFC3339)
+		if got != tc.want {
+			t.Errorf("floorToBucket(%s) = %s, want %s", tc.at, got, tc.want)
+		}
+	}
+}
+
+func TestBucketMatchesSydneyWallClock(t *testing.T) {
+	// floorToBucket floors absolute time, which is the same as flooring Sydney
+	// wall-clock time only because every Sydney offset is a whole number of
+	// hours. Both DST changeovers are swept minute by minute to hold that
+	// assumption to its face.
+	//
+	// The claim is checked on the result's wall-clock FIELDS rather than by
+	// rebuilding an instant with time.Date: on the autumn changeover 02:00–03:00
+	// happens twice, so a local time does not name one instant and the rebuilt
+	// oracle would be the thing that is wrong.
+	for _, start := range []string{"2026-04-05T00:00:00+11:00", "2026-10-04T00:00:00+10:00"} {
+		from, err := time.Parse(time.RFC3339, start)
+		if err != nil {
+			t.Fatalf("parsing %q: %v", start, err)
+		}
+		for minute := range 36 * 60 {
+			at := from.Add(time.Duration(minute) * time.Minute).Add(37 * time.Second)
+			bucket := floorToBucket(at)
+			local, bucketLocal := at.In(sydney), bucket.In(sydney)
+
+			if bucketLocal.Second() != 0 || bucketLocal.Nanosecond() != 0 || bucketLocal.Minute()%10 != 0 {
+				t.Fatalf("floorToBucket(%s) = %s, want a clean 10-minute boundary",
+					local.Format(time.RFC3339), bucketLocal.Format(time.RFC3339))
+			}
+			if bucket.After(at) || at.Sub(bucket) >= bucketSize {
+				t.Fatalf("floorToBucket(%s) = %s, want the bucket it falls in",
+					local.Format(time.RFC3339), bucketLocal.Format(time.RFC3339))
+			}
+			if bucketLocal.Day() != local.Day() || bucketLocal.Hour() != local.Hour() ||
+				bucketLocal.Minute() != local.Minute()-local.Minute()%10 {
+				t.Fatalf("floorToBucket(%s) = %s, want the same hour with the minute floored",
+					local.Format(time.RFC3339), bucketLocal.Format(time.RFC3339))
+			}
+		}
+	}
+}
+
+func TestDeparturesAtIsBucketedAndEchoed(t *testing.T) {
+	// The client pages on the echoed value, so it must be the bucket the server
+	// actually queried, not the instant the client happened to send.
+	upstream := &fakeUpstream{departures: sampleDepartures()}
+	_, handler := pinnedServer(t, upstream)
+
+	got := get(t, handler, departuresAt(-67*time.Minute)) // 16:45 → bucket 16:40
+	if got.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", got.Code, got.Body)
+	}
+	want := time.Date(2026, 9, 1, 16, 40, 0, 0, sydney)
+	if !upstream.at().Equal(want) {
+		t.Errorf("upstream at = %s, want the bucket %s",
+			upstream.at().In(sydney).Format(time.RFC3339), want.Format(time.RFC3339))
+	}
+	var body tfnsw.DeparturesResponse
+	if err := json.Unmarshal(got.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decoding body: %v", err)
+	}
+	if body.At == nil || *body.At != "2026-09-01T16:40:00+10:00" {
+		t.Errorf("at = %v, want the echoed bucket 2026-09-01T16:40:00+10:00", body.At)
+	}
+}
+
+func TestDeparturesWithoutAtEchoesNull(t *testing.T) {
+	// The live board is unchanged by this feature: no window asked for, no
+	// window claimed, and upstream is asked for now.
+	upstream := &fakeUpstream{departures: sampleDepartures()}
+	_, handler := pinnedServer(t, upstream)
+
+	got := get(t, handler, "/api/v1/departures?from=200060&to=215020")
+	if !upstream.at().IsZero() {
+		t.Errorf("upstream at = %v, want the zero time (now)", upstream.at())
+	}
+	if cc := got.Header().Get("Cache-Control"); cc != departuresCacheControl {
+		t.Errorf("Cache-Control = %q, want the live policy %q", cc, departuresCacheControl)
+	}
+	if !strings.Contains(got.Body.String(), `"at":null`) {
+		t.Errorf("body = %s, want \"at\":null", got.Body)
+	}
+}
+
+func TestDeparturesCachePolicyPerTier(t *testing.T) {
+	// The tier is chosen by how far into the past the BUCKET is, and 20 minutes
+	// is the line: a newer bucket can still hold a train that has not left, so
+	// it cannot be cached as settled.
+	cases := []struct {
+		name    string
+		offset  time.Duration
+		want    string
+		settled bool
+	}{
+		{"live board", 0, departuresCacheControl, false},
+		{"future window", 90 * time.Minute, departuresCacheControl, false},
+		{"ten minutes back", -10 * time.Minute, departuresCacheControl, false},
+		// 17:52 - 25m = 17:27, bucket 17:20, which is 32 min back: settled.
+		{"twenty-five minutes back", -25 * time.Minute, departuresPastCacheControl, true},
+		{"an hour back", -time.Hour, departuresPastCacheControl, true},
+		{"a day back", -24 * time.Hour, departuresPastCacheControl, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			upstream := &fakeUpstream{departures: sampleDepartures()}
+			server, handler := pinnedServer(t, upstream)
+
+			target := departuresAt(tc.offset)
+			if tc.name == "live board" {
+				target = "/api/v1/departures?from=200060&to=215020"
+			}
+			got := get(t, handler, target)
+			if got.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200: %s", got.Code, got.Body)
+			}
+			if cc := got.Header().Get("Cache-Control"); cc != tc.want {
+				t.Errorf("Cache-Control = %q, want %q", cc, tc.want)
+			}
+
+			// The in-memory TTL must mirror the s-maxage the header promises,
+			// so a cold CDN cannot cost an upstream call the header said it
+			// would not. Ageing the store the answer should NOT be in must
+			// change nothing; ageing the one it should be in must refetch.
+			wrongStore, rightStore := server.departuresPast, server.departures
+			if tc.settled {
+				wrongStore, rightStore = server.departures, server.departuresPast
+			}
+			wrongStore.SetClock(func() time.Time { return time.Now().Add(30 * 24 * time.Hour) })
+			get(t, handler, target)
+			if upstream.departureCalls.Load() != 1 {
+				t.Errorf("upstream calls = %d, want 1: the answer is in the other tier's cache",
+					upstream.departureCalls.Load())
+			}
+			rightStore.SetClock(func() time.Time { return time.Now().Add(30 * 24 * time.Hour) })
+			get(t, handler, target)
+			if upstream.departureCalls.Load() != 2 {
+				t.Errorf("upstream calls = %d, want 2: expiring its own tier must refetch",
+					upstream.departureCalls.Load())
+			}
+		})
+	}
+}
+
+func TestDeparturesSettledWindowIsCachedForAnHour(t *testing.T) {
+	// A live board is worth 30 seconds. What already ran is worth an hour —
+	// and re-fetching it would be worse than the cache, because upstream drops
+	// the realtime actuals from a window a few hours after it passes.
+	upstream := &fakeUpstream{departures: sampleDepartures()}
+	server, handler := pinnedServer(t, upstream)
+	target := departuresAt(-time.Hour)
+
+	for range 3 {
+		if got := get(t, handler, target); got.Code != http.StatusOK {
+			t.Fatalf("status = %d", got.Code)
+		}
+	}
+	if upstream.departureCalls.Load() != 1 {
+		t.Fatalf("upstream calls = %d, want 1", upstream.departureCalls.Load())
+	}
+
+	// Still one call well past the live TTL, which a past window must outlive.
+	server.departuresPast.SetClock(func() time.Time { return time.Now().Add(departuresTTL + time.Minute) })
+	get(t, handler, target)
+	if upstream.departureCalls.Load() != 1 {
+		t.Errorf("upstream calls = %d after %v, want the past window still cached",
+			upstream.departureCalls.Load(), departuresTTL+time.Minute)
+	}
+
+	// Past the hour it refetches.
+	server.departuresPast.SetClock(func() time.Time { return time.Now().Add(departuresPastTTL + time.Minute) })
+	get(t, handler, target)
+	if upstream.departureCalls.Load() != 2 {
+		t.Errorf("upstream calls = %d after %v, want a refetch",
+			upstream.departureCalls.Load(), departuresPastTTL+time.Minute)
+	}
+}
+
+func TestDeparturesCacheKeyIncludesTheBucket(t *testing.T) {
+	upstream := &fakeUpstream{departures: sampleDepartures()}
+	_, handler := pinnedServer(t, upstream)
+
+	// Two instants inside one bucket are one key: scrolling must not re-ask
+	// upstream for a window it already has.
+	get(t, handler, departuresAt(-61*time.Minute)) // 16:51 → 16:50
+	get(t, handler, departuresAt(-69*time.Minute)) // 16:43 → 16:40
+	get(t, handler, departuresAt(-68*time.Minute)) // 16:44 → 16:40
+	if upstream.departureCalls.Load() != 2 {
+		t.Errorf("upstream calls = %d, want 2 (two distinct buckets)", upstream.departureCalls.Load())
+	}
+
+	// The live board and an explicit window must never share an entry: their
+	// bodies differ, so a shared key would serve one as the other.
+	get(t, handler, "/api/v1/departures?from=200060&to=215020")
+	if upstream.departureCalls.Load() != 3 {
+		t.Errorf("upstream calls = %d, want the live board fetched separately",
+			upstream.departureCalls.Load())
+	}
+	// And the bucket must not swallow the other key parts either.
+	get(t, handler, departuresAt(-61*time.Minute)+"&limit=3")
+	if upstream.departureCalls.Load() != 4 {
+		t.Errorf("upstream calls = %d, want limit still part of the key",
+			upstream.departureCalls.Load())
+	}
+}
+
+func TestDeparturesAtBadRequests(t *testing.T) {
+	// The window is bounded because every bucket is a cache key and a possible
+	// upstream request; TfNSW quota is a hard budget.
+	_, handler := pinnedServer(t, &fakeUpstream{departures: sampleDepartures()})
+	cases := []struct{ name, target string }{
+		{"not a time", "/api/v1/departures?from=200060&to=215020&at=soon"},
+		{"date only", "/api/v1/departures?from=200060&to=215020&at=2026-09-01"},
+		{"no offset", "/api/v1/departures?from=200060&to=215020&at=2026-09-01T17:30:00"},
+		{"too far past", departuresAt(-25 * time.Hour)},
+		{"far too far past", departuresAt(-30 * 24 * time.Hour)},
+		{"too far future", departuresAt(3 * time.Hour)},
+		{"far too far future", departuresAt(48 * time.Hour)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := get(t, handler, tc.target)
+			if got.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400: %s", got.Code, got.Body)
+			}
+			if cc := got.Header().Get("Cache-Control"); cc != errorCacheableControl {
+				t.Errorf("Cache-Control = %q, want %q", cc, errorCacheableControl)
+			}
+			if code := decodeError(t, got).Error.Code; code != "bad_request" {
+				t.Errorf("code = %q, want bad_request", code)
+			}
+		})
+	}
+}
+
+func TestDeparturesAtAcceptsTheWindowEdges(t *testing.T) {
+	// A client that computes exactly now-24h or now+2h is inside the window,
+	// not 400ing on a rounding artefact.
+	upstream := &fakeUpstream{departures: sampleDepartures()}
+	_, handler := pinnedServer(t, upstream)
+	for _, offset := range []time.Duration{-maxPastWindow, maxFutureWindow, 0} {
+		if got := get(t, handler, departuresAt(offset)); got.Code != http.StatusOK {
+			t.Errorf("offset %v: status = %d, want 200: %s", offset, got.Code, got.Body)
+		}
+	}
+}
+
+func TestDeparturesAtToleratesAnUnencodedOffset(t *testing.T) {
+	// `+` is a space in a URL query, so an offset the client forgot to
+	// percent-encode arrives as "2026-09-01T16:40:00 10:00". Its meaning is not
+	// in doubt, so it is honoured rather than 400ed — and it must land on the
+	// same bucket as the properly encoded form.
+	upstream := &fakeUpstream{departures: sampleDepartures()}
+	_, handler := pinnedServer(t, upstream)
+
+	got := get(t, handler, "/api/v1/departures?from=200060&to=215020&at=2026-09-01T16:40:00+10:00")
+	if got.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", got.Code, got.Body)
+	}
+	want := time.Date(2026, 9, 1, 16, 40, 0, 0, sydney)
+	if !upstream.at().Equal(want) {
+		t.Errorf("upstream at = %s, want %s",
+			upstream.at().In(sydney).Format(time.RFC3339), want.Format(time.RFC3339))
+	}
+	// The encoded form is the same request, so it is also the same cache entry.
+	get(t, handler, departuresAt(-72*time.Minute)) // 16:40
+	if upstream.departureCalls.Load() != 1 {
+		t.Errorf("upstream calls = %d, want 1: both spellings are one bucket",
+			upstream.departureCalls.Load())
+	}
+}
+
+func TestDeparturesAtAcceptsUTC(t *testing.T) {
+	// Clients may send Z rather than the Sydney offset; the bucket is an
+	// instant, so both name the same window.
+	upstream := &fakeUpstream{departures: sampleDepartures()}
+	_, handler := pinnedServer(t, upstream)
+
+	if got := get(t, handler, "/api/v1/departures?from=200060&to=215020&at=2026-09-01T06:44:00Z"); got.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", got.Code, got.Body)
+	}
+	want := time.Date(2026, 9, 1, 16, 40, 0, 0, sydney)
+	if !upstream.at().Equal(want) {
+		t.Errorf("upstream at = %s, want %s",
+			upstream.at().In(sydney).Format(time.RFC3339), want.Format(time.RFC3339))
+	}
+}
+
 func TestUpstreamFailureMapsToStatus(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -280,8 +641,22 @@ func TestStopsContract(t *testing.T) {
 	if err := json.Unmarshal(got.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decoding body: %v", err)
 	}
-	if len(body.Stops) != 1 || body.Stops[0].ID != "200060" {
+	if len(body.Stops) != 2 || body.Stops[0].ID != "200060" {
 		t.Errorf("stops = %+v", body.Stops)
+	}
+	// Coordinates reach the client so it can rank saved trips by how near the
+	// station is; the position it compares them against never leaves the phone.
+	location := body.Stops[0].Location
+	if location == nil || location.Lat != -33.884024 || location.Lon != 151.206203 {
+		t.Errorf("location = %+v, want Central's coordinates", location)
+	}
+	// A station upstream has no coordinates for is null, not (0, 0) — which is
+	// in the Atlantic and would win every nearest-station comparison outright.
+	if body.Stops[1].Location != nil {
+		t.Errorf("location = %+v, want null", *body.Stops[1].Location)
+	}
+	if !strings.Contains(got.Body.String(), `"location":null`) {
+		t.Errorf("body = %s, want an explicit \"location\":null", got.Body)
 	}
 
 	// Repeating the search must not cost a second upstream request.

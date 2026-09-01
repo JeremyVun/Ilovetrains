@@ -88,10 +88,22 @@ func (c *Client) Stops(ctx context.Context, query string) (*StopsResponse, error
 	return mapStops(body)
 }
 
-// Departures returns the next journeys from one station to another.
-func (c *Client) Departures(ctx context.Context, from, to string, limit int) (*DeparturesResponse, error) {
+// Departures returns the journeys from one station to another departing at or
+// after `at`. A zero `at` means now.
+//
+// Upstream answers for past itdDate/itdTime and, for the recent past, answers
+// with realtime actuals rather than the timetable (verified 2026-09-01; see
+// docs/references/tfnsw-open-data.md). The realtime gate in mapTrip is what
+// keeps an aged-out window honest: once upstream forgets a service was
+// monitored, `estimated` goes null instead of echoing the timetable back as if
+// it were live.
+func (c *Client) Departures(ctx context.Context, from, to string, limit int, at time.Time) (*DeparturesResponse, error) {
 	now := c.now()
-	local := now.In(c.loc)
+	window := at
+	if window.IsZero() {
+		window = now
+	}
+	local := window.In(c.loc)
 
 	q := url.Values{}
 	q.Set("outputFormat", "rapidJSON")
@@ -120,7 +132,15 @@ func (c *Client) Departures(ctx context.Context, from, to string, limit int) (*D
 	if err != nil {
 		return nil, err
 	}
-	return mapTrip(body, from, to, limit, now, c.loc)
+	// generatedAt stays the fetch time, not the window: a client must always be
+	// able to compute how old the data it is showing is, including for a past
+	// window whose rows are hours older than the response.
+	resp, err := mapTrip(body, from, to, limit, now, c.loc)
+	if err != nil {
+		return nil, err
+	}
+	resp.At = formatTimePtr(at, c.loc)
+	return resp, nil
 }
 
 func (c *Client) get(ctx context.Context, path string, query url.Values) ([]byte, error) {

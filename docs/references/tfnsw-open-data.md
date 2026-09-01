@@ -29,7 +29,13 @@ by payload content, not systemMessages.
   code -2000). Use `type_sf=any` and filter `locations[]` to
   `type=="stop"`; rank by `isBest` / `matchQuality`.
 - Stop fields: `id` (global stop ID), `name`, `modes` (product classes
-  served). Verified IDs: Central `200060`, Parramatta `215020`.
+  served), `coord`. Verified IDs: Central `200060`, Parramatta `215020`.
+- **`coord` is `[latitude, longitude]`** (verified 2026-09-01 from the
+  fixtures, not assumed from the CRS name): Central is
+  `[-33.884024, 151.206203]` and the Adelaide coach stop `G50001` is
+  `[-34.927477, 138.595501]`. Read the other way round those are points in
+  Lebanon and the Southern Ocean. Every station in the captured fixtures has
+  a `coord`, but POI/street results do too, so presence is not a stop filter.
 - Prefix matching works (`parra`, `strathf` → the right stations, verified
   2026-09-01) but very short queries can lose to exact word matches on
   streets/bus stops (`parr` → only "Parr Pde" bus stops, which the
@@ -39,6 +45,29 @@ by payload content, not systemMessages.
 ### trip
 `GET /v1/tp/trip?outputFormat=rapidJSON&coordOutputFormat=EPSG:4326&depArrMacro=dep&itdDate=YYYYMMDD&itdTime=HHMM&type_origin=any&name_origin=<stopId>&type_destination=any&name_destination=<stopId>&calcNumberOfTrips=6&TfNSWTR=true&<exclusions>`
 
+- **Past windows work, and carry realtime actuals** (verified 2026-09-01,
+  five probes Central `200060` → Parramatta `215020`, all HTTP 200). An
+  `itdDate`/`itdTime` in the past with `depArrMacro=dep` returns journeys
+  departing at or after that time — it does not snap to now — and for the
+  recent past those journeys carry genuine realtime data, not the timetable:
+
+  | window | realtime legs | estimates vs planned |
+  |---|---|---|
+  | 20 min ago | 6/6 MONITORED | every leg differs: +3m18s … +3m48s on departure, and its own delay on arrival |
+  | 1 h ago | 5/6 MONITORED | departures all on time to the second; 5 arrivals differ (−12s … +180s) |
+  | 3 h ago | 1/6 | none differ |
+  | 6 h ago | 0/6 | none differ |
+
+  So **realtime survives about an hour and is gone by three**. As it ages out,
+  `isRealtimeControlled` and `realtimeStatus` go false/absent while
+  `departureTimeEstimated` stays present as a copy of the planned time — the
+  same trap as the live board, and the existing realtime gate is what makes
+  an old window degrade honestly to `estimated: null` instead of claiming
+  every train from this morning ran exactly on time.
+  Fixture: `trip_central_parramatta_past.json` (the 20-min window).
+  Consequence for caching: a settled window fetched soon after it passes is
+  BETTER data than the same window refetched hours later, so caching it hard
+  preserves the actuals rather than merely saving quota.
 - Mode exclusions (verified working):
   `excludedMeans=checkbox&exclMOT_4=1&exclMOT_5=1&exclMOT_7=1&exclMOT_9=1&exclMOT_10=1&exclMOT_11=1`
   → journeys came back all class 1.
@@ -116,8 +145,14 @@ poll realtime feeds ≥10–15s apart, static bundles at most daily.
 One station pair at 30s TTL ≈ 2,880 upstream calls/day worst case; the
 believed quota supports ~20 hot pairs even with zero CDN hit-rate.
 
+Past windows (`at`) add at most 157 further keys per station pair and limit
+(26 hours of 10-minute buckets), but each is fetched at most once an hour and
+in practice once ever, since what ran does not change. Scrolling the board
+back a day is ~144 upstream calls in the worst case and, after the first
+rider does it, none.
+
 ## Sources
 
-- Live probes 2026-08-31: `tools/fixtures/*.json`
+- Live probes 2026-08-31 and 2026-09-01: `tools/fixtures/*.json`
 - https://opendata.transport.nsw.gov.au/developers/documentation
 - https://opendata.transport.nsw.gov.au/dataset/trip-planner-apis
