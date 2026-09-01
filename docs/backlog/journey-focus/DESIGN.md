@@ -40,6 +40,43 @@ service. Data notes from the round that bind the build:
   exists in the fixture with no delay applied) — the tight treatment is not
   an edge case.
 
+## Built (2026-09-01)
+
+Shipped in `web/`: route `#/journey` (`js/journey.js` — the pure model,
+`js/detail.js` — A1's markup), focus per client-storage.md (`js/focus.js`,
+`storage.js`), the B2 strip in `js/board.js`, the styles in `app.css`. Shots of
+every state, both frames and both schemes, in `shots/` beside the comps.
+
+Five calls the port had to make, each of them a place where the comps' data and
+the API's data differ or where the exemplar had no case:
+
+1. **No replacement service.** A1's `cancelled` comp showed the next T4 taking
+   the cancelled one's place, which the comps' own data.js constructed by hand;
+   `/api/v1/departures` has no such field. What ships is honest about what we
+   know: `legDetail[].cancelled` strikes THAT leg in the board's idiom and the
+   arrival line is struck with it. The rule the comp was really demonstrating —
+   re-read the arrival platform from the leg that arrives, never assume it — is
+   kept, and tested.
+2. **Tight and shrunk are two things.** `PRINTED CHANGE WAS N MIN` and the
+   struck arrival time are printed only when the window actually shrank; a
+   change that is merely short (the real 4-minute one, no delay) gets the coral
+   figure without a sentence saying the printed change was the same 4 minutes.
+3. **A leg that is behind you** has no case in the comps. It keeps its place in
+   the ladder and empties its figure slot, which is the stale board's own
+   mechanism, rather than inventing a word for the provenance slot.
+4. **The third line is the headsign**, not "Northern Line to Gordon via
+   Lindfield": the API carries the badge code and the headsign, never the full
+   line name. Same third line the board prints.
+5. **`ON BOARD` counts to the door.** OPTIONS.md offered A2's leg DURATION
+   under that label; the round's own artifact (`comps/onboard.js`, which every
+   surface-B comp rendered) counts minutes until you step off, which is the
+   number you look at while standing up. That is what shipped.
+
+Known cost, faithful to B3: `you arrive Bondi Junction` does not fit the
+strip's body column beside a 20px clock time and wraps to its own line, exactly
+as it does in `b3-lead-390x844-boarddeparted.png`. The departed strip is
+therefore ~24px taller than the waiting one.
+
 ## Frozen IA (comps explore COMPOSITION only)
 
 - Board row → detail (whole row is the tap target; no new chrome on rows).

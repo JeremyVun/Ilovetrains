@@ -6,17 +6,22 @@
    fetches the figures count down in place; nothing reflows, because a row's
    height is state-independent. */
 
-import { esc } from './dom.js';
+import { esc, shortName } from './dom.js';
 import { rowLines } from './rowmodel.js';
 
 export function boardHtml(view) {
-  const { trip, direction, model, tripCount } = view;
+  const { trip, direction, model, tripCount, strip } = view;
   const from = direction === 'reverse' ? trip.to.name : trip.from.name;
   const to = direction === 'reverse' ? trip.from.name : trip.to.name;
 
+  /* From B3, transplanted: with a focus active and moving, the board's kicker
+     is the only element that tells a returning user which state the app is in
+     before they read a single number. */
+  const kicker = strip && strip.riding ? 'On this train' : 'Next departures';
+
   return `
 <div class="mast">
-  <div class="kicker"><span class="lbl">Next departures</span></div>
+  <div class="kicker"><span class="lbl">${esc(kicker)}</span></div>
   <h1>${esc(shortName(from))} <em>→</em> ${esc(shortName(to))}</h1>
   <div class="tools">
     <button data-act="reverse">Reverse</button>
@@ -26,6 +31,38 @@ export function boardHtml(view) {
   <div class="rule"></div>
 </div>
 ${rowsHtml(model)}
+${strip ? railHtml(strip, model) : footerHtml(model)}`;
+}
+
+/* B2 · Footer rail: the focused journey is a board row that has moved to the
+   bottom edge, under the masthead's own heavy rule printed a second time. It
+   sits in thumb reach and it ABSORBS the freshness footer rather than adding
+   to it — which is also why it never covers a service: the band is chrome, the
+   rows scroll under it (owner ruling: a focused board pays for the strip by
+   SCROLLING, never by hiding a service). */
+export function railHtml(strip, model) {
+  return `<div class="rail${strip.warn ? ' warn' : ''}" data-t="rail" data-act="detail" role="button" tabindex="0">${
+    railInnerHtml(strip, model)}</div>`;
+}
+
+export function railInnerHtml(strip, model) {
+  const { num, unit } = splitFigure(strip.figure);
+  const meta = strip.riding
+    ? `On board <b>${esc(strip.lineCode || '—')}</b>${strip.offTime ? ` &nbsp;·&nbsp; off ${esc(strip.offTime)}` : ''}`
+    : `The <b>${esc(strip.depTime)}</b> &nbsp;·&nbsp; ${
+      strip.changeCount === 0 ? 'direct' : strip.changeCount + ' change' + (strip.changeCount > 1 ? 's' : '')}`;
+  const third = strip.note
+    ? `<div class="dest note" data-t="rail-third">${esc(strip.note)}</div>`
+    : `<div class="dest" data-t="rail-third">${esc(strip.third || '—')}</div>`;
+
+  return `<div class="r${strip.wide ? ' wide' : ''}">
+  <div class="fig" data-t="rail-figure">${esc(num)}${unit ? `<span class="unit">${esc(unit)}</span>` : ''}<span class="prov" data-t="rail-prov">${esc(strip.provenance)}</span></div>
+  <div class="body">
+    <div class="dep"><strong>${esc(strip.arrTime)}</strong><span class="to">${esc(strip.arrives)} ${esc(strip.arrStation)}</span></div>
+    <div class="meta" data-t="rail-meta">${meta}</div>
+    ${third}
+  </div>
+</div>
 ${footerHtml(model)}`;
 }
 
@@ -73,9 +110,12 @@ function figureHtml(figure) {
   return esc(num) + (unit ? `<span class="unit">${esc(unit)}</span>` : '');
 }
 
+/* The whole row is the tap target for the journey's detail view (frozen IA,
+   DESIGN.md): no chevron, no new chrome — a board row is one object and
+   touching it opens it. */
 function rowHtml(row) {
   const cls = rowClass(row);
-  return `<div class="${cls}" style="--stem:${esc(row.lineColour)}" data-t="row" data-key="${esc(row.key)}">
+  return `<div class="${cls}" style="--stem:${esc(row.lineColour)}" data-t="row" data-key="${esc(row.key)}" data-act="detail" data-match="${esc(row.matchKey)}" role="button" tabindex="0">
   <div class="mins" data-t="figure">${figureHtml(row.figure)}<span class="prov${row.provenanceWarn ? ' warn' : ''}" data-t="provenance">${esc(row.provenance)}</span></div>
   <div class="body">
     <div class="dep">${depHtml(row)}</div>
@@ -104,7 +144,14 @@ export function sameRowSet(root, model) {
   return keys.length === model.rows.length && keys.every((k, i) => k === model.rows[i].key);
 }
 
-export function patch(root, model) {
+export function patch(root, model, strip) {
+  const rail = root.querySelector('[data-t="rail"]');
+  if (rail && strip) {
+    // The strip is three lines of fixed shape, so rewriting it wholesale costs
+    // nothing and cannot reflow the board above it.
+    rail.innerHTML = railInnerHtml(strip, model);
+    rail.className = 'rail' + (strip.warn ? ' warn' : '');
+  }
   const rows = [...root.querySelectorAll('[data-t="row"]')];
   rows.forEach((el, i) => {
     const row = model.rows[i];
@@ -155,10 +202,4 @@ export function dissolveDeparted(root, model, done) {
   setTimeout(done, 240);
 }
 
-/* "Central Station" reads as "Central" in a masthead that already says these
-   are departures. The API's names are station names; the head is a place. */
-export function shortName(name) {
-  return String(name || '').replace(/\s+Station$/i, '');
-}
-
-export { rowLines };
+export { rowLines, shortName };

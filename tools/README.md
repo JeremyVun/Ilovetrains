@@ -58,7 +58,7 @@ the JSON yourself cannot make.
 ```
 node tools/shoot-states.js [state...] [--list] [--url URL] [--out DIR]
         [--size WxH] [--media name:value] [--prefix light-]
-        [--probe "JS returning a value"]
+        [--probe "JS returning a value"] [--probe-file probe.js]
 ```
 
 The whole sweep under an emulated media feature is one line, and `--prefix`
@@ -70,13 +70,35 @@ node tools/shoot-states.js --media prefers-color-scheme:light --prefix light-
 
 Seeds the client's localStorage document, pins the clock through
 `window.__trains`, freezes the network so the live fetch cannot overwrite the
-state mid-shot, and photographs the result. `--probe` runs (awaited) JS in the
-page and prints what it returns, so a state can be *measured* in the same drive
-that shoots it. Six invariants are checked on every state and reported at
-`console.error` under the shot: three full lines per row, the figure fits its
-column, our own copy is never ellipsised, no part of the board is cut off with
-no way to scroll to it, the last row is whole at the end of the scroll, and the
-footer is never painted over a service or pushed below the frame.
+state mid-shot, and photographs the result. `--probe` (or `--probe-file`, for a
+probe long enough to drive a flow) runs awaited JS in the page and prints what
+it returns, so a state can be *measured* — or driven end to end — in the same
+drive that shoots it. Invariants are checked on every state and reported at
+`console.error` under the shot: three full lines per board row, the figure fits
+its column (rows and journey blocks alike), our own copy is never ellipsised,
+no part of a scrolling region is cut off with no way to scroll to it, its last
+item is whole at the end of the scroll, and the chrome beneath it is never
+painted over its content or pushed below the frame.
+
+That last pair is checked for the board against whatever chrome it has — the
+footer, or the **focused strip**, which absorbs the footer and which the rows
+scroll UNDER (a focused board pays for the strip by scrolling, never by hiding
+a service) — and for the **journey detail view** against its closing rule.
+
+The journey-focus states (`detail-hero`, `detail-tight`, `detail-cancelled`,
+`detail-long`, `board-focused`, `board-focused-scrolled`,
+`board-focused-departed`) run on the transfer corridor from
+`web/test/fixture.js`, and the `detail-*` ones reach the view by CLICKING a
+board row, so every one of them is also proof that the whole row is the tap
+target. They are shot to their own round's folder, at both frames and both
+schemes:
+
+```
+node tools/shoot-states.js detail-hero detail-tight detail-cancelled \
+  detail-long board-focused board-focused-scrolled board-focused-departed \
+  --out docs/backlog/journey-focus/shots            # add --size 412x732,
+                                                    # --media prefers-color-scheme:light --prefix light-
+```
 
 The `short-*` states shoot the board at **412x732** — a 412px Android with its
 browser chrome on screen, which is the frame the owner's phone actually gets and

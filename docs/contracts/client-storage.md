@@ -61,6 +61,12 @@ The document gains an optional `focus` field — "I'm on this train":
   snapshot when matched (live delays keep flowing); unmatched (departed)
   keeps the last snapshot.
 - At most one focused journey. Focusing another replaces it.
+- Deleting the trip deletes its focus, like its history and its cache: nothing
+  outlives the trip it describes.
+- The auto-clear is a WRITE, so it happens where writes happen — on the next
+  successful refresh, not during a render. An expired focus stops being drawn
+  immediately either way; rendering never touches storage, because the client
+  paints once with the real clock before anything can pin it.
 
 ## Prediction heuristic (v1 — keep it this simple)
 

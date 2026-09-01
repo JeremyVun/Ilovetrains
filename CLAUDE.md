@@ -40,12 +40,16 @@ is bumped. Develop with DevTools' "Update on reload", or in a throwaway profile
 - `docs/references/tfnsw-open-data.md` — upstream API notes; **[verify]**
   items must be resolved by live probes before being relied on
 - `docs/backlog/v1-core-loop/` — v1 design + phased build plan
+- `docs/backlog/journey-focus/` — journey detail + focus: design, comps and
+  verdict, and the built screens' shots in `shots/`
 - `tools/` — verification instruments (`screenshot.js`, `shoot-states.js`,
   `measure-open.js`, `make-icons.sh`) + the TfNSW probe and fixtures; read
   `tools/README.md` before trusting or changing any of them
 - `web/` — the client: `index.html`, `app.css`, ES modules in `web/js`
-  (`rowmodel`, `storage`, `predict` are pure and unit tested in `web/test`),
-  plus the PWA shell: `manifest.webmanifest`, `sw.js`, `icons/`
+  (`rowmodel`, `journey`, `focus`, `storage`, `predict` are pure and unit
+  tested in `web/test`), plus the PWA shell: `manifest.webmanifest`, `sw.js`,
+  `icons/`. Screens: the board (`board.js`), the journey detail view
+  (`detail.js`, route `#/journey`), setup, trips.
 - `cmd/server` — backend entrypoint; `internal/tfnsw` — upstream client and
   response mapping; `internal/cache` — TTL + single-flight + stale-on-error;
   `internal/api` — handlers, cache headers, error contract
