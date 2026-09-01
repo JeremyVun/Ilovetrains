@@ -40,7 +40,7 @@ func TestClientSendsAuthAndRequiredTripParams(t *testing.T) {
 		_, _ = w.Write([]byte(`{"journeys":[]}`))
 	}))
 
-	if _, err := client.Departures(context.Background(), "200060", "215020", 4); err != nil {
+	if _, err := client.Departures(context.Background(), "200060", "215020", 4, time.Time{}); err != nil {
 		t.Fatalf("Departures: %v", err)
 	}
 
@@ -74,6 +74,60 @@ func TestClientSendsAuthAndRequiredTripParams(t *testing.T) {
 	}
 	if len(got.Get("itdDate")) != 8 || len(got.Get("itdTime")) != 4 {
 		t.Errorf("itdDate/itdTime = %q/%q, want YYYYMMDD/HHMM", got.Get("itdDate"), got.Get("itdTime"))
+	}
+}
+
+func TestClientAsksUpstreamForThePastWindow(t *testing.T) {
+	// `at` must reach upstream as itdDate/itdTime — a past window that silently
+	// queried now would return the live board and look plausible while being
+	// the wrong answer entirely. generatedAt stays the fetch time, and the
+	// window comes back echoed as `at`.
+	var got url.Values
+	client, _ := testClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.URL.Query()
+		_, _ = w.Write([]byte(`{"journeys":[]}`))
+	}))
+	fetchedAt := mustParse(t, "2026-09-01T07:52:00Z") // 17:52 Sydney
+	client.now = func() time.Time { return fetchedAt }
+
+	at := mustParse(t, "2026-09-01T07:30:00Z") // 17:30 Sydney
+	resp, err := client.Departures(context.Background(), "200060", "215020", 6, at)
+	if err != nil {
+		t.Fatalf("Departures: %v", err)
+	}
+
+	if got.Get("itdDate") != "20260901" || got.Get("itdTime") != "1730" {
+		t.Errorf("itdDate/itdTime = %q/%q, want 20260901/1730 (the window, not now)",
+			got.Get("itdDate"), got.Get("itdTime"))
+	}
+	if got.Get("depArrMacro") != "dep" {
+		t.Errorf("depArrMacro = %q, want dep", got.Get("depArrMacro"))
+	}
+	if resp.At == nil || *resp.At != "2026-09-01T17:30:00+10:00" {
+		t.Errorf("at = %v, want the echoed window 2026-09-01T17:30:00+10:00", resp.At)
+	}
+	if resp.GeneratedAt != "2026-09-01T17:52:00+10:00" {
+		t.Errorf("generatedAt = %q, want the fetch time 2026-09-01T17:52:00+10:00", resp.GeneratedAt)
+	}
+}
+
+func TestClientWithoutAtQueriesNowAndEchoesNull(t *testing.T) {
+	var got url.Values
+	client, _ := testClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.URL.Query()
+		_, _ = w.Write([]byte(`{"journeys":[]}`))
+	}))
+	client.now = func() time.Time { return mustParse(t, "2026-09-01T07:52:00Z") }
+
+	resp, err := client.Departures(context.Background(), "200060", "215020", 6, time.Time{})
+	if err != nil {
+		t.Fatalf("Departures: %v", err)
+	}
+	if got.Get("itdTime") != "1752" {
+		t.Errorf("itdTime = %q, want 1752 (now)", got.Get("itdTime"))
+	}
+	if resp.At != nil {
+		t.Errorf("at = %q, want null when the caller did not ask for a window", *resp.At)
 	}
 }
 

@@ -2,7 +2,7 @@
 # Probe TfNSW Trip Planner API and save raw responses to tools/fixtures/.
 # Usage: tools/probe-tfnsw.sh
 # Reads TFNSW_API_KEY from env, falling back to .env at the repo root.
-# Makes ~5 requests per run (quota-cheap). Never prints the key.
+# Makes ~6 requests per run (quota-cheap). Never prints the key.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -47,6 +47,17 @@ EXCL="excludedMeans=checkbox&exclMOT_4=1&exclMOT_5=1&exclMOT_7=1&exclMOT_9=1&exc
 
 req trip_central_parramatta \
   "$BASE/trip?outputFormat=rapidJSON&coordOutputFormat=EPSG%3A4326&depArrMacro=dep&itdDate=$NOW_DATE&itdTime=$NOW_TIME&type_origin=any&name_origin=$CENTRAL&type_destination=any&name_destination=$PARRA&calcNumberOfTrips=6&$EXCL&TfNSWTR=true"
+
+# The same query 20 minutes in the past. Verified 2026-09-01: the trip endpoint
+# answers past itdDate/itdTime with realtime ACTUALS for the recent past — every
+# service in this window carried a real delay on both departure and arrival —
+# which is what makes the board's past rows worth showing. The window must stay
+# ~20 min back: much closer and the trains have not departed yet, much further
+# and upstream has dropped the actuals (gone by ~3h, see the reference doc).
+PAST_DATE=$(date -v-20M +%Y%m%d) PAST_TIME=$(date -v-20M +%H%M)
+
+req trip_central_parramatta_past \
+  "$BASE/trip?outputFormat=rapidJSON&coordOutputFormat=EPSG%3A4326&depArrMacro=dep&itdDate=$PAST_DATE&itdTime=$PAST_TIME&type_origin=any&name_origin=$CENTRAL&type_destination=any&name_destination=$PARRA&calcNumberOfTrips=6&$EXCL&TfNSWTR=true"
 
 req departure_mon_central \
   "$BASE/departure_mon?outputFormat=rapidJSON&coordOutputFormat=EPSG%3A4326&mode=direct&type_dm=stop&name_dm=$CENTRAL&depArrMacro=dep&itdDate=$NOW_DATE&itdTime=$NOW_TIME&TfNSWDM=true"

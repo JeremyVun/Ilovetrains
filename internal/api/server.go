@@ -18,7 +18,7 @@ import (
 // Upstream is the part of the TfNSW client the handlers need. Handler tests
 // substitute a fake so no test touches the network.
 type Upstream interface {
-	Departures(ctx context.Context, from, to string, limit int) (*tfnsw.DeparturesResponse, error)
+	Departures(ctx context.Context, from, to string, limit int, at time.Time) (*tfnsw.DeparturesResponse, error)
 	Stops(ctx context.Context, query string) (*tfnsw.StopsResponse, error)
 }
 
@@ -29,11 +29,21 @@ const (
 	departuresTTL = 30 * time.Second
 	stopsTTL      = 24 * time.Hour
 
+	// A settled past window does not change, so it is cached for an hour and
+	// the CDN is told it may keep it for one. Caching it is not only cheap but
+	// better: upstream drops realtime actuals from a window a few hours after
+	// it passes, so the cached copy taken while the actuals were still there is
+	// the more truthful answer.
+	departuresPastTTL = time.Hour
+
 	// The contract's stale-on-upstream-failure windows (owner ruling
 	// 2026-08-31): departures data ages badly, the near-static station list
 	// does not, so a week-old search index beats a 502 during a long outage.
-	departuresStaleWindow = 10 * time.Minute
-	stopsStaleWindow      = 7 * 24 * time.Hour
+	// A past window has already happened, so a day-old copy of it is exactly as
+	// true as a fresh fetch — matching the stale-while-revalidate we advertise.
+	departuresStaleWindow     = 10 * time.Minute
+	departuresPastStaleWindow = 24 * time.Hour
+	stopsStaleWindow          = 7 * 24 * time.Hour
 
 	// fetchBudget bounds one upstream fetch including its retry.
 	fetchBudget = 12 * time.Second
@@ -41,10 +51,28 @@ const (
 
 // Cache-Control values from the contract.
 const (
-	departuresCacheControl = "public, s-maxage=30, stale-while-revalidate=60"
-	stopsCacheControl      = "public, s-maxage=86400, stale-while-revalidate=604800"
-	errorCacheableControl  = "public, s-maxage=60"
-	noStore                = "no-store"
+	departuresCacheControl     = "public, s-maxage=30, stale-while-revalidate=60"
+	departuresPastCacheControl = "public, s-maxage=3600, stale-while-revalidate=86400"
+	stopsCacheControl          = "public, s-maxage=86400, stale-while-revalidate=604800"
+	errorCacheableControl      = "public, s-maxage=60"
+	noStore                    = "no-store"
+)
+
+// The `at` window, from the contract.
+const (
+	// bucketSize quantises `at`, so a client scrolling into the past pages on
+	// stable keys and every response stays a pure function of the query string.
+	bucketSize = 10 * time.Minute
+
+	// settledAge is how far into the past a bucket must be before every journey
+	// in it has departed and what ran can no longer change. A bucket newer than
+	// this can still contain a train that has not left, so it keeps the live
+	// cache policy.
+	settledAge = 20 * time.Minute
+
+	// How far a client may page. See departAt: these bound the key space.
+	maxPastWindow   = 24 * time.Hour
+	maxFutureWindow = 2 * time.Hour
 )
 
 // Journey count bounds from the contract.
@@ -58,20 +86,26 @@ const minQueryLength = 2
 // Server holds the caches and upstream client shared by all requests. It holds
 // no per-user state: every response is a pure function of the query string.
 type Server struct {
-	upstream   Upstream
-	departures *cache.Cache[*tfnsw.DeparturesResponse]
-	stops      *cache.Cache[*tfnsw.StopsResponse]
-	webDir     string
+	upstream Upstream
+	// Two departure caches, not one: a live window is worth 30 seconds and a
+	// settled past window is worth an hour, and cache.Cache holds one TTL.
+	departures     *cache.Cache[*tfnsw.DeparturesResponse]
+	departuresPast *cache.Cache[*tfnsw.DeparturesResponse]
+	stops          *cache.Cache[*tfnsw.StopsResponse]
+	webDir         string
+	now            func() time.Time
 }
 
 // New returns a server serving the API plus, if webDir exists, the static
 // client at /.
 func New(upstream Upstream, webDir string) *Server {
 	return &Server{
-		upstream:   upstream,
-		departures: cache.New[*tfnsw.DeparturesResponse](departuresTTL, departuresStaleWindow),
-		stops:      cache.New[*tfnsw.StopsResponse](stopsTTL, stopsStaleWindow),
-		webDir:     webDir,
+		upstream:       upstream,
+		departures:     cache.New[*tfnsw.DeparturesResponse](departuresTTL, departuresStaleWindow),
+		departuresPast: cache.New[*tfnsw.DeparturesResponse](departuresPastTTL, departuresPastStaleWindow),
+		stops:          cache.New[*tfnsw.StopsResponse](stopsTTL, stopsStaleWindow),
+		webDir:         webDir,
+		now:            time.Now,
 	}
 }
 
@@ -133,18 +167,48 @@ func (s *Server) handleDepartures(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
+	now := s.now()
+	at, err := departAt(query.Get("at"), now)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
 
-	key := from + "|" + to + "|" + strconv.Itoa(limit)
-	result, err := s.departures.Do(r.Context(), key, func(ctx context.Context) (*tfnsw.DeparturesResponse, error) {
+	// The bucket is part of the key, so a past page and the live board never
+	// share an entry, and asking for the current bucket explicitly is a
+	// different answer (it echoes `at`) from asking for now.
+	key := from + "|" + to + "|" + strconv.Itoa(limit) + "|" + bucketKey(at)
+	store, cacheControl := s.departures, departuresCacheControl
+	if settled(at, now) {
+		store, cacheControl = s.departuresPast, departuresPastCacheControl
+	}
+
+	result, err := store.Do(r.Context(), key, func(ctx context.Context) (*tfnsw.DeparturesResponse, error) {
 		ctx, cancel := fetchContext(ctx)
 		defer cancel()
-		return s.upstream.Departures(ctx, from, to, limit)
+		return s.upstream.Departures(ctx, from, to, limit, at)
 	})
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	writeData(w, departuresCacheControl, result.Stale, result.Value)
+	writeData(w, cacheControl, result.Stale, result.Value)
+}
+
+// settled reports whether a window is far enough in the past that every journey
+// in it has already departed, so the answer can be cached hard. A zero `at` is
+// the live board and never settled.
+func settled(at, now time.Time) bool {
+	return !at.IsZero() && at.Before(now.Add(-settledAge))
+}
+
+// bucketKey renders a window for the cache key. The empty string is "now",
+// which must not collide with any real bucket.
+func bucketKey(at time.Time) string {
+	if at.IsZero() {
+		return ""
+	}
+	return strconv.FormatInt(at.Unix(), 10)
 }
 
 func (s *Server) handleStops(w http.ResponseWriter, r *http.Request) {

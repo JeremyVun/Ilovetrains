@@ -19,18 +19,49 @@ Invariants:
 
 ## GET /api/v1/departures?from={stopId}&to={stopId}&limit={n}&at={t}
 
-`at` (added 2026-09-01, board-v2; DRAFT until the backend round verifies
-upstream accepts past times — that round updates this paragraph with what it
-proved): optional ISO 8601 time. Absent = now (existing behaviour and cache
-policy, unchanged). Present = journeys departing from time `t`, which the
-server rounds DOWN to a 10-minute bucket — the rounded value is echoed as
-`at` in the response so clients page on stable keys. Bucketing keeps the
-response a pure function of the query string. Cache: buckets in the past by
-more than 20 min get `s-maxage=3600, stale-while-revalidate=86400` (what ran
-is settled); buckets near/ahead of now keep the live policy. Past journeys
-may lack realtime — normal semantics apply (`estimated` null). Paging into
-the past = requesting earlier buckets; clients dedupe rows across pages by
-(line.name, departure.scheduled).
+`at` (added 2026-09-01, board-v2; verified against live TfNSW the same day —
+see `docs/references/tfnsw-open-data.md` for the probe table): optional ISO
+8601 time with an offset (`2026-09-01T17:30:00+10:00` or the same instant as
+`...Z`). Absent = now — existing behaviour, cache policy and body unchanged
+except that `at` is then `null`. Present = journeys departing at or after time
+`t`, which the server rounds DOWN to a 10-minute bucket; the rounded value is
+echoed as `at` in the response so clients page on stable keys, and bucketing
+keeps the response a pure function of the query string.
+
+Upstream answers past windows properly: it returns the journeys that departed
+in that window, and **for the recent past it returns realtime actuals, not the
+timetable** — a past row can honestly show that the 17:34 left at 17:37:18 and
+arrived 4½ minutes late. Realtime survives roughly an hour and has aged out by
+three, after which upstream serves the timetable with the realtime flags
+cleared; the usual gate then applies and `estimated` comes back `null`, so an
+old row degrades to scheduled-only rather than claiming every train ran exactly
+on time. Both registers are normal and a client must render both.
+
+Cache: a bucket more than 20 minutes in the past is settled — every journey in
+it has departed — and gets `s-maxage=3600, stale-while-revalidate=86400` with a
+matching 1-hour in-memory TTL. Buckets nearer to now, ahead of now, or absent
+keep the live policy. Caching a settled window hard is not only cheap but more
+truthful: the cached copy was taken while the actuals still existed upstream.
+
+`at` is rejected with `400` when it is unparseable, further than 24 hours in
+the past, or more than 2 hours in the future. This bounds the key space, which
+is a quota decision rather than a usability one: every reachable bucket is a
+distinct cache key and a possible upstream request, and 26 hours of 10-minute
+buckets is at most 157 keys per (`from`, `to`, `limit`). Bounds are applied to
+the bucket, so `now - 24h` exactly is inside the window.
+
+Paging into the past = requesting earlier buckets; clients dedupe rows across
+pages by (line.name, departure.scheduled). **Where a row appears on both a past
+page and the live board, the live board's copy wins.** A page returns `limit`
+journeys *from* its bucket, not journeys *inside* it, so a settled page whose
+station pair runs every 15 minutes reaches over an hour past its own bucket —
+and those rows are held under the settled page's 1-hour cache, so their
+`estimated` can be up to an hour behind. The overlap is a duplicate to resolve,
+never a reason to show a countdown from a past page.
+
+Note that `+` means a space in a URL query, so the offset must be
+percent-encoded as `%2B` — the server also accepts the un-encoded spelling,
+since its meaning is not in doubt, but a client should not rely on that.
 
 Next journeys from origin station to destination station. Backed by the TfNSW
 Trip Planner `trip` endpoint (not `departure_mon`, which cannot filter to
@@ -40,13 +71,16 @@ services that actually reach the destination).
   must differ from each other.
 - `limit`: max journeys, default 6, max 10. Non-numeric or outside 1–10 is a
   `400`, not silently clamped.
-- Cache: `s-maxage=30, stale-while-revalidate=60`.
+- `at`: optional departure window, as above.
+- Cache: `s-maxage=30, stale-while-revalidate=60`, except for a settled past
+  `at` window — see the `at` paragraph above.
 
 ```json
 {
   "from": {"id": "200060", "name": "Central Station"},
   "to":   {"id": "215020", "name": "Parramatta Station"},
   "generatedAt": "2026-08-31T17:42:00+10:00",
+  "at": null,
   "journeys": [
     {
       "departure": {
@@ -129,6 +163,10 @@ Semantics:
 - Journeys are sorted by effective departure (estimated, else scheduled).
 - `generatedAt` is when the data was fetched from TfNSW, not when the response
   was written, so a client can always compute the age of what it is showing.
+  It is the fetch time even for a past window, so it is unrelated to `at`: a
+  request for this morning answers with journeys hours old and a `generatedAt`
+  of minutes ago. `at` says which window the journeys are from; `generatedAt`
+  says how fresh the answer about it is.
 
 ## GET /api/v1/stops?q={text}
 
@@ -151,10 +189,16 @@ to train/metro stations only.
 }
 ```
 
-`location` (added 2026-09-01, board-v2): the station's WGS84 coordinates,
-from upstream's `coord` field; `null` if upstream omits it. Powers the
-client-side geolocation term in trip prediction — the server never receives
-a user location.
+`location` (added 2026-09-01, board-v2): the station's WGS84 coordinates, from
+upstream's `coord` field, whose axis order was verified from real responses as
+`[latitude, longitude]` — Central is `[-33.884024, 151.206203]` (see
+`docs/references/tfnsw-open-data.md`). `null` when upstream omits the pair or
+gives fewer than two values; never `{"lat": 0, "lon": 0}`, which is a point in
+the Atlantic that would win any nearest-station comparison outright. Every
+station in the captured fixtures carries coordinates, so `null` is a guard
+rather than an expected case. Powers the client-side geolocation term in trip
+prediction — the server never receives a user location, only publishes where
+stations are. No other field of this endpoint changed.
 
 ## GET /healthz
 

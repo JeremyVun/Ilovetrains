@@ -71,19 +71,31 @@ type Journey struct {
 	LegDetail           []Leg     `json:"legDetail"`
 }
 
-// DeparturesResponse is the body of GET /api/v1/departures.
+// DeparturesResponse is the body of GET /api/v1/departures. At echoes the
+// 10-minute bucket the journeys were asked for, and is null when the caller
+// asked for now.
 type DeparturesResponse struct {
 	From        Place     `json:"from"`
 	To          Place     `json:"to"`
 	GeneratedAt string    `json:"generatedAt"`
+	At          *string   `json:"at"`
 	Journeys    []Journey `json:"journeys"`
 }
 
-// Stop is one station in a stop search result.
+// Location is a station's WGS84 position, for the client's geolocation term.
+// The server never learns where the user is; it only says where stations are.
+type Location struct {
+	Lat float64 `json:"lat"`
+	Lon float64 `json:"lon"`
+}
+
+// Stop is one station in a stop search result. Location is null when upstream
+// omits the station's coordinates.
 type Stop struct {
-	ID    string   `json:"id"`
-	Name  string   `json:"name"`
-	Modes []string `json:"modes"`
+	ID       string    `json:"id"`
+	Name     string    `json:"name"`
+	Modes    []string  `json:"modes"`
+	Location *Location `json:"location"`
 }
 
 // StopsResponse is the body of GET /api/v1/stops.

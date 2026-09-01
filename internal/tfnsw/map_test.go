@@ -141,6 +141,75 @@ func TestMapStopsParramatta(t *testing.T) {
 	}
 }
 
+func TestMapStopsCarriesLocation(t *testing.T) {
+	// Axis order is the whole risk here: EPSG:4326 names latitude first, but
+	// plenty of APIs serve x,y anyway. These are the real captured coordinates —
+	// swap them and Central lands in Lebanon, which is what this test is for.
+	cases := []struct {
+		file     string
+		lat, lon float64
+	}{
+		{"stop_finder_central.json", -33.884024, 151.206203},
+		{"stop_finder_parramatta.json", -33.81749, 151.005325},
+	}
+	for _, tc := range cases {
+		t.Run(tc.file, func(t *testing.T) {
+			got, err := mapStops(fixture(t, tc.file))
+			if err != nil {
+				t.Fatalf("mapStops: %v", err)
+			}
+			location := got.Stops[0].Location
+			if location == nil {
+				t.Fatal("location = null, want the station's coordinates")
+			}
+			if location.Lat != tc.lat || location.Lon != tc.lon {
+				t.Errorf("location = %+v, want lat %v lon %v", *location, tc.lat, tc.lon)
+			}
+			// Sydney is south of the equator and east of Greenwich. A transposed
+			// pair passes the equality check above only if the fixture changed,
+			// so state the invariant that would survive a refresh too.
+			if location.Lat > 0 || location.Lon < 0 {
+				t.Errorf("location = %+v, want a southern/eastern point", *location)
+			}
+		})
+	}
+}
+
+func TestMapStopsLocationIsNullWhenUpstreamOmitsIt(t *testing.T) {
+	// Every station in the captured fixtures has coordinates, so the absent case
+	// has to be stated here: a fabricated position would send the client's
+	// nearest-station prediction somewhere the rider is not.
+	body := []byte(`{"locations":[
+		{"id":"1","name":"No Coord Station","type":"stop","modes":[1]},
+		{"id":"2","name":"Short Coord Station","type":"stop","modes":[1],"coord":[-33.8]},
+		{"id":"3","name":"Fine Station","type":"stop","modes":[1],"coord":[-33.8,151.2]}]}`)
+	got, err := mapStops(body)
+	if err != nil {
+		t.Fatalf("mapStops: %v", err)
+	}
+	if len(got.Stops) != 3 {
+		t.Fatalf("stops = %d, want 3", len(got.Stops))
+	}
+	for _, i := range []int{0, 1} {
+		if got.Stops[i].Location != nil {
+			t.Errorf("stop %d location = %+v, want null", i, *got.Stops[i].Location)
+		}
+	}
+	if got.Stops[2].Location == nil {
+		t.Error("stop 2 location = null, want the coordinates it carries")
+	}
+}
+
+func TestStopJSONKeepsLocationExplicitlyNull(t *testing.T) {
+	encoded, err := json.Marshal(Stop{})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !bytes.Contains(encoded, []byte(`"location":null`)) {
+		t.Errorf("body = %s, want it to contain \"location\":null", encoded)
+	}
+}
+
 func TestMapStopsEmptyResultIsNotAnError(t *testing.T) {
 	// A no-match stop_finder response still carries a type:"error"
 	// systemMessage; it must map to an empty list, not a failure.
@@ -254,6 +323,65 @@ func TestMapTripEstimatedIsNullWithoutRealtime(t *testing.T) {
 	}
 }
 
+// TestMapTripPastWindowKeepsRealtimeActuals is the golden for the whole `at`
+// feature. The fixture is a real trip response for a window 20 minutes in the
+// past (captured 2026-09-01 17:53 for itdTime=1732), and it proves the thing
+// the contract had to leave DRAFT: upstream answers past windows with realtime
+// ACTUALS, not the timetable. Every one of these six T1s left Central about
+// three minutes late and arrived late by its own amount — values that cannot
+// come from a schedule, and that a client can therefore show as what really
+// happened.
+func TestMapTripPastWindowKeepsRealtimeActuals(t *testing.T) {
+	got, err := mapTrip(fixture(t, "trip_central_parramatta_past.json"), "200060", "215020", 6,
+		mustParse(t, "2026-09-01T07:53:00Z"), sydney(t))
+	if err != nil {
+		t.Fatalf("mapTrip: %v", err)
+	}
+	if len(got.Journeys) != 6 {
+		t.Fatalf("journeys = %d, want 6", len(got.Journeys))
+	}
+	// Journeys are in the requested past window, not at the fetch time: the
+	// first one departs before generatedAt.
+	first := got.Journeys[0]
+	if first.Departure.Scheduled != "2026-09-01T17:34:00+10:00" {
+		t.Errorf("departure.scheduled = %q, want 2026-09-01T17:34:00+10:00",
+			first.Departure.Scheduled)
+	}
+	if first.Departure.Estimated == nil || *first.Departure.Estimated != "2026-09-01T17:37:18+10:00" {
+		t.Errorf("departure.estimated = %v, want the actual 2026-09-01T17:37:18+10:00",
+			first.Departure.Estimated)
+	}
+	if first.Arrival.Scheduled != "2026-09-01T17:59:00+10:00" {
+		t.Errorf("arrival.scheduled = %q, want 2026-09-01T17:59:00+10:00", first.Arrival.Scheduled)
+	}
+	if first.Arrival.Estimated == nil || *first.Arrival.Estimated != "2026-09-01T18:03:30+10:00" {
+		t.Errorf("arrival.estimated = %v, want the actual 2026-09-01T18:03:30+10:00",
+			first.Arrival.Estimated)
+	}
+	if first.Departure.Platform == nil || *first.Departure.Platform != "Platform 18" {
+		t.Errorf("platform = %v, want Platform 18", first.Departure.Platform)
+	}
+	if first.Line.Name != "T1" || first.DestinationHeadsign != "Emu Plains via Parramatta" {
+		t.Errorf("line/headsign = %+v / %q", first.Line, first.DestinationHeadsign)
+	}
+
+	// A schedule copy would put estimated exactly on scheduled everywhere. Every
+	// journey in this window carries a real, distinct delay on both ends — that
+	// is what makes the past worth showing rather than replaying the timetable.
+	for i, journey := range got.Journeys {
+		if journey.Departure.Estimated == nil || journey.Arrival.Estimated == nil {
+			t.Fatalf("journey %d lost its realtime estimate", i)
+		}
+		if *journey.Departure.Estimated == journey.Departure.Scheduled {
+			t.Errorf("journey %d departure.estimated equals scheduled; the fixture "+
+				"was captured with a real delay on every service", i)
+		}
+		if *journey.Arrival.Estimated == journey.Arrival.Scheduled {
+			t.Errorf("journey %d arrival.estimated equals scheduled", i)
+		}
+	}
+}
+
 func TestMapTripMetro(t *testing.T) {
 	got, err := mapTrip(fixture(t, "trip_tallawong_chatswood.json"), "2155384", "206710", 6,
 		mustParse(t, "2026-08-31T12:47:00Z"), sydney(t))
@@ -291,6 +419,9 @@ func TestFixturesCarryExpectedUpstreamFields(t *testing.T) {
 	}{
 		{"trip_central_parramatta.json", "T1 North Shore & Western Line", classTrain, "Platform 12", true},
 		{"trip_tallawong_chatswood.json", "M1 Metro North West & Bankstown Line", classMetro, "Platform 2", true},
+		// The past window must stay MONITORED, or the golden above stops
+		// testing that a departed service still carries its actuals.
+		{"trip_central_parramatta_past.json", "T1 North Shore & Western Line", classTrain, "Platform 18", true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.file, func(t *testing.T) {
@@ -577,6 +708,7 @@ func TestMapTripLegDetailMatchesLegCountOnEveryFixture(t *testing.T) {
 		{"trip_central_parramatta.json", "200060", "215020"},
 		{"trip_tallawong_chatswood.json", "2155384", "206710"},
 		{"trip_rhodes_bondijunction.json", "213820", "202210"},
+		{"trip_central_parramatta_past.json", "200060", "215020"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.file, func(t *testing.T) {
