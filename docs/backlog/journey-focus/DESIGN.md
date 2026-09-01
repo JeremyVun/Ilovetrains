@@ -22,6 +22,24 @@ Self-contained with `docs/contracts/api.md` (legDetail addition),
 3. **Transfer data** comes from the same cached departures response
    (legDetail) — no new endpoints, no extra upstream calls.
 
+## Verdict (owner, 2026-09-01)
+
+Comps round complete (6 comps, 48 shots, `comps/` beside this file).
+**A1 · Ledger** is the detail exemplar, **B2 · Footer rail** the focus
+exemplar — shot paths, transplants and the new provenance vocabulary
+(`TO CHANGE`, `ON BOARD`, `MIN TO GO`; detail view exempt from the
+three-line invariant) are recorded in `docs/STYLES.md`. The sixth-service
+cost of the strip is paid by scrolling (owner ruling), never by hiding a
+service. Data notes from the round that bind the build:
+- Change windows use time.js's floor-to-clock-minute rule so the change
+  figure always agrees with the printed times.
+- A cancelled leg's replacement can arrive at a DIFFERENT platform (real
+  case: the 10:12 T4 arrives Bondi Junction Platform 1, not 2) — the detail
+  view must re-read the arrival platform from the replacement, not assume it.
+- Tight connections are normal on this corridor (a real 4-minute change
+  exists in the fixture with no delay applied) — the tight treatment is not
+  an edge case.
+
 ## Frozen IA (comps explore COMPOSITION only)
 
 - Board row → detail (whole row is the tap target; no new chrome on rows).

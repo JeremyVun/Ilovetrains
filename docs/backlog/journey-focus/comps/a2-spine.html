@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>A2 · Spine</title>
+<link rel="stylesheet" href="base.css">
+<style>
+/* A2 · SPINE — the journey drawn as a route: a time gutter, a rail, stops.
+   The rail is painted in the line's own colour, so the journey is legibly two
+   trains before a word is read; the transfer is not a labelled row but a BREAK
+   IN THE RAIL — the one place on the page where the line stops. Town Hall is
+   printed once, spanning the break, because it is one station and printing it
+   twice is what makes every other route diagram hard to read.
+   (Donation from the rejected D·River: hollow ring = not confirmed / not on a
+   train; solid dot = a train is carrying you through this point.) */
+
+.route { flex: 1; overflow: hidden; padding: 20px 22px 0;
+         display: flex; flex-direction: column; }
+
+.stop, .ride, .brk { display: grid; grid-template-columns: 84px 26px 1fr; }
+.stop { align-items: center; flex: none; }
+/* The rail stretches to fill the frame: a route that stops halfway down the
+   page is a list, not a route. */
+.ride { flex: 1 1 auto; }
+
+.t {
+  font-size: 20px; font-weight: 400; letter-spacing: -0.01em; color: var(--ink);
+  text-align: right; padding-right: 12px; line-height: 1;
+}
+.t del { display: block; font-size: 13px; font-weight: 300; color: var(--ink-3); margin-top: 3px; }
+
+/* Rail column. The dot is drawn on the rail's own axis. */
+.rail { position: relative; }
+.rail::after {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: 9px; height: 9px; margin: -5px 0 0 -5px; border-radius: 50%;
+  background: var(--stem);
+}
+.rail.open::after { background: var(--bg); border: 1.5px solid var(--ink-3); }
+
+.place { min-width: 0; }
+.place .n {
+  font-size: 20px; font-weight: 400; letter-spacing: -0.01em; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.place .lbl { display: block; margin-top: 6px; }
+
+/* A ride: the rail is continuous and coloured, the service is named beside it. */
+.ride { min-height: 96px; }
+.ride .bar { position: relative; }
+.ride .bar::after {
+  content: ''; position: absolute; left: 50%; top: -20px; bottom: -20px;
+  width: 2px; margin-left: -1px; background: var(--stem);
+}
+.ride .svc { padding: 16px 0 16px; min-width: 0; align-self: start; }
+.ride .svc .code {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase;
+  color: var(--stem);
+}
+.ride .svc .head {
+  margin-top: 7px; font-size: 14px; font-weight: 300; letter-spacing: -0.005em;
+  line-height: 19px; color: var(--ink-2);
+}
+.ride .svc .dur { margin-top: 8px; }
+
+/* The break. No rail between the two rings: you are not on a train here, and
+   the discontinuity is the design. Town Hall is printed ONCE, spanning the
+   break, because it is one station. The gutter's job changes from "what time"
+   to "how long", so the change figure sits in the time column between the two
+   clock times it is the difference of. */
+/* The gap is the point, so it is given real height: two rings far enough
+   apart that the eye reads a discontinuity, not a hairline. */
+.brk { padding: 16px 0 18px; flex: none; align-items: stretch; min-height: 208px; }
+.brk .gut { display: grid; grid-template-rows: auto 1fr auto; row-gap: 12px; }
+.brk .gut .in, .brk .gut .out {
+  font-size: 20px; font-weight: 400; letter-spacing: -0.01em; line-height: 20px;
+  color: var(--ink); text-align: right; padding-right: 12px;
+}
+.brk .gut .in del, .brk .gut .out del {
+  display: block; font-size: 13px; font-weight: 300; color: var(--ink-3); margin-top: 3px;
+}
+.brk .railcol { position: relative; }
+.brk .railcol .ring {
+  position: absolute; left: 50%; margin-left: -5.5px;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--bg); border: 1.5px solid var(--ink-3);
+}
+.brk .railcol .ring.top { top: 5px; }
+.brk .railcol .ring.bot { bottom: 5px; }
+.brk .bd { display: flex; flex-direction: column; justify-content: center; padding: 16px 0; min-width: 0; }
+.brk .fig {
+  font-size: 54px; font-weight: 250; letter-spacing: -0.045em; line-height: .84;
+  color: var(--ink); text-align: right; padding-right: 12px;
+  align-self: center;
+}
+.brk .fig .prov {
+  display: block; margin-top: 9px; font-size: 10px; font-weight: 600;
+  letter-spacing: .13em; text-transform: uppercase; color: var(--ink-2); white-space: nowrap;
+}
+.brk h2 {
+  font-size: 29px; font-weight: 300; letter-spacing: -0.025em; line-height: 1.05;
+  color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.brk .plats {
+  margin-top: 10px; font-size: 10.5px; font-weight: 600; letter-spacing: .15em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.brk .plats b { color: var(--ink); font-weight: 600; }
+.brk .plats .arw { color: var(--ink-3); padding: 0 5px; font-weight: 400; }
+.brk .warnline {
+  margin-top: 9px; font-size: 10px; font-weight: 600; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--warn);
+}
+.brk.tight .fig, .brk.tight .fig .prov { color: var(--warn); }
+.brk.tight .rail::after { border-color: var(--warn); }
+
+.note {
+  grid-column: 3; margin-top: 9px; font-size: 10px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--warn);
+}
+.late .t { color: var(--warn); }
+.sched .t { color: var(--ink-2); font-weight: 300; }
+.strike { text-decoration: line-through; text-decoration-thickness: 1.5px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="data.js"></script>
+<script>
+(function () {
+  var m = model(), j = m.focus, L = m.long, now = m.now;
+  var a = j.legs[0], b = j.legs[1];
+  var eff = function (l, w) { return l[w + 'Est'] === null ? l[w + 'Sched'] : l[w + 'Est']; };
+
+  function stop(t, sched, place, platform, open, cls) {
+    return '<div class="stop ' + (cls || '') + '">' +
+      '<div class="t">' + clock(t) + (sched ? '<del>' + clock(sched) + '</del>' : '') + '</div>' +
+      '<div class="rail' + (open ? ' open' : '') + '"></div>' +
+      '<div class="place"><div class="n">' + esc(place) + '</div>' +
+        '<span class="lbl">' + esc(platform) + '</span></div>' +
+    '</div>';
+  }
+
+  function ride(leg, mins, note) {
+    return '<div class="ride" style="--stem:var(--line-' + leg.line.code + ')">' +
+      '<div></div><div class="bar"></div>' +
+      '<div class="svc">' +
+        '<div class="code">' + esc(leg.line.code) + '</div>' +
+        '<div class="head">' + esc(L ? leg.line.full : leg.line.name) + ' to ' + esc(leg.line.headsign) + '</div>' +
+        '<div class="lbl dur">' + mins + ' min on board</div>' +
+        (note ? '<div class="note" style="grid-column:auto">' + esc(note) + '</div>' : '') +
+      '</div></div>';
+  }
+
+  var depMs = eff(a, 'dep'), arrTH = eff(a, 'arr'), depTH = eff(b, 'dep'), endMs = eff(b, 'arr');
+  var tight = j.changeMin < j.printedChangeMin && j.cancelledLeg !== 1;
+  var brk =
+    '<div class="brk' + (tight ? ' tight' : '') + '">' +
+      '<div class="gut">' +
+        '<div class="in">' + clock(arrTH) + (tight ? '<del>' + clock(a.arrSched) + '</del>' : '') + '</div>' +
+        '<div class="fig">' + j.changeMin + '<span class="prov">to change</span></div>' +
+        '<div class="out">' + clock(depTH) +
+          (j.cancelledLeg === 1 ? '<del>' + b.replacedTime + '</del>' : '') + '</div>' +
+      '</div>' +
+      '<div class="railcol"><i class="ring top"></i><i class="ring bot"></i></div>' +
+      '<div class="bd"><h2>' + esc(L ? 'Town Hall Station' : 'Town Hall') + '</h2>' +
+        '<div class="plats">Platform <b>3</b><span class="arw">→</span>Platform <b>5</b></div>' +
+        (tight ? '<div class="warnline">Printed change was ' + j.printedChangeMin + ' min</div>' : '') +
+      '</div>' +
+    '</div>';
+  var leadMins = minsBetween(now, depMs);
+
+  var lede = (leadMins <= 0 ? 'Departing' : 'Leaves in ' + leadMins + ' min') +
+    ' &nbsp;·&nbsp; arrives ' + clock(endMs) +
+    (j.cancelledLeg === 1 ? ' <del style="color:var(--ink-3)">' + clock(j.arrSchedMs) + '</del>' : '');
+
+  document.getElementById('app').innerHTML =
+    '<div class="mast">' +
+      '<div class="kicker"><span class="lbl">Journey</span></div>' +
+      '<h1>' + esc(L ? 'Rhodes Station' : 'Rhodes') + ' <em>→</em> ' + esc(L ? 'Bondi Junction Station' : 'Bondi Junction') + '</h1>' +
+      '<div class="lede">' + lede + '</div>' +
+      '<div class="tools"><button>Board</button><button class="on">Focus this train</button></div>' +
+      '<div class="rule"></div>' +
+    '</div>' +
+    '<div class="route" style="--stem:var(--line-T9)">' +
+      stop(depMs, a.lateMin > 0 ? a.depSched : null, L ? a.from.station : a.from.name,
+           a.from.platform, false, a.lateMin > 0 ? 'late' : (a.realtime ? '' : 'sched')) +
+      ride(a, minsBetween(depMs, arrTH)) +
+      brk +
+      (j.cancelledLeg === 1 ? '<div class="ride" style="--stem:var(--line-T4)"><div></div><div class="bar"></div>' +
+        '<div class="svc"><div class="code">' + esc(b.line.code) + '</div>' +
+        '<div class="head">' + esc(L ? b.line.full : b.line.name) + ' to ' + esc(b.line.headsign) + '</div>' +
+        '<div class="lbl dur">' + minsBetween(depTH, endMs) + ' min on board</div>' +
+        '<div class="note" style="grid-column:auto">' + esc(b.note) + '</div></div></div>'
+        : ride(b, minsBetween(depTH, endMs))) +
+      '<div style="--stem:var(--line-T4)">' +
+        stop(endMs, null, L ? b.to.station : b.to.name, b.to.platform, false, '') + '</div>' +
+    '</div>' +
+    footerHtml();
+})();
+</script>
+</body>
+</html>

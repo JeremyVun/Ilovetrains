@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>A3 · Change first</title>
+<link rel="stylesheet" href="base.css">
+<style>
+/* A3 · CHANGE FIRST (the brave one) — promotes C·Countdown's rejected premise
+   ("the answer IS the screen") into this new context and then makes a harder
+   claim: on a journey detail the answer is not the departure, it is the
+   CHANGE, and at the change the thing you can actually get wrong is not the
+   station — you are standing in it — it is the platform. So the platform pair
+   is set at the h1 step and the station name is demoted to a kicker.
+   The second leg loses its countdown entirely: subtraction. */
+
+.sheet2 { flex: 1; overflow: hidden; padding: 0 22px; display: flex; flex-direction: column; }
+
+/* The leave block keeps the board's own first-row grammar, verbatim. */
+.leave { display: grid; grid-template-columns: 86px 1fr; gap: 0 16px;
+         align-items: start; padding: 22px 0 24px 12px; position: relative; }
+.leave::before { content: ''; position: absolute; left: 0; top: 26px; bottom: 24px;
+                 width: 2px; background: var(--stem); }
+.leave .mins { font-size: 78px; }
+.leave .dep { font-size: 23px; }
+.leave .dest { white-space: normal; overflow: visible; }
+
+/* The hero. Two heavy rules, the page's whole middle, one figure. */
+/* The change owns the middle of the page: the two heavy rules are the only
+   structure and everything between them is one fact. */
+.hero { border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink);
+        padding: 26px 0 30px; flex: none; }
+.hero .kick { display: block; margin-bottom: 16px; color: var(--ink-3); }
+.hero .plat {
+  font-size: 40px; font-weight: 300; letter-spacing: -0.03em; line-height: 1.04;
+  color: var(--ink); display: flex; align-items: baseline; flex-wrap: wrap;
+}
+.hero .plat .arw { color: var(--ink-3); font-weight: 200; padding: 0 12px; }
+.hero .plat .w { color: var(--ink-3); font-weight: 200; padding-right: 10px; font-size: 20px;
+                 letter-spacing: 0; }
+.hero .band { display: grid; grid-template-columns: 86px 1fr; gap: 0 16px;
+              align-items: end; margin-top: 20px; }
+.hero .fig {
+  font-size: 78px; font-weight: 250; letter-spacing: -0.045em; line-height: .84;
+  color: var(--ink); text-align: right;
+}
+.hero .fig .prov { display: block; margin-top: 9px; font-size: 10px; font-weight: 600;
+                   letter-spacing: .13em; text-transform: uppercase; color: var(--ink-2); }
+.hero .times { font-size: 15px; font-weight: 300; color: var(--ink-2); padding-bottom: 8px; }
+.hero .times b { color: var(--ink); font-weight: 400; font-size: 20px; letter-spacing: -0.01em; }
+.hero .times del { color: var(--ink-3); }
+.hero .warnline { margin-top: 12px; font-size: 10px; font-weight: 600; letter-spacing: .14em;
+                  text-transform: uppercase; color: var(--warn); }
+.hero.tight .fig, .hero.tight .fig .prov { color: var(--warn); }
+
+/* The arrival: a ledger line, not a row. No figure — you are not waiting for it. */
+.arrive { margin-top: auto; padding: 18px 0 0; border-top: 1px solid var(--rule); }
+.arrive .line { display: flex; align-items: baseline; gap: 10px; }
+.arrive .t { font-size: 23px; font-weight: 400; letter-spacing: -0.01em; color: var(--ink); }
+.arrive .t del { font-size: 15px; font-weight: 300; color: var(--ink-3); padding-left: 8px; }
+.arrive .n { font-size: 15px; font-weight: 300; color: var(--ink-2); min-width: 0;
+             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arrive .p { margin-left: auto; flex: none; padding-left: 10px; }
+.arrive .svc { margin-top: 9px; font-size: 10.5px; font-weight: 600; letter-spacing: .15em;
+               text-transform: uppercase; color: var(--stem); }
+.arrive .head { margin-top: 7px; font-size: 14px; font-weight: 300; color: var(--ink-2); }
+.arrive .note { margin-top: 9px; font-size: 10px; font-weight: 600; letter-spacing: .14em;
+                text-transform: uppercase; color: var(--warn); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="data.js"></script>
+<script>
+(function () {
+  var m = model(), j = m.focus, L = m.long, now = m.now;
+  var a = j.legs[0], b = j.legs[1];
+  var eff = function (l, w) { return l[w + 'Est'] === null ? l[w + 'Sched'] : l[w + 'Est']; };
+  var depMs = eff(a, 'dep'), arrTH = eff(a, 'arr'), depTH = eff(b, 'dep'), endMs = eff(b, 'arr');
+
+  var mins = minsBetween(now, depMs), f = figureFor(mins);
+  var late = a.lateMin > 0;
+  var prov = late ? a.lateMin + ' MIN LATE' : (a.realtime ? f.prov : 'SCHEDULED');
+  var tight = j.changeMin < j.printedChangeMin && j.cancelledLeg !== 1;
+  var cancelled = j.cancelledLeg === 1;
+
+  var leave =
+    '<div class="leave' + (late ? ' late' : '') + (a.realtime ? '' : ' sched') + '" style="--stem:var(--line-T9)">' +
+      '<div class="mins">' + esc(f.fig) + '<span class="prov' + (late ? ' warn' : '') + '">' + esc(prov) + '</span></div>' +
+      '<div class="body">' +
+        '<div class="dep"><strong>' + clock(depMs) + '</strong>' +
+          (late ? '<del>' + clock(a.depSched) + '</del>' : '') +
+          '<span class="to">' + esc(L ? a.from.station : a.from.name) + '</span></div>' +
+        '<div class="meta">Platform <b>' + a.from.platform.replace('Platform ', '') +
+          '</b> &nbsp;·&nbsp; <i>' + esc(a.line.code) + '</i></div>' +
+        '<div class="dest">' + esc(L ? a.line.full : a.line.name) + ' to ' + esc(a.line.headsign) + '</div>' +
+      '</div></div>';
+
+  var hero =
+    '<div class="hero' + (tight ? ' tight' : '') + '">' +
+      '<span class="lbl kick">Change at ' + esc(L ? 'Town Hall Station' : 'Town Hall') + '</span>' +
+      '<div class="plat"><span class="w">Platform</span>3<span class="arw">→</span><span class="w">Platform</span>5</div>' +
+      '<div class="band">' +
+        '<div class="fig">' + j.changeMin + '<span class="prov">to change</span></div>' +
+        '<div class="times"><b>' + clock(arrTH) + '</b>' +
+          (tight ? ' <del>' + clock(a.arrSched) + '</del>' : '') + ' in &nbsp;·&nbsp; <b>' + clock(depTH) + '</b>' +
+          (cancelled ? ' <del>' + b.replacedTime + '</del>' : '') + ' out</div>' +
+      '</div>' +
+      (tight ? '<div class="warnline">Printed change was ' + j.printedChangeMin + ' min</div>' : '') +
+    '</div>';
+
+  var arrive =
+    '<div class="arrive" style="--stem:var(--line-T4)">' +
+      '<div class="line"><span class="t">' + clock(endMs) +
+        (cancelled ? '<del>' + clock(j.arrSchedMs) + '</del>' : '') + '</span>' +
+        '<span class="n">' + esc(L ? b.to.station : b.to.name) + '</span>' +
+        '<span class="lbl p">' + esc(b.to.platform) + '</span></div>' +
+      '<div class="head"><i style="font-style:normal;color:var(--stem);font-weight:600">' +
+        esc(b.line.code) + '</i> · ' + esc(L ? b.line.full.replace(b.line.code + ' ', '') : b.line.name) + '</div>' +
+      (cancelled ? '<div class="note">' + esc(b.note) + '</div>' : '') +
+    '</div>';
+
+  document.getElementById('app').innerHTML =
+    '<div class="mast">' +
+      '<div class="kicker"><span class="lbl">Journey</span></div>' +
+      '<h1>' + esc(L ? 'Rhodes Station' : 'Rhodes') + ' <em>→</em> ' + esc(L ? 'Bondi Junction Station' : 'Bondi Junction') + '</h1>' +
+      '<div class="tools"><button>Board</button><button class="on">Focus this train</button></div>' +
+      '<div class="rule"></div>' +
+    '</div>' +
+    '<div class="sheet2">' + leave + hero + arrive + '</div>' +
+    footerHtml();
+})();
+</script>
+</body>
+</html>

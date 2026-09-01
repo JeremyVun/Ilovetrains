@@ -26,9 +26,28 @@ relying]**, Blue Mountains `#F99D1C`. The light scheme is below.
 Binding rules from the round (each found by breaking it):
 - **Three lines per row, in every state.** The slot under the minutes figure
   states that figure's provenance — `MIN`, `DEPARTING`, `SCHEDULED`,
-  `6 MIN LATE`, `CANCELLED` — so no state change can reflow a row or push the
-  sixth service below the fold. That list is the whole vocabulary; adding to it
-  is an owner's call.
+  `6 MIN LATE`, `CANCELLED`, and (owner ruling 2026-09-01, journey-focus
+  round) `TO CHANGE`, `ON BOARD`, `MIN TO GO` — so no state change can reflow
+  a row or push the sixth service below the fold. That list is the whole
+  vocabulary; adding to it is an owner's call. The three-line invariant binds
+  the BOARD; the journey DETAIL view is exempt (same owner ruling) — its rows
+  may run longer, its figures still always state their provenance.
+
+## Journey focus & detail verdict (owner, 2026-09-01)
+
+Exemplars: `docs/backlog/journey-focus/comps/shots/a1-ledger-390x844-hero.png`
+(detail view — legs in the board's own row grammar, the change bracketed by
+heavy rules with the station at headline scale) and
+`…/b2-footerrail-390x844-board.png` (focused strip — a bottom band absorbing
+the footer, MIN TO GO figure, in thumb reach). Full exploration:
+`docs/backlog/journey-focus/comps/OPTIONS.md`. Transplants ruled in:
+- A3's tight-connection treatment VERBATIM (coral change figure, both times,
+  `PRINTED CHANGE WAS 7 MIN`, no prediction, arrival figure never coloured)
+  and its `Platform 3 → Platform 5` pair construction.
+- A2's station-printed-once and its `ON BOARD` minutes label.
+- B3's departed-lead copy for the strip after departure and its second kicker.
+- A focused board pays for the strip by SCROLLING (the short-frame mechanic),
+  never by hiding a service.
 - **Cancelled lead never silently skips** (transplant from concept C): when
   the first service is cancelled, the row says
   `22:48 CANCELLED · NEXT TRAIN` in the same breath, at the full label idiom

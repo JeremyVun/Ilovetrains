@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>B3 · Lead</title>
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="detail.css">
+<style>
+/* B3 · LEAD (the brave one) — a focused journey RE-HEADLINES THE BOARD. It
+   takes the lead slot in the board's own first-row grammar, the masthead
+   kicker becomes "On this train", and the remaining departures are re-kickered
+   "Next departures" beneath a second heavy rule. After it leaves, it stays in
+   that slot and its figure quietly changes meaning: minutes-to-departure
+   becomes minutes-to-arrival, and the provenance slot says so.
+   The board stops being a list of departures and becomes: your train, then the
+   alternatives. */
+
+.lead { flex: none; padding: 0 22px; }
+.lead .row { border-bottom: 0; padding-bottom: 24px; }
+.lead .row .dest { white-space: normal; overflow: visible; }
+.lead .meta b { color: var(--ink-2); }
+.lead .rule2 { height: 2px; background: var(--ink); opacity: .82; }
+.lead .kick { padding: 15px 0 0; }
+.rows { padding-top: 4px; }
+@media (max-width: 375px) { .lead { padding-left: 18px; padding-right: 18px; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="data.js"></script>
+<script src="onboard.js"></script>
+<script>
+(function () {
+  var m = model();
+  if (m.name === 'onboard') {
+    document.getElementById('app').innerHTML = onboardDetailHtml(m, { kicker: 'On this train' });
+    return;
+  }
+  var j = m.focus, now = m.now;
+  var a = j.legs[0], b = j.legs[1];
+  var eff = function (l, w) { return l[w + 'Est'] === null ? l[w + 'Sched'] : l[w + 'Est']; };
+  var depTH = eff(b, 'dep'), arrTH = eff(a, 'arr');
+  var departed = minsBetween(now, j.depMs) < 0;
+  var toGo = minsBetween(now, j.arrMs);
+  var tight = j.changeMin < j.printedChangeMin && j.cancelledLeg !== 1;
+  var broken = j.cancelledLeg === 1;
+
+  /* Before it leaves, the figure is the one the board would have printed:
+     minutes until departure. After it leaves, the same slot counts down to the
+     arrival instead, and the word underneath says which. */
+  var figure = departed ? toGo : minsBetween(now, j.depMs);
+  var prov = departed ? 'min to go' : (a.lateMin > 0 ? a.lateMin + ' min late' : 'min');
+  var headline = departed
+    ? '<strong>' + clock(j.arrMs) + '</strong><span class="to">you arrive Bondi Junction</span>'
+    : '<strong>' + clock(j.depMs) + '</strong>' +
+      (a.lateMin > 0 ? '<del>' + clock(j.depSchedMs) + '</del>' : '') +
+      '<span class="to">arrives ' + clock(j.arrMs) + '</span>';
+
+  var meta = departed
+    ? 'On board <b>' + esc(a.line.code) + '</b> &nbsp;·&nbsp; off ' + clock(arrTH)
+    : 'Platform <b>' + a.from.platform.replace('Platform ', '') + '</b> &nbsp;·&nbsp; <i>' + esc(a.line.code) + '</i>';
+
+  var third = broken
+    ? '<div class="dest note">' + esc(b.note) + '</div>'
+    : tight
+      ? '<div class="dest note">' + j.changeMin + ' min to change · Town Hall Platform 3 → 5</div>'
+      : '<div class="dest">Change at Town Hall ' + clock(depTH) + ' &nbsp;·&nbsp; Platform 3 → 5</div>';
+
+  var lead =
+    '<div class="lead' + (tight || broken ? ' warn' : '') + '">' +
+      '<div class="row first' + (a.lateMin > 0 ? ' late' : '') + '" style="--stem:var(--line-T9)">' +
+        '<div class="mins">' + figure + '<span class="prov' + (a.lateMin > 0 ? ' warn' : '') + '">' +
+          esc(prov) + '</span></div>' +
+        '<div class="body"><div class="dep">' + headline + '</div>' +
+          '<div class="meta">' + meta + '</div>' + third + '</div>' +
+      '</div>' +
+      '<div class="rule2"></div>' +
+      '<div class="kick"><span class="lbl">Next departures</span></div>' +
+    '</div>';
+
+  var mast = '<div class="mast">' +
+    '<div class="kicker"><span class="lbl">' + (departed ? 'On this train' : 'Focused journey') + '</span></div>' +
+    '<h1>Rhodes <em>→</em> Bondi Junction</h1>' +
+    '<div class="tools"><button>Reverse</button><button>Edit</button></div>' +
+    '<div class="rule"></div>' +
+  '</div>';
+
+  /* The focused journey is not also listed below: on the departed board the
+     API has already dropped it, and before departure printing it twice would
+     be the same train answering the same question in two places. */
+  var rest = { board: m.board.filter(function (x) { return x.idx !== j.idx; }), now: m.now };
+  var rows = rest.board.map(function (jr) { return boardRowHtml(jr, m.now, false); });
+
+  document.getElementById('app').innerHTML =
+    mast + lead + '<div class="rows' + (rows.length < 6 ? ' sparse' : '') + '">' + rows.join('') + '</div>' +
+    footerHtml();
+})();
+</script>
+</body>
+</html>
