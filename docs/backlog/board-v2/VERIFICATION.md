@@ -1,6 +1,6 @@
 # Board v2 implementation verification
 
-Verified locally on 2026-09-02 against the locked comps8 in `comps-final/`.
+Verified locally and in production on 2026-09-02 against the locked comps8 in `comps-final/`.
 The browser driver is `tools/shoot-states.js`; it loads the real client, seeds
 the document the client writes, pins the clock, drives actual controls and
 checks geometry in Chromium. No `.env` or deployment secret was read.
@@ -60,3 +60,14 @@ API contract records the planned connection floor; the client-storage contract
 records coordinates, recent searches, rides, home inference and the ten-trip
 web LRU. Completed ride snapshots survive saved-trip eviction so home evidence
 does not disappear with management state.
+
+## Production
+
+Commit `34dc031` was pushed to `main`, published as the multi-architecture image
+`registry.jeremyvun.com/ilovetrains:latest` (manifest digest
+`sha256:a65cd08bf7f55d1b50394505d16d1c55a73cfae7075d213e3b3656b9b267451f`),
+and deployed to `syd1` by successful job `704ddb8ce9537ec23fc6c7bdb4581ac2`.
+The public health check, HTML shell, v6 service worker and a real departures
+request all returned successfully. A controlled warm Chromium open of
+`#/board` painted in 52ms, completed live data in 48ms, showed four rows and
+was controlled by the service worker, clearing the 500ms/2s experience bar.

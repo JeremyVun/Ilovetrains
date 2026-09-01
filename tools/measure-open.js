@@ -3,7 +3,7 @@
  *   warm open → the predicted board is on screen  < 500ms  (from cache)
  *   live data replaces it                          < 2s     (working network)
  *
- *   node tools/measure-open.js [--url http://localhost:8092/] [--shots DIR]
+ *   node tools/measure-open.js [--url http://localhost:8092/#/board] [--shots DIR]
  *
  * Both numbers come from the page's own Performance API on a real navigation,
  * not from a stopwatch around the harness:
@@ -119,7 +119,9 @@ function parseTiming(output) {
 
 async function main() {
   const argv = process.argv.slice(2);
-  let url = 'http://localhost:8092/';
+  // Home is a smart directions view in board v2. This harness measures the
+  // board's cached rows, so its default must name the board route explicitly.
+  let url = 'http://localhost:8092/#/board';
   let shots = path.join(os.tmpdir(), 'trains-measure');
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--url') url = argv[++i];

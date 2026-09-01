@@ -9,7 +9,7 @@ NOT go through GitHub — the image is built and pushed from this machine).
 ## Status
 
 The v1 backend, web client and installable/offline PWA shipped 2026-08-31/09-01.
-Board v2 was built and locally verified against the locked comps8 on 2026-09-02:
+Board v2 was built, deployed and verified against the locked comps8 on 2026-09-02:
 home is the open state, board is a now-anchored timeline, and focused journeys
 become smart-header directions. Evidence and exact geometry are in
 `docs/backlog/board-v2/VERIFICATION.md`; the earlier v1 report is
@@ -74,7 +74,7 @@ Caddy edge-proxy at ilovetrains.jeremyvun.com.
    (deployctl client → syd1 webhook; binary: `make build` in that repo or
    `DEPLOYCTL_BIN=agent/deployctl/deployctl`).
 4. Verify: https://ilovetrains.jeremyvun.com/healthz then the board itself;
-   re-run `node tools/measure-open.js --url https://ilovetrains.jeremyvun.com/`
+   re-run `node tools/measure-open.js --url https://ilovetrains.jeremyvun.com/#/board`
    for real-origin numbers.
 
 ## Rules
