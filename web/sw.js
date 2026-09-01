@@ -29,8 +29,10 @@
    v4: the scrolling board (app.css) and the station-search policy (a new
    module, js/search.js, plus setup.js and board.js) — same reason. A phone
    that has already visited keeps the old, unscrollable shell until this
-   number changes. */
-const VERSION = 'v4';
+   number changes.
+   v5: the journey detail view and focus (js/journey.js, js/detail.js,
+   js/focus.js, plus app.css, board.js, main.js, storage.js). */
+const VERSION = 'v5';
 const SHELL_CACHE = 'shell-' + VERSION;
 const DATA_CACHE = 'data-' + VERSION;
 
@@ -44,7 +46,10 @@ const SHELL = [
   '/manifest.webmanifest',
   '/js/api.js',
   '/js/board.js',
+  '/js/detail.js',
   '/js/dom.js',
+  '/js/focus.js',
+  '/js/journey.js',
   '/js/lines.js',
   '/js/main.js',
   '/js/predict.js',

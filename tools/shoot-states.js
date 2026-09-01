@@ -76,6 +76,29 @@ const TRIP_2 = {
   to: { id: '213910', name: 'Epping Station' },
   createdAt: '2026-08-10T08:00:00+10:00'
 };
+/* The transfer corridor: the journey-focus round's own data, so the detail
+   shots and the exemplar (comps/shots/a1-ledger-390x844-hero.png) describe the
+   same six real T9 → T4 services. */
+const TRIP_TRANSFER = {
+  id: 'trip-rhodes-bondi',
+  from: { id: '213820', name: 'Rhodes Station' },
+  to: { id: '200080', name: 'Bondi Junction Station' },
+  createdAt: '2026-08-01T08:00:00+10:00'
+};
+const TRIP_LONG = {
+  id: 'trip-olympicpark-mtvictoria',
+  from: { id: '206010', name: 'Sydney Olympic Park Station' },
+  to: { id: '253030', name: 'Mount Victoria Station' },
+  createdAt: '2026-08-01T08:00:00+10:00'
+};
+
+/* Tap the row a state is about. The whole row is the target (frozen IA), so
+   this drives the real affordance rather than the route — a detail shot is
+   also the proof that the board opens it. */
+const OPEN_ROW = (i = 0) => `
+  document.querySelectorAll('[data-t="row"]')[${i}].click();
+  await sleep(140);
+`;
 
 /** History that makes `predict` choose TRIP forward at 22:45 on a weekday. */
 function history(tripId = TRIP.id) {
@@ -86,7 +109,7 @@ function history(tripId = TRIP.id) {
   ];
 }
 
-function doc({ trips = [TRIP], body = null, fetchedAt = NOW_ISO, hist = history() } = {}) {
+function doc({ trips = [TRIP], body = null, fetchedAt = NOW_ISO, hist = history(), focus = null } = {}) {
   const d = {
     schemaVersion: 1,
     trips,
@@ -95,6 +118,15 @@ function doc({ trips = [TRIP], body = null, fetchedAt = NOW_ISO, hist = history(
     cache: {}
   };
   if (body) d.cache[trips[0].from.id + '-' + trips[0].to.id] = { fetchedAt, body };
+  // Exactly as the client writes it (docs/contracts/client-storage.md): the
+  // focused journey is a verbatim snapshot, which is what lets the strip
+  // outlive the journey's departure from the board.
+  if (focus) {
+    d.focus = {
+      tripId: trips[0].id, direction: 'forward',
+      focusedAt: fetchedAt, journey: focus
+    };
+  }
   return d;
 }
 
@@ -102,7 +134,11 @@ function doc({ trips = [TRIP], body = null, fetchedAt = NOW_ISO, hist = history(
 
 async function states() {
   const fx = await import(pathToFileURL(path.join(ROOT, 'web/test/fixture.js')).href);
-  const { departuresBody, baseJourneys, journey, delay, cancel } = fx;
+  const {
+    departuresBody, baseJourneys, journey, delay, cancel,
+    transferBody, transferJourneys, delayLeg, cancelLeg,
+    TRANSFER_NOW, TRANSFER_DEPARTED_NOW
+  } = fx;
 
   const board = (name, body, opts = {}) => ({
     name,
@@ -111,6 +147,53 @@ async function states() {
     body,
     ...opts
   });
+
+  const TRANSFER_AT = '2026-09-01T09:21:00+10:00';
+
+  /* A board (and optionally a focus) on the transfer corridor. */
+  const transfer = (name, journeys, opts = {}) => {
+    const body = transferBody({ journeys, generatedAt: opts.generatedAt || TRANSFER_AT });
+    return {
+      name,
+      seed: doc({
+        trips: [TRIP_TRANSFER], body, hist: [],
+        fetchedAt: opts.generatedAt || TRANSFER_AT, focus: opts.focus || null
+      }),
+      now: opts.now || TRANSFER_NOW,
+      body,
+      after: opts.after
+    };
+  };
+
+  const tighten = (journeys) => { delayLeg(journeys[0], 0, 5); return journeys; };
+  const breakLeg = (journeys) => { cancelLeg(journeys[0], 1); return journeys; };
+
+  /* Sydney Olympic Park → Strathfield → Mount Victoria: a real journey shape
+     carrying the longest station names and the longest headsign the board has
+     ever had to print. */
+  const longBody = () => {
+    const j = transferJourneys()[0];
+    Object.assign(j.legDetail[0], {
+      line: { name: 'T7', mode: 'train' },
+      headsign: 'Central via Lidcombe',
+      from: { id: '206010', name: 'Sydney Olympic Park Station', platform: 'Platform 1' },
+      to: { id: '206020', name: 'Strathfield Station', platform: 'Platform 4' }
+    });
+    Object.assign(j.legDetail[1], {
+      line: { name: 'BMT', mode: 'train' },
+      headsign: 'Mount Victoria via Parramatta and Katoomba',
+      from: { id: '206020', name: 'Strathfield Station', platform: 'Platform 6' },
+      to: { id: '253030', name: 'Mount Victoria Station', platform: 'Platform 2' }
+    });
+    j.line = { name: 'T7', mode: 'train' };
+    j.destinationHeadsign = 'Central via Lidcombe';
+    return {
+      from: { id: '206010', name: 'Sydney Olympic Park Station' },
+      to: { id: '253030', name: 'Mount Victoria Station' },
+      generatedAt: TRANSFER_AT,
+      journeys: [j]
+    };
+  };
 
   const delayed = baseJourneys();
   delay(delayed[0], 6);
@@ -200,6 +283,49 @@ async function states() {
     board('short-long-names', departuresBody({ journeys: long }), { size: SHORT }),
     board('short-long-names-scrolled', departuresBody({ journeys: long }), {
       size: SHORT, after: SCROLL_TO_END
+    }),
+
+    /* --- the journey detail view and the focused board ------------------- */
+
+    // The exemplar's own moment: 09:21 at Rhodes, the 09:24 three minutes out.
+    transfer('detail-hero', transferJourneys(), { after: OPEN_ROW(0) }),
+
+    // The first leg five minutes late, so the printed 7-minute change is
+    // really 2. Two times, two windows, and no claim about whether you make it.
+    transfer('detail-tight', tighten(transferJourneys()), { after: OPEN_ROW(0) }),
+
+    // The second leg cancelled: the journey is cancelled because ANY leg is,
+    // and the detail view is the only screen that says WHICH.
+    transfer('detail-cancelled', breakLeg(transferJourneys()), { after: OPEN_ROW(0) }),
+
+    // The longest real strings on any of these corridors: nothing abbreviated,
+    // the third line allowed to wrap rather than truncate (the detail view's
+    // exemption from the three-line invariant, owner ruling 2026-09-01).
+    {
+      name: 'detail-long',
+      seed: doc({ trips: [TRIP_LONG], body: longBody(), fetchedAt: TRANSFER_AT, hist: [] }),
+      now: TRANSFER_NOW,
+      body: longBody(),
+      after: OPEN_ROW(0)
+    },
+
+    // The board with a focus active: the strip absorbs the footer, and the
+    // sixth service is paid for by scrolling, never by hiding it.
+    transfer('board-focused', transferJourneys(), { focus: transferJourneys()[0] }),
+
+    // ...and the proof, because "the sixth service is reachable" is a claim
+    // about a gesture and not about a still image: driven to the end of the
+    // scroll, the last service is whole and the strip has not eaten it.
+    transfer('board-focused-scrolled', transferJourneys(), {
+      focus: transferJourneys()[0], after: SCROLL_TO_END
+    }),
+
+    // 09:47: the focused journey has left the board and the snapshot carries
+    // it. B3's departed copy, and the masthead's second kicker.
+    transfer('board-focused-departed', transferJourneys().slice(2), {
+      focus: transferJourneys()[0],
+      now: TRANSFER_DEPARTED_NOW,
+      generatedAt: '2026-09-01T09:47:00+10:00'
     }),
 
     { name: 'first-run', seed: doc({ trips: [], hist: [] }), now: NOW, route: '#/setup' },
@@ -293,6 +419,22 @@ function pageScript(state) {
   try {
     const problems = [];
     const rowEls = [...document.querySelectorAll('[data-t="row"]')];
+
+    /* The journey detail view is EXEMPT from the three-line invariant (its
+       blocks may run longer), but not from the two rules that invariant
+       serves: a figure that does not fit its column is drawn straight through
+       the time beside it, and our own copy is never ellipsised. */
+    for (const block of document.querySelectorAll('[data-t="leg"],[data-t="change"]')) {
+      const fig = block.querySelector('.mins');
+      if (fig && fig.scrollWidth > fig.clientWidth) {
+        problems.push('detail figure "' + (fig.firstChild && fig.firstChild.nodeValue)
+          + '" overflows its column: ' + fig.scrollWidth + ' > ' + fig.clientWidth);
+      }
+      for (const own of block.querySelectorAll('.warnline, .prov')) {
+        if (own.scrollWidth > own.clientWidth) problems.push('detail copy truncated: ' + own.textContent);
+      }
+    }
+
     for (const row of rowEls) {
       // docs/STYLES.md, binding: three lines per row, in every state.
       const lines = ['.dep', '.meta', '.dest'].map((s) => row.querySelector(s));
@@ -312,35 +454,48 @@ function pageScript(state) {
     }
     const ftr = document.querySelector('[data-t="footer"]');
     if (ftr && ftr.scrollWidth > ftr.clientWidth) problems.push('footer truncated');
+    // Wherever it ends up — its own line, or absorbed into the focused strip —
+    // the freshness line is in the frame.
+    if (ftr && ftr.getBoundingClientRect().bottom > innerHeight + 0.5) {
+      problems.push('the footer is below the frame');
+    }
 
     /* Every service is reachable. The board fills the frame, and when the frame
        is too short for six three-line rows it has to SCROLL — a frame that
        simply clips the sixth service is how the owner's phone lost it on
        2026-09-01, and no screenshot showed it, because a clipped row looks like
-       a row that is nearly on screen. */
-    const rowsEl = document.querySelector('.rows');
-    if (rowsEl) {
-      const box = rowsEl.getBoundingClientRect();
-      const beyond = rowsEl.scrollHeight - rowsEl.clientHeight;
-      const scrolls = /auto|scroll/.test(getComputedStyle(rowsEl).overflowY);
+       a row that is nearly on screen.
+
+       A scrolling region and the chrome beneath it: nothing in the region may
+       be unreachable, the last thing in it must be whole at the end of the
+       scroll, and the chrome never paints over it or hangs below the frame.
+       The focused board's chrome is the STRIP, which absorbs the footer — the
+       board pays for it by scrolling (owner ruling), never by hiding a
+       service. The detail view's chrome is its closing rule. */
+    const region = (sel, itemSel, chromeEl, what) => {
+      const el = document.querySelector(sel);
+      if (!el) return;
+      const box = el.getBoundingClientRect();
+      const items = [...el.querySelectorAll(itemSel)];
+      const beyond = el.scrollHeight - el.clientHeight;
+      const scrolls = /auto|scroll/.test(getComputedStyle(el).overflowY);
       if (beyond > 1 && !scrolls) {
-        problems.push(beyond + 'px of board is cut off with no way to scroll to it');
+        problems.push(beyond + 'px of ' + what + ' is cut off with no way to scroll to it');
       }
-      // At the bottom of the scroll — which for a board that fits is where it
-      // already is — the last service must be whole.
-      const last = rowEls[rowEls.length - 1];
-      if (last && rowsEl.scrollTop >= beyond - 1) {
+      const last = items[items.length - 1];
+      if (last && el.scrollTop >= beyond - 1) {
         const over = Math.round(last.getBoundingClientRect().bottom - box.bottom);
-        if (over > 1) problems.push('the last row is still ' + over + 'px short of visible at the end of the scroll');
+        if (over > 1) problems.push('the last ' + what + ' item is still ' + over + 'px short of visible at the end of the scroll');
       }
-      // The footer states how old the board is; it never states it on top of a
-      // service. It sits under the rows, in the frame, always.
-      if (ftr) {
-        const ftrBox = ftr.getBoundingClientRect();
-        if (box.bottom > ftrBox.top + 0.5) problems.push('the footer is painted over the board');
-        if (ftrBox.bottom > innerHeight + 0.5) problems.push('the footer is below the frame');
+      if (chromeEl) {
+        const chrome = chromeEl.getBoundingClientRect();
+        if (box.bottom > chrome.top + 0.5) problems.push('the ' + what + ' chrome is painted over its content');
+        if (chrome.bottom > innerHeight + 0.5) problems.push('the ' + what + ' chrome is below the frame');
       }
-    }
+    };
+
+    region('.rows', '[data-t="row"]', document.querySelector('.rail') || ftr, 'board');
+    region('.legs', '[data-t="leg"],[data-t="change"]', document.querySelector('.tail'), 'journey');
     if (problems.length) console.error('INVARIANT ' + ${JSON.stringify(state.name)} + ': ' + problems.join('; '));
   } catch (e) { console.error('invariant check failed: ' + e.message); }
 
@@ -375,6 +530,10 @@ async function main() {
     // Measure the state you are looking at, in the same drive that shoots it:
     // --probe "return {w: document.querySelector('.dest').scrollWidth}"
     else if (argv[i] === '--probe') probe = argv[++i];
+    // A probe that drives a flow is a script, not a flag: --probe-file takes
+    // the same JS from a file, which is the only way to write more than one
+    // statement of it without fighting the shell.
+    else if (argv[i] === '--probe-file') probe = fs.readFileSync(argv[++i], 'utf8');
     // Any state at any viewport: --size 360x800 is the narrow phone the
     // 390px design has to survive.
     else if (argv[i] === '--size') sizeOverride = argv[++i];

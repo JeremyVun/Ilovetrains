@@ -60,3 +60,98 @@ export function cancel(j) {
   j.cancelled = true;
   return j;
 }
+
+/* ---- the transfer corridor ---------------------------------------------- */
+
+/* Rhodes → Bondi Junction, the six T9 → T4 journeys of
+   tools/fixtures/trip_rhodes_bondijunction.json (captured 2026-09-01), mapped
+   to the api.md shape the server produces. Every timestamp is the fixture's,
+   to the second; the seconds matter, because they are what makes the
+   floor-to-clock-minute rule visible (the last journey's change is 3m18s of
+   wall clock and 4 minutes of printed timetable — the real tight connection on
+   this corridor, with no delay applied to it).
+   Five of the fixture's eleven journeys route via an "On Demand" bus and are
+   excluded server-side (api.md); the six here are what a client sees.
+   The last two are genuinely not realtime-controlled upstream. */
+
+export const TRANSFER_NOW = Date.parse('2026-09-01T09:21:00+10:00');
+export const TRANSFER_DEPARTED_NOW = Date.parse('2026-09-01T09:47:00+10:00');
+
+const TRANSFER_RAW = [
+  { dep: '09:24:18', arrTH: '09:51:36', depTH: '09:58:00', arr: '10:08:00', platform: '2', realtime: true },
+  { dep: '09:39:18', arrTH: '10:06:36', depTH: '10:12:00', arr: '10:22:00', platform: '1', realtime: true },
+  { dep: '09:54:18', arrTH: '10:21:36', depTH: '10:32:00', arr: '10:42:00', platform: '1', realtime: true },
+  { dep: '10:09:18', arrTH: '10:36:36', depTH: '10:42:00', arr: '10:52:00', platform: '2', realtime: true },
+  { dep: '10:24:18', arrTH: '10:51:36', depTH: '11:02:00', arr: '11:12:00', platform: '2', realtime: false },
+  { dep: '10:39:18', arrTH: '11:08:42', depTH: '11:12:00', arr: '11:22:00', platform: '1', realtime: false }
+];
+
+const sydney = (hhmmss) => `2026-09-01T${hhmmss}+10:00`;
+const times = (scheduled, realtime) => ({
+  scheduled: sydney(scheduled),
+  estimated: realtime ? sydney(scheduled) : null
+});
+
+export function transferJourneys() {
+  return TRANSFER_RAW.map((r) => {
+    const legDetail = [
+      {
+        line: { name: 'T9', mode: 'train' },
+        headsign: 'Gordon via Lindfield',
+        from: { id: '213820', name: 'Rhodes Station', platform: 'Platform 1' },
+        to: { id: '200070', name: 'Town Hall Station', platform: 'Platform 3' },
+        departure: times(r.dep, r.realtime),
+        arrival: times(r.arrTH, r.realtime),
+        cancelled: false
+      },
+      {
+        line: { name: 'T4', mode: 'train' },
+        headsign: 'Bondi Junction',
+        from: { id: '200070', name: 'Town Hall Station', platform: 'Platform 5' },
+        to: { id: '200080', name: 'Bondi Junction Station', platform: 'Platform ' + r.platform },
+        departure: times(r.depTH, r.realtime),
+        arrival: times(r.arr, r.realtime),
+        cancelled: false
+      }
+    ];
+    return {
+      departure: { ...legDetail[0].departure, platform: 'Platform 1' },
+      arrival: { ...legDetail[1].arrival },
+      line: { name: 'T9', mode: 'train' },
+      destinationHeadsign: 'Gordon via Lindfield',
+      stopsAway: null,
+      cancelled: false,
+      legs: 2,
+      legDetail
+    };
+  });
+}
+
+export function transferBody(overrides = {}) {
+  return {
+    from: { id: '213820', name: 'Rhodes Station' },
+    to: { id: '200080', name: 'Bondi Junction Station' },
+    generatedAt: overrides.generatedAt || sydney('09:21:00'),
+    journeys: overrides.journeys || transferJourneys()
+  };
+}
+
+/** Push one leg's realtime estimate `minutes` past its timetable, and the
+    journey's own departure with it when it is the first leg. */
+export function delayLeg(journey, index, minutes) {
+  const shift = (iso) => new Date(Date.parse(iso) + minutes * 60000).toISOString();
+  const leg = journey.legDetail[index];
+  leg.departure.estimated = shift(leg.departure.scheduled);
+  leg.arrival.estimated = shift(leg.arrival.scheduled);
+  if (index === 0) journey.departure.estimated = leg.departure.estimated;
+  if (index === journey.legDetail.length - 1) journey.arrival.estimated = leg.arrival.estimated;
+  return journey;
+}
+
+/** Cancel one leg. A journey is cancelled if ANY leg is (api.md); which one
+    is a question only `legDetail` can answer. */
+export function cancelLeg(journey, index) {
+  journey.legDetail[index].cancelled = true;
+  journey.cancelled = true;
+  return journey;
+}

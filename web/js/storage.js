@@ -41,6 +41,15 @@ export function parseDoc(raw) {
   if (v.lastViewed && typeof v.lastViewed.tripId === 'string' && DIRECTIONS.includes(v.lastViewed.direction)) {
     doc.lastViewed = { tripId: v.lastViewed.tripId, direction: v.lastViewed.direction };
   }
+  /* The focused journey (added 2026-09-01). Optional and self-describing, so
+     the migration is the absence of the key: a document written before this
+     shipped simply has no focus. A malformed one is dropped rather than
+     repaired — the strip it would draw is a claim about a train. */
+  const f = v.focus;
+  if (f && typeof f.tripId === 'string' && DIRECTIONS.includes(f.direction)
+      && typeof f.focusedAt === 'string' && f.journey && typeof f.journey === 'object') {
+    doc.focus = { tripId: f.tripId, direction: f.direction, focusedAt: f.focusedAt, journey: f.journey };
+  }
   if (v.cache && typeof v.cache === 'object') {
     for (const [k, entry] of Object.entries(v.cache)) {
       if (entry && typeof entry.fetchedAt === 'string' && entry.body && typeof entry.body === 'object') {
@@ -52,13 +61,15 @@ export function parseDoc(raw) {
 }
 
 export function serializeDoc(doc) {
-  return JSON.stringify({
+  const out = {
     schemaVersion: SCHEMA_VERSION,
     trips: doc.trips,
     history: doc.history,
     lastViewed: doc.lastViewed,
     cache: doc.cache
-  });
+  };
+  if (doc.focus) out.focus = doc.focus;
+  return JSON.stringify(out);
 }
 
 export function cacheKey(fromId, toId) {
@@ -94,6 +105,7 @@ export function removeTrip(doc, tripId) {
     delete next.cache[cacheKey(trip.from.id, trip.to.id)];
     delete next.cache[cacheKey(trip.to.id, trip.from.id)];
   }
+  if (next.focus && next.focus.tripId === tripId) delete next.focus;
   return next;
 }
 

@@ -7,8 +7,9 @@
    cancellation or missing feed can push the sixth service past the fold.
    `rowLines()` is that invariant, written down. */
 
-import { parseIso, clock, minutesUntil, ageLabel } from './time.js';
+import { parseIso, clock, minutesUntil, ageLabel, countdownFigure } from './time.js';
 import { lineColour } from './lines.js';
+import { journeyKey } from './journey.js';
 
 /* 30s refresh cadence plus margin: past this, a countdown is a claim the data
    cannot support (owner ruling 2026-08-31). */
@@ -22,8 +23,9 @@ export const CANCELLED_LEAD_NOTE = (time) => time + ' cancelled · next train';
 
 /* Owner ruling 2026-09-01 (B): past 99 minutes the figure changes unit rather
    than growing a third digit. "187" is arithmetically true and unreadable —
-   the clock time beside it already says 03:53 better than three digits do. */
-export const HOURS_FROM_MIN = 100;
+   the clock time beside it already says 03:53 better than three digits do.
+   The rule itself is `countdownFigure` in time.js, shared with the journey
+   detail view and the focused strip so the three can never disagree. */
 
 export function boardModel(body, nowMs, opts = {}) {
   const staleMs = opts.staleMs ?? STALE_MS;
@@ -71,9 +73,7 @@ export function boardModel(body, nowMs, opts = {}) {
 function figureFor(cancelled, stale, mins) {
   if (cancelled) return '–';
   if (stale) return '';
-  if (mins <= 0) return 'Now';
-  if (mins >= HOURS_FROM_MIN) return Math.round(mins / 60) + 'H';
-  return String(mins);
+  return countdownFigure(mins);
 }
 
 function journeyRow(journey, nowMs, stale, opts) {
@@ -111,6 +111,11 @@ function journeyRow(journey, nowMs, stale, opts) {
 
   return {
     key: (dep.scheduled || dep.estimated) + '|' + lineCode + '|' + (dep.platform || ''),
+    // The identity the detail view and the focus snapshot re-match on
+    // (client-storage.md). The row key above also carries the platform, which
+    // upstream can revise; this one is the pair that cannot move.
+    matchKey: journeyKey(journey),
+    journey,
     first: false,
     // Three characters do not fit the figure column at the board's headline
     // size — measured 129px in an 86px column, which put the hero figure

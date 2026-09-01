@@ -22,6 +22,17 @@ export function minutesUntil(ms, nowMs) {
   return Math.floor(ms / MINUTE) - Math.floor(nowMs / MINUTE);
 }
 
+/** A count of minutes as the ladder prints it (owner ruling 2026-09-01 B):
+    "Now" for the minute a thing happens in, minutes up to 99, rounded hours
+    beyond that — three digits of minutes is arithmetic, and the clock time
+    beside the figure already said it better. Shared by the board's rows, the
+    journey's legs and the focused strip so the three can never disagree. */
+export function countdownFigure(mins) {
+  if (mins <= 0) return 'Now';
+  if (mins >= 100) return Math.round(mins / 60) + 'H';
+  return String(mins);
+}
+
 /** Footer copy, exactly the exemplar's strings (CSS uppercases them). */
 export function ageLabel(seconds, offline) {
   const s = Math.max(0, Math.round(seconds));

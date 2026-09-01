@@ -7,15 +7,31 @@ export function esc(value) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+/* "Central Station" reads as "Central" in a masthead that already says these
+   are departures. The API's names are station names; the head is a place. */
+export function shortName(name) {
+  return String(name || '').replace(/\s+Station$/i, '');
+}
+
 export function mount(root, html) {
   root.innerHTML = html;
 }
 
-/** One delegated click handler per screen, matched on [data-act]. */
+/** One delegated click handler per screen, matched on [data-act].
+    Enter and Space too: the board row and the focused strip are tap targets
+    that are not <button>s (a button cannot contain the row's own headings),
+    so the keyboard has to be handed to them explicitly. */
 export function onAction(root, handler) {
   root.addEventListener('click', (ev) => {
     const el = ev.target.closest('[data-act]');
     if (!el || !root.contains(el)) return;
+    handler(el.dataset.act, el, ev);
+  });
+  root.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    const el = ev.target.closest('[data-act][role="button"]');
+    if (!el || !root.contains(el)) return;
+    ev.preventDefault();
     handler(el.dataset.act, el, ev);
   });
 }

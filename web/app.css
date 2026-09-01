@@ -132,6 +132,9 @@ button { cursor: pointer; }
   text-transform: uppercase; color: var(--ink-3);
 }
 .mast .tools button:active { color: var(--ink); }
+/* One tool per screen may be the action rather than a way out: the detail
+   view's FOCUS THIS TRAIN is set in full ink where BOARD is a label. */
+.mast .tools button.on { color: var(--ink); }
 .mast .rule { height: 2px; background: var(--ink); opacity: .82; }
 .mast .lede {
   margin-top: 12px; font-size: 14px; font-weight: 300; line-height: 1.5;
@@ -278,6 +281,127 @@ button { cursor: pointer; }
 }
 .ftr.offline { color: var(--warn); }
 
+/* ---- journey detail (A1 · Ledger) --------------------------------------- */
+
+/* Ported from docs/backlog/journey-focus/comps/detail.css + a1-ledger.html
+   (the exemplar: comps/shots/a1-ledger-390x844-hero.png). The journey printed
+   in the board's own row grammar: three blocks in the same 86px + 1fr ladder —
+   leg, change, leg. The first leg keeps the board's first-row treatment
+   because it is still the number you came for. The change is made unmissable
+   STRUCTURALLY, not by out-shouting it: bracketed by the masthead's own heavy
+   rule, with its station name at the h1 step. */
+
+.legs {
+  /* The blocks sit tight together under the rule and the page's bottom margin
+     is just margin — a journey with two legs is complete, not truncated, so
+     the board's "distribute rather than leave a hole" rule does not apply.
+     They still have to be REACHABLE: on a short frame with long names the
+     ledger scrolls, the way the board's rows do, rather than running under the
+     closing rule. */
+  flex: 0 1 auto; min-height: 0; padding: 0 22px;
+  display: flex; flex-direction: column;
+  overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+}
+.legs .row { border-bottom: 1px solid var(--rule); flex: none; }
+.legs .row:last-child { border-bottom: 0; }
+
+/* The detail view relaxes the board's three-line invariant on the last line
+   only (owner ruling 2026-09-01): that invariant exists to stop a state change
+   pushing the sixth service past the fold, and a journey has two legs, not
+   six. The longest real headsign on this corridor wraps rather than truncates. */
+.legs .dest { white-space: normal; overflow: visible; }
+
+/* Not flex: a flex row eats the space between "PLATFORM" and its number. */
+.legs .meta { position: relative; padding-right: 34px; white-space: normal; }
+.legs .meta .badge { position: absolute; right: 0; top: 0; color: var(--stem); font-weight: 700; }
+
+/* A leg that is behind you keeps its place in the ladder and loses its figure:
+   the slot empties and holds its height, exactly as the stale board's does,
+   because a countdown to something that has already happened is not a number
+   anyone can use. */
+.legs .row.done .mins { min-height: 66px; }
+.legs .row.first.done .mins { min-height: 87px; }
+.legs .row.done .dep strong, .legs .row.done .dest { color: var(--ink-2); }
+/* ...and the whole ledger dims off old data, the way the board does. */
+.legs.stale .row { opacity: .55; }
+.legs.stale .mins { min-height: 66px; }
+.legs.stale .row.first .mins { min-height: 87px; }
+
+/* The change band. Heavy rule above and below = the masthead rule, reused. */
+.chg { padding-top: 24px; padding-bottom: 25px; }
+.chg { border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink) !important; }
+.chg .mins { font-size: 54px; }
+.chg .mins .prov { color: var(--ink-2); }
+.chg h2 {
+  font-size: 29px; font-weight: 300; letter-spacing: -0.025em; line-height: 1.05;
+  color: var(--ink);
+}
+.chg .meta { margin-top: 10px; padding-right: 0; }
+.chg .meta b { color: var(--ink); }
+.chg .meta .arw { color: var(--ink-3); padding: 0 5px; font-weight: 400; }
+.chg .dest { color: var(--ink-2); }
+.chg .dest del { color: var(--ink-3); }
+/* The tight connection states two times and two windows and makes NO claim
+   about whether you make it (A3, transplanted verbatim). The app has no data
+   that could support such a claim, and a wrong "you'll miss it" is the worst
+   error this screen can make. Corollary: the ARRIVAL figure is never coral —
+   only the change is, because only the change is at risk. */
+.chg .warnline {
+  margin-top: 8px; font-size: 10px; font-weight: 600; letter-spacing: .14em;
+  line-height: 19px; text-transform: uppercase; color: var(--warn);
+}
+.chg.tight .mins, .chg.tight .mins .prov { color: var(--warn); }
+
+/* The journey ends somewhere, and that platform is stated nowhere else. The
+   closing rule answers the masthead's. */
+.tail { margin-top: auto; flex: none; padding: 0 22px; }
+.tail .rule { height: 2px; background: var(--ink); opacity: .82; }
+.tail .line { display: flex; align-items: baseline; gap: 10px; padding: 14px 0 0; }
+.tail .t { font-size: 20px; font-weight: 400; letter-spacing: -0.01em; color: var(--ink); }
+.tail .n { font-size: 14px; font-weight: 300; color: var(--ink-2); min-width: 0;
+           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tail .p { margin-left: auto; flex: none; padding-left: 10px; }
+/* An arrival that is not going to happen is struck, in the board's own idiom. */
+.tail.cx .t { text-decoration: line-through; text-decoration-thickness: 1.5px; color: var(--ink-3); }
+
+/* ---- focused strip (B2 · Footer rail) ----------------------------------- */
+
+/* The focused journey is a board row that has moved to the bottom edge, under
+   the masthead's own heavy rule printed a second time. It sits in thumb reach,
+   it ABSORBS the freshness footer rather than adding to it, and it is loud:
+   the minutes-to-go figure is set at the board's secondary figure size, so
+   "you get there at 10:08, in 47 minutes" is the second thing on the screen
+   after the next departure.
+
+   It is chrome, not a row: the board scrolls UNDER it (owner ruling — a
+   focused board pays for the strip by scrolling, never by hiding a service). */
+.rail {
+  flex: none; padding: 0 22px;
+  border-top: 2px solid var(--ink);
+}
+.rail .r {
+  display: grid; grid-template-columns: 86px 1fr; gap: 0 16px;
+  align-items: start; padding: 16px 0 4px 12px; position: relative;
+}
+/* No colour stem: the heavy rule already says this band is not the board, and
+   a second coloured stem on a screen that already has one on the lead row
+   spends the accent twice. */
+.rail .fig {
+  font-size: 44px; font-weight: 250; letter-spacing: -0.045em; line-height: .84;
+  color: var(--ink); text-align: right; padding-top: 2px;
+}
+.rail .r.wide .fig { font-size: 36px; }
+.rail .fig .prov {
+  display: block; margin-top: 9px; font-size: 10px; font-weight: 600;
+  letter-spacing: .13em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap;
+}
+.rail .fig .unit { font-size: .40em; font-weight: 300; letter-spacing: 0; padding-left: .04em; }
+.rail .dep { font-size: 20px; }
+.rail .meta { margin-top: 9px; }
+.rail .meta b { color: var(--ink-2); }
+.rail .dest { margin-top: 7px; }
+.rail .ftr { padding: 8px 0 max(18px, env(safe-area-inset-bottom, 0px)); }
+
 /* ---- setup, search, trips ---------------------------------------------- */
 
 .sheet {
@@ -353,7 +477,7 @@ button { cursor: pointer; }
    at the full idiom (205px of copy in a 210px column, measured). */
 @media (max-width: 375px) {
   .mast { padding-left: 18px; padding-right: 18px; }
-  .rows, .sheet { padding-left: 18px; padding-right: 18px; }
+  .rows, .sheet, .legs, .tail, .rail { padding-left: 18px; padding-right: 18px; }
   .ftr { padding-left: 18px; padding-right: 18px; }
 }
 
@@ -366,13 +490,15 @@ button { cursor: pointer; }
      an ID and so out-specifies a bare class: `max-width: 100%` was quietly
      beating `max-width: 940px`, and every desktop shot ran the full 1280px
      measure. Verified 2026-09-01 by measuring .rows, not by reading the CSS. */
-  #app > .mast, #app > .rows, #app > .sheet, #app > .ftr {
+  #app > .mast, #app > .rows, #app > .sheet, #app > .ftr,
+  #app > .legs, #app > .tail, #app > .rail {
     max-width: 940px; margin: 0 auto;
   }
+  #app > .tail { margin-top: auto; }
   .mast { padding: 26px 64px 0; }
   .mast h1 { font-size: 36px; }
   .mast .tools { margin-top: 12px; padding-bottom: 12px; }
-  .rows, .sheet { padding: 0 64px; width: 100%; }
+  .rows, .sheet, .legs, .tail, .rail { padding: 0 64px; width: 100%; }
   .row { grid-template-columns: 132px 1fr; padding: 12px 0 13px 20px; }
   .mins { font-size: 58px; }
   .row.first { padding-top: 18px; padding-bottom: 19px; }
