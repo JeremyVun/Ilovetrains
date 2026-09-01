@@ -12,9 +12,10 @@ Full exploration and rejected concepts: `docs/backlog/v1-core-loop/comps/OPTIONS
 
 The language: a printed timetable page. One column measure, one scale ladder,
 letterspaced small-caps labels (10px / 600 / 0.14–0.16em uppercase), a single
-heavy rule under the masthead, hairlines between rows, colour used once per
-screen as accent. System font stack only — no webfont may sit between cold
-open and the answer. Tabular figures for all numerals.
+heavy rule under the masthead, hairlines between rows, colour per the Board v2
+amendment below (originally "once per screen as accent"). System font stack
+only — no webfont may sit between cold open and the answer. Tabular figures
+for all numerals.
 
 Palette (dark, the primary scheme): `#0A0B0D` ground, `#F4F5F7` ink (17.6:1),
 ink-2 at 66% (~8:1), ink-3 at 46% (labels only), `#FF7A5C` coral for
@@ -78,6 +79,78 @@ the footer, MIN TO GO figure, in thumb reach). Full exploration:
 - Motion: figures count down in place; a departed service dissolves and the
   list closes upward (~240ms); the freshness dot is the only always-live
   element. Rows never reflow.
+
+## Board v2 verdict (owner, 2026-09-01/02) — new exemplars
+
+Exemplars, binding for the board, the home screen and the directions header.
+Build against these images; judge every later screen side by side with them.
+Full exploration, all rejected directions and the round-by-round owner rulings:
+`docs/backlog/board-v2/DESIGN.md` and `docs/backlog/board-v2/comps-final/` (round 1 exploration: `…/comps/`).
+
+- **Board:** `docs/backlog/board-v2/comps-final/shots/board-390x844-hero.png`
+  (+ `-long`, `-past`, `-deep`, `-delayed`, `-cancelled`, `-landing`, the
+  412×732 pair and `-hero-light`).
+- **Home:** `docs/backlog/board-v2/comps-final/shots/home-390x844-out.png` is the resting state;
+  `…/shots/home-390x844-change.png` is the directions hero.
+- **The state ladder:** `home-390x844-{before,leave,board,change,final,
+  arrive,done,tight,cxl,back,nofix}.png`.
+
+What the exemplars make binding, beyond the amendment below:
+
+- **The row's three facts in one area** — minutes (unit welded to the
+  numeral), platform, line colour — with departure station/time and arrival
+  station/time reading as two scanning groups. Rows rank by departure.
+- **The journey bar is a time axis**: 0% departure, 100% arrival, every mark a
+  percentage of that journey's own minutes. The change is drawn as a real gap,
+  bracketed by the alight numeral in leg 1's colour and the boarding numeral
+  in leg 2's colour. Measured deviation from the true ratio is **0.0px** and a
+  build must hold that; there is no minimum gap width (owner ruling — the true
+  scale ships first).
+- **Six whole services at 390×844 AND 412×732, in every state.** Row height is
+  a fraction of the scroller, never a pixel constant; past and future rows are
+  identical in height at any given width (118.7px at 390×844, 100.0px at
+  412×732). A frozen pixel row height is what broke this once and it is the
+  same defect recorded under "the frame does not get to eat a service".
+- **Past rows are future rows, dimmed** — same grammar, figure counting up,
+  `AGO`. Dimming is in type colour, never container opacity.
+- **No "on time" verb.** The provenance slot prints only exceptions:
+  `SCHEDULED`, `CANCELLED`, `n MIN LATE`, `DEPARTING`, `TIMETABLE ONLY`, and
+  the directions words `TO CHANGE` / `TO GO` / `AGO` (owner ruling, 2026-09-02).
+  The slot keeps its reserved height so nothing reflows.
+- **Line codes stay deleted from board rows**; they return on home's saved-trip
+  rows as coloured `T` badges, alongside the stacked vertical colour lines
+  (owner: "why not both?").
+- **The boarding platform cap leaves the bar once you have boarded**, and the
+  bar takes the full measure — a `PLATFORM 1` cap beside an instruction reading
+  `Platform 5` is the same ambiguity the round exists to kill.
+- **The B2 focus strip is deleted** (owner ruling 2026-09-02). Its reason —
+  "once you are on the train the only copy of it left is the one in
+  localStorage" — stopped being true when the board gained past departures.
+  The home header carries the tracked trip instead.
+- **The progress marker is continuous** (owner ruling 2026-09-02), driven by
+  timetable and live estimates, never by continuous location.
+
+## Board v2 amendment (owner ruling 2026-09-01, comps round 2)
+
+Both colour rules are amended — the owner's playtest complaint ("the colour
+coding for different lines is not visible enough") cannot be answered under
+them, measured across four comp directions:
+
+- **"Colour used once per screen as accent" → "Colour is the line's; it
+  appears once per service, and it may be filled."** On a single-trip board
+  the device reads as identity ("this board is the orange line"), not as a
+  per-row diff; it genuinely differentiates only at a change of trains and in
+  the trips list. A multi-leg journey's colour device is split by leg **in
+  ride order and to scale with the real leg durations** (owner: "20% one
+  line, 50% one line, 30% another").
+- **Filled shapes are permitted for the line-colour device** (pill, rail,
+  roundel). Knocked-out ink on a fill is measured, not assumed: code text on
+  a fill is set ≥14px/700 (large-text threshold, 3:1 — every line clears it,
+  including M1 at 4.35:1, so no per-line darkened variant is needed for
+  chips); on paper the fill's ink is the ground for every line. The light
+  palette's "darkened per-line variants, not a filled chip" bullet below is
+  superseded to that extent — the darkened values remain binding wherever a
+  line colour is used as *text*.
 
 ## Owner rulings, 2026-09-01
 

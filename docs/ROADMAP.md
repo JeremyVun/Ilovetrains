@@ -25,3 +25,12 @@ numbers: warm cached paint 12ms, live data 7ms (edge cache).
 - Disruption/trackwork awareness (alerts surfaced on saved trips)
 - Geolocation-assisted trip prediction
 - Home-screen widgets / native wrapper
+- **Ride history as a stat** (owner idea 2026-09-01): with a native wrapper
+  and coarse background location, count actual rides and print it in the
+  saved-trip row's meta, beside the "last ridden Friday" fact that is already
+  there — "you rode this 4 times this week". Honesty constraint carried from
+  the board's two-register rule: count only what can actually be observed. A
+  count inferred from app opens is a count of *looks*, not rides, and must be
+  named as whatever it really measures — a rider who took the train twice and
+  is told they took it four times has been told something false about their
+  own week. Needs ride detection first; the PWA cannot observe it today.

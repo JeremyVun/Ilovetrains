@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>Round 6 — the geometry corrections, and the focused trip as directions</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0A0B0D; color: #F4F5F7;
+    font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  header { padding: 34px 34px 8px; max-width: 980px; }
+  h1 { font-size: 26px; font-weight: 300; letter-spacing: -.02em; margin: 0 0 12px; }
+  h2 { font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase;
+       color: #F4F5F7; margin: 52px 0 4px; padding: 0 34px; }
+  h3 { font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase;
+       color: rgba(244,245,247,.46); margin: 28px 0 0; padding: 0 34px; }
+  p  { color: rgba(244,245,247,.72); margin: 0 0 8px; max-width: 84ch; }
+  p.note { padding: 0 34px; }
+  b { color: #F4F5F7; }
+  .row { display: flex; gap: 18px; overflow-x: auto; padding: 14px 34px 8px; align-items: flex-start; }
+  figure { margin: 0; flex: none; width: 250px; }
+  figure img { width: 250px; display: block; border: 1px solid rgba(244,245,247,.16); }
+  figure.z { width: 430px; } figure.z img { width: 430px; }
+  figure.zz { width: 640px; } figure.zz img { width: 640px; }
+  figcaption { font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+    color: rgba(244,245,247,.46); padding-top: 8px; line-height: 1.6; }
+  figcaption b { color: #F4F5F7; font-weight: 600; }
+  em { font-style: normal; color: #FF7A5C; }
+  .ask { border-left: 2px solid #FF7A5C; padding: 2px 0 2px 14px; margin: 12px 34px 4px; max-width: 82ch; }
+  .ask p { color: #F4F5F7; }
+  table { border-collapse: collapse; margin: 10px 34px 4px; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 16px 6px 0; border-bottom: 1px solid rgba(244,245,247,.10);
+    color: rgba(244,245,247,.72); vertical-align: top; }
+  th { font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: #F4F5F7; }
+  td.k { color: #F4F5F7; white-space: nowrap; }
+  code { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: #F4F5F7; }
+</style>
+</head><body>
+
+<header>
+  <h1>Round 6 &mdash; your seven corrections, and the focused trip as a directions object</h1>
+  <p>Two pieces of work. <b>Part 1</b> is your correction list, every item measured
+  before and after; nothing you did not name has moved. <b>Part 2</b> is the new
+  one: the smart header stops answering &ldquo;when is the next train&rdquo; and
+  starts answering &ldquo;what do I do next, and where am I&rdquo;.</p>
+  <p>Every clock time, platform, line and headsign is still read out of the repo's
+  captured fixtures. The frames that are not journeys are labelled where they
+  appear &mdash; <b>D6</b> two-digit change platforms (a measurement), <b>D7</b>
+  tight change, <b>D8</b> cancelled, <b>D1</b> the evening reversal.</p>
+</header>
+
+<div class="ask">
+  <p><b>THE THREE THINGS TO JUDGE.</b> (1) Is the transfer gap now honestly to
+  scale &mdash; block&nbsp;2, at 4&times;. (2) Does the header tell you what to do
+  &mdash; the ladder. (3) Does the focus strip survive &mdash; the pair near the
+  bottom, where my recommendation is that it does not.</p>
+</div>
+
+<!-- ================================================================= -->
+<h2>Part 1 &middot; corrections 1&ndash;5 &nbsp;the board, before and after</h2>
+<p class="note">Left is the frame you were reacting to. Right is the same
+scenario now. Four corrections are in this one pair: the gap to scale, the
+figure column 8% narrower, the ink starting on the page margin, and one row
+height for past and future alike. T1 is deleted &mdash; there is one board file
+and one home file in the workshop now.</p>
+<div class="row">
+  <figure><img src="calibration-board-t2.png"><figcaption><b>Before</b> &mdash; figure track 88px, right-aligned, so the ink starts 64px in on a <code>3min</code> row and 31px in on <code>78min</code>. Gap drawn 15px of a 134px bar.</figcaption></figure>
+  <figure><img src="shots/board-390x844-hero.png"><figcaption><b>After</b> &mdash; track 81px, left-aligned: <code>inkL 22 &middot; inkR 22 &middot; even</code>. Bar 141px, gap 22.4px. Six whole services.</figcaption></figure>
+  <figure><img src="shots/board-390x844-past.png"><figcaption><b>Correction 5</b> &mdash; past and future rows, both <b>118.7px</b>. They were 98 against 128 in this exact frame. The height is one sixth of the frame below the NOW line, read off the scroller, so the two halves cannot drift apart again &mdash; and on the 412&times;732 Android both halves are 100px.</figcaption></figure>
+  <figure><img src="shots/board-390x844-landing.png"><figcaption>Still lands at now, still never opens inside the past. <code>scroll 475/475</code>.</figcaption></figure>
+</div>
+
+<h2>Part 1 &middot; correction 2 &nbsp;the gap, accurately to scale &mdash; at 4&times;</h2>
+<p class="note">You asked for &ldquo;great care for the head and tail to be
+correctly positioned so that the transfer line gap shows accurately scaled&rdquo;.
+The old bar could not do it, and the reason was arithmetic rather than care: the
+two platform numerals were laid out as <b>flex siblings</b>, so they ate about
+40px of the bar before a single minute was drawn, and the runs then shared what
+was left over. The <em>ratio</em> 27&nbsp;:&nbsp;7&nbsp;:&nbsp;10 was right; the
+<em>positions</em> were not &mdash; the end of leg&nbsp;1 was drawn 24px away from
+where it happens, and the gap came out 30% narrow.</p>
+<p class="note">The bar is now a <b>time axis</b>: 0% is departure, 100% is
+arrival, and every mark on it is a percentage of the journey's own minutes.
+The numerals stopped displacing the runs and started <b>overlaying</b> them
+&mdash; the alight numeral's right edge pinned to the end of leg&nbsp;1 (the tail
+of the red line), the boarding numeral's left edge to the start of leg&nbsp;2
+(the head of the blue one). What is left between them is the dwell, at its true
+share. <b>No minimum gap width</b>, as you ruled.</p>
+<div class="row">
+  <figure class="z"><img src="shots/zoom-board-bar.png"><figcaption><b>7-minute change</b>, 4&times;. Bar 141px. Drawn <code>86.3 / 22.4 / 32.0</code> against wanted <code>86.3 / 22.4 / 32.0</code> &mdash; <b>deviation 0 / 0 / 0</b>. Tail's right edge 86.3 (want 86.3); head's left edge 108.7 (want 108.7).</figcaption></figure>
+  <figure class="z"><img src="shots/zoom-board-tight.png"><figcaption><b>2-minute change</b> (D7), same bar, same scale. Visible gap <b>6.4px</b>. That is what two minutes is worth here, and nothing is padding it.</figcaption></figure>
+</div>
+<p class="note">Deviation is <b>0.0px on every scenario at every width</b> &mdash;
+390, 412, 360, the board row, the home header at full measure, and the focus
+strip. It is checked by arithmetic rather than by eye: the drawing carries the
+minutes it claims to obey in the page itself, and <code>measure.js</code>
+recomputes the picture from them.</p>
+
+<h2>Part 1 &middot; corrections 3 and 4 &nbsp;the figure column, and the two page edges</h2>
+<div class="row">
+  <figure class="zz"><img src="shots/zoom-board-left.png"><figcaption><b>Correction 4</b>, 4&times;. Your page padding was already even &mdash; every box measured 22&#124;22. What was uneven was the <b>ink</b>: right-aligned, the leftmost mark on the page moved with the countdown, 64px in on <code>3min</code> and 31px on <code>78min</code>, against a hard 22px on the right. Left-aligned, the figures make a column against the page edge, like <code>Rhodes</code> and <code>NOW</code> above them.</figcaption></figure>
+</div>
+<p class="note"><b>Correction 3:</b> figure track <b>88 &rarr; 81px, 8% back</b>,
+the middle of the 5&ndash;10% you asked for. The track is still sized to the
+widest <em>legal</em> lockup, never to the hero value: <code>78min</code> measures
+78 of 81 (it was 81 of 88, which is a coincidence rather than a fit &mdash; the
+<code>min</code> unit was trimmed to buy real slack), <code>12H</code> 71 of 81,
+<code>Now</code> 72 of 81. The seven pixels went straight into the journey line:
+<b>bar 134 &rarr; 141px</b>, which is where the colour device and the gap are drawn.</p>
+
+<h2>Part 1 &middot; corrections 6 and 7 &nbsp;saved trips</h2>
+<p class="note">&ldquo;Why not both?&rdquo; &mdash; so both. They are not the same
+statement: the <b>stacked rules</b> are a shape in the margin that says how many
+trains a trip is and which colours, read without focusing; the <b>badges</b> are a
+name inside the sentence a human actually reads, at the end each one belongs to.
+This re-admits the line code on home only; board rows keep it deleted.</p>
+<div class="row">
+  <figure class="zz"><img src="shots/zoom-triprow.png"><figcaption>4&times;. Stacked rules at the left edge, coloured <code>T</code> badge at each end of the name. Knocked-out ink on the fill at 14px/700, the measured floor.</figcaption></figure>
+</div>
+<p class="note"><b>Correction 7:</b> the rows were <b>elastic between 74 and 132px</b>
+and three trips took the whole scroller &mdash; a row three times its own content
+reads as a section, not a control. They are <b>68px fixed</b> now: 45px of content
+in 25px of air, half again over the 44px tap floor, and the probe checks it on
+every frame. <b>The cost, and it is yours to accept or reject:</b> three trips now
+leave <b>228px of empty page</b> above the thumb bar at 390&times;844. The only way
+to fill it is the elastic row you just asked me to delete.</p>
+
+<!-- ================================================================= -->
+<h2>Part 2 &middot; the state ladder &mdash; one journey, read at seven times of day</h2>
+<p class="note">Rhodes 09:24 &rarr; Town Hall 09:51, change 7 minutes, Town Hall
+09:58 &rarr; Bondi Junction 10:08. The only thing that changes between the seven
+tracking frames is the clock.</p>
+<table>
+  <tr><th>state</th><th>clock</th><th>figure</th><th>word</th><th>the sentence</th><th>the receipt</th></tr>
+  <tr><td class="k">before you leave</td><td class="k">09:09</td><td class="k">15 min</td><td class="k">&mdash;</td><td>Gordon via Lindfield</td><td>none &mdash; standing at Rhodes and being shown the Rhodes trip explains itself</td></tr>
+  <tr><td class="k">leave now</td><td class="k">09:20</td><td class="k">4 min</td><td class="k">&mdash;</td><td class="k">Leave now for Platform 1</td><td class="k">You&rsquo;re 120 m from Rhodes.</td></tr>
+  <tr><td class="k">on board</td><td class="k">09:33</td><td class="k">18 min</td><td class="k">TO CHANGE</td><td class="k">Off at Town Hall &middot; Platform 3</td><td>none</td></tr>
+  <tr><td class="k">change here</td><td class="k">09:53</td><td class="k">5 min</td><td class="k">TO CHANGE</td><td class="k">Platform 5 &middot; 09:58 to Bondi Junction</td><td>none</td></tr>
+  <tr><td class="k">final leg</td><td class="k">10:01</td><td class="k">7 min</td><td class="k">TO GO</td><td class="k">Off at Bondi Junction &middot; Platform 2</td><td>none</td></tr>
+  <tr><td class="k">arriving</td><td class="k">10:06</td><td class="k">2 min</td><td class="k">TO GO</td><td class="k">Off at Bondi Junction &middot; Platform 2</td><td>none</td></tr>
+  <tr><td class="k">arrived</td><td class="k">10:11</td><td class="k">3 min</td><td class="k">AGO</td><td class="k">You arrived at Bondi Junction.</td><td class="k">TRIP OVER &mdash; You rode out at 09:24, and you&rsquo;re at Bondi Junction now. [Show the way back] [Not now]</td></tr>
+  <tr><td class="k"><em>tight change</em></td><td class="k">09:47</td><td class="k">9 min</td><td class="k"><em>TO CHANGE</em></td><td class="k"><em>TIGHT CHANGE &middot; 2 MIN &middot; PLATFORM 5</em></td><td class="k">Printed change was 7 min.</td></tr>
+  <tr><td class="k"><em>cancelled</em></td><td class="k">09:21</td><td class="k">18 min</td><td class="k">&mdash;</td><td class="k"><em>09:24 CANCELLED &middot; NEXT TRAIN</em></td><td>none &mdash; the coral line is the statement</td></tr>
+  <tr><td class="k">the reversal</td><td class="k">18:12</td><td class="k">12 min</td><td class="k">&mdash;</td><td>via Town Hall</td><td class="k">You rode out at 09:24. Here&rsquo;s the way back.</td></tr>
+  <tr><td class="k">no location fix</td><td class="k">09:09</td><td class="k">15 min</td><td class="k">&mdash;</td><td>Gordon via Lindfield</td><td class="k">You ride this most weekday mornings.</td></tr>
+</table>
+<p class="note"><b>The receipt scales with the leap, and proximity moved into it.</b>
+The top strip used to claim <code>NEAREST &middot; RHODES &middot; 120 M</code> on
+every frame whether it earned it or not. It is printed now in exactly one state
+&mdash; the one where the app tells you to start walking &mdash; because that is
+the only state that spends the fix. The strip's left half instead names
+<b>what is being tracked</b>, with a chevron: that is the switch, and what it
+opens is the list already on screen a thumb below it, whose label now reads
+<code>TRACK ANOTHER TRIP</code>.</p>
+
+<h2>Part 2 &middot; the ladder, in trip order</h2>
+<div class="row">
+  <figure><img src="shots/home-390x844-before.png"><figcaption><b>1 &middot; before you leave</b> &mdash; 09:09. Fifteen minutes: nothing to do, so nothing is said but which train it is. The marker is grey and has not started.</figcaption></figure>
+  <figure><img src="shots/home-390x844-leave.png"><figcaption><b>2 &middot; leave now</b> &mdash; 09:20. The instruction takes the page's ink; the fix that justifies it is printed under it.</figcaption></figure>
+  <figure><img src="shots/home-390x844-board.png"><figcaption><b>3 &middot; on board</b> &mdash; 09:33. The figure counts to the next thing you must DO &mdash; getting off at 09:51, not the connecting train at 09:58. <code>Off at Town Hall &middot; Platform 3</code>, never &ldquo;you are on board&rdquo;.</figcaption></figure>
+  <figure><img src="shots/home-390x844-change.png"><figcaption><b>4 &middot; change here</b> &mdash; 09:53. <b>The state the whole device exists for.</b> The marker is standing in the gap, and the part of the wait behind it is already spent.</figcaption></figure>
+  <figure><img src="shots/home-390x844-final.png"><figcaption><b>5 &middot; final leg</b> &mdash; 10:01. Same sentence pattern as the change: off at X, platform N.</figcaption></figure>
+  <figure><img src="shots/home-390x844-arrive.png"><figcaption><b>6 &middot; arriving</b> &mdash; 10:06. Two minutes; the bar is nearly all spent.</figcaption></figure>
+  <figure><img src="shots/home-390x844-done.png"><figcaption><b>7 &middot; arrived</b> &mdash; 10:11. Marker done, whole journey greyed, and the handoff in the device this page already owns: evidence, then a verb, printed in place.</figcaption></figure>
+</div>
+<h3>the two exceptions the logic already models</h3>
+<div class="row">
+  <figure><img src="shots/home-390x844-tight.png"><figcaption><b>Tight change</b> (D7) &mdash; the warning takes the line whole, which is the cancelled lead's own precedent, and <code>PRINTED CHANGE WAS 7 MIN</code> goes underneath. The 2-minute gap is 15.7px of a 346px bar.</figcaption></figure>
+  <figure><img src="shots/home-390x844-cxl.png"><figcaption><b>Cancelled</b> (D8) &mdash; never silently skipped. The header answers with the 09:39 and names the one it dropped, at the full label idiom.</figcaption></figure>
+  <figure><img src="shots/home-390x844-wide.png"><figcaption><b>Two-digit platforms</b> (D6) &mdash; a measurement, not a journey. Both numerals fit, the gap is untouched, nothing is clamped.</figcaption></figure>
+</div>
+<h3>the receipt states, and the rest of the sweep</h3>
+<div class="row">
+  <figure><img src="shots/home-390x844-back.png"><figcaption><b>The reversal</b> &mdash; the biggest leap, the longest receipt. Note the top strip: <code>TRACKING &middot; BONDI JN &rarr; RHODES</code> is the disambiguation this state has always needed.</figcaption></figure>
+  <figure><img src="shots/home-390x844-nofix.png"><figcaption><b>No fix</b> &mdash; degrades silently to time + history, and says which.</figcaption></figure>
+  <figure><img src="shots/home-390x844-moved.png"><figcaption><b>Home may have moved</b> &mdash; unchanged.</figcaption></figure>
+  <figure><img src="shots/home-390x844-ask.png"><figcaption><b>The permission ask</b> &mdash; unchanged.</figcaption></figure>
+  <figure><img src="shots/home-390x844-many.png"><figcaption><b>Five trips</b>, mid-journey. Switching stays one tap and no scroll.</figcaption></figure>
+  <figure><img src="shots/home-390x844-add.png"><figcaption><b>New trip</b> &mdash; unchanged.</figcaption></figure>
+  <figure><img src="shots/home-390x844-save.png"><figcaption><b>Both stations chosen</b> &mdash; unchanged.</figcaption></figure>
+</div>
+
+<h2>Part 2 &middot; the marker, at 4&times;</h2>
+<p class="note">You asked for &ldquo;some nice progress icon on the line&rdquo;. It
+is made of the two things this system already owns and nothing else: a <b>notch</b>
+cut through the filled bar in the page's own ground, with a 2px core of the line
+you are on, and a small filled <b>wedge</b> above it. A wedge over a rule is a
+printed index mark &mdash; a ruler's cursor. A circle on a route would be a map,
+which this is not.</p>
+<p class="note">The part of the journey behind you is <b>dimmed</b>, which is not a
+new idea either: it is your own ruling that past rows are future rows dimmed,
+applied at the scale of one journey. The marker is grey at rest at both ends and
+takes the line's colour in motion &mdash; in the dwell it wears the colour of the
+line it is about to board, because a directions object points forward.</p>
+<div class="row">
+  <figure class="z"><img src="shots/zoom-bar-before.png"><figcaption><b>At rest</b> &mdash; grey, at zero, against the boarding platform. Nothing has been travelled and the marker says so.</figcaption></figure>
+  <figure class="z"><img src="shots/zoom-bar-board.png"><figcaption><b>Riding leg 1</b> &mdash; a red core in a red run, with the minutes behind it dimmed. The cap is gone: you have boarded.</figcaption></figure>
+  <figure class="z"><img src="shots/zoom-bar-change.png"><figcaption><b>In the gap</b> &mdash; blue, because blue is what you are about to board. The spent part of the wait is dimmed behind it.</figcaption></figure>
+  <figure class="z"><img src="shots/zoom-bar-final.png"><figcaption><b>Just past the numeral it passed.</b> The wedge lives entirely above the platform boxes and the notch paints under them, so a numeral is never bitten into. Measured on every frame.</figcaption></figure>
+  <figure class="z"><img src="shots/zoom-bar-done.png"><figcaption><b>Done</b> &mdash; grey again, at 100%, the whole journey spent.</figcaption></figure>
+  <figure class="z"><img src="shots/zoom-bar-wide.png"><figcaption><b>Two-digit stress</b> (D6), in the gap.</figcaption></figure>
+  <figure class="z"><img src="shots/zoom-bar-tight-light.png"><figcaption><b>Tight change, on paper.</b> The 2-minute gap is a coral sliver between the boxes. <em>Flagged:</em> a dimmed T9 red on paper is pink, which STYLES warns can read as a different line &mdash; here the two halves are adjacent on one bar, so it reads as progress. Your call.</figcaption></figure>
+</div>
+
+<h2>Part 2 &middot; the other sizes, and light</h2>
+<div class="row">
+  <figure><img src="shots/home-412x732-change.png"><figcaption>412&times;732 &mdash; the change.</figcaption></figure>
+  <figure><img src="shots/home-412x732-many.png"><figcaption>412&times;732, five trips. The header gives air to the list and holds at its 190px floor.</figcaption></figure>
+  <figure><img src="shots/home-390x844-change-light.png"><figcaption>Light &mdash; the change.</figcaption></figure>
+  <figure><img src="shots/home-390x844-before-light.png"><figcaption>Light &mdash; before you leave.</figcaption></figure>
+  <figure><img src="shots/home-390x844-tight-light.png"><figcaption>Light &mdash; tight change.</figcaption></figure>
+  <figure><img src="shots/board-390x844-hero-light.png"><figcaption>Light &mdash; the corrected board.</figcaption></figure>
+  <figure><img src="shots/board-412x732-hero.png"><figcaption>412&times;732 &mdash; the board. <b>Six whole services</b>, nothing scrolling, rows 100px. This is the Android you lost the sixth train on; the row is a sixth of the frame here as it is a sixth of the frame at 390&times;844.</figcaption></figure>
+</div>
+
+<!-- ================================================================= -->
+<h2>The structural question &middot; does the focus strip survive?</h2>
+<p class="note">Both frames are 09:33: you are nine minutes into the 09:24 and you
+have the board open. Same data, same clock, one difference.</p>
+<div class="row">
+  <figure><img src="shots/board-390x844-riding.png"><figcaption><b>With the strip</b> &mdash; <b>5</b> whole services, rows <b>98px</b>. The strip takes its 124px out of every row rather than off the end of the board.</figcaption></figure>
+  <figure><img src="shots/board-nostrip-390x844-riding.png"><figcaption><b>Without</b> &mdash; <b>5</b> whole services, rows <b>118.7px</b>. Same count, a fifth more air in each row. And the 09:24 you are on is still on the board, dimmed, above the NOW rule, saying <code>9min AGO</code>.</figcaption></figure>
+  <figure><img src="shots/board-390x844-focused.png"><figcaption>Standing at Rhodes, 09:21, with the strip: <b>6</b> at 98px.</figcaption></figure>
+  <figure><img src="shots/board-nostrip-390x844-focused.png"><figcaption>Same moment without: <b>6</b> at 118.7px &mdash; the whole board, at full height.</figcaption></figure>
+  <figure><img src="shots/board-412x732-riding.png"><figcaption>412&times;732 with: <b>5</b>, rows down to <b>79px</b> &mdash; three pixels above the row's own ink. This is where the strip actually hurts.</figcaption></figure>
+  <figure><img src="shots/board-nostrip-412x732-riding.png"><figcaption>412&times;732 without: <b>5</b>, rows 100px.</figcaption></figure>
+</div>
+<div class="ask">
+  <p><b>MY RECOMMENDATION: DELETE IT.</b> The strip's original reason is written in
+  the shipped code &mdash; &ldquo;once you are on the train the only copy of it left
+  is the one in localStorage&rdquo;. <b>Board v2 made that untrue.</b> The board now
+  keeps past departures, so your train is still there, above the NOW rule, dimmed.
+  The strip's remaining content is the home header's content word for word, and the
+  price is measured &mdash; though the row height correction has changed what the
+  price is. It no longer costs you a service: rows are a sixth of whatever frame
+  is left, so six still fit under the strip. It costs <b>21px out of every row on
+  the board</b> &mdash; 118.7 down to 98 at 390&times;844, and 100 down to
+  <b>79</b> on the 412&times;732 Android, three pixels clear of the row's own ink
+  and the tightest the board gets anywhere in this workshop.</p>
+  <p><b>What the board loses, honestly.</b> It stops saying <em>which</em> departed
+  service is yours &mdash; the <code>9min AGO</code> row looks like any other row
+  that has run &mdash; and it stops carrying the instruction and the marker while
+  you are looking at it, which is one tap back to home. If you want the board to
+  know, the cheapest honest mark is the tracked row's hairline promoted to the
+  heavy rule the NOW anchor already uses. I have not comped that; say the word.</p>
+</div>
+
+<h2>What I would like ruled</h2>
+<p class="note">1. <b>The strip.</b> Delete, or keep and pay 21px of every row on the board for
+it.<br>
+2. <b>228px of empty page</b> under three tight trip rows &mdash; accept, or give
+some of it back to the rows.<br>
+3. <b>The boarding platform cap disappears once you have boarded.</b> A
+<code>PLATFORM 1</code> cap beside an instruction reading <code>Platform 5</code>
+is the same ambiguity you complained about with the minutes figure, so the cap is
+printed until you board and then the bar takes the whole page. It is not lost
+&mdash; it is in the journey detail view.<br>
+4. <b>The word under the figure.</b> <code>TO CHANGE</code> and <code>AGO</code> you
+have already ruled. <code>TO GO</code> is the shipped strip's own
+<code>47min to go</code> moved under the figure rather than beside it &mdash; not a
+new word, but say if you want <code>MIN TO GO</code> spelled out under a numeral
+that is already wearing <code>min</code>.<br>
+5. <b>The line code returns on home</b> (correction 6) and stays deleted on the
+board. Confirming, since it amends a rule you set.</p>
+
+</body></html>
