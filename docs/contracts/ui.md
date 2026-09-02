@@ -216,6 +216,10 @@ the same change as this contract, and git keeps the history.
 - Smart home and directions: the `home-390x844-*.png` state family
   (`before`, `change`, `final`, `tight`, `cxl`, `back`, `before-light`) and
   `home-412x732-change.png`.
+- Journey detail: `detail-390x844-hero.png` plus its `tight`, `cancelled`,
+  `long`, `hero-light` and `412x732` variants. These are shots of the built
+  screen (`tools/shoot-states.js detail-*`), which ported the A1 Ledger
+  verdict of 2026-09-01; the round's comps were closed out with their folder.
 
 Visual changes are compared side-by-side with the relevant calibration asset
 and verified in the real client. Use `tools/shoot-states.js` for web geometry

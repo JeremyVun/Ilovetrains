@@ -105,6 +105,9 @@ ports mechanical:
   generator, seeded fixture data, the standard frames and schemes, the
   measured probes for tap targets, scroll landing and axis geometry) so a
   round is a directory of HTML plus a one-line shoot, not a copied `shoot.js`.
+  Start from the last round's workshop, which git keeps at commit `91aadd9`
+  under `docs/backlog/board-v2/comps-final/` (`shoot.js`, `measure.js`,
+  `hmeasure.js`, `base.css`, `data.js`, `index.html`).
 - Comps built from the live `web/app.css` and `tools/fixtures/` by
   reference, never by hand-copy, so a comp cannot drift from the product's
   language. Instrument traps documented once (`tools/README.md`).
