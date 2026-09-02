@@ -16,7 +16,10 @@ location and focused journeys stay on the device.
 - `docs/contracts/client-storage.md` — binding persisted client state,
   prediction, focus and home inference.
 - `docs/contracts/ui.md` — binding client behavior, visual language and
-  calibration exemplars.
+  calibration rules.
+- `assets/comps/latest/` — the authoritative comps: the current calibration
+  exemplar frames every screen is judged against. Replaced, never
+  accumulated, when an owner verdict changes a design.
 - `docs/ROADMAP.md` — work queue and candidate product directions.
 - `docs/references/tfnsw-open-data.md` — upstream observations. Resolve any
   **[verify]** item with a correctly invoked live probe before relying on it.
@@ -37,6 +40,8 @@ references, and delete the entire folder. Git retains any history.
 - `internal/cache/` — TTL cache, single-flight and stale-on-error behavior.
 - `internal/tfnsw/` — TfNSW client, upstream types and response mapping.
 - `web/` — dependency-free vanilla ES-module PWA, service worker and tests.
+- `assets/` — durable media; `assets/comps/latest/` is the only comps
+  location.
 - `tools/` — TfNSW probes, captured fixtures and browser verification tools.
 - `Dockerfile` and `docker-bake.hcl` — the production image build.
 - `../projects/stacks/ilovetrains/` — production compose/config in the infra

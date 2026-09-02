@@ -147,14 +147,16 @@ moves through are binding in `docs/contracts/ui.md`.
   degrades silently.
 - Dark is the primary scheme; light is derived by measurement and shipped.
 
-Exact geometry and the driven flows are recorded in
-`docs/backlog/board-v2/VERIFICATION.md`.
+The measured geometry that resulted is recorded as invariants in
+`docs/contracts/ui.md`, and the calibration exemplars are the frames in
+`assets/comps/latest/`.
 
 ## Design authority
 
-`docs/contracts/ui.md` is authoritative for current UI behavior and names the
-calibration assets for the board, home and directions header. Build against
-the images and judge every affected screen side-by-side with them.
+`docs/contracts/ui.md` is authoritative for current UI behavior. The
+authoritative comps are always at `assets/comps/latest/`: the current
+calibration exemplars for the board, home and directions header. Build
+against those images and judge every affected screen side-by-side with them.
 
 It is authoritative, not final: it should be iterated on wherever an
 improvement is believed. The way to iterate is another comps round (below),
@@ -165,9 +167,10 @@ the chat.
 ## How design work is done: comp boards
 
 The endorsed way to change how the app looks or behaves on screen is the
-comps process that produced board v2 (`docs/backlog/board-v2/DESIGN.md` is
-the worked example, six rounds from playtest complaints to a locked design).
-The `design-comps` skill carries the full method; the shape is:
+comps process that produced board v2: six rounds from verbatim playtest
+complaints to a locked design, preserved in git history under
+`docs/backlog/board-v2/` (deleted at close, 2026-09-02). The `design-comps`
+skill carries the full method; the shape is:
 
 1. The owner's complaints or intents, near-verbatim, are the spec.
 2. Three to five genuinely divergent throwaway HTML comps in `/tmp`, built
@@ -178,7 +181,8 @@ The `design-comps` skill carries the full method; the shape is:
 3. A contact sheet the owner opens in a browser, with a recommendation and
    an honest "why this might be wrong" per direction.
 4. Owner verdict → the winner becomes the calibration exemplar → iterate on
-   it, stealing the best organ of each loser → amend `docs/contracts/ui.md`.
+   it, stealing the best organ of each loser → amend `docs/contracts/ui.md`
+   and replace the frames in `assets/comps/latest/` in the same change.
 5. Only then a build brief, written against the exemplar image.
 6. After implementation and verification, migrate every surviving contract,
    seam and current calibration asset out of `docs/backlog/<round>/`, update

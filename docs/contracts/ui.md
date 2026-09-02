@@ -51,7 +51,8 @@ substitutes for going back.
 
 - The smart header uses the same information grammar as a board row, promoted
   through scale and spacing: origin above departure time, destination above
-  arrival time, with the journey time axis beneath.
+  arrival time, with the journey time axis beneath. Both station names share
+  one top edge and both times share one baseline.
 - The header may fetch live data only for the selected trip. Saved-trip rows
   use device-held facts such as line identity, distance and last ride; opening
   home must not fan out one upstream request per saved trip.
@@ -81,7 +82,9 @@ substitutes for going back.
 ## Departure board
 
 - The board is a timeline anchored at now. It opens at the anchor, never in the
-  past, and scrolling upward reveals earlier departures.
+  past, and scrolling upward reveals earlier departures. There is no labelled
+  scroll affordance (`EARLIER`, `NOW`) and no reverse control on the board;
+  reversal belongs to the smart header.
 - Rows rank by effective departure. Past and future rows use the same grammar
   and equal height; past rows are distinguished through type colour, not
   container opacity.
@@ -203,13 +206,16 @@ readable mapping.
 
 ## Calibration and verification
 
-Current calibration assets:
+The authoritative comps live at `assets/comps/latest/`. It always holds the
+current calibration exemplars and nothing else; when an owner verdict
+replaces a screen's design, the new exemplar frames replace the old ones in
+the same change as this contract, and git keeps the history.
 
-- Board: `docs/backlog/board-v2/comps-final/shots/board-390x844-hero.png`
-  plus its past, delayed, cancelled, long, short-frame and light variants.
-- Smart home and directions: the
-  `docs/backlog/board-v2/comps-final/shots/home-390x844-*.png` state family,
-  especially `before`, `change`, `final`, `tight`, `cxl` and `back`.
+- Board: `board-390x844-hero.png` plus its `past`, `delayed`, `cancelled`,
+  `long`, `hero-light` and `412x732` variants.
+- Smart home and directions: the `home-390x844-*.png` state family
+  (`before`, `change`, `final`, `tight`, `cxl`, `back`, `before-light`) and
+  `home-412x732-change.png`.
 
 Visual changes are compared side-by-side with the relevant calibration asset
 and verified in the real client. Use `tools/shoot-states.js` for web geometry

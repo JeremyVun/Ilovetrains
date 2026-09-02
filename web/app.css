@@ -431,7 +431,7 @@ button { cursor: pointer; }
   .ftr { padding-left: 18px; padding-right: 18px; }
 }
 
-/* ---- Board v2: locked comps8 board ------------------------------------- */
+/* ---- Departure board (calibration: assets/comps/latest/board-*) ------- */
 
 .sy-mast { flex: none; padding: 12px 22px 0; }
 .sy-top { display: flex; align-items: center; justify-content: space-between; }
@@ -560,7 +560,7 @@ button { cursor: pointer; }
 }
 .sy-end span { display: block; margin-top: 8px; font-size: 14px; font-weight: 300; color: var(--ink-3); }
 
-/* ---- Board v2: locked comps8 home/directions --------------------------- */
+/* ---- Smart home and directions (calibration: assets/comps/latest/home-*) */
 
 .home-screen { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 .hm-c {
@@ -601,8 +601,7 @@ button { cursor: pointer; }
 }
 .hm-st.warn { color: var(--warn); }
 .hm-hd.late .hm-n, .hm-hd.late .hm-e.from .hm-t { color: var(--warn); }
-/* Both station/time groups share the same top and baseline. This corrects the
-   comps8 offset where Bondi Junction / 10:08 sat lower than Rhodes / 09:24. */
+/* Both station/time groups share the same top and baseline (ui.md, smart home). */
 .hm-ends { grid-column: 2; grid-row: 1; display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
 .hm-e { display: flex; flex-direction: column; min-width: 0; }
 .hm-e.to { margin-left: auto; text-align: right; }

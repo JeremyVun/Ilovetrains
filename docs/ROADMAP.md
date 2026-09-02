@@ -24,14 +24,15 @@ Cloudflare+Caddy on syd1 (see `docs/operations/deploy.md`); real-origin numbers:
 cached paint 12ms, live data 7ms (edge cache).
 
 ### M3 — Board v2 + smart home — DONE 2026-09-02
-Locked comps8 implemented: home is the open state, the departure board is a
+The locked board v2 design is implemented: home is the open state, the departure board is a
 now-anchored past/future timeline, and focused journeys become continuous
 directions in the smart header. Includes exact percentage transfer axes,
 actuals-vs-timetable past rows, real return journeys, recent/fuzzy station
 search, location-aware prediction, completed-ride/home inference, ten-trip
-LRU, and the server-tuneable planned transfer floor. Browser and geometry
-evidence: `docs/backlog/board-v2/VERIFICATION.md`. Design history, six
-rounds of owner rulings: `docs/backlog/board-v2/DESIGN.md`.
+LRU, and the server-tuneable planned transfer floor. The resulting rules and
+geometry are binding in `docs/contracts/ui.md`; the exemplars are in
+`assets/comps/latest/`. The six rounds of owner rulings live in git history
+(`docs/backlog/board-v2/`, closed 2026-09-02).
 
 ## Next
 
