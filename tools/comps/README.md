@@ -127,9 +127,13 @@ before this vocabulary is still measured.
 
 ## captions.json
 
-The comp agent writes it; the sheet builds from it. Captions carry
-measurements, never adjectives — the numbers are appended automatically from
-`report.json`, so a caption cannot claim what the probes did not measure.
+The comp agent writes it; the sheet builds from it. Every word on the sheet is
+written for the owner to read and decide on: plain sentences, one measurement
+where it decides something, every question beside a frame that shows it. Nothing
+is appended from `report.json` — read the numbers there and write the one that
+matters into the caption. File paths, selectors and cause taxonomies belong in
+OPTIONS.md, never on the sheet (owner ruling 2026-09-02). The synthetic deltas
+are declared automatically under a collapsed "What is synthetic" in the header.
 
 ```json
 {

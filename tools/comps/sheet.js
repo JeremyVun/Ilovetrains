@@ -3,9 +3,9 @@
  * small-caps captions, a `.row` of figures per direction, an `.ask` block for
  * the things to judge.
  *
- * Captions carry MEASUREMENTS, never adjectives: the numbers are pulled out of
- * shots/report.json automatically and appended to whatever the comp agent
- * wrote, so a caption cannot claim what the probes did not measure.
+ * Every word on the sheet is the comp agent's, written for the owner. Probe
+ * output stays in shots/report.json; the owner ruled (2026-09-02) that an
+ * auto-captioned sheet left him unable to decide anything on it.
  *
  * Usage
  *   node tools/comps/sheet.js <workshop> [--out index.html]
@@ -53,33 +53,11 @@ const STYLE = `
   th { font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: #F4F5F7; }
   td.k { color: #F4F5F7; white-space: nowrap; }
   code { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: #F4F5F7; }
+  details { margin: 6px 0 0; color: rgba(244,245,247,.46); font-size: 12px; }
+  details ul { margin: 6px 0 0; padding-left: 18px; } summary { cursor: pointer; }
 `;
 
 const escape = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-function measurements(shot) {
-  if (!shot) return '';
-  const out = [`<code>${shot.frame}</code>`];
-  if (shot.scroller) {
-    if (shot.scroller.whole) out.push(`<b>${shot.scroller.whole}</b> whole`);
-    out.push(shot.scroller.extent > 0
-      ? `scroll <code>${shot.scroller.top}/${shot.scroller.extent}</code>`
-      : 'nothing scrolling');
-  }
-  if (shot.tapFloor != null) out.push(`taps &ge; <code>${shot.tapFloor}px</code>`);
-  for (const a of shot.axes || []) {
-    out.push(`bar <code>${Math.round(a.width)}px</code> dev <code>${a.dev.join('/')}</code>`
-      + (a.visGap != null ? ` gap <code>${a.visGap}px</code>` : ''));
-  }
-  for (const t of (shot.tracks || []).filter((x) => x.invades)) {
-    out.push(`<em>${t.track} "${escape(t.value)}" invades ${t.ink}/${t.box}</em>`);
-  }
-  if (shot.overflow) out.push(`<em>overflow +${shot.overflow.px}px</em>`);
-  if (shot.belowFold) out.push(`<em>below fold +${shot.belowFold.px}px</em>`);
-  if (shot.taps.length) out.push(`<em>tap&lt;44 ${escape(shot.taps.join(' '))}</em>`);
-  if (shot.spill.length) out.push(`<em>spill ${escape(shot.spill.join(' '))}</em>`);
-  return out.join(' &middot; ');
-}
 
 function figure(spec, report, exemplarDir) {
   const size = spec.size ? ` ${spec.size}` : '';
@@ -97,9 +75,8 @@ function figure(spec, report, exemplarDir) {
   }
   const shot = report.shots[spec.shot];
   const src = shot ? shot.file : 'shots/' + spec.shot + '.png';
-  const note = spec.note ? spec.note + ' &mdash; ' : '';
   return `<figure class="${spec.size || ''}"><img src="${src}">`
-    + `<figcaption>${note}${measurements(shot)}</figcaption></figure>`;
+    + `<figcaption>${spec.note || ''}</figcaption></figure>`;
 }
 
 function withExemplars(figures, exemplarNames, enabled) {
@@ -116,12 +93,14 @@ function withExemplars(figures, exemplarNames, enabled) {
 function deltaLede() {
   // The declarations are read out of the generator's own block comment, so the
   // continuation markers come with them.
-  const line = (d) => `<b>${d.id}</b> `
-    + d.text.split('.')[0].replace(/\n\s*\*\s*/g, ' ').replace(/\s+/g, ' ').trim();
-  return `<p>Real materials only: every clock time, platform, line and headsign is read out of `
-    + `<code>tools/fixtures/</code>. The synthetic deltas applied, and there are no others &mdash; `
-    + scenarios.DELTAS.concat(scenarios.HOME_DELTAS).map(line).join('; ')
-    + `. The full declarations are in the workshop's generated data files.</p>`;
+  const line = (d) => `<li><b>${d.id}</b> `
+    + d.text.split('.')[0].replace(/\n\s*\*\s*/g, ' ').replace(/\s+/g, ' ').trim() + '.</li>';
+  return `<p>Every time, platform, line and headsign on this sheet is real, read out of `
+    + `<code>tools/fixtures/</code>. Where a state cannot be shown from days with no disruption, `
+    + `a named change is applied to a real service.</p>`
+    + `<details><summary>What is synthetic</summary><ul>`
+    + scenarios.DELTAS.concat(scenarios.HOME_DELTAS).map(line).join('')
+    + `</ul></details>`;
 }
 
 function build(workshop) {
