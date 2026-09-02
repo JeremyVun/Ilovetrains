@@ -63,9 +63,12 @@ function collect(cfg) {
   });
 
   const taps = [];
+  let tapFloor = null;
   document.querySelectorAll(S.tap).forEach((e) => {
     const r = e.getBoundingClientRect();
-    if (r.height > 0 && r.height < cfg.tapMin) taps.push(name(e) + ':' + Math.round(r.height));
+    if (r.height <= 0) return;
+    if (tapFloor === null || r.height < tapFloor) tapFloor = px(r.height);
+    if (r.height < cfg.tapMin) taps.push(name(e) + ':' + Math.round(r.height));
   });
 
   let scroller = null;
@@ -98,7 +101,7 @@ function collect(cfg) {
   };
 
   const tracks = [];
-  document.querySelectorAll(S.track).forEach((track, index) => {
+  document.querySelectorAll(S.track).forEach((track) => {
     const lockups = (track.getAttribute('data-lockups') || '').split('|').filter(Boolean);
     if (!lockups.length) return;
     const row = track.closest(S.lockupRow) || track.parentElement;
@@ -161,7 +164,7 @@ function collect(cfg) {
     axes.push(entry);
   });
 
-  return { w: vw, h: vh, overflow, belowFold, taps, scroller, spill, clip, tracks, axes };
+  return { w: vw, h: vh, overflow, belowFold, taps, tapFloor, scroller, spill, clip, tracks, axes };
 }
 
 function source(config) {
