@@ -42,12 +42,20 @@ self-contained: a fresh agent can reclaim the round from the directory alone.
   [--scale 4] [--scheme dark] [--frame phone]`** A 4× clip of the live cascade,
   for decisions that live in twenty pixels. The manifest's `zooms` run with the
   matrix; this CLI is for finding the clip.
+  **`zoom.js <workshop> --from <png> <x> <y> <w> <h> [--out NAME] [--scale 4]
+  [--srcdsf 2]`** takes the same clip out of a PNG instead — an exemplar is a
+  file, not a page, and a calibration round is decided on the two magnified side
+  by side. Nearest-neighbour, so it stays a magnification; `x/y/w/h` are CSS px
+  as on a page and `--srcdsf` says what the file was shot at.
 - **`sheet.js <workshop> [--out index.html]`** Builds the contact sheet from
   `comps.json`, `shots/report.json` and `captions.json`. It does not open a
   browser; the orchestrator does that.
-- **`diff.js <a.png|dirA> <b.png|dirB> [--threshold N]`** Pixel diff with no
-  dependencies: both PNGs are decoded by the browser that drew them and compared
-  through `getImageData`. Per-platform regression, and this harness's own gate.
+- **`diff.js <a.png|dirA> <b.png|dirB> [--threshold N] [--dsf 2]`** Pixel diff
+  with no dependencies: both PNGs are decoded by the browser that drew them and
+  compared through `getImageData`. Per-platform regression, and this harness's
+  own gate. Under every `DIFF` line it prints the bands the differing pixels
+  fall in — `y 94-106 x 141-367 (2717px)`, in CSS px at `--dsf` — because a
+  round has to name WHICH thing differs, not only how many pixels did.
 - **`scenarios.js`** The scenario catalogue, derived from `tools/fixtures/`.
 - **`probes.js`, `chrome.js`, `manifest.js`** The probe pack, the CDP driver and
   the manifest reader.
@@ -66,6 +74,13 @@ module and printed into the head of the generated data file, and `sheet.js`
 names all of them in the sheet's lede automatically — the owner must never rule
 on a fixture artifact by mistake. Board deltas: `delayed`, `cancelled`, `tight`.
 Home deltas: `D1`–`D8`.
+
+`data.js` and `hdata.js` each define `TRIPS`, `SCENARIOS` and `scenarioName`,
+and both are classic scripts: a comp loads ONE of them, never both. Their rows
+carry the fixture's own values, not the product's formatting of them — `dist` is
+`"14 km"` where `home.js` prints `"14 km away"`, and `rode` is a plausible
+history string `lastRidden()` would never emit — so a comp that wants the
+product's copy applies the product's own function to them.
 
 Scenario names a fresh round starts with: `hero`, `past`, `deep`, `delayed`,
 `cancelled`, `tight`, `focused`, `riding`, `long`, `trips`, `ask` (board);
@@ -167,6 +182,14 @@ can carry the same hooks and be measured by the same code.
 `belowFold`, `taps`, `tapFloor`, `scroller` (`whole`/`top`/`extent`), `spill`,
 `clip`, `tracks` (`ink`/`box`/`invades` per lockup) and `axes`
 (`drawn`/`want`/`dev`/`tailRight`/`headLeft`/`visGap`/`clamped`/`offScale`).
+
+Two things about it that have bitten a round. `belowFold` is measured against
+the VIEWPORT, unlike the counts, so a scroller that is deliberately taller than
+the screen reports one on every scrolled shot: read it with `scroller.extent`
+beside it, and believe it only for content outside `[data-scroller]`. And the
+file is MERGED with the previous run so a per-concept shoot does not erase its
+siblings, which means shots of a concept you deleted stay in it until you delete
+`shots/report.json` too.
 
 ## Traps this harness exists to defeat
 

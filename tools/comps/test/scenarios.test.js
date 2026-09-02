@@ -12,6 +12,7 @@ const { execFileSync } = require('node:child_process');
 const path = require('node:path');
 
 const scenarios = require('../scenarios.js');
+const sheet = require('../sheet.js');
 
 const REPO = path.join(__dirname, '..', '..', '..');
 const ARCHIVE = '91aadd9:docs/backlog/board-v2/comps-final/';
@@ -65,4 +66,15 @@ test('every applied delta is declared in the generated head', () => {
   for (const d of scenarios.DELTAS) assert.match(board, new RegExp('`' + d.id + '`'));
   const home = scenarios.renderHomeData();
   for (const d of scenarios.HOME_DELTAS) assert.match(home, new RegExp('`' + d.id + '`'));
+});
+
+test('the sheet lede prints the declaration, not the comment it lives in', () => {
+  const wrapped = scenarios.DELTAS.concat(scenarios.HOME_DELTAS)
+    .filter((d) => d.text.includes('\n'));
+  assert.ok(wrapped.length, 'a declaration wraps, or this test proves nothing');
+
+  const lede = sheet.deltaLede();
+  assert.doesNotMatch(lede, /\*/, 'no continuation marker reaches the sheet');
+  assert.doesNotMatch(lede, /\s{2,}/, 'no run of whitespace survives');
+  for (const d of scenarios.DELTAS) assert.ok(lede.includes(d.id), d.id + ' is named');
 });

@@ -35,14 +35,49 @@ const COMPARE = `(async (a, b) => {
     return x.getImageData(0, 0, img.width, img.height).data;
   };
   const pa = pixels(ia), pb = pixels(ib);
+  const w = ia.width;
+  const rows = [];
   let differs = 0, worst = 0;
   for (let i = 0; i < pa.length; i += 4) {
     const d = Math.max(Math.abs(pa[i] - pb[i]), Math.abs(pa[i+1] - pb[i+1]),
                        Math.abs(pa[i+2] - pb[i+2]), Math.abs(pa[i+3] - pb[i+3]));
-    if (d) { differs++; if (d > worst) worst = d; }
+    if (!d) continue;
+    differs++;
+    if (d > worst) worst = d;
+    const p = i / 4, y = (p / w) | 0, x = p % w;
+    const row = rows[y] || (rows[y] = { y, px: 0, x0: x, x1: x });
+    row.px++;
+    if (x < row.x0) row.x0 = x;
+    if (x > row.x1) row.x1 = x;
   }
-  return { differs, total: pa.length / 4, worst, size: [ia.width, ia.height], sizeMismatch: false };
+  return { differs, total: pa.length / 4, worst, size: [ia.width, ia.height],
+           sizeMismatch: false, rows: rows.filter(Boolean) };
 })`;
+
+/* A count says a comp differs; a comps round has to name WHICH thing differs.
+   Rows within `gap` of each other are one band, so a line of type reads as one
+   region instead of as its ascenders and descenders. */
+function bands(rows, gap = 6, limit = 8) {
+  const out = [];
+  for (const row of rows) {
+    const last = out[out.length - 1];
+    if (last && row.y - last.y1 <= gap) {
+      last.y1 = row.y;
+      last.x0 = Math.min(last.x0, row.x0);
+      last.x1 = Math.max(last.x1, row.x1);
+      last.px += row.px;
+    } else {
+      out.push({ y0: row.y, y1: row.y, x0: row.x0, x1: row.x1, px: row.px });
+    }
+  }
+  return out.sort((a, b) => b.px - a.px).slice(0, limit).sort((a, b) => a.y0 - b.y0);
+}
+
+/** Device pixels are what the PNG holds; a comp is authored in CSS px. */
+function describeBands(list, dsf) {
+  return list.map((b) => `y ${Math.round(b.y0 / dsf)}-${Math.round(b.y1 / dsf)}`
+    + ` x ${Math.round(b.x0 / dsf)}-${Math.round(b.x1 / dsf)} (${b.px}px)`).join('\n        ');
+}
 
 const dataUrl = (file) => 'data:image/png;base64,' + fs.readFileSync(file).toString('base64');
 
@@ -70,9 +105,12 @@ async function diff(a, b) {
 async function main() {
   const argv = process.argv.slice(2);
   const t = argv.indexOf('--threshold');
+  const d = argv.indexOf('--dsf');
   const threshold = t >= 0 ? Number(argv[t + 1]) : 0;
-  const [a, b] = argv.filter((x, i) => !x.startsWith('--') && (t < 0 || i !== t + 1));
-  if (!a || !b) throw new Error('usage: diff.js <a.png|dirA> <b.png|dirB> [--threshold N]');
+  const dsf = d >= 0 ? Number(argv[d + 1]) : 2;
+  const skip = new Set([t + 1, d + 1].filter((i) => i > 0));
+  const [a, b] = argv.filter((x, i) => !x.startsWith('--') && !skip.has(i));
+  if (!a || !b) throw new Error('usage: diff.js <a.png|dirA> <b.png|dirB> [--threshold N] [--dsf 2]');
 
   const results = await diff(path.resolve(a), path.resolve(b));
   let bad = 0;
@@ -83,6 +121,9 @@ async function main() {
       ? `SIZE ${r.size.slice(0, 2).join('x')} vs ${r.size.slice(2).join('x')}`
       : `${r.differs} / ${r.total} px differ` + (r.differs ? `, worst channel ${r.worst}` : '');
     console.log(`${over ? 'DIFF' : 'same'}  ${r.name}  ${detail}`);
+    if (over && r.rows && r.rows.length) {
+      console.log('        ' + describeBands(bands(r.rows), dsf));
+    }
   }
   console.log(`\n${results.length - bad}/${results.length} identical within ${threshold}`);
   if (bad) process.exit(1);

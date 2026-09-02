@@ -114,7 +114,10 @@ function withExemplars(figures, exemplarNames, enabled) {
 }
 
 function deltaLede() {
-  const line = (d) => `<b>${d.id}</b> ${d.text.split('.')[0].replace(/\s+/g, ' ').trim()}`;
+  // The declarations are read out of the generator's own block comment, so the
+  // continuation markers come with them.
+  const line = (d) => `<b>${d.id}</b> `
+    + d.text.split('.')[0].replace(/\n\s*\*\s*/g, ' ').replace(/\s+/g, ' ').trim();
   return `<p>Real materials only: every clock time, platform, line and headsign is read out of `
     + `<code>tools/fixtures/</code>. The synthetic deltas applied, and there are no others &mdash; `
     + scenarios.DELTAS.concat(scenarios.HOME_DELTAS).map(line).join('; ')
@@ -186,4 +189,4 @@ if (require.main === module) {
   try { main(); } catch (e) { console.error(e.message || e); process.exit(1); }
 }
 
-module.exports = { build };
+module.exports = { build, deltaLede };
