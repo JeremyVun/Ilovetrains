@@ -117,3 +117,11 @@ test('a page with no viewport meta is refused rather than laid out at 980px', as
     /VIEWPORT LIE: asked 390, got 980/
   );
 });
+
+test('a @class lockup with no [data-lockup-row] ancestor is flagged as unguarded', async () => {
+  const r = await probe('track-unguarded.html');
+  assert.ok(r.tracks.some((t) => t.value === '999' && t.unguarded), JSON.stringify(r.tracks));
+  assert.match(probes.summarise(r, 44), /LOCKUP UNGUARDED fig/);
+  const guarded = await probe('track-cascade.html');
+  assert.ok(guarded.tracks.every((t) => !t.unguarded));
+});

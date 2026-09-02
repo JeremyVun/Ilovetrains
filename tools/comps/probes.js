@@ -104,7 +104,8 @@ function collect(cfg) {
   document.querySelectorAll(S.track).forEach((track) => {
     const lockups = (track.getAttribute('data-lockups') || '').split('|').filter(Boolean);
     if (!lockups.length) return;
-    const row = track.closest(S.lockupRow) || track.parentElement;
+    const guardedRow = track.closest(S.lockupRow);
+    const row = guardedRow || track.parentElement;
     if (!row || !row.parentElement) return;
     const rowWidth = Math.round(row.getBoundingClientRect().width);
     const label = track.getAttribute('data-track') || name(track);
@@ -130,7 +131,10 @@ function collect(cfg) {
       const wide = inkWidth(ink);
       const box = Math.round(twin.getBoundingClientRect().width);
       clone.remove();
-      tracks.push({ track: label, value, ink: wide, box, invades: wide > box });
+      // A @class guard with no [data-lockup-row] ancestor runs on a bare clone,
+      // which over-states the ink and invented a defect once (2026-09-02).
+      const unguarded = Boolean(klass) && !guardedRow;
+      tracks.push({ track: label, value, ink: wide, box, invades: wide > box, unguarded });
     });
   });
 
@@ -191,6 +195,8 @@ function summarise(r, tapMin) {
   if (r.scroller && r.scroller.extent > 0) parts.push(`scroll ${r.scroller.top}/${r.scroller.extent}`);
   const invades = r.tracks.filter((t) => t.invades);
   if (invades.length) parts.push('TRACK INVADED ' + invades.map((t) => `${t.track}="${t.value}" ${t.ink}/${t.box}`).join(' '));
+  const unguarded = [...new Set(r.tracks.filter((t) => t.unguarded).map((t) => t.track))];
+  if (unguarded.length) parts.push('LOCKUP UNGUARDED ' + unguarded.join(' ') + ' (no [data-lockup-row] ancestor; ink over-stated)');
   r.axes.forEach((a) => {
     if (a.offScale) parts.push(`OFF SCALE ${a.axis} drawn ${a.drawn.join('/')} want ${a.want.join('/')} dev ${a.dev.join('/')}`);
     if (a.clamped) parts.push(`CLAMPED ${a.axis} ${a.clamped}`);

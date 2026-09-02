@@ -84,7 +84,7 @@ function withExemplars(figures, exemplarNames, enabled) {
   const out = [];
   for (const f of figures) {
     const twin = f.shot && exemplarNames.has(f.shot + '.png');
-    if (twin && !f.noExemplar) out.push({ exemplar: f.shot + '.png', note: f.note || '' });
+    if (twin && !f.noExemplar) out.push({ exemplar: f.shot + '.png', note: f.noteExemplar || '' });
     out.push(f);
   }
   return out;

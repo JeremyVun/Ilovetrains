@@ -20,8 +20,11 @@ function workshop() {
   }));
   fs.writeFileSync(path.join(dir, 'captions.json'), JSON.stringify({
     title: 't', lede: ['for the owner'],
-    sections: [{ h2: 'c', exemplars: false, figures: [{ shot: 'c-390x844-hero', note: 'The gap is 22px, a fifth of the bar.' }] }]
+    sections: [{ h2: 'c', exemplars: false, figures: [{ shot: 'c-390x844-hero', note: 'The gap is 22px, a fifth of the bar.' }] },
+      { h2: 'pair', figures: [{ shot: 'c-390x844-hero', note: 'The app.', noteExemplar: 'the design you locked' }] }]
   }));
+  fs.mkdirSync(path.join(dir, 'exemplars'));
+  fs.writeFileSync(path.join(dir, 'exemplars', 'c-390x844-hero.png'), '');
   return dir;
 }
 
@@ -34,4 +37,10 @@ test('a caption is exactly what the comp agent wrote; probe output never reaches
 test('the synthetic deltas are declared, folded away under a summary', () => {
   const html = sheet.build(workshop());
   assert.match(html, /<details><summary>What is synthetic<\/summary><ul><li><b>delayed<\/b>/);
+});
+
+test('the exemplar column carries its own caption, never a copy of the shot\'s', () => {
+  const html = sheet.build(workshop());
+  assert.match(html, /<b>Exemplar<\/b> &mdash; the design you locked</);
+  assert.strictEqual((html.match(/The app\./g) || []).length, 1);
 });

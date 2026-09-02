@@ -156,9 +156,16 @@ are declared automatically under a collapsed "What is synthetic" in the header.
 ```
 
 A figure whose `shot` has a same-named file in `exemplars/` gets the exemplar
-column beside it automatically — verdicts are made side by side. Set
-`"exemplars": false` on the section, or `"noExemplar": true` on the figure, to
-suppress it. `size` is `z` (430px) or `zz` (640px).
+column beside it automatically — verdicts are made side by side. Its caption is
+the figure's `noteExemplar` (default empty, never a copy of the shot's note).
+Set `"exemplars": false` on the section, or `"noExemplar": true` on the figure,
+to suppress it. `size` is `z` (430px) or `zz` (640px); a plain figure is 250px,
+with 18px gaps, and a row does not wrap — keep a row inside a 1400px screen
+(five plain, three `z`, or two `zz`), and split a longer comparison into
+`h3`-only sections, or the owner never sees the figures past the right edge.
+
+A zoom shot from the manifest is addressed by its bare name; one made from the
+CLI is addressed by its file basename, which carries the `zoom-` prefix.
 
 ## The data-attribute vocabulary
 
