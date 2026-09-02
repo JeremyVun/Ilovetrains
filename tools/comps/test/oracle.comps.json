@@ -1,0 +1,36 @@
+{
+  "round": "board-v2-comps-final",
+  "title": "The archived board v2 final round, re-shot by tools/comps/",
+  "frames": {
+    "phone": { "w": 390, "h": 844, "note": "the standard frame" },
+    "short": { "w": 412, "h": 732, "note": "a 412px Android with its browser chrome on screen" }
+  },
+  "concepts": ["board", "board-nostrip", "home"],
+  "settle": 260,
+  "probes": {
+    "selectors": {
+      "scroller": ".tl, .rows, .sh, .led",
+      "tap": "button, .tripr, .led-row",
+      "axis": ".sy-bar",
+      "seg": ".sy-r, .sy-g0",
+      "pinA": ".sy-p.a",
+      "pinB": ".sy-p.b"
+    }
+  },
+  "jobs": [
+    { "concept": "board", "frames": ["phone"],
+      "scenarios": ["hero", "past", "landing", "deep", "delayed", "cancelled", "tight", "long", "focused", "riding"] },
+    { "concept": "board", "frames": ["short"], "scenarios": ["hero", "long", "riding"] },
+    { "concept": "board", "frames": ["phone"], "scenarios": ["hero"], "schemes": ["light"] },
+    { "concept": "board-nostrip", "frames": ["phone"], "scenarios": ["riding", "focused"] },
+    { "concept": "board-nostrip", "frames": ["short"], "scenarios": ["riding"] },
+    { "concept": "home", "frames": ["phone"],
+      "scenarios": ["before", "leave", "board", "change", "final", "arrive", "done",
+                    "tight", "cxl", "wide", "back", "moved", "nofix", "ask", "many", "add", "save"] },
+    { "concept": "home", "frames": ["short"], "scenarios": ["change", "before", "many", "add"] },
+    { "concept": "home", "frames": ["phone"], "scenarios": ["change", "before", "tight"], "schemes": ["light"] }
+  ],
+  "zooms": [
+    { "out": "oracle-bar", "concept": "board", "scenario": "hero", "x": 22, "y": 300, "w": 160, "h": 40 }
+  ]
+}

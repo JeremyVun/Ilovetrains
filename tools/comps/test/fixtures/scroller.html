@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>document.documentElement.className = /defect/.test(location.search) ? 'defect' : 'clean';</script>
+<style>
+  body { margin: 0; padding: 22px; background: #0A0B0D; color: #F4F5F7; font: 16px sans-serif; }
+  .tl { height: 300px; overflow: auto; }
+  .defect .tl { height: 250px; }
+  .svc { box-sizing: border-box; height: 100px; border-bottom: 1px solid rgba(244,245,247,.1); }
+  .svc.past { opacity: .5; }
+</style>
+</head><body>
+<div class="tl" data-scroller>
+  <div class="svc past" data-svc data-past>09:24</div>
+  <div class="svc past" data-svc data-past>09:39</div>
+  <div class="svc" data-svc>09:54</div>
+  <div class="svc" data-svc>10:09</div>
+  <div class="svc" data-svc>10:24</div>
+  <div class="svc" data-svc>10:39</div>
+</div>
+<script>document.querySelector('.tl').scrollTop = 200;</script>
+</body></html>

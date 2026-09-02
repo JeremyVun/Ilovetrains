@@ -98,19 +98,21 @@ ports mechanical:
 - **State catalogue and seeded shooters**: `shoot-states.js`'s state list
   becomes a shared directory of seeded documents, clocks and API fixtures;
   the web shooter reads it, and each native port ships a shooter that reads
-  the same catalogue before its first verdict.
+  the same catalogue before its first verdict. `tools/comps/scenarios.js` is
+  the start of it — it derives the scenarios from the fixtures already, but
+  emits mapped view rows, where `shoot-states.js` seeds API-shaped documents.
 - **Parity tool**: per-platform pixel regression against its own golden,
   cross-platform diff of a debug layout dump, and a side-by-side sheet.
-- A reusable comps harness in `tools/` (shoot script, contact-sheet
-  generator, seeded fixture data, the standard frames and schemes, the
-  measured probes for tap targets, scroll landing and axis geometry) so a
-  round is a directory of HTML plus a one-line shoot, not a copied `shoot.js`.
-  Start from the last round's workshop, which git keeps at commit `91aadd9`
-  under `docs/backlog/board-v2/comps-final/` (`shoot.js`, `measure.js`,
-  `hmeasure.js`, `base.css`, `data.js`, `index.html`).
-- Comps built from the live `web/app.css` and `tools/fixtures/` by
-  reference, never by hand-copy, so a comp cannot drift from the product's
-  language. Instrument traps documented once (`tools/README.md`).
+- **Done 2026-09-02** — a reusable comps harness in `tools/comps/` (round
+  scaffold, matrix shooter, magnifier, contact-sheet generator, pixel diff,
+  the scenario catalogue, the standard frames and schemes, the measured probes
+  for tap targets, scroll landing, track lockups and axis geometry) so a round
+  is a directory of HTML plus a one-line shoot, not a copied `shoot.js`.
+- **Done 2026-09-02** — comps built from the live `web/app.css` and
+  `tools/fixtures/` by reference, never by hand-copy, so a comp cannot drift
+  from the product's language. Instrument traps documented once
+  (`tools/comps/README.md`, indexed from `tools/README.md`), each as code plus
+  one line, and every probe proven to bite against a planted defect.
 
 ### M8 — Native Android and iOS (gated)
 Kotlin/Compose and Swift/SwiftUI, each in its own repository or top-level

@@ -225,5 +225,7 @@ Visual changes are compared side-by-side with the relevant calibration asset
 and verified in the real client. Use `tools/shoot-states.js` for web geometry
 and flows; a native port must ship an equivalent seeded-state shooter before
 its first verdict (PROJECT.md, "Native clients"). A design change requires
-new divergent comps and an owner verdict before product implementation; update
+new divergent comps and an owner verdict before product implementation
+(`tools/comps/`, whose acceptance oracle reproduces the frames above
+pixel-identically); update
 this contract when that verdict changes current behavior.

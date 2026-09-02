@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>document.documentElement.className = /defect/.test(location.search) ? 'defect' : 'clean';</script>
+<style>
+  body { margin: 0; padding: 22px; background: #0A0B0D; color: #F4F5F7; font: 16px sans-serif; }
+  .bar { position: relative; width: 141px; height: 20px; }
+  .seg { position: absolute; top: 8px; height: 4px; background: #E4572E; }
+  .seg.g { background: rgba(244,245,247,.2); }
+  .seg.b { background: #4A7BC8; }
+  .p { position: absolute; top: 0; font: 700 12px/20px sans-serif; }
+  .clean .seg.a { left: 0; width: 61.3636%; }
+  .clean .seg.g { left: 61.3636%; width: 15.9091%; }
+  .clean .seg.b { left: 77.2727%; width: 22.7273%; }
+  .clean .p.a { right: 38.6364%; }
+  .clean .p.b { left: 77.2727%; }
+
+  /* The bug the archive's round-5 correction was written against: the numerals
+     are flex siblings, so they eat the bar before a minute is drawn. */
+  .defect .bar { display: flex; align-items: center; }
+  .defect .seg { position: static; }
+  .defect .seg.a { flex: 27; }
+  .defect .seg.g { flex: 7; }
+  .defect .seg.b { flex: 10; }
+  .defect .p { position: static; flex: none; width: 20px; }
+</style>
+</head><body>
+<div class="bar" data-axis="27/7/10">
+  <span class="seg a" data-seg></span>
+  <span class="seg g" data-seg></span>
+  <span class="seg b" data-seg></span>
+  <span class="p a" data-pin="a">3</span>
+  <span class="p b" data-pin="b">5</span>
+</div>
+</body></html>
