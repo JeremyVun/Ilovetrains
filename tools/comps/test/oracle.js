@@ -22,6 +22,12 @@ const { execFileSync } = require('child_process');
 const REPO = path.join(__dirname, '..', '..', '..');
 const ARCHIVE_COMMIT = '91aadd9';
 const ARCHIVE_PATH = 'docs/backlog/board-v2/comps-final';
+// Exemplars re-shot from the real client after an owner ruling; the archive's
+// CSS cannot reproduce them, so they are calibration for the build, not the harness.
+const CLIENT_SHOTS = {
+  'board-390x844-hero-light.png': 'light chip numerals are paper (owner, 2026-09-02)',
+  'home-390x844-before-light.png': 'light chip numerals are paper (owner, 2026-09-02)'
+};
 const WORKSHOP = '/tmp/trains-comps-oracle';
 const EXEMPLARS = path.join(REPO, 'assets', 'comps', 'latest');
 
@@ -51,16 +57,23 @@ function main() {
   console.log(node(['tools/comps/shoot.js', WORKSHOP]));
   console.log(node(['tools/comps/sheet.js', WORKSHOP]));
 
+  const archiveExemplars = fs.mkdtempSync(path.join(os.tmpdir(), 'trains-comps-oracle-exemplars-'));
+  for (const f of fs.readdirSync(EXEMPLARS)) {
+    if (CLIENT_SHOTS[f]) { console.log(`skip  ${f}  client shot: ${CLIENT_SHOTS[f]}`); continue; }
+    fs.copyFileSync(path.join(EXEMPLARS, f), path.join(archiveExemplars, f));
+  }
+
   let diff = '';
   let identical = true;
   try {
-    diff = node(['tools/comps/diff.js', EXEMPLARS, path.join(WORKSHOP, 'shots')]);
+    diff = node(['tools/comps/diff.js', archiveExemplars, path.join(WORKSHOP, 'shots')]);
   } catch (e) {
     diff = e.stdout || String(e);
     identical = false;
   }
   console.log(diff);
   fs.rmSync(source, { recursive: true, force: true });
+  fs.rmSync(archiveExemplars, { recursive: true, force: true });
 
   if (!identical) {
     console.error('ORACLE FAILED — find out why and fix the harness; the exemplars are the truth.');
