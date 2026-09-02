@@ -43,7 +43,7 @@ checks geometry in Chromium. No `.env` or deployment secret was read.
 
 - Tapping a board row opens its real journey detail.
 - Focusing that journey returns to home and promotes the snapshot into the
-  smart header; no B2 footer strip appears on the board.
+  smart header; no footer focus strip appears on the board.
 - The marker advances through first leg, dwell and final leg on the same time
   axis. The boarding platform cap disappears after departure.
 - Choosing “Show the way back” clears the completed focus, fetches the real

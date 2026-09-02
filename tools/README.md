@@ -80,24 +80,22 @@ no part of a scrolling region is cut off with no way to scroll to it, its last
 item is whole at the end of the scroll, and the chrome beneath it is never
 painted over its content or pushed below the frame.
 
-That last pair is checked for the board against whatever chrome it has — the
-footer, or the **focused strip**, which absorbs the footer and which the rows
-scroll UNDER (a focused board pays for the strip by scrolling, never by hiding
-a service) — and for the **journey detail view** against its closing rule.
+That last pair is checked for the board against its footer and for the journey
+detail view against its closing rule. The sweep also rejects any focused state
+that restores the deleted board strip.
 
-The journey-focus states (`detail-hero`, `detail-tight`, `detail-cancelled`,
+The transfer-detail states (`detail-hero`, `detail-tight`, `detail-cancelled`,
 `detail-long`, `board-focused`, `board-focused-scrolled`,
 `board-focused-departed`) run on the transfer corridor from
 `web/test/fixture.js`, and the `detail-*` ones reach the view by CLICKING a
 board row, so every one of them is also proof that the whole row is the tap
-target. They are shot to their own round's folder, at both frames and both
-schemes:
+target. Output defaults to the system temporary directory; use `--out` only
+for a deliberate comparison set:
 
 ```
 node tools/shoot-states.js detail-hero detail-tight detail-cancelled \
-  detail-long board-focused board-focused-scrolled board-focused-departed \
-  --out docs/backlog/journey-focus/shots            # add --size 412x732,
-                                                    # --media prefers-color-scheme:light --prefix light-
+  detail-long board-focused board-focused-scrolled board-focused-departed
+# add --size 412x732 or --media prefers-color-scheme:light --prefix light-
 ```
 
 The `short-*` states shoot the board at **412x732** — a 412px Android with its
@@ -111,8 +109,8 @@ to scroll to it` at 412x732, and 17px at 390x844.
 
 ## measure-open.js and make-icons.sh
 
-`measure-open.js` reports the DESIGN.md experience bar — cached paint and live
-data, in ms — from a cold open and then a warm, worker-served one, and exits
+`measure-open.js` reports the `docs/contracts/ui.md` experience bar — cached
+paint and live data, in ms — from a cold open and then a warm, worker-served one, and exits
 non-zero if the bar is missed. `make-icons.sh` regenerates `web/icons/*` from
 `tools/icon.html` (a canvas drawing whose proportions are query-tunable) at the
 exact sizes the manifest promises.

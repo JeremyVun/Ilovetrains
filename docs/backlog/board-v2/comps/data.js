@@ -179,6 +179,5 @@ function scenarioName() {
   return m ? m[1] : 'hero';
 }
 
-/* DEPARTED is a new word in the provenance vocabulary (STYLES.md: "adding to it
-   is an owner's call"). It is proposed by every direction in this round and is
-   flagged as an owner call in OPTIONS.md. */
+/* DEPARTED is proposed new provenance vocabulary in every direction in this
+   round and is flagged as an owner call in OPTIONS.md. */

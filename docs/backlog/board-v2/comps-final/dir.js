@@ -52,7 +52,7 @@ function DIR(j, now, opt) {
     figure: '', prov: '', instruction: '', at: 0, phase: 'pre'
   };
 
-  /* CANCELLED NEVER SILENTLY SKIPS (STYLES ruling A, verbatim idiom). The header
+  /* CANCELLED NEVER SILENTLY SKIPS (docs/contracts/ui.md). The header
      answers with the next train — that is what the screen is for — and says in
      the same breath which one it dropped. */
   if (j.cancelled) {
@@ -106,8 +106,8 @@ function DIR(j, now, opt) {
     }
   }
 
-  /* THE CONNECTION AT RISK. STYLES binds A3's treatment: the change figure goes
-     coral, both times are shown, `PRINTED CHANGE WAS 7 MIN`, no prediction. In a
+  /* THE CONNECTION AT RISK. The UI contract makes the change figure coral,
+     shows both times and `PRINTED CHANGE WAS 7 MIN`, and makes no prediction. In a
      header with one instruction line the warning REPLACES the instruction — the
      precedent is the cancelled lead, which does exactly that on the board — and
      the printed-change evidence goes in the line under it, which is the slot

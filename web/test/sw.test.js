@@ -50,7 +50,7 @@ test('the manifest is installable: name, start_url, display, 192 and 512 icons',
   assert.ok(manifest.short_name.length <= 12, 'short_name has to survive a home screen');
   assert.equal(manifest.start_url, '/');
   assert.ok(['standalone', 'fullscreen', 'minimal-ui'].includes(manifest.display));
-  assert.equal(manifest.theme_color, '#0A0B0D', 'the dark ground from docs/STYLES.md');
+  assert.equal(manifest.theme_color, '#0A0B0D', 'the dark ground from docs/contracts/ui.md');
   const sizes = manifest.icons.map((i) => i.sizes);
   assert.ok(sizes.includes('192x192'), 'installability needs a 192px icon');
   assert.ok(sizes.includes('512x512'), 'installability needs a 512px icon');

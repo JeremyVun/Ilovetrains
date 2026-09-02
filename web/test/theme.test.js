@@ -1,8 +1,8 @@
 /* The palette is a measurement, so it is tested as one.
  *
- * docs/STYLES.md fixes the CONTRAST STRUCTURE of the board — primary ink at
+ * docs/contracts/ui.md fixes the CONTRAST STRUCTURE of the board — primary ink at
  * ~17:1, secondary at ~8:1, labels clear of 4.5:1, the accent and every line
- * badge readable as text — and the light scheme (owner ruling 2026-09-01 C)
+ * badge readable as text — and the light scheme
  * had to reach that structure with different values, not by inverting the dark
  * ones. Nothing here reads a screenshot: it parses the stylesheet's own custom
  * properties and computes WCAG relative-luminance ratios against each scheme's
@@ -102,8 +102,8 @@ for (const [scheme, name] of [[dark, 'dark'], [light, 'light']]) {
   });
 }
 
-/* The defect this exists for: T1's #F99D1C is 1.9:1 on a light ground —
-   unreadable as the bare letterspaced small caps the meta line sets it in. */
+/* T1's dark-scheme #F99D1C is only 1.9:1 on a light ground, so each scheme
+   needs its own readable line-badge value. */
 test('every line badge is readable as text in the scheme it is printed in', () => {
   for (const code of Object.keys(COLOURS)) {
     for (const [scheme, name, floor] of [[dark, 'dark', 2.2], [light, 'light', 4.5]]) {

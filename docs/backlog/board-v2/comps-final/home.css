@@ -153,7 +153,7 @@
   color: var(--ink);
 }
 /* The track is still sized to the widest lockup the vocabulary can make —
-   `78min`, `Now`, and `12H` past 99 minutes (STYLES ruling B), which is a real
+   `78min`, `Now`, and `12H` past 99 minutes (per docs/contracts/ui.md), which is a real
    home-screen value at midnight — because the ends line's left edge must not
    move when the figure changes width. hmeasure `LOCK_*` measures all three
    through the real cascade; left-aligned, an over-long one overflows to the
@@ -461,7 +461,7 @@
 .hm-bar.save { padding-top: 0; }
 .hm-bar.save button { flex: 1; justify-content: flex-start; font-size: 13px; letter-spacing: .12em; min-height: 64px; }
 
-/* ---- below 375px the page margin flexes, not the type (STYLES ruling A) ----- */
+/* ---- below 375px the page margin flexes, not the type --------------------- */
 @media (max-width: 375px) {
   .hm-top, .hm-hd, .hm-rec, .hm-offer, .hm-ix, .hm-bar, .hm-ask, .hm-mast, .hm-sheet {
     padding-left: 18px; padding-right: 18px;

@@ -69,12 +69,12 @@ read/write atomic and migration simple):
   query and ranks returned stops fuzzily, so a prefix such as `Rhode` ranks
   `Rhodes` first.
 - A station's optional `location` is captured from `/api/v1/stops` at save
-  time. Existing trips are backfilled lazily by stop id. Missing coordinates
-  disable only the location term.
+  time. Trips without coordinates are backfilled lazily by stop id. Missing
+  coordinates disable only the location term.
 
-## Focused journey (added 2026-09-01)
+## Focused journey
 
-The document gains an optional `focus` field — "I'm on this train":
+The document may contain an optional `focus` field — "I'm on this train":
 
 ```json
 "focus": {
@@ -117,10 +117,10 @@ recencyDecay: 0.97 ^ ageInDays
 Pick the highest score. Tie/all-zero fallback: `lastViewed`, then first
 saved trip `forward`.
 
-### Geolocation term (added 2026-09-01, board-v2)
+### Geolocation term
 
 Saved trip stations MAY carry `location: {lat, lon}` (captured from
-`/api/v1/stops` at save time; older trips are backfilled lazily by
+`/api/v1/stops` at save time; trips without it are backfilled lazily by
 re-querying the stops API and matching on id). When the user has granted
 geolocation and a fix ≤5 min old exists:
 

@@ -1,86 +1,101 @@
-# trains_app — "ilovetrains"
+# trains_app — ilovetrains
 
-Sydney next-train PWA: zero-tap departure board for saved trips, no ads.
-Thin-client PWA + stateless Go caching proxy over TfNSW Open Data.
-Live at https://ilovetrains.jeremyvun.com. Source on GitHub:
-git@github.com:JeremyVun/Ilovetrains.git (push after landing work; deploys do
-NOT go through GitHub — the image is built and pushed from this machine).
+Sydney train and metro clients that answer “What train should I take right
+now?” with no account, ads or server-side personal state. The web app is live
+at https://ilovetrains.jeremyvun.com.
 
-## Status
+The installable web PWA (and, later, native Android and iOS clients) use the
+same stateless Go JSON API, which caches Transport for NSW Open Data. Saved trips, history, prediction,
+location and focused journeys stay on the device.
 
-The v1 backend, web client and installable/offline PWA shipped 2026-08-31/09-01.
-Board v2 was built, deployed and verified against the locked comps8 on 2026-09-02:
-home is the open state, board is a now-anchored timeline, and focused journeys
-become smart-header directions. Evidence and exact geometry are in
-`docs/backlog/board-v2/VERIFICATION.md`; the earlier v1 report is
-`docs/backlog/v1-core-loop/VERIFICATION.md`. `TFNSW_API_KEY` lives in `.env`
-(gitignored) — never commit or print it.
+## Read first
 
-Run the whole app: `set -a; source .env; set +a; go run ./cmd/server`, then
-open http://localhost:8080 — the server serves `web/` at `/` (env:
-`TFNSW_API_KEY` required, `PORT` default 8080, `WEB_DIR` default `./web`,
-`MIN_CONNECTION_TIME` default `3m`).
-Test: `go test ./...` and `cd web && npm test` — no test makes a network call,
-and the client has no build step and no npm deps.
+- `AGENTS.md` — execution, verification and repository rules for agent work.
+- `docs/PROJECT.md` — product purpose, principles and design process.
+- `docs/contracts/api.md` — binding backend API and caching behavior.
+- `docs/contracts/client-storage.md` — binding persisted client state,
+  prediction, focus and home inference.
+- `docs/contracts/ui.md` — binding client behavior, visual language and
+  calibration exemplars.
+- `docs/ROADMAP.md` — work queue and candidate product directions.
+- `docs/references/tfnsw-open-data.md` — upstream observations. Resolve any
+  **[verify]** item with a correctly invoked live probe before relying on it.
+- `docs/operations/deploy.md` — production topology, deployment and checks.
+- `docs/backlog/` — disposable workspaces for active design and build work.
+  Completed items are closed out into contracts and deleted.
+- `tools/README.md` — verification instruments, invocation and known traps.
 
-Editing the client: `web/sw.js` serves the shell cache-first, so a browser that
-has already visited will keep serving the old CSS and modules until `VERSION`
-is bumped. Develop with DevTools' "Update on reload", or in a throwaway profile
-— `tools/screenshot.js` and `tools/shoot-states.js` use one by default.
+Contracts change in the same commit as the behavior they describe. Backlog
+folders are never durable documentation: when an item ships, migrate only its
+current contracts, seams and decisions into `docs/contracts/`, update surviving
+references, and delete the entire folder. Git retains any history.
 
 ## Structure
 
-- `docs/PROJECT.md` — what/why, principles, key decisions, core flows
-- `docs/ROADMAP.md` — milestones
-- `docs/STYLES.md` — BINDING design verdict (B·Editorial exemplar) + intent
-- `docs/contracts/api.md` — backend JSON API (binding)
-- `docs/contracts/client-storage.md` — localStorage schema + prediction
-  heuristic (binding)
-- `docs/references/tfnsw-open-data.md` — upstream API notes; **[verify]**
-  items must be resolved by live probes before being relied on
-- `docs/backlog/v1-core-loop/` — v1 design + phased build plan
-- `docs/backlog/journey-focus/` — journey detail + focus: design, comps and
-  verdict, and the built screens' shots in `shots/`
-- `docs/backlog/board-v2/` — locked home/board design, comps8 sources and the
-  implementation verification report
-- `tools/` — verification instruments (`screenshot.js`, `shoot-states.js`,
-  `measure-open.js`, `make-icons.sh`) + the TfNSW probe and fixtures; read
-  `tools/README.md` before trusting or changing any of them
-- `web/` — the client: `index.html`, `app.css`, ES modules in `web/js`
-  (`rowmodel`, `journey`, `focus`, `storage`, `predict` are pure and unit
-  tested in `web/test`), plus the PWA shell: `manifest.webmanifest`, `sw.js`,
-  `icons/`. Screens: home/directions (`home.js`, route `#/`), the timeline
-  board (`board.js`, route `#/board`), journey detail (`detail.js`, route
-  `#/journey`), and setup.
-- `cmd/server` — backend entrypoint; `internal/tfnsw` — upstream client and
-  response mapping; `internal/cache` — TTL + single-flight + stale-on-error;
-  `internal/api` — handlers, cache headers, error contract
+- `cmd/server/` — Go entrypoint. It serves the API and `web/` at `/`.
+- `internal/api/` — handlers, validation, cache headers and error envelope.
+- `internal/cache/` — TTL cache, single-flight and stale-on-error behavior.
+- `internal/tfnsw/` — TfNSW client, upstream types and response mapping.
+- `web/` — dependency-free vanilla ES-module PWA, service worker and tests.
+- `tools/` — TfNSW probes, captured fixtures and browser verification tools.
+- `Dockerfile` and `docker-bake.hcl` — the production image build.
+- `../projects/stacks/ilovetrains/` — production compose/config in the infra
+  repository; it is not owned by this repository.
 
-## Deploy (syd1 VM, via the infra repo at ../projects)
+## Local development
 
-The app ships as ONE image (Go binary + `web/` baked in), built here and RUN
-by the infra repo's `stacks/ilovetrains/` compose stack behind the shared
-Caddy edge-proxy at ilovetrains.jeremyvun.com.
+Never read or source `.env` without explicit user permission. This includes
+commands that load it indirectly. Never print or commit `TFNSW_API_KEY`.
 
-1. Build + push the image (multi-arch, to the self-hosted registry):
-   `docker buildx bake --push` (see `docker-bake.hcl`; registry
-   registry.jeremyvun.com). Remember the sw.js `VERSION` bump rule below.
-2. If the stack/config changed: edit `../projects/stacks/ilovetrains/`
-   (compose + `config.env`; the secret `TFNSW_API_KEY` lives in that stack's
-   gitignored `secrets.env` — the infra repo's pre-commit hook seals it to
-   the committed `secrets.env.age`, and the VM decrypts it at reconcile).
-   Commit AND PUSH the infra repo — the VM pulls it from origin.
-3. Deploy: `cd ../projects && cli/deploy.sh ilovetrains`
-   (deployctl client → syd1 webhook; binary: `make build` in that repo or
-   `DEPLOYCTL_BIN=agent/deployctl/deployctl`).
-4. Verify: https://ilovetrains.jeremyvun.com/healthz then the board itself;
-   re-run `node tools/measure-open.js --url https://ilovetrains.jeremyvun.com/#/board`
-   for real-origin numbers.
+With `TFNSW_API_KEY` already present in the process environment:
 
-## Rules
+```sh
+go run ./cmd/server
+```
 
-- Server is stateless; personal data never leaves the device. Don't add
-  server-side user state without an owner ruling.
-- Contract docs update in the same change as the interface they describe.
-- Any deploy that changes a file in `web/sw.js`'s `SHELL` list must bump
-  `VERSION` in that file, or returning users keep the old shell.
+Open http://localhost:8080. Runtime variables are `TFNSW_API_KEY` (required),
+`PORT` (default `8080`), `WEB_DIR` (default `./web`) and
+`MIN_CONNECTION_TIME` (default `3m`).
+
+Primary test gates:
+
+```sh
+go test ./...
+(cd web && npm test)
+```
+
+The web client has no dependency installation or build step. There is no
+native client in this repository yet; the web app is the reference
+implementation every later port is measured against (see `docs/PROJECT.md`,
+"Native clients").
+
+## Verification and tools
+
+Read `tools/README.md` before trusting or modifying an instrument. In
+particular:
+
+- `tools/screenshot.js` captures a real Chromium viewport and checks for
+  viewport lies and horizontal overflow.
+- `tools/shoot-states.js` seeds and drives the real web client while checking
+  geometry, scrolling, tap targets and content reachability.
+- `tools/measure-open.js` measures cached paint and live-data timing.
+- `tools/probe-tfnsw.sh` makes live upstream requests and requires an API key;
+  use captured fixtures for normal tests.
+
+Visual behavior needs a real-client drive at the affected phone sizes and
+schemes. Unit tests alone do not prove layout, service-worker or offline
+behavior. Follow the exact invocation documented by each instrument before
+believing a failure.
+
+## Non-negotiable rules
+
+- The server remains stateless. Do not send location, saved trips, history,
+  rides or identity to it without an owner ruling and contract change.
+- The API key exists only in the server process.
+- Any change to a file listed in `web/sw.js`'s `SHELL` array must bump
+  `VERSION` in the same change. Returning browsers otherwise keep old code.
+- Develop service-worker changes with “Update on reload” or a throwaway
+  browser profile; the browser tools use a throwaway profile by default.
+- Push landed source changes to GitHub. A source push does not deploy the app;
+  production is built and deployed from this machine using the operations
+  runbook.

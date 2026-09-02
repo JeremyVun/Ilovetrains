@@ -1,4 +1,4 @@
-/* The experience bar, measured (docs/backlog/v1-core-loop/DESIGN.md):
+/* The experience bar, measured (docs/contracts/ui.md):
  *
  *   warm open → the predicted board is on screen  < 500ms  (from cache)
  *   live data replaces it                          < 2s     (working network)
@@ -159,7 +159,7 @@ async function main() {
       console.error('EXPERIENCE BAR NOT MET: ' + bar.join('; '));
       process.exitCode = 1;
     } else {
-      console.log('experience bar met (warm open, docs/backlog/v1-core-loop/DESIGN.md)');
+      console.log('experience bar met (warm open, docs/contracts/ui.md)');
     }
   } finally {
     fs.rmSync(work, { recursive: true, force: true, maxRetries: 5, retryDelay: 60 });

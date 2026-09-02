@@ -1,10 +1,7 @@
-/* Ported from docs/backlog/v1-core-loop/comps/base.css + b-editorial.html
-   (the calibration exemplar: comps/shots/b-editorial-390x844.png).
-   Type scale, spacing and colour values are the comp's, unchanged.
-
-   A printed timetable page: one column measure, one scale ladder,
+/* Implements the visual language in docs/contracts/ui.md: a printed timetable
+   page with one column measure, one scale ladder,
    letterspaced small-caps labels, one heavy rule under the masthead,
-   hairlines below it, colour once per screen as accent. System stack only —
+   hairlines below it, and line colour attached to each service. System stack only —
    no webfont may sit between a cold open and the answer. */
 
 :root {
@@ -29,14 +26,14 @@
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-/* ---- light scheme (owner ruling 2026-09-01 C) --------------------------- */
+/* ---- light scheme ------------------------------------------------------- */
 
 /* Not an inversion — a second printing of the same page. The dark palette's
    CONTRAST STRUCTURE is what carries over, and dark ink on paper does not
    reach it at the same alphas as light ink on black: ink-2 needs 0.75 here
    where it needs 0.66 there, ink-3 needs 0.60 against 0.46. Every value below
-   was measured (WCAG relative luminance), not eyeballed; the ratios are in
-   docs/STYLES.md beside the reasoning.
+   was measured (WCAG relative luminance), not eyeballed; the contrast roles
+   are fixed by docs/contracts/ui.md.
 
    The ground is warm paper (#FAF9F5), not #FFF: a language made entirely of
    hairlines and 250-weight numerals glares off pure white, and the exemplar's
@@ -55,7 +52,7 @@
 
     /* Darkened per line, hue and saturation held, lightness dropped only until
        the badge clears 4.5:1 as text. Four lines were already dark enough to
-       print unchanged. Measured ratios in docs/STYLES.md. */
+       print unchanged. Ratios are guarded by web/test/theme.test.js. */
     --line-T1: #A46204; /* 4.61 */  --line-T2: #0079A3; /* 4.68 */
     --line-T3: #BD4D0A; /* 4.71 */  --line-T4: #005AA3; /* 6.66, unchanged */
     --line-T5: #C4258F; /* 4.97, unchanged */
@@ -187,7 +184,7 @@ button { cursor: pointer; }
   display: block; margin-top: 9px; text-transform: uppercase;
 }
 .mins .prov.warn { color: var(--warn); }
-/* The hours figure's unit (ruling B): the numeral keeps the headline size and
+/* The rounded-hours contract: the numeral keeps the headline size and
    the H is set small beside it, on the same baseline, in the figure's own
    colour. Flat at the hero size "3H" is 91px in an 86px column. */
 .mins .unit { font-size: .40em; font-weight: 300; letter-spacing: 0; padding-left: .04em; }
@@ -217,10 +214,7 @@ button { cursor: pointer; }
 /* The cancelled-lead note takes the third line's slot rather than adding a
    fourth, so the row is three lines in every state. Same line box height.
 
-   Full label idiom, at every width (owner ruling 2026-09-01 A). The stopgap it
-   replaces set this one line at 9px/.05em — the only type on the board outside
-   the ladder — to fit the longer copy "…NEXT RUNNING SERVICE". The ruling
-   shortened the copy instead: "22:48 CANCELLED · NEXT TRAIN" measures 205px at
+   Full label idiom, at every width. "22:48 CANCELLED · NEXT TRAIN" measures 205px at
    10px/.14em, against a 210px body column on the narrowest phone we support. */
 .dest.note {
   font-size: 10px; font-weight: 600; letter-spacing: .14em; line-height: 19px;
@@ -231,13 +225,12 @@ button { cursor: pointer; }
 .row.first { padding-top: 24px; padding-bottom: 26px; }
 .row.first .dep { font-size: 23px; }
 
-/* A three-character figure is wider than the column at the headline size:
-   measured 129px against 86px on 2026-09-01, which ran the hero figure
-   straight through the departure time beside it. It steps down one size rather
-   than being clipped or allowed to eat the body column.
+/* A three-character figure measures 129px against the 86px headline column.
+   It steps down one size rather than being clipped or allowed to eat the body
+   column.
 
-   Ruling B retired the case that found this ("187" is "3H" now), but not the
-   rule: "Now" is three characters, and so is a service that rounds to ten
+   Rounded hours remove the case that found this ("187" is "3H" now), but not
+   the rule: "Now" is three characters, and so is a service that rounds to ten
    hours or more. Reachable, so kept — and the in-browser figure-overflow
    invariant would catch it going the other way. */
 .row.wide .mins { font-size: 44px; }
@@ -260,10 +253,9 @@ button { cursor: pointer; }
 .rows.stale .mins { min-height: 66px; }
 .rows.stale .row.first .mins { min-height: 87px; }
 /* The dimming belongs to the ROWS, not to the container. On the container it
-   also dimmed the one-line hint that stands in for them ("no board saved for
-   this trip yet") — and 55% of the coral over paper is 2.6:1, a washed salmon
-   (found in light-cold-offline, 2026-09-01). Nothing is more load-bearing than
-   the only sentence on the screen. */
+   also dims the one-line hint that stands in for them ("no board saved for
+   this trip yet"); 55% of the coral over paper is only 2.6:1. The only
+   sentence on the screen must remain readable. */
 .rows.stale .row { opacity: .55; }
 /* ...and a row on its way out still goes all the way out. */
 .rows .row.gone { opacity: 0; }
@@ -281,15 +273,12 @@ button { cursor: pointer; }
 }
 .ftr.offline { color: var(--warn); }
 
-/* ---- journey detail (A1 · Ledger) --------------------------------------- */
+/* ---- journey detail ----------------------------------------------------- */
 
-/* Ported from docs/backlog/journey-focus/comps/detail.css + a1-ledger.html
-   (the exemplar: comps/shots/a1-ledger-390x844-hero.png). The journey printed
-   in the board's own row grammar: three blocks in the same 86px + 1fr ladder —
-   leg, change, leg. The first leg keeps the board's first-row treatment
-   because it is still the number you came for. The change is made unmissable
-   STRUCTURALLY, not by out-shouting it: bracketed by the masthead's own heavy
-   rule, with its station name at the h1 step. */
+/* The journey uses the board's row grammar: leg, change, leg in the same 86px
+   + 1fr ladder. The first leg keeps the board's first-row treatment. The
+   change is bracketed by the masthead's heavy rule, with its station at the h1
+   step, as required by docs/contracts/ui.md. */
 
 .legs {
   /* The blocks sit tight together under the rule and the page's bottom margin
@@ -306,7 +295,7 @@ button { cursor: pointer; }
 .legs .row:last-child { border-bottom: 0; }
 
 /* The detail view relaxes the board's three-line invariant on the last line
-   only (owner ruling 2026-09-01): that invariant exists to stop a state change
+   only: that invariant exists to stop a state change
    pushing the sixth service past the fold, and a journey has two legs, not
    six. The longest real headsign on this corridor wraps rather than truncates. */
 .legs .dest { white-space: normal; overflow: visible; }
@@ -341,11 +330,9 @@ button { cursor: pointer; }
 .chg .meta .arw { color: var(--ink-3); padding: 0 5px; font-weight: 400; }
 .chg .dest { color: var(--ink-2); }
 .chg .dest del { color: var(--ink-3); }
-/* The tight connection states two times and two windows and makes NO claim
-   about whether you make it (A3, transplanted verbatim). The app has no data
-   that could support such a claim, and a wrong "you'll miss it" is the worst
-   error this screen can make. Corollary: the ARRIVAL figure is never coral —
-   only the change is, because only the change is at risk. */
+/* A tight connection states the available times and windows without claiming
+   whether the rider will make it. Only the change uses the warning colour;
+   the arrival figure does not. */
 .chg .warnline {
   margin-top: 8px; font-size: 10px; font-weight: 600; letter-spacing: .14em;
   line-height: 19px; text-transform: uppercase; color: var(--warn);
@@ -364,7 +351,7 @@ button { cursor: pointer; }
 /* An arrival that is not going to happen is struck, in the board's own idiom. */
 .tail.cx .t { text-decoration: line-through; text-decoration-thickness: 1.5px; color: var(--ink-3); }
 
-/* ---- focused strip (B2 · Footer rail) ----------------------------------- */
+/* ---- legacy focused strip ----------------------------------------------- */
 
 /* The focused journey is a board row that has moved to the bottom edge, under
    the masthead's own heavy rule printed a second time. It sits in thumb reach,

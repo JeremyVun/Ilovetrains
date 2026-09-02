@@ -8,11 +8,6 @@ is already there: minutes until departure, platform, realtime delay, arrival
 time. No search, no ads, no account. Save your trips once; the app learns
 which one you need from when you use it, entirely on your device.
 
-<p align="center">
-  <img src="docs/backlog/v1-core-loop/shots/on-time-390x844.png" width="300" alt="Departure board, dark" />
-  <img src="docs/backlog/v1-core-loop/shots/light-delayed-390x844.png" width="300" alt="Departure board with a delay, light" />
-</p>
-
 ## How it works
 
 ```
@@ -43,7 +38,7 @@ go run ./cmd/server         # serves web/ and the API on :8080
 
 Tests: `go test ./...` and `cd web && npm test` (no network, no npm deps).
 The docs are the real map: start at `CLAUDE.md`, then `docs/PROJECT.md`,
-`docs/contracts/` (binding interfaces) and `docs/STYLES.md` (binding design).
+`docs/contracts/` (binding API, state and UI behavior).
 
 ## Data
 

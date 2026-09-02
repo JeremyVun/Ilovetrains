@@ -1,5 +1,4 @@
-/* The journey detail view's markup — a port of comps/a1-ledger.html, wired to
-   live data. Structure, class names and type values are the comp's.
+/* Journey detail markup for the ledger contract in docs/contracts/ui.md.
 
    Split the same way board.js is: `detailHtml` builds the page, `patch`
    rewrites only the figures and the provenance labels, so the ledger counts

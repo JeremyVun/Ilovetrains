@@ -19,14 +19,13 @@ Invariants:
 
 ## GET /api/v1/departures?from={stopId}&to={stopId}&limit={n}&at={t}
 
-`at` (added 2026-09-01, board-v2; verified against live TfNSW the same day —
-see `docs/references/tfnsw-open-data.md` for the probe table): optional ISO
-8601 time with an offset (`2026-09-01T17:30:00+10:00` or the same instant as
-`...Z`). Absent = now — existing behaviour, cache policy and body unchanged
-except that `at` is then `null`. Present = journeys departing at or after time
-`t`, which the server rounds DOWN to a 10-minute bucket; the rounded value is
-echoed as `at` in the response so clients page on stable keys, and bucketing
-keeps the response a pure function of the query string.
+`at` is an optional ISO 8601 time with an offset
+(`2026-09-01T17:30:00+10:00` or the same instant as `...Z`). Absent means now
+and the response carries `at: null`. Present means journeys departing at or
+after time `t`, which the server rounds DOWN to a 10-minute bucket; the rounded
+value is echoed as `at` in the response so clients page on stable keys, and
+bucketing keeps the response a pure function of the query string. Upstream
+behavior for past windows is recorded in `docs/references/tfnsw-open-data.md`.
 
 Upstream answers past windows properly: it returns the journeys that departed
 in that window, and **for the recent past it returns realtime actuals, not the
@@ -118,8 +117,8 @@ Semantics:
 - `legs > 1` means a transfer is required; v1 clients may show a transfer
   badge but journeys are still ordered by departure time. `legs` counts
   services only — a walking transfer between platforms is not a leg.
-- `legDetail` (added 2026-09-01) lists the service legs in order, one entry
-  per train/metro service; same length as `legs`. Walking legs (upstream
+- `legDetail` lists the service legs in order, one entry per train/metro
+  service; same length as `legs`. Walking legs (upstream
   product class 99/100) are folded into the gap between service legs, never
   listed. Each leg:
 
@@ -143,18 +142,17 @@ Semantics:
   inside that gap — often there is no walking leg at all for a
   platform-to-platform change, so the gap is the only transfer signal).
   For single-leg journeys `legDetail` has one entry mirroring the journey's
-  own fields. This is an additive change: existing fields are unchanged and
-  the response stays a pure cached function of the query string — leg detail
-  comes from the same upstream `trip` call, no extra upstream cost.
-- Journeys containing any non-train/metro SERVICE leg (e.g. product class 10
-  "On Demand" buses, observed leaking past the exclMOT exclusions on
-  2026-09-01, fixture `trip_rhodes_bondijunction.json` journey 2) are
-  EXCLUDED entirely — v1 plans trains and metro only, and a journey you
-  cannot take by train is not an answer to this board's question. They are
+  own fields. Leg detail comes from the same upstream `trip` call with no
+  extra upstream request, so the response remains a pure cached function of
+  the query string.
+- Journeys containing any non-train/metro SERVICE leg, such as a product
+  class 10 "On Demand" bus, are EXCLUDED entirely — v1 plans trains and metro
+  only, and a journey you cannot take by train is not an answer to this
+  board's question. They are
   dropped before `limit` is applied, so a board still fills with up to
-  `limit` takeable journeys. The upstream request also sends `exclMOT_10=1`
-  (verified 2026-09-01 to remove them at the source); the server-side drop is
-  the guard for the next class that leaks.
+  `limit` takeable journeys. The upstream request also sends `exclMOT_10=1`;
+  the server-side drop guards against any excluded class that upstream still
+  returns.
 - Cancelled services are included with `cancelled: true` (clients render
   struck-through), never silently dropped. Detection is deliberately loose
   (any upstream realtime status containing "cancel"): the exact upstream shape
@@ -196,16 +194,16 @@ to train/metro stations only.
 }
 ```
 
-`location` (added 2026-09-01, board-v2): the station's WGS84 coordinates, from
-upstream's `coord` field, whose axis order was verified from real responses as
-`[latitude, longitude]` — Central is `[-33.884024, 151.206203]` (see
+`location` is the station's WGS84 coordinates from upstream's `coord` field,
+whose axis order is `[latitude, longitude]` — Central is
+`[-33.884024, 151.206203]` (see
 `docs/references/tfnsw-open-data.md`). `null` when upstream omits the pair or
 gives fewer than two values; never `{"lat": 0, "lon": 0}`, which is a point in
 the Atlantic that would win any nearest-station comparison outright. Every
 station in the captured fixtures carries coordinates, so `null` is a guard
-rather than an expected case. Powers the client-side geolocation term in trip
-prediction — the server never receives a user location, only publishes where
-stations are. No other field of this endpoint changed.
+rather than an expected case. It powers the client-side geolocation term in
+trip prediction — the server never receives a user location, only publishes
+where stations are.
 
 ## GET /healthz
 
@@ -233,7 +231,7 @@ is set so a cross-origin client can read it. Clients showing stale data must
 indicate its age.
 
 The 10-minute stale window applies to departures only. For `/api/v1/stops`
-the stale window is 7 days (owner ruling 2026-08-31): the station list is
+the stale window is 7 days: the station list is
 near-static, so during a long TfNSW outage station search keeps working from
 a stale index rather than returning 502.
 
@@ -243,11 +241,11 @@ a stale index rather than returning 502.
 routes always take precedence, and unknown `/api/` paths return the JSON error
 envelope rather than falling through to the file server.
 
-Every static response carries `Cache-Control: no-cache` (added 2026-09-01):
-absent an explicit header Cloudflare edge-caches static extensions for 4h,
-which held back a deployed service-worker bump. no-cache = revalidate
-(Last-Modified 304s), not don't-store; client-side speed comes from the
-service worker, and `sw.js` must never be served stale by a proxy.
+Every static response carries `Cache-Control: no-cache`. Without an explicit
+header, Cloudflare can edge-cache static extensions for hours and delay a
+service-worker update. `no-cache` means revalidate (`Last-Modified` 304s), not
+don't-store; client-side speed comes from the service worker, and `sw.js` must
+never be served stale by a proxy.
 
 The client is a PWA, so two of those files are load-bearing:
 `/manifest.webmanifest` must be served as `application/manifest+json` (the

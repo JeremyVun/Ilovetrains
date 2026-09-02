@@ -36,8 +36,8 @@ const (
 	// the more truthful answer.
 	departuresPastTTL = time.Hour
 
-	// The contract's stale-on-upstream-failure windows (owner ruling
-	// 2026-08-31): departures data ages badly, the near-static station list
+	// The contract's stale-on-upstream-failure windows differ because
+	// departures data ages badly while the near-static station list
 	// does not, so a week-old search index beats a 502 during a long outage.
 	// A past window has already happened, so a day-old copy of it is exactly as
 	// true as a fresh fetch — matching the stale-while-revalidate we advertise.

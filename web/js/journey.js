@@ -1,18 +1,16 @@
-/* The journey detail view's data model — a port of comps/a1-ledger.html
-   (docs/backlog/journey-focus/comps/shots/a1-ledger-390x844-hero.png, the
-   exemplar) with the transplants docs/STYLES.md ruled in. Pure: a journey
-   object from /api/v1/departures plus `now` in, render-ready blocks out. No
-   DOM, no fetch, no clock reads.
+/* The journey detail view's data model, implementing docs/contracts/ui.md.
+   Pure: a journey object from /api/v1/departures plus `now` in, render-ready
+   blocks out. No DOM, fetch or clock reads.
 
    The detail view is the board's own row grammar, three blocks deep: leg,
-   change, leg. It is EXEMPT from the board's three-line invariant (owner
-   ruling 2026-09-01) — a journey has two legs, not six, so the third line may
+   change, leg. It is EXEMPT from the board's three-line invariant — a journey
+   has two legs, not six, so the third line may
    wrap rather than truncate. What it is not exempt from is the rule the
    invariant serves: every figure states its provenance, and the vocabulary is
    closed (MIN / DEPARTING / SCHEDULED / N MIN LATE / CANCELLED / TO CHANGE /
-   ON BOARD / MIN TO GO).
+   ON BOARD / TO GO).
 
-   Two rules from the comps round bind the arithmetic here:
+   Two rules bind the arithmetic here:
    - Change windows are measured between CLOCK MINUTES (time.js's floor rule),
      so the change figure can never disagree with the two times printed beside
      it. The real 4-minute change on this corridor — 11:08:42 into Town Hall,
@@ -27,9 +25,8 @@ import { parseIso, clock, minutesUntil, countdownFigure } from './time.js';
 import { lineColour } from './lines.js';
 import { shortName } from './dom.js';
 
-/* A change window this short is worth colouring even when nothing has gone
-   wrong: tight connections are normal on this corridor (DESIGN.md), so the
-   treatment is not an edge case. */
+/* A change this short is worth colouring even when realtime did not shrink
+   it; short scheduled connections are normal. */
 export const TIGHT_CHANGE_MIN = 5;
 
 /** The time a leg actually happens at: the estimate when the leg is realtime
@@ -96,7 +93,7 @@ function platformOf(place) {
  *
  * Four states the board does not have, and one it does:
  * - WAITING: the board's own row, figure counting to departure.
- * - ON BOARD (transplant from A2, owner ruling): you are riding it, so the
+ * - ON BOARD: you are riding it, so the
  *   figure counts to the moment you step OFF and the platform printed is the
  *   one you step onto — "4 MIN" under a train you are already on would be a
  *   count of the wrong thing.
@@ -178,8 +175,8 @@ function legRow(leg, index, nowMs, stale) {
 
 /** The ON BOARD leg prints the arrival, not the departure: the fact you need
     on a train you are already on is when to stand up and where you land — and
-    the platform that matters is the one you step ONTO, not the one you
-    boarded from (A2, transplanted). */
+    the platform that matters is the one you step onto, not the one you
+    boarded from. */
 function ridingHeadline(row) {
   return {
     ...row,
@@ -229,8 +226,8 @@ function changeBlock(prev, next, nowMs, stale) {
     broken,
     done,
     arrTime: arrMs === null ? null : clock(arrMs),
-    // Both times, the timetabled one struck (A3, verbatim). Only when the
-    // window actually shrank: printing "was 4 min" beside a 4-minute change
+    // Both times, with the timetabled one struck. Only when the window
+    // actually shrank: printing "was 4 min" beside a 4-minute change
     // would be the page arguing with itself.
     arrStruck: shrunk && arrScheduled !== null ? clock(arrScheduled) : null,
     depTime: depMs === null ? null : clock(depMs),
@@ -298,7 +295,7 @@ export function journeyDetail(journey, nowMs, opts = {}) {
     lede: ledeFor(changes, arrTime),
     // The journey ends somewhere, and that platform is stated nowhere else on
     // the screen. Read from the leg that actually arrives, every render — a
-    // replacement service can land on a different platform (DESIGN.md).
+    // replacement service can land on a different platform.
     arrival: {
       time: arrTime,
       station: shortName((last.to && last.to.name) || opts.toName || ''),

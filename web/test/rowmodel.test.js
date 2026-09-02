@@ -132,8 +132,8 @@ test('departed services close the list upward; a shorter board distributes', () 
   assert.equal(m.rows[0].first, true);
 });
 
-/* Owner ruling 2026-09-01 (D): "Now / MIN" printed a unit under a figure that
-   is not a number of minutes. The slot names the event instead. */
+/* "Now / MIN" printed a unit under a figure that is not a number of minutes.
+   The slot names the event instead, as required by docs/contracts/ui.md. */
 test('a service leaving this minute reads Now, and the slot under it says DEPARTING', () => {
   const m = boardModel(
     body(baseJourneys(), '2026-08-31T22:48:00+10:00'),
@@ -168,8 +168,8 @@ test('DEPARTING never displaces a more specific provenance', () => {
   assert.equal(cxModel.rows[0].provenance, 'CANCELLED');
 });
 
-/* Owner ruling 2026-09-01 (B): past 99 minutes the figure changes unit. "187"
-   is true and unreadable; the clock time beside it already says 03:53 better. */
+/* Past 99 minutes the figure changes unit. "187" is true and unreadable; the
+   clock time beside it already says 03:53 better (docs/contracts/ui.md). */
 test('past 99 minutes the figure is rounded hours, not three digits', () => {
   const at = (mins) => {
     const t = new Date(NOW + mins * 60000).toISOString();
@@ -234,10 +234,8 @@ test('a missing generatedAt is treated as stale, not as fresh', () => {
   assert.equal(m.stale, true);
 });
 
-/* Found in the browser 2026-09-01: a first open with an empty cache printed
-   "OFFLINE · LAST UPDATED 0S AGO" under "no board saved for this trip yet" —
-   dating a board that had never been loaded, and calling a client that was
-   still waiting for its first answer offline. */
+/* A first open with an empty cache has no board timestamp and is not offline
+   while its first request is still pending. */
 test('a board that was never loaded reports no age', () => {
   const waiting = boardModel({}, NOW);
   assert.equal(waiting.footer.text, '', 'nothing has been updated yet');
@@ -258,13 +256,10 @@ test('a board that WAS loaded still reports its age', () => {
   assert.equal(old.footer.dot, 'stale');
 });
 
-/* Found live on the late-night board 2026-09-01: the next train was 187
-   minutes away and the hero figure, which has no clip and no ellipsis, was
-   drawn straight through the departure time beside it. Three characters do not
-   fit the figure column at the headline size, so the row has to say so.
-
-   Ruling B retired the three-DIGIT case, not the rule: "Now" is three
-   characters, and so is any service that rounds to ten hours or more. */
+/* Three characters do not fit the headline figure column, so the row must mark
+   them for the smaller type treatment. Rounded hours remove the three-digit
+   case, not the width rule: "Now" is
+   three characters, and so is any service that rounds to ten hours or more. */
 test('a figure of three characters marks itself wide', () => {
   const at = (mins) => {
     const t = new Date(NOW + mins * 60000).toISOString();
@@ -294,7 +289,7 @@ test('a figure of three characters marks itself wide', () => {
   assert.deepEqual(staleBoard.rows.map((r) => [r.figure, r.wide]), [['', false]]);
 });
 
-/* THE INVARIANT (docs/STYLES.md): three lines per row, in every state, so no
+/* THE INVARIANT (docs/contracts/ui.md): three lines per row, in every state, so no
    state change can reflow a row or push the sixth service below the fold. */
 test('every row is exactly three non-empty lines in every state', () => {
   const scenarios = {
@@ -334,8 +329,8 @@ test('past punctuality and elapsed figures require an actuals record', () => {
   }];
 
   const timetable = structuredClone(actual);
-  // Simulate the exact stale-cache defect: the journey-level delta survived,
-  // but the per-leg realtime gate says this is timetable-only.
+  // The journey-level delta may survive even when the per-leg realtime gate
+  // says this is timetable-only.
   timetable.legDetail[0].departure.estimated = null;
   timetable.legDetail[0].arrival.estimated = null;
   timetable.line = { ...timetable.line, name: 'T2' };

@@ -12,7 +12,7 @@ import {
 const detail = (journey, now = TRANSFER_NOW, opts) => journeyDetail(journey, now, opts);
 const blocksOf = (model, type) => model.blocks.filter((b) => b.type === type);
 
-test('the ledger prints leg, change, leg — the exemplar\'s three blocks', () => {
+test('journey detail prints leg, change, leg in travel order', () => {
   const m = detail(transferJourneys()[0]);
 
   assert.deepEqual(m.blocks.map((b) => b.type), ['leg', 'change', 'leg']);
@@ -81,7 +81,7 @@ test('a delayed first leg shrinks the change: both times, both windows, no verdi
   assert.equal(change.warnline, 'Printed change was 7 min');
   assert.equal(change.arrTime, '09:56');
   assert.equal(change.arrStruck, '09:51');
-  // The arrival figure is never coloured: only the change is at risk (A3).
+  // The arrival figure is never coloured: only the change is at risk.
   assert.equal(m.legs[1].kind, 'live');
 });
 
@@ -133,8 +133,8 @@ test('the detail view says WHICH leg is cancelled', () => {
 
 test('the arrival platform is read from the leg that actually arrives', () => {
   const journeys = transferJourneys();
-  // The real case (DESIGN.md): the 10:12 T4 lands on Bondi Junction Platform 1,
-  // not the 2 the 09:58 uses. Nothing may assume the platform is unchanged.
+  // The 10:12 T4 lands on Bondi Junction Platform 1, not the 2 the 09:58 uses.
+  // Nothing may assume the platform is unchanged.
   assert.equal(detail(journeys[0]).arrival.platform, '2');
   assert.equal(detail(journeys[1]).arrival.platform, '1');
 });
@@ -185,7 +185,7 @@ test('the leg you are riding counts to the door, not to a departure', () => {
   assert.equal(riding.time, '09:51');
   assert.equal(riding.tail, 'off at Town Hall');
   // The platform that matters on a train you are already on is the one you
-  // step onto (A2, transplanted).
+  // step onto.
   assert.equal(riding.platform, '3');
   assert.equal(m.departed, true);
   assert.equal(m.toGo, 21);

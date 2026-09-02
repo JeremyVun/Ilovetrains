@@ -48,7 +48,7 @@ Minute arithmetic is `web/js/time.js`'s: both sides floored to the clock minute,
 so the figure always agrees with the clock times printed beside it.
 
 **Frozen.** Zero-tap answer, honest states, no server-side user state. The focus
-strip (B2) and the journey detail (A1) exist and each direction had to show the
+strip and journey detail exist and each direction had to show the
 strip coexisting with its new navigation — see the `focused` frames.
 
 ---
@@ -71,13 +71,13 @@ visible without scrolling:
 
 **C4 is the only direction whose service count does not change between the two
 phones.** That is not a tie-break, it is the defect the owner personally hit last
-round — "the owner lost the sixth train on a real phone", `STYLES.md` — and only
+round — "the owner lost the sixth train on a real phone" — and only
 one of these four designs is structurally immune to it. Everything else on this
 page is a matter of taste; this is a measurement.
 
 ### 2. Complaint 3 cannot be satisfied without amending a binding rule
 
-`STYLES.md`: *"colour used once per screen as accent"*, and *"a filled chip would
+The inherited design rules said *"colour used once per screen as accent"* and *"a filled chip would
 be the only filled shape in a system made entirely of hairlines"*. Both were
 written deliberately and both are what the owner is now complaining about. Every
 direction in this round breaks one of them, and there is no version that does not:
@@ -171,7 +171,7 @@ live board's copy wins.
 `c1-platformtab-*.png`
 
 **The idea.** Keep the board's row grammar and answer the confusion by *species*:
-the minutes figure wears its unit welded to the numeral — the same lockup ruling B
+the minutes figure wears its unit welded to the numeral — the same rounded-hours lockup
 already invented for `3H`, promoted to every row — and the platform is lifted out
 of the 10.5px meta line into a labelled block of its own at the right edge, at
 28–32px under a `PLATFORM` label. Line colour becomes a 6px rail down the left of
@@ -248,8 +248,8 @@ crosses it. The only travelling element on the screen is `NOW`.
 new bottom masthead, and the row-rule-as-colour device.
 
 **Why this might be wrong — and it is the strongest objection in the round.** It
-contradicts the product's own stated intent: *"The primary read is one number:
-minutes until the next train"* (`STYLES.md`). The comp demotes that number to 27px
+contradicts the inherited intent: *"The primary read is one number: minutes
+until the next train"*. The comp demotes that number to 27px
 beside a 50px clock. It may well be that the owner's complaint is *"I confused the
 big number"*, not *"stop making a number big"*, in which case this direction
 answers a question he did not ask, at the cost of the thing he liked. Second
@@ -300,7 +300,7 @@ crossing block, a per-line ink table for the discs, and two node species.
 
 **Why this might be wrong.** The spine is the one device in the round that carries
 no information the clock times do not already carry — round 2 made exactly this
-objection to A2's rail and it stands. **It is explicitly NOT proportional**, and
+objection to the earlier decorative route spine and it stands. **It is explicitly NOT proportional**, and
 that matters: round 1 measured true-position spacing at ~9px/min on an 844px
 screen and found the claim survives only above ~8-minute headways, collapsing at
 peak (`d-river-390x844-long.png`). So this is a time axis that is not to scale —
@@ -310,7 +310,7 @@ screen here; on the `long` board it is six identical orange discs on an orange
 line, which is the finding above biting hardest.
 
 **Passes.** *Pass 1 → 2:* the comp rendered broken — **`.rail` collided with the
-shipped `.rail` in `base.css`** (the B2 footer band, `padding: 0 22px`), and with
+shipped `.rail` in `base.css`** (the footer focus band, `padding: 0 22px`), and with
 `box-sizing: border-box` a `width: 4px` rail was forced to 44px. Renamed to
 `.spine`. The `PLAT` label was being struck through by its own rail, so it now
 knocks the rail out behind it. *Pass 2 → 3:* past discs lost their platform digit
@@ -402,8 +402,7 @@ is a real answer: the prediction degrades silently to time-and-history.
 
 ## Additions to house vocabulary these comps need
 
-Each is an owner's call (`STYLES.md`: *"that list is the whole vocabulary; adding
-to it is an owner's call"*).
+Each requires a vocabulary change in `docs/contracts/ui.md`.
 
 1. **`TIMETABLE ONLY`** — the provenance for a past row whose realtime record has
    aged out or never existed. Non-negotiable given the two-register finding;
@@ -414,7 +413,7 @@ to it is an owner's call"*).
    (realtime-controlled and `estimated == planned`).
 3. **`DEPARTED`** as a past-tense provenance, if a direction keeps a figure slot on
    past rows.
-4. **The welded unit on every figure**, not just on `3H`. Ruling B invented the
+4. **The welded unit on every figure**, not just on `3H`. The rounded-hours rule introduced the
    lockup for the hours case; C1 and C4 argue it was always the answer to the
    confusion and the hours case just found it first.
 5. **A filled colour shape** (finding 2) and **colour more than once per screen**
@@ -515,7 +514,7 @@ busiest screen, and it costs M for an effect C4 gets from one 7px band.
   with an opaque origin, so `data.js` defines globals on purpose.
 - **`base.css` is `web/app.css` copied verbatim**, which means **every class name
   in the shipped app is live in your comp**. This cost a shoot cycle: `.rail` is
-  the B2 focused strip and carries `padding: 0 22px`, so a 4px `.rail` of your own
+  the legacy focused strip and carries `padding: 0 22px`, so a 4px `.rail` of your own
   is forced to 44px by `border-box`. Prefix or rename. `.row`, `.mins`, `.dep`,
   `.meta`, `.dest`, `.legs`, `.tail`, `.sheet`, `.field`, `.trip`, `.act` are all
   taken too.

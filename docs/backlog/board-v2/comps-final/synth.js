@@ -8,7 +8,7 @@
   /* ROUND 5: T2 SHIPS. The joined variant is deleted — the dwell gap stays and
      is bracketed by the alight numeral and the boarding numeral, strictly to
      scale (bar.js). `SY_STRIP` is the one thing the host page still varies, and
-     it is this round's open structural question: does the B2 focus strip survive
+     it is this round's open structural question: does the board focus strip survive
      now that the home smart header carries the tracked trip? */
   var STRIP = window.SY_STRIP !== false;
 
@@ -84,8 +84,8 @@
     /* The slot keeps its reserved height on every row and prints only when it
        has an exception or a tense to state — `ON TIME` is deleted (round 4). */
     var dep = r.past ? r.pastDep : r.dep;
-    /* The delay as BOTH numbers, the shipped idiom (STYLES, journey-focus
-       verdict): on a past row it is the whole punctuality claim, and it is why
+    /* The delay uses both numbers as required by docs/contracts/ui.md. On a
+       past row it is the whole punctuality claim, and it is why
        the provenance slot is free to say AGO. It is printed only where the
        record backs it — never on a timetable-only row. */
     var was = (r.pastStruck || (!r.past && r.planned))
@@ -112,7 +112,7 @@
       + '<span>Nothing scheduled after ' + last + '.</span></div>';
   }
 
-  /* THE B2 FOCUS STRIP, rebuilt in the directions grammar so the with/without
+  /* THE BOARD FOCUS STRIP, rebuilt in the directions grammar so the with/without
      comparison this round has to make is a fair one. It is the same object as
      the home header — same figure, same referent word, same instruction, same
      bar with the same marker — which is exactly the question: home header,
@@ -150,7 +150,7 @@
     if (m.rows[0] && m.rows[0].cx) note = m.rows[0].dep + ' cancelled &middot; next train';
     var fut = m.next.map(function (r, i) {
       /* A connection at risk replaces the headsign with the warning, exactly as
-         the cancelled lead does (STYLES ruling A's precedent). In t2 the coral
+         the cancelled lead does (the cancellation precedent in docs/contracts/ui.md). In t2 the coral
          gap says it in the picture as well; in t1 this line is the only place
          it can be said at all. */
       if (r.tight) return row(r, i, 'Tight change &middot; ' + r.chg.mins + ' min');

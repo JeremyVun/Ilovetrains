@@ -167,10 +167,10 @@
 }
 /* MEASURED, not chosen: `text-align: right` start-aligns an over-long line box,
    so the column is sized to the widest lockup the vocabulary can make — two
-   digits + `min`, `12H` past 99 minutes (STYLES ruling B), and `Now`, which is
+   digits + `min`, `12H` past 99 minutes (per docs/contracts/ui.md), and `Now`, which is
    the widest of the three and gets a step down. Measured through the real
    cascade (measure.js `lock`): Now 71/88, 12H 71/88, 78min 81/88, and even the
-   out-of-vocabulary 999min — which STYLES ruling B forbids by rounding past 99
+   out-of-vocabulary 999min — which docs/contracts/ui.md forbids by rounding past 99
    minutes to hours — clears at 86/88. The lead's figure was cut from 76px to
    72px for the same reason: it measured 116px in a 116px track, which is not a
    fit, it is a coincidence. */
@@ -219,9 +219,8 @@
 .sy-bar .sy-r.a { background: var(--stem); }
 .sy-bar .sy-r.b { background: var(--stem2); }
 .sy-bar .sy-g0 { background: var(--rule); }
-/* the one thing the gap can say that no other element on the row can — this
-   connection is at risk. STYLES already binds the treatment (A3's coral change
-   figure); this is that ruling drawn instead of written. */
+/* The gap alone can show that this connection is at risk. The UI contract's
+   warning treatment is drawn here instead of written. */
 .sy-bar .sy-g0.warn { background: var(--warn); }
 
 /* ---- THE TRANSFER, AS TWO PLATFORM BOXES (round 4, geometry corrected) -----
@@ -303,14 +302,14 @@
   font-size: 14px; font-weight: 300; line-height: 18px; color: var(--ink-2);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-/* STYLES ruling A, verbatim idiom: `09:24 CANCELLED · NEXT TRAIN`. */
+/* Cancellation idiom from docs/contracts/ui.md: `09:24 CANCELLED · NEXT TRAIN`. */
 .sy-sign.note {
   font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
   color: var(--warn); line-height: 18px;
 }
 
-/* the delay as BOTH numbers, the shipped idiom (STYLES, journey-focus verdict:
-   "timetabled time struck through beside the live one"). On a past row it is
+/* The delay uses both numbers, with the timetabled time struck beside the live
+   one as required by docs/contracts/ui.md. On a past row it is
    the whole punctuality claim, which is what frees the slot under the figure to
    say AGO; it is never printed on a timetable-only row. */
 .sy-was {
@@ -347,7 +346,7 @@
 
    DIMMING IS DONE IN TYPE COLOUR, not in a container opacity.  A descendant
    opacity multiplies (round 3 lost a cancelled numeral to .26 x .26), and 55%
-   of the coral on paper is a washed salmon (STYLES, light palette) — the one
+   of the coral on paper is a washed salmon (UI contract light palette) — the one
    thing on a past row that must not dim is the exception.  The colour device
    gets ONE opacity of its own, applied to the whole journey line, so the fill
    and its knocked-out ink dim together and the ratio between them survives. */
@@ -391,7 +390,7 @@
 }
 .sy-end span { display: block; margin-top: 8px; font-size: 14px; font-weight: 300; color: var(--ink-3); }
 
-/* ---- focused journey strip (B2), riding the bottom edge --------------------
+/* ---- legacy focused journey strip, riding the bottom edge ------------------
    Rebuilt this round in the directions grammar so that the question "does the
    strip survive now that the home header carries the tracked trip" is decided
    between two objects that say the SAME thing rather than between an old one and
@@ -449,7 +448,7 @@
 }
 
 /* ---- below 375px the page margin flexes, not the type ---------------------
-   The shipped rule (STYLES ruling A): the sheet gets narrower, so the margin
+   The sheet gets narrower, so the margin
    goes 22 -> 18 in proportion, and every measured string still sets whole. */
 @media (max-width: 375px) {
   .sy-mast { padding-left: 18px; padding-right: 18px; }

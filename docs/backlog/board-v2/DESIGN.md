@@ -29,9 +29,9 @@ designs are judged against these words):
   platform the figure — comps decide, complaint decides the winner. Line
   colour must be VISIBLE (complaint 3): the line's colour as a first-class
   element per row (rail/bar/badge at real size), not a 10px letterspaced
-  code. Still the B·Editorial language (STYLES.md) unless a comp proves the
-  language itself is the problem — flag that as an owner call, don't decide
-  it.
+  code. The visual language remains governed by `docs/contracts/ui.md`
+  unless a comp proves the language itself is the problem — flag that as an
+  owner call, don't decide it.
 - **Mobile-first navigation** (complaint 4): thumb-reach primary actions,
   obvious back affordance everywhere (EDIT is not a back button — detail
   view's BOARD label and trips' DONE have the same disease). Propose a
@@ -46,9 +46,9 @@ designs are judged against these words):
 
 ## Constraints carried forward
 
-- All existing binding rules (STYLES.md) hold on the board unless a comp
-  explicitly proposes an amendment as an owner call.
-- Focus strip (B2) and journey detail (A1) exist; v2 composition must keep
+- All rules in `docs/contracts/ui.md` hold on the board unless a comp explicitly
+  proposes an amendment as an owner call.
+- A board focus strip and journey detail exist; v2 composition must keep
   them coherent (the strip rides the board; detail is one tap from a row).
 - Zero-tap answer, honest states, speed budget — unchanged product law.
 
@@ -100,8 +100,7 @@ His words (near-verbatim, binding):
   scroll affordance; the board still lands at now and never opens scrolled).
   Probably no REVERSE button either ("I would never use it") — reversal is
   the smart header's job.
-- **Colour rules:** amend both binding STYLES.md rules — recorded there
-  ("Board v2 amendment").
+- **Colour rules:** amend both binding colour rules in `docs/contracts/ui.md`.
 - **Trip management defects (build scope):** the add-trip search must show
   the past 3 searches for the "from" and "to" fields (retyping is a bad
   experience); the station typeahead needs proper fuzzy ranking ("Rhode"
@@ -286,14 +285,14 @@ Two refinements that survive that ruling and cost no UI:
 riding / arrived, the next change with its platform and minutes, the
 tight-change flag (`TIGHT_CHANGE_MIN`), cancellation, and orders its third
 line as *what is wrong → what you must do → where you are going*. That is
-turn-by-turn logic; it currently renders as the B2 footer strip.
+turn-by-turn logic; it currently renders as the footer focus strip.
 
 The progress marker travels the row's coloured bar, which is also why the
 dwell gap is being reconsidered (Round 4): with a marker on it, the gap stops
 being empty space and becomes the place the marker travels toward, waits in,
 and leaves.
 
-**Open, to be settled by the comp round:** whether the B2 focus strip survives
+**Open, to be settled by the comp round:** whether the board focus strip survives
 once the header carries the active trip — home header, focus strip and journey
 detail would otherwise be three renderings of one object. Also whether the
 progress marker is driven by timetable + live estimates only (keeping the
@@ -302,8 +301,8 @@ than by continuous tracking.
 
 ## Round 6 verdict — design CLOSED (owner, 2026-09-02)
 
-Comps committed at `docs/backlog/board-v2/comps/`; exemplars named in
-`docs/STYLES.md` ("Board v2 verdict"). Four final calls:
+Comps committed at `docs/backlog/board-v2/comps/`; current behavior is folded
+into `docs/contracts/ui.md`. Four final calls:
 
 - **The progress marker stays continuous.** The owner accepts that the
   position is inferred from the clock rather than observed. The known gap it
@@ -311,7 +310,7 @@ Comps committed at `docs/backlog/board-v2/comps/`; exemplars named in
   and the header tells you to alight eleven minutes early) — is accepted, not
   solved; switching trips does not correct it. Revisit only if it bites in
   real use.
-- **The B2 focus strip is deleted.** Recorded in STYLES.md.
+- **The board focus strip is deleted.** Required by `docs/contracts/ui.md`.
 - **The empty page under three saved trips stays empty** (~230px above the
   thumb bar). The page ends when your trips end and "that's everything on this
   phone" says so; nothing is invented to fill it.

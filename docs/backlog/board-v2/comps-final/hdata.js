@@ -83,8 +83,8 @@ var WIDE = {
 };
 
 /* D8. The 09:39 is the fixture's own next service; `cancelled` carries the time
-   of the one that will not run, because the copy STYLES ruling A binds names it
-   in the same breath: `09:24 CANCELLED · NEXT TRAIN`. */
+   of the service that will not run because the cancellation copy names it in
+   the same breath: `09:24 CANCELLED · NEXT TRAIN` (docs/contracts/ui.md). */
 var CXL = {
   from: 'Rhodes', to: 'Bondi Junction', plat: '1',
   dep: '09:39', arr: '10:22', head: 'Gordon via Lindfield', arrPlat: '1',
@@ -265,7 +265,7 @@ function scenarioName() {
 }
 
 /* Knocked-out ink on a filled line colour, MEASURED against #F4F5F7 and
-   #0A0B0D (STYLES.md Board v2 amendment: text on a fill is set >=14px/700, the
+   #0A0B0D. Text on a fill is set >=14px/700, the
    3:1 large-text threshold, which every line clears).  White loses on
    T1/T2/T3/T7/T8/M1; on PAPER the fill's ink is the ground for every line. */
 var INK_ON = { T1: 'bg', T2: 'bg', T3: 'bg', T7: 'bg', T8: 'bg', M1: 'bg',

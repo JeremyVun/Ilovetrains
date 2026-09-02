@@ -104,10 +104,9 @@ export function parseDoc(raw) {
   if (v.lastViewed && typeof v.lastViewed.tripId === 'string' && DIRECTIONS.includes(v.lastViewed.direction)) {
     doc.lastViewed = { tripId: v.lastViewed.tripId, direction: v.lastViewed.direction };
   }
-  /* The focused journey (added 2026-09-01). Optional and self-describing, so
-     the migration is the absence of the key: a document written before this
-     shipped simply has no focus. A malformed one is dropped rather than
-     repaired — the directions it would draw are a claim about a train. */
+  /* The focused journey is optional and self-describing; absence means there
+     is no focus. A malformed one is dropped rather than repaired — the
+     directions it would draw are a claim about a train. */
   const f = v.focus;
   if (f && typeof f.tripId === 'string' && DIRECTIONS.includes(f.direction)
       && typeof f.focusedAt === 'string' && f.journey && typeof f.journey === 'object') {

@@ -23,18 +23,7 @@
  * Bump VERSION on every deploy that changes any file in SHELL.
  */
 
-/* v2: the light scheme, the shortened cancelled-lead copy and the hours figure
-   (owner rulings 2026-09-01) all live in index.html, app.css and js/ — every
-   one of them a cache-first shell file.
-   v4: the scrolling board (app.css) and the station-search policy (a new
-   module, js/search.js, plus setup.js and board.js) — same reason. A phone
-   that has already visited keeps the old, unscrollable shell until this
-   number changes.
-   v5: the journey detail view and focus (js/journey.js, js/detail.js,
-   js/focus.js, plus app.css, board.js, main.js, storage.js).
-   v6: board v2 timeline, home/directions, the shared journey time axis,
-   recent search and location-aware prediction. */
-const VERSION = 'v6';
+const VERSION = 'v7';
 const SHELL_CACHE = 'shell-' + VERSION;
 const DATA_CACHE = 'data-' + VERSION;
 

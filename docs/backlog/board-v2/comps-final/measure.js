@@ -35,7 +35,7 @@ function connect(url){return new Promise((res,rej)=>{const s=new WebSocket(url);
         start-aligns an over-long line box, so a right-aligned figure silently
         invades the column to its LEFT and no overflow probe fires. Measure the
         WIDEST lockup the vocabulary can produce against its track, not the
-        scenario's actual value: the figure must hold "12H" (STYLES ruling B),
+        scenario's actual value: the figure must hold "12H" (per docs/contracts/ui.md),
         "78min" and "Now"; the provenance slot "6 MIN LATE"; the cap a two-digit
         platform; the third line the cancelled-lead copy. */
      const M=(t,cls)=>{const e=q(cls); if(!e) return null; const c=e.cloneNode(false);

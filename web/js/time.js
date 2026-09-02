@@ -22,7 +22,7 @@ export function minutesUntil(ms, nowMs) {
   return Math.floor(ms / MINUTE) - Math.floor(nowMs / MINUTE);
 }
 
-/** A count of minutes as the ladder prints it (owner ruling 2026-09-01 B):
+/** A count of minutes as the ladder prints it:
     "Now" for the minute a thing happens in, minutes up to 99, rounded hours
     beyond that — three digits of minutes is arithmetic, and the clock time
     beside the figure already said it better. Shared by the board's rows, the

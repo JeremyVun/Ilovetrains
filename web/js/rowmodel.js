@@ -1,27 +1,25 @@
 /* The departure board's data model. Pure: an API body plus `now` in, a
    render-ready board out. No DOM, no fetch, no clock reads.
 
-   THE RULE (docs/STYLES.md, binding): the slot under the figure always states
-   that figure's provenance — MIN / DEPARTING / SCHEDULED / N MIN LATE /
-   CANCELLED — and every row is exactly three lines in every state, so no delay,
-   cancellation or missing feed can push the sixth service past the fold.
-   `rowLines()` is that invariant, written down. */
+   THE RULE (docs/contracts/ui.md, binding): the slot under the figure reserves
+   room for interpretation-changing provenance — DEPARTING / SCHEDULED /
+   N MIN LATE / CANCELLED — and every row body is exactly three lines in every
+   state, so no delay, cancellation or missing feed can push the sixth service
+   past the fold. `rowLines()` is that invariant, written down. */
 
 import { parseIso, clock, minutesUntil, ageLabel, countdownFigure } from './time.js';
 import { lineColour } from './lines.js';
 import { journeyKey } from './journey.js';
 
 /* 30s refresh cadence plus margin: past this, a countdown is a claim the data
-   cannot support (owner ruling 2026-08-31). */
+   cannot support. */
 export const STALE_MS = 90_000;
 const LIVE_DOT_MS = 45_000;
 
-/* Owner ruling 2026-09-01 (A): the note is set at the full label idiom on every
-   width, so the copy is the length the idiom can print — "train" is also the
-   product's own noun where "running service" is operator vocabulary. */
+/* The contract copy fits the full label idiom at every supported width. */
 export const CANCELLED_LEAD_NOTE = (time) => time + ' cancelled · next train';
 
-/* Owner ruling 2026-09-01 (B): past 99 minutes the figure changes unit rather
+/* Past 99 minutes the figure changes unit rather
    than growing a third digit. "187" is arithmetically true and unreadable —
    the clock time beside it already says 03:53 better than three digits do.
    The rule itself is `countdownFigure` in time.js, shared with the journey
@@ -80,9 +78,9 @@ export function boardModel(body, nowMs, opts = {}) {
 }
 
 /** The figure in the big slot: a dash for a cancellation, nothing at all off
-    stale data (owner ruling: a countdown from an old cache is a lie), "Now" for
+    stale data (a countdown from an old cache is a lie), "Now" for
     the minute a service is leaving in, minutes up to 99, and rounded hours
-    beyond that (owner ruling B) — the unit changes so the figure stays one
+    beyond that — the unit changes so the figure stays one
     glance wide. */
 function figureFor(cancelled, stale, mins) {
   if (cancelled) return '–';
@@ -128,8 +126,8 @@ function journeyRow(journey, nowMs, stale, opts) {
   else if (delayMin > 0) { kind = 'late'; provenance = past ? 'AGO' : delayMin + ' MIN LATE'; }
   else if (past) { kind = 'live'; provenance = 'AGO'; }
   else if (!realtime || stale) { kind = 'sched'; provenance = 'SCHEDULED'; }
-  // Owner ruling 2026-09-01 (D): the figure "Now" is not a count of minutes,
-  // so the slot under it names what is happening instead of its unit.
+  // "Now" is not a count of minutes, so the slot under it names what is
+  // happening instead of its unit (docs/contracts/ui.md).
   else { kind = 'live'; provenance = mins <= 0 ? 'DEPARTING' : ''; }
 
   const figure = past
@@ -147,10 +145,9 @@ function journeyRow(journey, nowMs, stale, opts) {
     effectiveMs: effective,
     journey,
     first: false,
-    // Three characters do not fit the figure column at the board's headline
-    // size — measured 129px in an 86px column, which put the hero figure
-    // through the departure time on the late-night board. Ruling B retired the
-    // three-DIGIT case ("187" is "3H" now), but three characters are still
+    // Three characters measure 129px in the 86px headline figure column.
+    // Rounded hours remove the three-digit case ("187" is "3H"), but three
+    // characters are still
     // reachable two ways: "Now", and a service far enough out to round to ten
     // hours or more ("10H"). The row says so and the stylesheet sizes it down.
     wide: figure.length >= 3,

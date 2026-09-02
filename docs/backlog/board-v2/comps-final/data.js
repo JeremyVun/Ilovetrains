@@ -83,7 +83,8 @@ function span2(a, b) {
   return d < 0 ? d + 1440 : d;
 }
 
-/* STYLES ruling B, one helper for both halves of the board: past 99 minutes the
+/* The rounded-hours rule in docs/contracts/ui.md, one helper for both halves of
+   the board: past 99 minutes the
    figure is rounded hours, so the elapsed figure of an old past row obeys the
    same rule the countdown does and the track is sized once for both. */
 function figOf(n) { return n > 99 ? Math.round(n / 60) + 'H' : String(n); }
@@ -219,7 +220,7 @@ function model(name) {
       : r.m === 0 ? 'DEPARTING'
       : r.sched ? 'SCHEDULED' : '';
     /* One figure rule for both halves of the board: the magnitude, in minutes,
-       rounded to hours past 99 (STYLES ruling B). Ahead it counts down; behind
+       rounded to hours past 99 (per docs/contracts/ui.md). Ahead it counts down; behind
        it counts up, and the word under it says which. */
     r.fig = r.cx ? '—' : r.past ? figOf(r.ago) : r.m === 0 ? 'Now' : figOf(r.m);
     return r;
@@ -241,8 +242,8 @@ function scenarioName() {
 
 /* VOCABULARY CHANGES THIS ROUND, both owner's calls and both already ruled:
    - `ON TIME` is DELETED (round 4). The slot is silent on an ordinary service.
-   - `AGO` is ADDED, and it is the only past-tense word on the board. STYLES.md
-     says adding to the vocabulary is an owner's call; the owner made it
+   - `AGO` is ADDED, and it is the only past-tense word on the board. It is now
+     part of the vocabulary in docs/contracts/ui.md; the owner requested it
      ("greyed out with the verb 'ago' underneath the time").
    `DEPARTED`, proposed in round 3, is gone with the log-line past register that
    needed it — a dimmed row above the NOW rule saying `18min AGO` has no use for

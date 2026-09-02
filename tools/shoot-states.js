@@ -1,6 +1,6 @@
 /* Drive the REAL client into each board state and shoot it.
  *
- *   node tools/shoot-states.js                 # every state, into docs/.../shots
+ *   node tools/shoot-states.js                 # every state, into the system temp directory
  *   node tools/shoot-states.js stale sparse    # just these
  *   node tools/shoot-states.js --list
  *   node tools/shoot-states.js --url http://localhost:8092 --out /tmp/look
@@ -40,11 +40,10 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 
 const ROOT = path.resolve(__dirname, '..');
-const DEFAULT_OUT = path.join(ROOT, 'docs/backlog/v1-core-loop/shots');
+const DEFAULT_OUT = path.join(os.tmpdir(), 'trains-states');
 const DEFAULT_URL = 'http://localhost:8092/';
 
-/* The exemplar's moment: 22:45 on Monday 31 August 2026, the clock the
-   comps were drawn at (comps/shots/b-editorial-390x844.png). */
+/* The fixture's pinned moment: 22:45 on Monday 31 August 2026. */
 const NOW_ISO = '2026-08-31T22:45:00+10:00';
 const NOW = Date.parse(NOW_ISO);
 
@@ -76,9 +75,8 @@ const TRIP_2 = {
   to: { id: '213910', name: 'Epping Station' },
   createdAt: '2026-08-10T08:00:00+10:00'
 };
-/* The transfer corridor: the journey-focus round's own data, so the detail
-   shots and the exemplar (comps/shots/a1-ledger-390x844-hero.png) describe the
-   same six real T9 → T4 services. */
+/* The transfer corridor uses the captured fixture shared with the unit tests:
+   six real T9 → T4 services. */
 const TRIP_TRANSFER = {
   id: 'trip-rhodes-bondi',
   from: { id: '213820', name: 'Rhodes Station' },
@@ -293,10 +291,8 @@ async function states() {
     journeys: [reverseJourney]
   };
 
-  /* The late-night board, which is what Sydney actually shows between the last
-     service and the first: waits of three digits, no realtime control on any
-     of them. Found live 2026-09-01 at 00:47 — every seeded state until then
-     had a one- or two-digit figure. */
+  /* A late-night board between the last service and the first: waits beyond 99
+     minutes, with no realtime control on any service. */
   const lateNight = [187, 216, 221, 240, 251, 266].map((mins, i) => ({
     departure: {
       scheduled: new Date(NOW + mins * 60000).toISOString(),
@@ -349,7 +345,7 @@ async function states() {
     board('stale-departed', departuresBody(), { now: Date.parse('2026-08-31T23:05:00+10:00') }),
 
     // Caught mid-dissolve: the 22:48 service has just left, its row is fading
-    // and the list is about to close upward (~240ms, docs/STYLES.md).
+    // and the list is about to close upward during its transition.
     board('dissolve', departuresBody(), {
       // No sleep: screenshot.js's own 120ms settle lands the capture around
       // half way through the 240ms fade, which is the only moment it exists.
@@ -402,7 +398,7 @@ async function states() {
 
     // The longest real strings on any of these corridors: nothing abbreviated,
     // the third line allowed to wrap rather than truncate (the detail view's
-    // exemption from the three-line invariant, owner ruling 2026-09-01).
+    // exemption from the three-line invariant in docs/contracts/ui.md).
     {
       name: 'detail-long',
       seed: doc({ trips: [TRIP_LONG], body: longBody(), fetchedAt: TRANSFER_AT, hist: [] }),
@@ -430,8 +426,8 @@ async function states() {
       focus: transferJourneys()[0], after: SCROLL_TO_END
     }),
 
-    // 09:47: the focused journey has left the board and the snapshot carries
-    // it. B3's departed copy, and the masthead's second kicker.
+    // 09:47: the focused journey has left the live board, while its snapshot
+    // remains available to home and journey detail.
     transfer('board-focused-departed', transferJourneys().slice(2), {
       focus: transferJourneys()[0],
       now: TRANSFER_DEPARTED_NOW,
@@ -551,7 +547,7 @@ function pageScript(state) {
     }
 
     for (const row of rowEls) {
-      // docs/STYLES.md, binding: three lines per row, in every state.
+      // docs/contracts/ui.md, binding: three lines per row, in every state.
       const lines = ['.sy-t', '.sy-j', '.sy-sign'].map((s) => row.querySelector(s));
       if (lines.some((el) => !el || !el.textContent.trim())) problems.push('row is not three full lines');
       // The figure must fit its column: it has no ellipsis and nothing clips
@@ -606,7 +602,7 @@ function pageScript(state) {
         && Math.abs(fromTime.getBoundingClientRect().top - toTime.getBoundingClientRect().top) > 0.1) {
       problems.push('home endpoint times are vertically misaligned');
     }
-    if (document.querySelector('.rail')) problems.push('deleted B2 focus strip is still rendered');
+    if (document.querySelector('.rail')) problems.push('deleted board focus strip is still rendered');
 
     const timeline = document.querySelector('.sy-tl');
     const futureRows = timeline ? [...timeline.querySelectorAll('.sy-fwd > .sy-row')] : [];
@@ -735,6 +731,7 @@ async function main() {
 
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'trains-states-'));
   const env = { ...process.env, TZ: 'Australia/Sydney' };
+  fs.mkdirSync(out, { recursive: true });
 
   try {
     for (const state of chosen) {
