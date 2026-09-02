@@ -62,14 +62,24 @@ test('a cancelled lead never silently skips: the next running service says so', 
   const m = boardModel(body(js), NOW);
 
   assert.equal(m.rows[0].cancelled, true);
-  assert.equal(m.rows[0].figure, '–');
+  assert.equal(m.rows[0].figure, '—');
   assert.equal(m.rows[0].provenance, 'CANCELLED');
-  assert.equal(m.rows[0].arrTime, null);
+  assert.equal(m.rows[0].arrTime, '23:17', 'the timetabled arrival survives the cancellation');
   assert.equal(m.rows[1].note, '22:48 cancelled · next train');
   // The note belongs to the next RUNNING service, and only to it.
   assert.equal(m.rows[0].note, null);
   assert.equal(m.rows[3].note, null);
   assert.equal(m.rows[3].provenance, 'CANCELLED');
+});
+
+test('a cancelled row prints an em dash and keeps the arrival it promised', () => {
+  const js = baseJourneys();
+  cancel(js[0]);
+  const row = boardModel(body(js), NOW).rows[0];
+
+  assert.equal(row.figure, '\u2014', 'the cancelled figure is an em dash, not an en dash');
+  assert.equal(row.arrTime, '23:17');
+  assert.equal(rowLines(row)[0], '22:48 arrives 23:17');
 });
 
 test('a running lead carries no cancellation note', () => {
@@ -108,7 +118,7 @@ test('a stale cancelled row keeps saying cancelled', () => {
   const js = baseJourneys();
   cancel(js[0]);
   const m = boardModel(body(js, new Date(NOW - 300_000).toISOString()), NOW);
-  assert.equal(m.rows[0].figure, '–');
+  assert.equal(m.rows[0].figure, '—');
   assert.equal(m.rows[0].provenance, 'CANCELLED');
 });
 
@@ -284,7 +294,7 @@ test('a figure of three characters marks itself wide', () => {
 
   // A cancelled row's dash and a stale row's empty slot are not wide.
   const cancelled = boardModel({ generatedAt: new Date(NOW).toISOString(), journeys: [cancel(at(187))] }, NOW);
-  assert.deepEqual(cancelled.rows.map((r) => [r.figure, r.wide]), [['–', false]]);
+  assert.deepEqual(cancelled.rows.map((r) => [r.figure, r.wide]), [['—', false]]);
   const staleBoard = boardModel({ generatedAt: new Date(NOW - 4 * 3600_000).toISOString(), journeys: [at(187)] }, NOW);
   assert.deepEqual(staleBoard.rows.map((r) => [r.figure, r.wide]), [['', false]]);
 });

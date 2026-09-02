@@ -82,8 +82,10 @@ export function boardModel(body, nowMs, opts = {}) {
     the minute a service is leaving in, minutes up to 99, and rounded hours
     beyond that — the unit changes so the figure stays one
     glance wide. */
+export const CANCELLED_FIGURE = '—';
+
 function figureFor(cancelled, stale, mins) {
-  if (cancelled) return '–';
+  if (cancelled) return CANCELLED_FIGURE;
   if (stale) return '';
   return countdownFigure(mins);
 }
@@ -131,7 +133,7 @@ function journeyRow(journey, nowMs, stale, opts) {
   else { kind = 'live'; provenance = mins <= 0 ? 'DEPARTING' : ''; }
 
   const figure = past
-    ? (actual && !cancelled ? countdownFigure(Math.max(0, -mins)) : (cancelled ? '–' : ''))
+    ? (actual && !cancelled ? countdownFigure(Math.max(0, -mins)) : (cancelled ? CANCELLED_FIGURE : ''))
     : figureFor(cancelled, stale, mins);
 
   const lineCode = (journey.line && journey.line.name) || '';
@@ -166,7 +168,8 @@ function journeyRow(journey, nowMs, stale, opts) {
     // A timetable-only row may carry a stale delta in malformed/cached input;
     // neither number is allowed to become a punctuality claim without actuals.
     schedTime: delayMin > 0 && scheduled !== null && (!past || actual) ? clock(scheduled) : null,
-    arrTime: cancelled || arrivalMs === null ? null : clock(arrivalMs),
+    // A cancelled row keeps its arrival: it is what the next train is judged against.
+    arrTime: arrivalMs === null ? null : clock(arrivalMs),
     platform: dep.platform ? String(dep.platform).replace(/^platform\s+/i, '') : null,
     lineCode,
     lineColour: lineColour(lineCode),
