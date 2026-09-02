@@ -202,8 +202,8 @@ function tripRowHtml(entry) {
     : codes.length === 1
       ? `${badge(codes[0])}${esc(entry.from)} <em>→</em> ${esc(entry.to)}`
       : `${esc(entry.from)} <em>→</em> ${esc(entry.to)}`;
-  const status = entry.selected ? '<b>Tracking now</b>' : entry.distance;
-  const sub = [status, entry.ridden].filter(Boolean).join(' · ');
+  const lead = entry.selected ? 'Tracking now' : entry.distance;
+  const sub = [lead ? `<b>${lead}</b>` : '', entry.ridden].filter(Boolean).join(' · ');
   return `<button class="tripr${entry.selected ? ' top' : ''}" data-svc data-act="select-trip" data-id="${esc(entry.trip.id)}" data-direction="${esc(entry.direction)}">
     <span class="hm-in">${spine}<span class="hm-bd"><span class="hm-nm">${name}</span><span class="hm-sub">${sub}</span></span></span>
   </button>`;

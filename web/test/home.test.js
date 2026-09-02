@@ -102,6 +102,31 @@ test('a delayed smart-header train names the delay beside its effective time', (
   assert.equal(model.provenanceWarn, true);
 });
 
+test('every saved-trip row leads with its distance in bold, not just the tracked one', () => {
+  const station = (id, name, lat, lon) => ({ id, name, location: { lat, lon } });
+  const trip = (id, from, to) => ({ id, from, to, createdAt: new Date(0).toISOString() });
+  const doc = {
+    ...emptyDoc(),
+    trips: [
+      trip('t1', station('213820', 'Rhodes Station', -33.8299, 151.0866),
+        station('200080', 'Bondi Junction Station', -33.8915, 151.2477)),
+      trip('t2', station('200060', 'Central Station', -33.8832, 151.2069),
+        station('215020', 'Parramatta Station', -33.8172, 151.0050))
+    ]
+  };
+  const model = homeModel(doc, { tripId: 't1', direction: 'forward' }, null, at('09:21'), {
+    fix: { lat: -33.8299, lon: 151.0866 }
+  });
+  const html = homeHtml(model);
+
+  assert.deepEqual(model.ranked.map((entry) => entry.selected), [true, false]);
+  assert.ok(model.ranked[1].distance, 'the unselected row has a distance to print');
+  assert.ok(html.includes(`<b>${model.ranked[1].distance}</b>`),
+    'the distance is bold on an unselected row');
+  assert.ok(html.includes('<b>Tracking now</b>'), 'and the tracked row still says so');
+});
+
+
 /* homeHtml only reads `directions` and `ranked`; the rest of the model is the
    screen around the header. */
 function headerOnly(directions, ranked = []) {
