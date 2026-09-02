@@ -135,6 +135,9 @@ export function directionsModel(value, nowMs, opts = {}) {
     progress: { at, phase: 'pre' },
     showBoardingPlatform: true,
     warn: false,
+    // Separate from `warn`: a cancellation warns in words, but its connection
+    // is not at risk, and only risk may paint the transfer gap (ui.md).
+    tight: false,
     provenanceWarn: false,
     receipt: opts.receipt || '',
     changes
@@ -207,6 +210,7 @@ export function directionsModel(value, nowMs, opts = {}) {
     && (change.departure === null || nowMs < change.departure));
   if (risk) {
     model.warn = true;
+    model.tight = true;
     model.instruction = `Tight change · ${risk.minutes} min`
       + (risk.toPlatform ? ` · Platform ${risk.toPlatform}` : '');
     if (risk.printed !== null && risk.minutes < risk.printed) {

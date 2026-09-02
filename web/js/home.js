@@ -152,7 +152,7 @@ export function homeHtml(model) {
   const device = journey ? journeyDeviceHtml(journey, {
     caps: true,
     progress: d.progress,
-    tight: d.warn,
+    tight: d.tight,
     showBoardingPlatform: d.showBoardingPlatform
   }) : { html: '<span class="sy-j"><span class="sy-bar"></span></span>', vars: '' };
   const tracking = `Tracking · ${shortName(d.from)} → ${shortName(d.to)}`;
