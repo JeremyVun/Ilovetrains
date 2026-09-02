@@ -191,14 +191,20 @@ skill carries the full method; the shape is:
 
 Because this loop is how the product moves, **the tooling that makes a
 high-quality, detailed comp board cheap and fast is product infrastructure,
-not scaffolding.** Each round so far has re-inherited a `shoot.js`, a
-`base.css`, a `data.js` and an `index.html` sheet by copying the previous
-round's; the repo tools (`tools/screenshot.js`, `tools/shoot-states.js`) hold
-the instrument traps that make a screenshot trustworthy (viewport clamping,
-missing viewport meta, invisible overflow, orphaned Chrome, lazy localStorage
-flush). Any session touching this loop should leave it cheaper for the next
-one: reusable harnesses over per-round copies, documented traps, measured
-probes (tap targets, scroll position, axis geometry) alongside the shots.
+not scaffolding.** It lives in `tools/comps/` (2026-09-02): a round is
+scaffolded, shot and assembled in three commands, and every instrument trap
+found the hard way is code there with one line saying what breaks without it.
+The workshop's `base.css` is copied verbatim from `web/app.css` with its git
+blob hash and its data is generated from `tools/fixtures/`, so a comp cannot
+drift from the product's language or invent a departure; every synthetic delta
+is declared in the data file and named in the sheet's lede. The measured probes
+(tap targets, scroll position and whole-item counts against the scroller, text
+spill, widest-legal-lockup track stress, time-axis geometry) ship with the
+shots, and its acceptance oracle reproduces every frame in
+`assets/comps/latest/` pixel-identically. Read `tools/comps/README.md`; the
+other instruments (`tools/screenshot.js`, `tools/shoot-states.js`) shoot the
+BUILT client and hold the same traps. Any session touching this loop should
+leave it cheaper for the next one.
 
 ## Shape
 

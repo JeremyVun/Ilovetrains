@@ -10,7 +10,37 @@
   it, checking the board's invariants in the browser as it goes.
 - `measure-open.js` — the experience bar in milliseconds, from the page's own
   Performance API.
+- `comps/` — the design-comps harness: scaffold a round, shoot the matrix of
+  concepts × scenarios × frames × schemes with measured probes, build the
+  contact sheet. Read `comps/README.md`.
 - `icon.html` + `make-icons.sh` — regenerate the PWA icons through the browser.
+
+## comps/
+
+A round is a directory of HTML plus a one-line shoot, not a copied `shoot.js`:
+
+```
+node tools/comps/new-round.js <name>            # /tmp/trains-comps-<name>
+node tools/comps/shoot.js     /tmp/trains-comps-<name>
+node tools/comps/sheet.js     /tmp/trains-comps-<name>    # then open index.html
+```
+
+Comps are built from the live `web/app.css` and `tools/fixtures/` **by
+reference** — `new-round.js` copies the stylesheet verbatim with its git blob
+hash and generates the data from `tools/comps/scenarios.js`, so a comp cannot
+drift from the product's language or invent a departure. Every synthetic delta
+is declared in the generated data file and named in the sheet's lede.
+
+`shoot.js` shoots the built comps, where `shoot-states.js` shoots the built
+client; they share the traps but not the job. Its probes (right-edge overflow,
+below-fold, whole items and scroll position against the scroller, tap targets,
+text spill versus deliberate ellipsis, widest-legal-lockup track stress, time
+axis geometry) are keyed on data attributes documented in `comps/README.md`,
+and each one has a fixture with a planted defect proving it bites.
+
+The gates are `node --test 'tools/comps/test/*.test.js'` and
+`node tools/comps/test/oracle.js`, which reproduces every calibration exemplar
+in `assets/comps/latest/` pixel-identically from the archived board v2 workshop.
 
 ## screenshot.js
 
