@@ -477,8 +477,10 @@ button { cursor: pointer; }
   padding: 0; border-bottom: 1px solid var(--rule); outline-offset: -2px;
 }
 .sy-fig { grid-column: 1; grid-row: 1 / 4; text-align: left; }
+/* No min-height: the ROW is the 44px tap target, and a floor here drops the
+   stepped-down cancelled row's provenance label 15px below every other one. */
 .sy-fig .sy-n {
-  display: block; white-space: nowrap; min-height: 44px;
+  display: block; white-space: nowrap;
   font-size: 52px; font-weight: 250; letter-spacing: -.045em; line-height: .84; color: var(--ink);
 }
 .sy-fig .sy-u {
