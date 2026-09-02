@@ -202,7 +202,12 @@ generate theirs from the same values); new line codes must update every
 client's mapping and its tests in the same change. Filled
 line-colour devices are permitted; text on a fill is at least 14px/700 and
 meets 3:1 contrast. Line colour used as text must use the scheme-specific
-readable mapping.
+readable mapping. Platform numerals on a line-colour chip — the boarding cap,
+the transfer platform markers and the saved-trip line badges — are paper in
+the light scheme, on every line: paper reads better than ink on all fourteen
+light-scheme line colours and is the only value that clears 3:1 on T4 and HUN.
+The dark scheme knocks them out per line colour, where ink is the readable
+value on T4, T5, T9, CCN and HUN and paper is on the rest.
 
 ## Calibration and verification
 

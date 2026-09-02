@@ -114,6 +114,22 @@ test('every line badge is readable as text in the scheme it is printed in', () =
   }
 });
 
+/* Owner ruling 2026-09-02, written into ui.md: numerals on a line-colour chip
+   are paper in the light scheme, on every line. Ink on the light T4 blue is
+   2.66:1 and fails the contract's own 3:1 bar for text on a fill. */
+test('light-scheme chip numerals are paper, and paper clears 3:1 on every line', () => {
+  assert.match(css, /@media\s*\(prefers-color-scheme:\s*light\)\s*\{\s*\.sy-cap,\s*\.sy-bar\s+\.sy-p,\s*\.hm-bdg\s*\{\s*color:\s*var\(--bg\)\s*!important/);
+
+  const paper = rgb(light['--bg'], [0, 0, 0]);
+  for (const code of Object.keys(COLOURS)) {
+    const fill = rgb(light['--line-' + code], paper);
+    const [hi, lo] = [luminance(paper), luminance(fill)].sort((a, b) => b - a);
+    const measured = (hi + 0.05) / (lo + 0.05);
+    assert.ok(measured >= 3,
+      `paper on the light --line-${code} is ${measured.toFixed(2)}:1, wanted >= 3`);
+  }
+});
+
 /* js/lines.js maps the API's badge code to a custom property; if the two lists
    drift, a real line silently paints in the fallback ink instead of its own
    colour, which no screenshot of Central → Parramatta would ever show. */
