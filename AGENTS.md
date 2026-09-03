@@ -1,1 +1,1 @@
-/Users/jeremy/.claude/CLAUDE.md
+./CLAUDE.md

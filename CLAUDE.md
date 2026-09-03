@@ -49,8 +49,8 @@ references, and delete the entire folder. Git retains any history.
 
 ## Local development
 
-Never read or source `.env` without explicit user permission. This includes
-commands that load it indirectly. Never print or commit `TFNSW_API_KEY`.
+Never load or source `.env` directly or indirectly without explicit user permission.
+Never print or commit `TFNSW_API_KEY`.
 
 With `TFNSW_API_KEY` already present in the process environment:
 
@@ -69,10 +69,8 @@ go test ./...
 (cd web && npm test)
 ```
 
-The web client has no dependency installation or build step. There is no
-native client in this repository yet; the web app is the reference
-implementation every later port is measured against (see `docs/PROJECT.md`,
-"Native clients").
+The web app is the reference implementation every later port is measured against
+(see `docs/PROJECT.md`, "Native clients").
 
 ## Verification and tools
 
@@ -101,6 +99,5 @@ believing a failure.
   `VERSION` in the same change. Returning browsers otherwise keep old code.
 - Develop service-worker changes with “Update on reload” or a throwaway
   browser profile; the browser tools use a throwaway profile by default.
-- Push landed source changes to GitHub. A source push does not deploy the app;
-  production is built and deployed from this machine using the operations
+- After a backlog item is completed, close it out and deploy it using the operations
   runbook.

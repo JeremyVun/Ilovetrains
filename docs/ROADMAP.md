@@ -58,6 +58,10 @@ by whether the header answers the user's real intent more often:
   reviewed with the `user-facing-copy` skill.
 - **Home-may-have-moved** flow iterated from real use (it is built but the
   experience is untested in the wild).
+- **Focused-journey disruption recovery**: when a later leg is cancelled while
+  the user may already be travelling, make the smart header switch to the next
+  best alternative. Do not rely on a recovery button in the cancelled journey
+  detail (owner ruling 2026-09-03).
 - Known accepted gap to watch: right trip, wrong service (missed the 09:24,
   caught the 09:39) — revisit only if it bites.
 
