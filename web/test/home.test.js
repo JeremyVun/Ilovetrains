@@ -320,6 +320,28 @@ test('a focused journey and a located user keep the receipt slot for their own c
   assert.equal(receiptOf(focused, at('09:21')), '');
 });
 
+test('the reverse receipt prints the ride’s Sydney time from any device zone', (t) => {
+  const runnerZone = process.env.TZ;
+  t.after(() => { process.env.TZ = runnerZone; });
+
+  const doc = {
+    ...emptyDoc(),
+    trips: [HOME_TRIP],
+    rides: [{
+      tripId: 't1', direction: 'forward',
+      departedAt: '2026-09-01T08:12:00+10:00', arrivedAt: '2026-09-01T08:56:00+10:00',
+      from: RHODES, to: BONDI
+    }]
+  };
+  const receipt = () => homeModel(doc, { tripId: 't1', direction: 'reverse' },
+    transferBody(), at('17:40'), {}).directions.receipt;
+
+  for (const zone of ['Australia/Sydney', 'Australia/Perth', 'UTC']) {
+    process.env.TZ = zone;
+    assert.equal(receipt(), 'You rode out at 08:12. Here’s the way back.', zone);
+  }
+});
+
 test('the first paint claims no provenance it does not have', () => {
   const model = homeModel({ ...emptyDoc(), trips: [HOME_TRIP] }, HOME_SELECTION, null, at('09:21'), {});
   assert.equal(model.directions.provenance, '');

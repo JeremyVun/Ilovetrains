@@ -92,6 +92,16 @@ the JSON yourself cannot make.
 6. A rejected `--eval` promise arrives in `Runtime.evaluate`'s result, not as a
    `Runtime.exceptionThrown` event. Unread, it photographs the wrong screen and
    exits 0. The result's `exceptionDetails` is read and raised.
+7. Two agents, one debugger port. `CDP_PORT` defaults to 9333 here and in every
+   `shoot-states.js` run, so a second agent attaches to the first agent's
+   browser and photographs its app — or dies with `Session with given id not
+   found`. Pick a private port per agent (`CDP_PORT=9441`). `comps/chrome.js`
+   asks Chrome for port 0 and is already immune.
+8. Two agents, one web server. A second `python3 -m http.server` on a port that
+   is already bound exits quietly, so `--url` drives whichever worktree bound
+   first: a green sweep of somebody else's code. Pick a private port, and verify
+   the served file is yours — `curl` a module and grep it for something your
+   branch changed — before believing any frame.
 
 ## shoot-states.js
 

@@ -27,10 +27,13 @@ export function boardModel(body, nowMs, opts = {}) {
   const ageSec = ageMs === null ? 0 : ageMs / 1000;
 
   const liveJourneys = Array.isArray(body && body.journeys) ? body.journeys : [];
-  const liveKeys = new Set(liveJourneys.map(journeyKey));
   const futureRows = liveJourneys
     .map((j) => journeyRow(j, nowMs, stale, { ...opts, pastSource: false }))
     .filter((r) => r !== null && !r.past);
+  // Only a service the live answer still shows can outrank a past copy of it.
+  // A service it lists but has already dropped below now has no live row left,
+  // so its last live estimate is the only copy there is (ui.md, departed).
+  const liveKeys = new Set(futureRows.map((row) => row.matchKey));
 
   const pastRows = (Array.isArray(opts.pastBodies) ? opts.pastBodies : [])
     .flatMap((page) => Array.isArray(page && page.journeys) ? page.journeys : [])

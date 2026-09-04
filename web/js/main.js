@@ -65,6 +65,7 @@ let pastInflight = null;
 /* A tick may not rewrite a view whose markup is unchanged: the write would
    discard the element a wheel is scrolling and cancel a smooth scroll. */
 const painted = { home: null, board: null, detail: null };
+let pastRowCount = 0;
 let dissolving = null;
 
 /* The freshness age is the one thing that changes every second, so it is the
@@ -108,6 +109,7 @@ function route() {
   const root = freshRoot();
   state.view = null;
   painted.home = painted.board = painted.detail = null;
+  pastRowCount = 0;
   dissolving = null;
 
   if (hash === '#/setup' || hash === '#/trips/new') return renderSetup(root, ctx);
@@ -316,13 +318,17 @@ function renderBoard({ addedAbove = false, fade = true } = {}) {
   });
   if (html !== painted.board && !(fade && beginDissolve(html, model, addedAbove))) {
     const saved = Board.preserveTimeline(state.root);
+    // A service that has just left is redrawn above the anchor, so the timeline
+    // has to close upward around it rather than push the whole board down.
+    const grewAbove = model.pastRows.length > pastRowCount;
     state.root.innerHTML = html;
     painted.board = html;
+    pastRowCount = model.pastRows.length;
     if (state.initialBoardLanding) {
       Board.landAtNow(state.root);
       state.initialBoardLanding = false;
     } else {
-      Board.restoreTimeline(state.root, saved, addedAbove);
+      Board.restoreTimeline(state.root, saved, addedAbove || grewAbove);
     }
     wireTimeline();
   }

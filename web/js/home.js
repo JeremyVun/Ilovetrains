@@ -121,7 +121,7 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
   let receipt = opts.receipt || '';
   if (!receipt && selected.direction === 'reverse') {
     const outbound = (doc.rides || []).filter((ride) => ride.tripId === selectedTrip.id && ride.direction === 'forward').at(-1);
-    if (outbound) receipt = `You rode out at ${new Date(outbound.departedAt).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: false })}. Here’s the way back.`;
+    if (outbound) receipt = `You rode out at ${clock(Date.parse(outbound.departedAt))}. Here’s the way back.`;
   }
   if (!receipt && opts.predicted && !activeFocus && !opts.fix && doc.trips.length >= 2) {
     const evidence = viewEvidence(doc, selected, nowMs);
