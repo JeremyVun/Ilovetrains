@@ -114,6 +114,13 @@ body > *, #app > * { width: 100%; min-width: 0; max-width: 100%; }
 
 #app { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 
+/* The board has no labelled scroll affordance by contract, and a desktop
+   scrollbar was the only one on the screen (owner ruling, 2026-09-05). */
+.sy-tl, .hm-ix, .detail-scroll { scrollbar-width: none; }
+.sy-tl::-webkit-scrollbar, .hm-ix::-webkit-scrollbar, .detail-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 input, button { font: inherit; color: inherit; background: none; border: 0; }
 button { cursor: pointer; }
 
@@ -270,6 +277,10 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
   column-gap: var(--sy-gap); align-items: center;
   padding: 9px var(--sy-pad) 10px; outline-offset: -2px;
 }
+/* A departed service fades where it stood; the timeline closes upward only
+   once it has gone (ui.md, departure board). */
+.sy-row.departing { opacity: 0; transition: opacity 240ms linear; }
+
 /* Edge to edge, as a ledger rule: an inset border makes each service look
    like it leaks into the next. */
 .sy-row::after {

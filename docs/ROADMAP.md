@@ -85,10 +85,6 @@ ambiguity about what is tappable, no figure without its provenance, offline
 paint from the worker, pixel agreement with the exemplars in both schemes.
 Comp round first for anything compositional; instrument first for anything
 geometric. Open owner questions, each an observation waiting on a ruling:
-- `TIMETABLE ONLY` overflows the 72px figure column by 24px on every past
-  timetable-only row, at both frames and both schemes; ui.md names it an open
-  defect. A ruling decides whether the column widens or the word changes, and
-  the provenance vocabulary is closed, so a new word would need drafting.
 - After departure the promoted journey-detail row's live `TO CHANGE` figure
   paints in the board's dimmed past-row ink, while the same count in the smart
   header is full ink. A ruling decides which ink a live figure on a past row

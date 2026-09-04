@@ -106,8 +106,9 @@ function journeyRow(journey, nowMs, stale, opts) {
   const effective = past && !actual && scheduled !== null ? scheduled : candidateEffective;
   const mins = minutesUntil(effective, nowMs);
   // Delay is measured between the minutes actually displayed, so the label can
-  // never disagree with the two clock times beside it.
-  const delayMin = realtime && scheduled !== null
+  // never disagree with the two clock times beside it. Without actuals there is
+  // nothing to be late against, whatever delta a cached page still carries.
+  const delayMin = realtime && scheduled !== null && (!past || actual)
     ? Math.floor(estimated / 60000) - Math.floor(scheduled / 60000)
     : 0;
 
@@ -117,8 +118,10 @@ function journeyRow(journey, nowMs, stale, opts) {
     : parseIso(arrival.estimated) ?? parseIso(arrival.scheduled);
 
   let kind, provenance;
-  if (past && !actual) { kind = 'sched'; provenance = 'TIMETABLE ONLY'; }
-  else if (cancelled) { kind = 'cx'; provenance = 'CANCELLED'; }
+  if (cancelled) { kind = 'cx'; provenance = 'CANCELLED'; }
+  // Elapsed time is elapsed time in either register; only actuals may also
+  // carry a struck scheduled time and a delay (ui.md, past data).
+  else if (past && !actual) { kind = 'sched'; provenance = 'AGO'; }
   else if (delayMin > 0) { kind = 'late'; provenance = past ? 'AGO' : delayMin + ' MIN LATE'; }
   else if (past) { kind = 'live'; provenance = 'AGO'; }
   else if (!realtime || stale) { kind = 'sched'; provenance = 'SCHEDULED'; }
@@ -126,8 +129,8 @@ function journeyRow(journey, nowMs, stale, opts) {
   // happening instead of its unit (docs/contracts/ui.md).
   else { kind = 'live'; provenance = mins <= 0 ? 'DEPARTING' : ''; }
 
-  const figure = past
-    ? (actual && !cancelled ? countdownFigure(Math.max(0, -mins)) : (cancelled ? CANCELLED_FIGURE : ''))
+  const figure = past && !cancelled
+    ? countdownFigure(Math.max(0, -mins))
     : figureFor(cancelled, stale, mins);
 
   const lineCode = (journey.line && journey.line.name) || '';
@@ -156,9 +159,7 @@ function journeyRow(journey, nowMs, stale, opts) {
     provenance,
     provenanceWarn: cancelled || (!past && delayMin > 0),
     depTime: clock(effective),
-    // A timetable-only row may carry a stale delta in malformed/cached input;
-    // neither number is allowed to become a punctuality claim without actuals.
-    schedTime: delayMin > 0 && scheduled !== null && (!past || actual) ? clock(scheduled) : null,
+    schedTime: delayMin > 0 && scheduled !== null ? clock(scheduled) : null,
     // A cancelled row keeps its arrival: it is what the next train is judged against.
     arrTime: arrivalMs === null ? null : clock(arrivalMs),
     platform: platformNumber(dep.platform) || null,

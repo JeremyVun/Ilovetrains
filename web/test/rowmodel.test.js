@@ -330,7 +330,7 @@ test('every row is exactly three non-empty lines in every state', () => {
   }
 });
 
-test('past punctuality and elapsed figures require an actuals record', () => {
+test('past punctuality — not elapsed time — requires an actuals record', () => {
   const actual = journey('22:30', '22:42', '12', 'T1', 'Penrith', true);
   delay(actual, 4);
   actual.legDetail = [{
@@ -363,12 +363,41 @@ test('past punctuality and elapsed figures require an actuals record', () => {
   assert.equal(actualRow.schedTime, '22:30');
   assert.equal(actualRow.kind, 'late');
 
-  assert.equal(timetableRow.figure, '', 'timetable-only may not state elapsed time');
-  assert.equal(timetableRow.provenance, 'TIMETABLE ONLY');
+  // Owner ruling 2026-09-05: the scheduled time answers "how long ago?" too.
+  assert.equal(timetableRow.figure, '15', 'elapsed is counted from the scheduled departure');
+  assert.equal(timetableRow.provenance, 'AGO');
   assert.equal(timetableRow.depTime, '22:30', 'the stale delta is not printed as an actual');
   assert.equal(timetableRow.schedTime, null);
-  assert.equal(timetableRow.kind, 'sched');
+  assert.equal(timetableRow.delayMin, 0);
+  assert.equal(timetableRow.kind, 'sched', 'the numeral keeps the quiet scheduled weight');
   assert.equal(timetableRow.provenanceWarn, false);
+});
+
+/* The journey-level estimate can outlive the per-leg realtime record in a
+   cached past page. Nothing derived from it may reach the screen. */
+test('a stale delta on a timetable-only past row never becomes a struck time', () => {
+  const journeyWithDelta = journey('22:30', '22:42', '12', 'T1', 'Penrith', true);
+  delay(journeyWithDelta, 9);
+  journeyWithDelta.legDetail = [{
+    line: journeyWithDelta.line,
+    headsign: journeyWithDelta.destinationHeadsign,
+    from: { name: 'Central', platform: 'Platform 12' },
+    to: { name: 'Parramatta', platform: 'Platform 1' },
+    departure: { scheduled: journeyWithDelta.departure.scheduled, estimated: null },
+    arrival: { scheduled: journeyWithDelta.arrival.scheduled, estimated: null }
+  }];
+
+  const row = boardModel(departuresBody({ journeys: [] }), NOW, {
+    pastBodies: [{ journeys: [journeyWithDelta] }]
+  }).pastRows[0];
+
+  assert.equal(row.actual, false);
+  assert.equal(row.schedTime, null, 'no strike without actuals');
+  assert.equal(row.delayMin, 0, 'no delay without actuals');
+  assert.equal(row.depTime, '22:30', 'the timetable time is the one printed');
+  assert.equal(row.figure, '15', 'elapsed still counts, from the scheduled time');
+  assert.equal(row.provenance, 'AGO');
+  assert.deepEqual(rowLines(row), ['22:30 arrives 22:42', 'Platform 12 · T1', 'Penrith']);
 });
 
 /* --- the line that stands in for the whole board -------------------------- */
