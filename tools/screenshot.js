@@ -25,7 +25,7 @@
  *   --full            capture beyond the viewport (whole scroll height)
  *   --quiet           suppress page console errors
  *
- * TRAPS — all four were paid for in lost review passes; do not "simplify" them.
+ * TRAPS — every one was paid for in lost review passes; do not "simplify" them.
  *
  * 1. VIEWPORT LIE. `chrome --headless --window-size=390,844 --screenshot`
  *    silently clamps the layout viewport to 500 CSS px on macOS and then crops
@@ -52,6 +52,13 @@
  *    discards it. With --profile that turns the second run into a cold app
  *    with warm service-worker caches. The browser is asked to close first and
  *    given a moment to flush, with SIGKILL still the backstop (trap 4).
+ *
+ * 6. SILENT --eval FAILURE. Runtime.evaluate returns a rejected promise in its
+ *    RESULT rather than raising Runtime.exceptionThrown, so a driving script
+ *    that throws used to skip everything after it and still shoot, print
+ *    nothing and exit 0 — a convincing photograph of the wrong screen. The
+ *    result's exceptionDetails is read; a failed --eval prints EVAL FAILED
+ *    with the message and exits non-zero, saving nothing.
  *
  * Seeding note: localStorage is origin-scoped, so --seed navigates to the URL
  * once to acquire the origin, writes the key, then navigates again. Anything
@@ -169,7 +176,13 @@ async function main() {
     await navigate(page, args.url);
     await sleep(args.wait);
     if (args.evalJs) {
-      await page.send('Runtime.evaluate', { expression: args.evalJs, awaitPromise: true });
+      // TRAP 6: a rejected --eval promise comes back in the RESULT, so an
+      // unread exceptionDetails shoots whatever the page was showing, exit 0.
+      const ev = await page.send('Runtime.evaluate', { expression: args.evalJs, awaitPromise: true });
+      if (ev.exceptionDetails) {
+        const d = ev.exceptionDetails;
+        throw new Error('EVAL FAILED: ' + ((d.exception && d.exception.description) || d.text));
+      }
       await sleep(120);
     }
 

@@ -72,6 +72,21 @@ read/write atomic and migration simple):
   time. Trips without coordinates are backfilled lazily by stop id. Missing
   coordinates disable only the location term.
 
+## Trip selection
+
+Three things can name the trip a screen is about, and the two sides of a tap
+read them in a different order:
+
+- Home shows the focused journey if one is live, else the explicit selection,
+  else the prediction.
+- The departure board and journey detail show the explicit selection if the
+  user made one, else the focus, else the prediction.
+
+The explicit selection is the trip whose saved-trip row the user tapped. It
+lasts for the page load and is never persisted, and it never writes `focus`. A
+location fix arriving afterwards re-predicts only when nothing explicit was
+chosen.
+
 ## Focused journey
 
 The document may contain an optional `focus` field — "I'm on this train":
@@ -85,8 +100,10 @@ The document may contain an optional `focus` field — "I'm on this train":
 }
 ```
 
-- Set when the user focuses a journey from its detail view; cleared by the
-  user, or automatically once now > the journey's effective arrival + 30 min.
+- Set only by `Take this train` on journey detail; nothing else writes it.
+  There is no unfocus control: it clears itself once now > the journey's
+  effective arrival + 30 min, and accepting the return offer that a finished
+  focus produces clears it too.
 - `journey` is a full snapshot so directions and detail stay viewable after
   departure and offline. On each refresh the client re-matches it in fresh
   data by (first leg's line.name, departure.scheduled) and updates the
@@ -132,11 +149,12 @@ locationFactor(candidate) =
 score = base score × locationFactor
 ```
 
-Deterministic given (storage document, current time, fix). The fix never
-leaves the device and is never persisted beyond the session. Permission is
-requested contextually (user has ≥2 saved trips), never on first load;
-denial degrades silently to time+history. Wherever trips are listed
-(switcher, trip management), they are ordered by current score with the
+Deterministic given (storage document, current time, fix). The fix never leaves
+the device: it is never persisted and never sent to the server. Permission is
+requested contextually (user has ≥2 saved trips), never on first load; denial
+degrades silently to time+history. A client whose permission is already granted
+takes one silent fix when home opens, without a prompt. Wherever trips are
+listed (switcher, trip management), they are ordered by current score with the
 predicted one visually highlighted at the top.
 
 ## Completed rides and home-station heuristic
@@ -161,16 +179,17 @@ Home evidence is intentionally small and tuneable:
   accepts.
 
 A focused trip is OVER once `now` is later than its effective arrival. Home may
-then offer the opposite direction, but accepting the offer clears the finished
-focus and fetches a real return journey. Transfer platforms therefore come
-from that return response; they are never produced by reversing the outbound
-snapshot. Focusing a journey is the user's consent to directions mode, and
-focusing another is the correction—there is no separate “I’m not on this”
-state.
+then offer the opposite direction, and accepting that offer is the one path
+other than expiry that clears a focus; it then fetches a real return journey.
+Transfer platforms therefore come from that return response; they are never
+produced by reversing the outbound snapshot. Focusing a journey is the user's
+consent to directions mode, and focusing another is the correction — there is
+no separate “I’m not on this” state and no manual unfocus.
 
 Invariants:
 - Deterministic given (storage document, current time) — testable.
 - Any change to the formula bumps no schema version (history format is
   stable) but must update this doc in the same change.
-- The UI always shows *which* trip was predicted and offers one-tap flip
-  and one-tap trip switch; the heuristic must never hide other trips.
+- The UI always shows *which* trip was predicted and switching trip is one tap;
+  the heuristic must never hide other trips. There is no reversal control: the
+  opposite direction is offered automatically once a focused trip is over.

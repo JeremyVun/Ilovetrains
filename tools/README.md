@@ -61,7 +61,8 @@ node tools/screenshot.js <url> <out.png> [--size 390x844] [--dsf 2]
 before the app boots, so any client state — saved trips, history, a cached
 board — can be set up without driving the UI. `--eval` runs JS after load and
 awaits a promise, which is how the interactive flows get driven; anything the
-page logs at `console.warn`/`error` is printed under the shot.
+page logs at `console.warn`/`error` is printed under the shot, and an `--eval`
+that throws or rejects is fatal (`EVAL FAILED`, no shot, non-zero exit).
 
 `--media prefers-reduced-motion:reduce` emulates a media feature (a media query
 you cannot emulate is one you cannot verify). `--profile DIR` reuses a browser
@@ -88,6 +89,9 @@ the JSON yourself cannot make.
    `--profile`, that turned "reopen the app" into a first-run screen with warm
    worker caches — a convincing wrong answer. The browser is asked to close
    first and given a moment to flush, with SIGKILL still the backstop.
+6. A rejected `--eval` promise arrives in `Runtime.evaluate`'s result, not as a
+   `Runtime.exceptionThrown` event. Unread, it photographs the wrong screen and
+   exits 0. The result's `exceptionDetails` is read and raised.
 
 ## shoot-states.js
 
@@ -161,12 +165,8 @@ The transfer states (`detail-hero`, `detail-tight`, `detail-cancelled`,
 `board-cancelled-tight`, `board-two-change`) run on the transfer corridor from
 `web/test/fixture.js`; `detail-direct` runs on the Central → Parramatta board.
 Every `detail-*` state reaches the view by CLICKING a board row, so each one is
-also proof that the whole row is the tap target — every one except
-`detail-long`, which is **broken**: it declares no `route`, so it opens on home,
-its row click finds nothing, and the rejected `--eval` promise is swallowed (see
-the trap below). It photographs home and checks no invariant. Giving that state
-`route: '#/board'` is the whole fix. Output defaults to the system temporary
-directory; use `--out` only for a deliberate comparison set:
+also proof that the whole row is the tap target. Output defaults to the system
+temporary directory; use `--out` only for a deliberate comparison set:
 
 ```
 node tools/shoot-states.js detail-hero detail-direct detail-tight \
@@ -179,12 +179,15 @@ the pinned clock *and* `t.state.body.generatedAt` together. Advance only the
 clock and the seeded board is four hours old, so the client correctly withholds
 every figure — a plausible shot of the wrong screen.
 
-**Trap: a state's driving script can fail in silence.** `screenshot.js` awaits
-`--eval` through `Runtime.evaluate`, which returns a rejected promise in its
-*result* rather than raising `Runtime.exceptionThrown`; nothing reads it. A
-throw in a state's `after` therefore skips the rest of the page script —
-including every invariant — and still shoots, exits 0 and prints no warning. A
-green sweep is not proof a state rendered: read the frame.
+**Trap: a driving script that throws.** `Runtime.evaluate` returns a rejected
+`--eval` promise in its *result* rather than raising `Runtime.exceptionThrown`.
+A throw in a state's `after` skips the rest of the page script, including every
+invariant, and the frame is then whatever the page happened to be showing.
+`screenshot.js` reads `exceptionDetails`: a failed `--eval` prints
+`EVAL FAILED` with the message, saves no shot and exits non-zero, so the sweep
+fails on it. A state that shoots is a state whose script ran to the end; a
+green sweep still says nothing about what no invariant covers, so read the
+frames.
 
 ### Re-shooting `assets/comps/latest/`
 

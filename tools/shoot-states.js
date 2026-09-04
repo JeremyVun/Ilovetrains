@@ -563,6 +563,7 @@ async function states() {
       seed: doc({ trips: [TRIP_LONG], body: longBody(), fetchedAt: TRANSFER_AT, hist: [] }),
       now: TRANSFER_NOW,
       body: longBody(),
+      route: '#/board',
       after: OPEN_ROW(0),
       expect: { rail: true }
     },
