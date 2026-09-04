@@ -400,6 +400,29 @@ test('a stale delta on a timetable-only past row never becomes a struck time', (
   assert.deepEqual(rowLines(row), ['22:30 arrives 22:42', 'Platform 12 · T1', 'Penrith']);
 });
 
+/* The train you just missed is in the past register the moment it leaves, not
+   whenever upstream gets round to dropping it (ui.md, departed services). */
+test('a service the live answer still lists but has already run is a past row', () => {
+  const journeys = baseJourneys();
+  const departed = journeys[0];
+  const model = boardModel(departuresBody({ journeys }), NOW + 4 * 60_000, {
+    pastBodies: [{ journeys: [departed] }]
+  });
+
+  assert.ok(!model.futureRows.some((row) => row.depTime === '22:48'),
+    'a departed service has no future row');
+  const row = model.pastRows.find((item) => item.depTime === '22:48');
+  assert.ok(row, 'the last live copy of it stands in the past register');
+  assert.equal(row.provenance, 'AGO');
+  assert.equal(row.actual, true, 'the live estimate is an actuals record');
+
+  // A service the live answer does still show keeps winning over a past copy.
+  const running = boardModel(departuresBody({ journeys }), NOW, {
+    pastBodies: [{ journeys: [departed] }]
+  });
+  assert.equal(running.pastRows.length, 0);
+});
+
 /* --- the line that stands in for the whole board -------------------------- */
 
 /* When there are no rows there is one sentence on the screen, and on a cold

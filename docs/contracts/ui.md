@@ -209,8 +209,10 @@ substitutes for going back.
 - Clock times are printed in Australia/Sydney regardless of the device's zone.
 - A departed service dissolves before the timeline closes upward, and remains
   in the past register from the last live estimate the client saw for it rather
-  than waiting for a past page to reach it. Reduced motion removes the
-  transition; state variants otherwise preserve row geometry.
+  than waiting for a past page to reach it or for upstream to drop it. The
+  `NOW` anchor keeps its place on screen while the row moves across it, so the
+  board closes upward instead of pushing itself down a row. Reduced motion
+  removes the transition; state variants otherwise preserve row geometry.
 - The board closes with `— SIX SERVICES SHOWN` when six services are returned
   and `— END OF BOARD` otherwise; a board of three or fewer adds
   `Nothing scheduled after HH:MM.`
@@ -225,8 +227,9 @@ substitutes for going back.
   reads as having left on time, which the owner chose over a second register for
   elapsed time (ruling, 2026-09-05).
 - Whether a past row has actuals is decided by its realtime data, never by its
-  age or position. Where a live response and past page duplicate a service, the
-  live response wins.
+  age or position. Where a live response and a past page carry the same service,
+  the live response wins for as long as it still shows it as a departure; once
+  it has run, the last live copy of it is the past row.
 - No past row shows a departure countdown.
 - Stale or offline future data drops countdown figures, removes already
   departed rows, uses absolute clock times, and states
@@ -312,7 +315,10 @@ substitutes for going back.
 The interface reads as a printed timetable: one column measure, one type-scale
 ladder, a heavy masthead rule, hairline row rules, system fonts and tabular
 figures. Labels use one letterspaced uppercase idiom. There are no cards within
-cards, ornamental chrome or happy-path spinners.
+cards, ornamental chrome or happy-path spinners. No scrolling region draws a
+scrollbar — not the board, the trip list or journey detail — because on a
+pointer device it was the one piece of chrome on a screen that is otherwise all
+hairlines (owner ruling, 2026-09-05).
 
 Dark is the primary scheme; light is a warm-paper printing of the same contrast
 hierarchy, not a colour inversion.
