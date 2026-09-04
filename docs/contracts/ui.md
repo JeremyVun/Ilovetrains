@@ -68,6 +68,12 @@ substitutes for going back.
   and the coloured platform markers of every change. Both station names share
   one top edge and both times share one baseline; the arrival clock, the
   smaller of the two, takes a 7px top margin to reach it.
+- The header is content-sized rather than centred in a reserved box, so a
+  receipt appearing pushes the heavy rule down instead of taking up slack. The
+  band above it is the device's top inset with a 14px floor, which is the
+  screen's only notch clearance. Its rhythm is 20px above the figure row, 12px
+  to the journey device and to a receipt, 8px above the instruction line and
+  12px below the block to the rule.
 - Station names are never ellipsised. A name that would clip is shortened by
   rule until it fits: `Station` dropped, `Junction` to `Jn`, then leading
   compass words to initials.
@@ -380,10 +386,22 @@ The set is thirty frames:
 
 Measurements these frames carry deliberately, so nothing above reads as drift:
 the two header clocks share a baseline to within 1px, which is the tolerance
+<<<<<<< HEAD
 the instrument allows; a focused journey still shows its boarding cap and
 pre-departure progress marker before it leaves, so `home-390x844-focused-cxl`
 carries both; `detail-*-tight` shoots a change shortened by a late first leg,
 so its promoted row reads `5 MIN LATE`.
+=======
+the instrument allows; the header's heavy rule sits 214px from the frame top
+at 390×844 with no receipt, which is what the content-sized block measures;
+a focused journey still shows its boarding cap and pre-departure progress
+marker before it leaves, so `home-390x844-focused-cxl` carries both;
+`detail-*-tight` shoots a change shortened by a late first leg,
+so its promoted row reads `5 MIN LATE`. One defect is visible and open, not
+accepted: on `board-390x844-past` the provenance `TIMETABLE ONLY` overflows the
+72px figure column by 24px, which the sweep prints as a `NOTE` pending an owner
+ruling on the column or the word.
+>>>>>>> fixes/p6
 
 Client markup carries the data attributes the comps harness probes, so the
 instrument measures the built screen with the probes that judged its comps.

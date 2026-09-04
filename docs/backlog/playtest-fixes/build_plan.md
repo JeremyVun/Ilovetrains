@@ -174,7 +174,7 @@ Owns: `web/app.css` (`.hm-c` variables and `.hm-hd` sizing), `docs/contracts/ui.
 re-shot with the documented table, `tools/shoot-states.js` invariants if
 the verdict adds one.
 
-Done:  — [ ]
+Done:  — [x] (dc22bda, merged 2026-09-05)
 
 ## Close
 
