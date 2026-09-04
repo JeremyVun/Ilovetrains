@@ -89,9 +89,23 @@ substitutes for going back.
   fact about the data and keeps the live colour however late the journey is.
 - A focused journey cancelled before it departs shows the next running service
   from the live board, under the instruction
-  `<cancelled time> CANCELLED · NEXT TRAIN` and the status `CANCELLED`. A
-  cancellation after the journey is under way keeps the focused journey on
-  screen with its warning copy.
+  `<cancelled time> CANCELLED · NEXT TRAIN` and the status `CANCELLED`, and so
+  does a journey whose first leg is cancelled while it is being ridden. When a
+  LATER leg is cancelled after departure the focused journey stays on screen:
+  the figure keeps counting to the next action, and the instruction names the
+  leg that was lost rather than the one that left —
+  `<HH:MM> FROM <STATION> CANCELLED`, its departure clock time and its
+  boarding station.
+- While the first board loads the header prints no provenance. The slot is
+  empty rather than carrying a claim about data that has not arrived; the
+  instruction line says `Getting the next trains…`, or
+  `No saved board for this trip yet` with nothing cached and no network.
+- A tight change still ahead paints the header's dwell segment in the warning
+  colour in every phase, including before the train has left. The paint alone
+  carries the warning there: the instruction line stays the headsign before
+  departure, and becomes `Tight change · <n> min · Platform <n>` only once the
+  journey is under way, with the receipt `Printed change was <n> min.` when the
+  window has shrunk below what was printed.
 - The header may fetch live data only for the selected trip. Saved-trip rows
   use device-held facts such as line identity, distance and last ride; opening
   home must not fan out one upstream request per saved trip.
@@ -103,6 +117,14 @@ substitutes for going back.
   the storage contract's ten-trip LRU.
 - A receipt explains a prediction only when the app made a meaningful leap.
   It names real evidence. A manually focused trip needs no receipt.
+- The view-history receipt appears only when all of: the shown trip was
+  predicted rather than tapped or focused; at least two trips are saved; there
+  is no location fix; and the shown (trip, direction) has at least three
+  history events the predictor itself counts — same day type as now and within
+  two hours of this hour. `You check this trip most weekday mornings.` further
+  requires now to be a weekday before 12:00 and those events to fall on at
+  least three distinct days; otherwise the receipt reads `You often check this
+  trip around now.`. Failing the evidence, the header carries no receipt.
 - Copy about the train is always safe. Copy about the person requires evidence
   supplied by their action or persisted ride record. App opens are looks, not
   rides: a receipt drawn from view history says the user checks a trip
@@ -110,7 +132,10 @@ substitutes for going back.
   around now.`), never that they ride it. Only a persisted ride supports the
   reverse-direction receipt.
 - Location permission is requested contextually, never on first load. Missing
-  or denied location degrades silently to device history and time.
+  or denied location degrades silently to device history and time. `Not now`
+  is remembered: the panel stays away for 30 days across reloads, and a
+  permission the browser already reports as `granted` or `denied` suppresses
+  it entirely.
 
 ## Setup and station search
 
@@ -267,8 +292,10 @@ substitutes for going back.
 - Directions count to the next required action and use `TO CHANGE` or `TO GO`.
   The instruction line names the station and platform of that action: while
   riding, `Get off at <station> · Platform <n>`; while dwelling at a change,
-  `Change at <station> · Platform <n>`. The platform clause is omitted when
-  upstream gives none. The boarding-platform cap disappears after boarding.
+  `Change at <station> · Platform <n>`; and, with a tight change still ahead,
+  `Tight change · <n> min · Platform <n>` in place of either. The platform
+  clause is omitted when upstream gives none. The boarding-platform cap
+  disappears after boarding.
 - The progress marker moves continuously from timetable and live estimates. It
   is an inference from time, never a claim of continuous location tracking.
 

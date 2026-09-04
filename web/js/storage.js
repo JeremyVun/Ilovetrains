@@ -9,6 +9,7 @@ export const RIDES_CAP = 100;
 export const TRIPS_CAP = 10;
 export const SEARCH_CAP = 3;
 export const DIRECTIONS = ['forward', 'reverse'];
+export const LOCATION_ASK_QUIET_MS = 30 * 86_400_000;
 
 export function emptyDoc() {
   return {
@@ -112,6 +113,9 @@ export function parseDoc(raw) {
       && typeof f.focusedAt === 'string' && f.journey && typeof f.journey === 'object') {
     doc.focus = { tripId: f.tripId, direction: f.direction, focusedAt: f.focusedAt, journey: f.journey };
   }
+  if (v.locationAsk && typeof v.locationAsk.declinedAt === 'string') {
+    doc.locationAsk = { declinedAt: v.locationAsk.declinedAt };
+  }
   if (v.cache && typeof v.cache === 'object') {
     for (const [k, entry] of Object.entries(v.cache)) {
       if (entry && typeof entry.fetchedAt === 'string' && entry.body && typeof entry.body === 'object') {
@@ -134,7 +138,14 @@ export function serializeDoc(doc) {
     cache: doc.cache
   };
   if (doc.focus) out.focus = doc.focus;
+  if (doc.locationAsk) out.locationAsk = doc.locationAsk;
   return JSON.stringify(out);
+}
+
+/** "Not now" on the location ask, remembered: a decline the app forgets on
+    reload is a nag. */
+export function declineLocation(doc, atMs) {
+  return { ...doc, locationAsk: { declinedAt: new Date(atMs).toISOString() } };
 }
 
 export function cacheKey(fromId, toId) {

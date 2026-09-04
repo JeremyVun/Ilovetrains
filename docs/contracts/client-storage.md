@@ -46,6 +46,7 @@ read/write atomic and migration simple):
     "inferredAt": "2026-08-31T20:00:00+10:00"
   },
   "lastViewed": {"tripId": "uuid", "direction": "forward"},
+  "locationAsk": {"declinedAt": "2026-09-01T09:21:00+10:00"},
   "cache": {
     "<from>-<to>": {"fetchedAt": "...", "body": {"…": "last departures response"}}
   }
@@ -68,6 +69,9 @@ read/write atomic and migration simple):
   useful station answers, not raw keystrokes. Add-trip shows them before a
   query and ranks returned stops fuzzily, so a prefix such as `Rhode` ranks
   `Rhodes` first.
+- `locationAsk` is optional and holds only the time the user last declined the
+  location panel. Absence means never declined; a malformed value is dropped,
+  not repaired.
 - A station's optional `location` is captured from `/api/v1/stops` at save
   time. Trips without coordinates are backfilled lazily by stop id. Missing
   coordinates disable only the location term.
@@ -146,14 +150,25 @@ locationFactor(candidate) =
   2.5  if distance(fix, origin(candidate)) ≤ 2 km
   1.0  if 2–10 km (or origin has no coords, or no fix/permission)
   0.3  if > 10 km
-score = base score × locationFactor
+score = (base score + 0.01) × locationFactor
 ```
+
+The 0.01 floor is what lets location answer where history cannot. Standing at
+a trip's destination with no history at all, the way back scores
+0.01 × 2.5 = 0.025 against the way out's 0.01 × 1.0 = 0.01, or 0.003 when the
+origin is more than 10 km away, so the reverse wins. With no fix every
+candidate carries the same floor, so they tie and the fallback answers as
+before. Any real history dwarfs the floor: a single view an hour off and a day
+old scores about 0.97, which outranks it from any distance.
 
 Deterministic given (storage document, current time, fix). The fix never leaves
 the device: it is never persisted and never sent to the server. Permission is
 requested contextually (user has ≥2 saved trips), never on first load; denial
-degrades silently to time+history. A client whose permission is already granted
-takes one silent fix when home opens, without a prompt. Wherever trips are
+degrades silently to time+history. Declining writes `locationAsk.declinedAt`,
+which suppresses the panel for 30 days across reloads; a Permissions API state
+of `granted` or `denied` suppresses it outright, because the question has
+already been answered. A client whose permission is already granted takes one
+silent fix when home opens, without a prompt. Wherever trips are
 listed (switcher, trip management), they are ordered by current score with the
 predicted one visually highlighted at the top.
 

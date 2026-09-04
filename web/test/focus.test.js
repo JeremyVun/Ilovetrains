@@ -157,3 +157,45 @@ test('cancellation and arrival outrank lateness', () => {
   const over = focusStatus(delayLeg(transferJourneys()[0], 1, 5), { activeLeg: 1, over: true });
   assert.deepEqual([over.text, over.kind, over.late], ['Trip over', 'complete', false]);
 });
+
+
+/* ---- tight changes and later-leg cancellations (design.md 1, 7) --------- */
+
+test('a tight change is painted from the first phase, while the words wait', () => {
+  // The corridor's real 4-minute change, read before its own train leaves.
+  const journey = transferJourneys()[5];
+  const before = directionsModel(journey, at('10:30'));
+  assert.deepEqual([before.phase, before.tight, before.warn], ['pre', true, false]);
+  assert.equal(before.instruction, 'Gordon via Lindfield', 'the paint carries the warning here');
+
+  const riding = directionsModel(journey, at('10:45'));
+  assert.deepEqual([riding.phase, riding.tight, riding.warn], ['ride', true, true]);
+  assert.equal(riding.instruction, 'Tight change · 4 min · Platform 5');
+});
+
+test('a shrunk change keeps its printed receipt once under way', () => {
+  const journey = delayLeg(transferJourneys()[0], 0, 5);
+  const riding = directionsModel(journey, at('09:40'));
+  assert.equal(riding.tight, true);
+  assert.equal(riding.instruction, 'Tight change · 2 min · Platform 5');
+  assert.equal(riding.receipt, 'Printed change was 7 min.');
+});
+
+test('a later leg cancelled after departure names that leg, not the one that left', () => {
+  const journey = cancelLeg(transferJourneys()[0], 1);
+  const riding = directionsModel(journey, at('09:33'));
+
+  assert.deepEqual([riding.phase, riding.figure, riding.provenance], ['ride', '18', 'TO CHANGE']);
+  assert.equal(riding.instruction, '09:58 from Town Hall cancelled');
+  assert.deepEqual([riding.warn, riding.tight], [true, false]);
+
+  const dwelling = directionsModel(journey, at('09:53'));
+  assert.deepEqual([dwelling.phase, dwelling.figure], ['dwell', '5']);
+  assert.equal(dwelling.instruction, '09:58 from Town Hall cancelled');
+
+  // Before it leaves, and when the cancelled leg is the one being ridden, the
+  // next-train form is unchanged.
+  assert.equal(directionsModel(journey, at('09:21')).instruction, '09:24 CANCELLED · NEXT TRAIN');
+  assert.equal(directionsModel(cancelLeg(transferJourneys()[0], 0), at('09:33')).instruction,
+    '09:24 CANCELLED · NEXT TRAIN');
+});
