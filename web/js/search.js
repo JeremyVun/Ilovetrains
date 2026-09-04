@@ -130,3 +130,11 @@ export function rankStops(stops, query) {
   })).sort((a, b) => b.score - a.score || a.index - b.index)
     .map((item) => item.stop);
 }
+
+/** What Enter (or the keyboard's Search key) commits to. A hint stands in for
+    the list rather than accompanying it, so while one shows there is nothing
+    to commit. */
+export function topPick(results, hint) {
+  if (hint) return null;
+  return Array.isArray(results) && results.length ? results[0] : null;
+}

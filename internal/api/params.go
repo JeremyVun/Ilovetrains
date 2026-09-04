@@ -90,8 +90,11 @@ func floorToBucket(t time.Time) time.Time {
 	return t.Truncate(bucketSize)
 }
 
+// searchText normalises a station query to the one form that is both the cache
+// key and the text sent upstream, so "Central", "central" and "  CENTRAL  " are
+// a single 24-hour cache entry and a single upstream call.
 func searchText(value string) (string, error) {
-	value = strings.TrimSpace(value)
+	value = strings.ToLower(strings.Join(strings.Fields(value), " "))
 	if len([]rune(value)) < minQueryLength {
 		return "", badRequest(fmt.Sprintf("q must be at least %d characters", minQueryLength))
 	}

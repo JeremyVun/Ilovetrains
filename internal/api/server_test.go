@@ -44,8 +44,9 @@ type fakeUpstream struct {
 	stopCalls      atomic.Int32
 	lastLimit      atomic.Int32
 
-	mu     sync.Mutex
-	lastAt time.Time
+	mu        sync.Mutex
+	lastAt    time.Time
+	lastQuery string
 }
 
 func (f *fakeUpstream) Departures(_ context.Context, from, to string, limit int, at time.Time) (*tfnsw.DeparturesResponse, error) {
@@ -77,8 +78,17 @@ func (f *fakeUpstream) at() time.Time {
 	return f.lastAt
 }
 
-func (f *fakeUpstream) Stops(_ context.Context, _ string) (*tfnsw.StopsResponse, error) {
+func (f *fakeUpstream) query() string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.lastQuery
+}
+
+func (f *fakeUpstream) Stops(_ context.Context, query string) (*tfnsw.StopsResponse, error) {
 	call := f.stopCalls.Add(1)
+	f.mu.Lock()
+	f.lastQuery = query
+	f.mu.Unlock()
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -663,6 +673,56 @@ func TestStopsContract(t *testing.T) {
 	get(t, handler, "/api/v1/stops?q=central")
 	if upstream.stopCalls.Load() != 1 {
 		t.Errorf("upstream calls = %d, want 1", upstream.stopCalls.Load())
+	}
+}
+
+func TestStopsNormalisesTheQuery(t *testing.T) {
+	upstream := &fakeUpstream{stops: sampleStops()}
+	handler := newTestServer(t, upstream)
+
+	first := get(t, handler, "/api/v1/stops?q=Central")
+	if first.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", first.Code, first.Body)
+	}
+	if q := upstream.query(); q != "central" {
+		t.Errorf("upstream query = %q, want the normalised text", q)
+	}
+
+	// Every spelling of the same search is one cache entry and one upstream
+	// call, so a user backspacing over their own capitals costs nothing.
+	for _, spelling := range []string{"central", "%20%20CENTRAL%20%20", "CeNtRaL"} {
+		got := get(t, handler, "/api/v1/stops?q="+spelling)
+		if got.Code != http.StatusOK {
+			t.Fatalf("%s: status = %d, want 200: %s", spelling, got.Code, got.Body)
+		}
+		if got.Body.String() != first.Body.String() {
+			t.Errorf("%s: body = %s, want the first answer", spelling, got.Body)
+		}
+	}
+	if calls := upstream.stopCalls.Load(); calls != 1 {
+		t.Errorf("upstream calls = %d, want 1: every spelling is one query", calls)
+	}
+
+	// Collapsed inner whitespace is the same query as a single space.
+	get(t, handler, "/api/v1/stops?q=central%20%20%20station")
+	get(t, handler, "/api/v1/stops?q=Central+Station")
+	if calls := upstream.stopCalls.Load(); calls != 2 {
+		t.Errorf("upstream calls = %d, want 2: inner spacing collapses too", calls)
+	}
+	if q := upstream.query(); q != "central station" {
+		t.Errorf("upstream query = %q, want single-spaced text", q)
+	}
+}
+
+func TestStopsMeasuresTheMinimumAfterNormalising(t *testing.T) {
+	handler := newTestServer(t, &fakeUpstream{stops: sampleStops()})
+	// One rune once the whitespace is gone, and one multi-byte rune that a
+	// byte-length minimum would have waved through.
+	for _, target := range []string{"/api/v1/stops?q=%20c%20", "/api/v1/stops?q=%C3%A9"} {
+		got := get(t, handler, target)
+		if got.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400", target, got.Code)
+		}
 	}
 }
 
