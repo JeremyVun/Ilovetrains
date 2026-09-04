@@ -77,6 +77,34 @@ export function refreshFocus(doc, selection, body, nowMs) {
   return { ...doc, focus: { ...focus, journey: match } };
 }
 
+/** A cancelled leg cancels the journey (api.md). */
+export function journeyCancelled(journey) {
+  return Boolean(journey && (journey.cancelled === true
+    || legsOf(journey).some((item) => item.cancelled === true)));
+}
+
+function departureDelayMinutes(item) {
+  const scheduled = Date.parse(((item || {}).departure || {}).scheduled || '');
+  const estimated = Date.parse(((item || {}).departure || {}).estimated || '');
+  if (!Number.isFinite(scheduled) || !Number.isFinite(estimated)) return null;
+  return Math.floor(estimated / 60000) - Math.floor(scheduled / 60000);
+}
+
+/* The one status the header's top line and the focused saved row share.
+   Late needs fresh data, a realtime estimate on the leg the rider is actually
+   waiting on, and a positive delta between printed minutes; cancellation and
+   arrival outrank it (build_plan.md, "Late status"). */
+export function focusStatus(journey, opts = {}) {
+  const state = (text, kind, late, leg, delay) => ({ text, kind, late, leg, delay });
+  if (opts.over) return state('Trip over', 'complete', false, -1, 0);
+  if (journeyCancelled(journey)) return state('Cancelled', 'exception', false, -1, 0);
+  const leg = Number.isInteger(opts.activeLeg) && opts.activeLeg >= 0 ? opts.activeLeg : 0;
+  const delay = departureDelayMinutes(legsOf(journey)[leg]);
+  return !opts.stale && delay !== null && delay > 0
+    ? state('Running late', 'late', true, leg, delay)
+    : state('Running', 'ordinary', false, leg, delay || 0);
+}
+
 /** Smart-header directions state. This is deliberately pure: changing the
     business thresholds never changes the renderer or its percentage axis. */
 export function directionsModel(value, nowMs, opts = {}) {
@@ -132,6 +160,7 @@ export function directionsModel(value, nowMs, opts = {}) {
     provenance: '',
     instruction: first.headsign || (journey && journey.destinationHeadsign) || '',
     phase: 'pre',
+    activeLeg: 0,
     progress: { at, phase: 'pre' },
     showBoardingPlatform: true,
     warn: false,
@@ -189,17 +218,20 @@ export function directionsModel(value, nowMs, opts = {}) {
       const hasChange = Boolean(next);
       model.figure = stale ? '' : countdownFigure(minutesUntil(legArrival, nowMs));
       model.provenance = hasChange ? 'TO CHANGE' : 'TO GO';
-      model.instruction = `Off at ${hasChange ? next.station : model.to}`
+      model.instruction = `Get off at ${hasChange ? next.station : model.to}`
         + (cleanPlatform(legs[i].to && legs[i].to.platform)
           ? ` · Platform ${cleanPlatform(legs[i].to.platform)}` : '');
+      model.activeLeg = i;
       phase = i === 0 ? 'ride' : 'ride2';
       break;
     }
     if (next && next.departure !== null && nowMs < next.departure) {
       model.figure = stale ? '' : countdownFigure(minutesUntil(next.departure, nowMs));
       model.provenance = 'TO CHANGE';
-      model.instruction = (next.toPlatform ? `Platform ${next.toPlatform} · ` : '')
-        + `${clock(next.departure)} to ${model.to}`;
+      // Ruling 3: name the station you change at, not only the platform.
+      model.instruction = `Change at ${next.station}`
+        + (next.toPlatform ? ` · Platform ${next.toPlatform}` : '');
+      model.activeLeg = next.index;
       phase = 'dwell';
       break;
     }

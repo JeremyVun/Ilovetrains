@@ -83,6 +83,38 @@ const TRIP_TRANSFER = {
   to: { id: '200080', name: 'Bondi Junction Station' },
   createdAt: '2026-08-01T08:00:00+10:00'
 };
+/* The same corridor with the station coordinates the distance line needs; the
+   ids are unchanged, so the seeded cache still matches. */
+const TRIP_TRANSFER_LOCATED = {
+  ...TRIP_TRANSFER,
+  from: { id: '213820', name: 'Rhodes Station', location: { lat: -33.8299, lon: 151.0866 } },
+  to: { id: '200080', name: 'Bondi Junction Station', location: { lat: -33.8915, lon: 151.2477 } }
+};
+const TRIP_CENTRAL_LOCATED = {
+  id: 'trip-central-parramatta',
+  from: { id: '200060', name: 'Central Station', location: { lat: -33.8832, lon: 151.2069 } },
+  to: { id: '215020', name: 'Parramatta Station', location: { lat: -33.8172, lon: 151.0050 } },
+  createdAt: '2026-08-05T08:00:00+10:00'
+};
+const TRIP_METRO = {
+  id: 'trip-tallawong-chatswood',
+  from: { id: '206710', name: 'Tallawong Station', location: { lat: -33.6918, lon: 150.9060 } },
+  to: { id: '207210', name: 'Chatswood Station', location: { lat: -33.7967, lon: 151.1830 } },
+  createdAt: '2026-08-06T08:00:00+10:00'
+};
+const TRIP_MEADOWBANK = {
+  id: 'trip-meadowbank-townhall',
+  from: { id: '213810', name: 'Meadowbank Station', location: { lat: -33.8180, lon: 151.0900 } },
+  to: { id: '200070', name: 'Town Hall Station', location: { lat: -33.8735, lon: 151.2070 } },
+  createdAt: '2026-08-07T08:00:00+10:00'
+};
+const TRIP_EPPING = {
+  id: 'trip-epping-chatswood',
+  from: { id: '213910', name: 'Epping Station', location: { lat: -33.7727, lon: 151.0820 } },
+  to: { id: '207210', name: 'Chatswood Station', location: { lat: -33.7967, lon: 151.1830 } },
+  createdAt: '2026-08-08T08:00:00+10:00'
+};
+
 const TRIP_LONG = {
   id: 'trip-olympicpark-mtvictoria',
   from: { id: '206010', name: 'Sydney Olympic Park Station' },
@@ -96,6 +128,13 @@ const TRIP_LONG = {
 const OPEN_ROW = (i = 0) => `
   document.querySelectorAll('[data-t="row"]')[${i}].click();
   await sleep(140);
+`;
+
+/* The one-shot fix the top line reads, written where the client keeps it. */
+const FIX = (lat, lon, nowMs) => `
+  t.state.fix = { lat: ${lat}, lon: ${lon}, at: ${nowMs} };
+  t.rerender();
+  await sleep(40);
 `;
 
 /** History that makes `predict` choose TRIP forward at 22:45 on a weekday. */
@@ -167,15 +206,21 @@ async function states() {
 
   const home = (name, journeys, opts = {}) => {
     const body = transferBody({ journeys, generatedAt: opts.generatedAt || TRANSFER_AT });
+    const seed = doc({
+      trips: opts.trips || [TRIP_TRANSFER],
+      body,
+      hist: opts.hist || [],
+      fetchedAt: opts.generatedAt || TRANSFER_AT,
+      focus: opts.focus || null
+    });
+    // A saved trip prints its line badges from whatever board it has on the
+    // device, so a multi-trip home needs more than the selected trip's.
+    for (const [key, cached] of Object.entries(opts.cache || {})) {
+      seed.cache[key] = { fetchedAt: opts.generatedAt || TRANSFER_AT, body: cached };
+    }
     return {
       name,
-      seed: doc({
-        trips: opts.trips || [TRIP_TRANSFER],
-        body,
-        hist: opts.hist || [],
-        fetchedAt: opts.generatedAt || TRANSFER_AT,
-        focus: opts.focus || null
-      }),
+      seed,
       now: opts.now || TRANSFER_NOW,
       body,
       route: '#/',
@@ -210,6 +255,20 @@ async function states() {
     lead.arrival = at('10:22');
     lead.legs = 3;
     return journeys;
+  };
+
+  /* One displayed minute is the smallest positive delay the floored-minute
+     arithmetic can print (r3 OPTIONS.md, S3/S4). */
+  const lateSecond = () => { const j = transferJourneys(); delayLeg(j[0], 1, 1); return j; };
+  const lateFirst = () => { const j = transferJourneys(); delayLeg(j[0], 0, 1); return j; };
+  const staleLate = () => { const j = transferJourneys(); delayLeg(j[0], 1, 9); return j; };
+  const cancelledLead = () => { const j = transferJourneys(); cancelLeg(j[0], 0); return j; };
+  const scheduledOnly = () => {
+    const j = transferJourneys();
+    j[0].legDetail.forEach((item) => { item.departure.estimated = null; item.arrival.estimated = null; });
+    j[0].departure.estimated = null;
+    j[0].arrival.estimated = null;
+    return j;
   };
 
   /* Sydney Olympic Park → Strathfield → Mount Victoria: a real journey shape
@@ -351,6 +410,65 @@ async function states() {
       now: Date.parse('2026-09-01T10:01:00+10:00'),
       generatedAt: '2026-09-01T10:01:00+10:00',
       focus: transferJourneys()[0]
+    }),
+
+    /* --- the smart home's own states ------------------------------------ */
+
+    // No fix at all is `home-before`. With one, the top line answers distance,
+    // and inside 200 m it answers AT.
+    home('home-at', transferJourneys(), {
+      trips: [TRIP_TRANSFER_LOCATED], after: FIX(-33.8299, 151.0866, TRANSFER_NOW)
+    }),
+    home('home-near', transferJourneys(), {
+      trips: [TRIP_TRANSFER_LOCATED], after: FIX(-33.8335, 151.0866, TRANSFER_NOW)
+    }),
+    home('home-far', transferJourneys(), {
+      trips: [TRIP_TRANSFER_LOCATED], after: FIX(-33.8731, 151.0866, TRANSFER_NOW)
+    }),
+
+    // The second leg one displayed minute late, read during the Town Hall
+    // dwell: leg 1 is the relevant one, so this is RUNNING LATE.
+    home('home-late-change', lateSecond(), {
+      now: Date.parse('2026-09-01T09:53:00+10:00'),
+      generatedAt: '2026-09-01T09:53:00+10:00',
+      focus: lateSecond()[0]
+    }),
+    // The first leg late, read while riding it.
+    home('home-late-first', lateFirst(), {
+      now: Date.parse('2026-09-01T09:33:00+10:00'),
+      generatedAt: '2026-09-01T09:33:00+10:00',
+      focus: lateFirst()[0]
+    }),
+    // A four-hour-old snapshot carrying a stored nine-minute delay still says
+    // RUNNING: a stale delta is not evidence of lateness.
+    home('home-stale-focused', staleLate(), {
+      now: Date.parse('2026-09-01T09:53:00+10:00'),
+      generatedAt: '2026-09-01T05:53:00+10:00',
+      focus: staleLate()[0]
+    }),
+    // No realtime control on either leg: nothing to be late against.
+    home('home-scheduled-focused', scheduledOnly(), {
+      now: Date.parse('2026-09-01T09:53:00+10:00'),
+      generatedAt: '2026-09-01T09:53:00+10:00',
+      focus: scheduledOnly()[0]
+    }),
+    // B8: cancelled before it departs, the header hands over to the next
+    // running service while the status still reads CANCELLED.
+    home('home-focused-cancelled', cancelledLead(), {
+      now: Date.parse('2026-09-01T09:21:00+10:00'),
+      generatedAt: '2026-09-01T09:21:00+10:00',
+      focus: cancelledLead()[0]
+    }),
+    // Past the arrival: TRIP OVER, with the return offer under the header.
+    home('home-over', transferJourneys(), {
+      now: Date.parse('2026-09-01T10:11:00+10:00'),
+      generatedAt: '2026-09-01T10:11:00+10:00',
+      focus: transferJourneys()[0]
+    }),
+    home('home-five-trips', transferJourneys(), {
+      trips: [TRIP_TRANSFER_LOCATED, TRIP_CENTRAL_LOCATED, TRIP_METRO, TRIP_MEADOWBANK, TRIP_EPPING],
+      focus: transferJourneys()[0],
+      cache: { '200060-215020': departuresBody() }
     }),
     board('on-time', departuresBody()),
     board('past-register', departuresBody(), {
@@ -631,9 +749,18 @@ function pageScript(state) {
         && Math.abs(fromStation.getBoundingClientRect().top - toStation.getBoundingClientRect().top) > 0.1) {
       problems.push('home station names are vertically misaligned');
     }
-    if (fromTime && toTime
-        && Math.abs(fromTime.getBoundingClientRect().top - toTime.getBoundingClientRect().top) > 0.1) {
-      problems.push('home endpoint times are vertically misaligned');
+    // Ruling 10: unequal clocks, so the shared edge is the baseline, not the
+    // box top. A zero-height inline-block sits on the line box's baseline.
+    const baselineOf = (el) => {
+      const probe = document.createElement('span');
+      probe.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline';
+      el.appendChild(probe);
+      const y = probe.getBoundingClientRect().top;
+      probe.remove();
+      return y;
+    };
+    if (fromTime && toTime && Math.abs(baselineOf(fromTime) - baselineOf(toTime)) > 1.01) {
+      problems.push('home endpoint times do not share a baseline');
     }
     if (document.querySelector('.rail')) problems.push('deleted board focus strip is still rendered');
 

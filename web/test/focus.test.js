@@ -5,11 +5,11 @@ import assert from 'node:assert/strict';
 
 import {
   setFocus, clearFocus, isFocused, focusExpired, matchJourney, refreshFocus,
-  FOCUS_CLEAR_MS
+  directionsModel, focusStatus, FOCUS_CLEAR_MS
 } from '../js/focus.js';
 import { parseDoc, serializeDoc, emptyDoc, removeTrip } from '../js/storage.js';
 import {
-  TRANSFER_NOW, TRANSFER_DEPARTED_NOW, transferBody, transferJourneys, delayLeg
+  TRANSFER_NOW, TRANSFER_DEPARTED_NOW, transferBody, transferJourneys, delayLeg, cancelLeg
 } from './fixture.js';
 
 const TRIP = {
@@ -99,4 +99,61 @@ test('the focus clears itself half an hour past arrival, and not a minute before
   assert.equal(focusExpired(doc.focus, arrival + FOCUS_CLEAR_MS + 1000), true);
   assert.equal(refreshFocus(doc, SELECTION, transferBody(), arrival + FOCUS_CLEAR_MS + 1000).focus, undefined);
   assert.equal(clearFocus(doc).focus, undefined);
+});
+
+
+/* ---- the late rule (build_plan.md, "Late status") ------------------------ */
+
+const at = (time) => Date.parse(`2026-09-01T${time}:00+10:00`);
+const legOf = (journey, nowMs) => directionsModel(journey, nowMs).activeLeg;
+
+test('the relevant leg follows the journey phase, not the journey', () => {
+  const journey = transferJourneys()[0];
+  assert.equal(legOf(journey, at('09:21')), 0, 'before departure');
+  assert.equal(legOf(journey, at('09:33')), 0, 'riding the first leg');
+  assert.equal(legOf(journey, at('09:53')), 1, 'waiting at Town Hall');
+  assert.equal(legOf(journey, at('10:01')), 1, 'riding the second leg');
+});
+
+test('a positive realtime delta on the relevant leg is the only source of RUNNING LATE', () => {
+  const dwelling = delayLeg(transferJourneys()[0], 1, 1);
+  const late = focusStatus(dwelling, { activeLeg: legOf(dwelling, at('09:53')) });
+  assert.deepEqual([late.text, late.late, late.leg, late.delay], ['Running late', true, 1, 1]);
+
+  // The same journey read one phase earlier is on time: leg 0 is not delayed.
+  const earlier = focusStatus(dwelling, { activeLeg: legOf(dwelling, at('09:33')) });
+  assert.deepEqual([earlier.text, earlier.late], ['Running', false]);
+
+  const first = delayLeg(transferJourneys()[0], 0, 1);
+  const firstLate = focusStatus(first, { activeLeg: legOf(first, at('09:33')) });
+  assert.deepEqual([firstLate.text, firstLate.leg], ['Running late', 0]);
+
+  const onTime = focusStatus(transferJourneys()[0], { activeLeg: 1 });
+  assert.deepEqual([onTime.text, onTime.late, onTime.delay], ['Running', false, 0]);
+});
+
+test('sub-minute drift the printed clocks cannot explain is not late', () => {
+  const journey = transferJourneys()[0];
+  const leg = journey.legDetail[1];
+  leg.departure.estimated = new Date(Date.parse(leg.departure.scheduled) + 30_000).toISOString();
+  assert.equal(focusStatus(journey, { activeLeg: 1 }).late, false);
+});
+
+test('stale data and a scheduled-only leg never manufacture RUNNING LATE', () => {
+  const stored = delayLeg(transferJourneys()[0], 1, 9);
+  assert.equal(focusStatus(stored, { activeLeg: 1, stale: true }).text, 'Running');
+  assert.equal(focusStatus(stored, { activeLeg: 1 }).text, 'Running late');
+
+  const scheduled = delayLeg(transferJourneys()[0], 1, 9);
+  scheduled.legDetail[1].departure.estimated = null;
+  assert.equal(focusStatus(scheduled, { activeLeg: 1 }).text, 'Running');
+});
+
+test('cancellation and arrival outrank lateness', () => {
+  const cancelled = cancelLeg(delayLeg(transferJourneys()[0], 1, 5), 1);
+  const status = focusStatus(cancelled, { activeLeg: 1 });
+  assert.deepEqual([status.text, status.kind, status.late], ['Cancelled', 'exception', false]);
+
+  const over = focusStatus(delayLeg(transferJourneys()[0], 1, 5), { activeLeg: 1, over: true });
+  assert.deepEqual([over.text, over.kind, over.late], ['Trip over', 'complete', false]);
 });
