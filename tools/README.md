@@ -103,30 +103,71 @@ Seeds the client's localStorage document, pins the clock through
 state mid-shot, and photographs the result. `--probe` (or `--probe-file`, for a
 probe long enough to drive a flow) runs awaited JS in the page and prints what
 it returns, so a state can be *measured* — or driven end to end — in the same
-drive that shoots it. Invariants are checked on every state and reported at
-`console.error` under the shot: three full lines per board row, the figure fits
-its column (rows and journey blocks alike), our own copy is never ellipsised,
-no part of a scrolling region is cut off with no way to scroll to it, its last
-item is whole at the end of the scroll, and the chrome beneath it is never
-painted over its content or pushed below the frame.
+drive that shoots it.
 
-That last pair is checked for the board against its footer and for the journey
-detail view against its closing rule. The sweep also rejects any focused state
-that restores the deleted board strip.
+Invariants are checked on every state and reported at `console.error` under the
+shot; a state that means something particular declares it in its own `expect`
+block (the status string its top line must read, whether journey detail may
+carry an action rail), so the assertion lives beside the seed that causes it.
+What is checked, with the comp probes the numbers come from:
 
-The transfer-detail states (`detail-hero`, `detail-tight`, `detail-cancelled`,
-`detail-long`, `board-focused`, `board-focused-scrolled`,
-`board-focused-departed`) run on the transfer corridor from
-`web/test/fixture.js`, and the `detail-*` ones reach the view by CLICKING a
-board row, so every one of them is also proof that the whole row is the tap
-target. Output defaults to the system temporary directory; use `--out` only
-for a deliberate comparison set:
+- three full lines per board row, and a 96px row (100px promoted into detail)
+  with its rule drawn edge to edge of a row that is itself edge to edge of the
+  region holding it;
+- one figure column everywhere: every row figure and every detail step time
+  ends at `--sy-pad` + `--sy-fig` (22 + 72 on a phone), and they agree with
+  each other;
+- the figure fits that column, and our own copy is never ellipsised — an
+  upstream headsign may be, but only once it has used the whole row;
+- every change on a row names its station and its boarding platform, inside
+  the frame;
+- the tight window is painted on the dwell segment alone, never on a ride
+  segment and never on a cancelled row;
+- journey detail: steps 72px (change steps 82px), 18px between the summary and
+  the heavy rule, a 66px action rail flush with the frame, and no rail at all
+  when the journey is cancelled or already followed;
+- home: the endpoint names share a top edge and the clocks share a *baseline*
+  (measured with a zero-height inline-block probe, because the two clocks are
+  different sizes — a shared box top is the thing ruling 10 calls wrong), one
+  status string in both the top line and the focused saved-trip row, and a
+  `LIVE` dot that stays the live colour however late the journey is;
+- in the light scheme, T1 and BMT fill `#F99D1C` with paper numerals while the
+  same codes as bare text stay `#A46204` (ruling 37);
+- tap targets 44px, time-axis segments on scale, no part of a scrolling region
+  cut off with no way to scroll to it, its last item whole at the end of the
+  scroll, and the chrome beneath it never painted over its content or pushed
+  below the frame.
+
+The scrolling regions are the board and its footer, journey detail and its
+closing rule, and the home trip list and its rail. The sweep also rejects any
+focused state that restores the deleted board strip.
+
+One measurement is printed at `console.warn` as `NOTE` instead of failing:
+`past-register` and `past-register-scrolled` each report `provenance
+"TIMETABLE ONLY" overflows the figure column by 24px`, twice — once per
+timetable-only row. It is pre-existing and no comp renders it; the owner rules
+on the column or the word, and until then the sweep stays green with the number
+in plain sight.
+
+The transfer states (`detail-hero`, `detail-tight`, `detail-cancelled`,
+`detail-long`, `detail-departed`, `detail-focused`, `board-focused`,
+`board-focused-scrolled`, `board-focused-departed`, `board-tight`,
+`board-cancelled-tight`, `board-two-change`) run on the transfer corridor from
+`web/test/fixture.js`; `detail-direct` runs on the Central → Parramatta board.
+Every `detail-*` state reaches the view by CLICKING a board row, so each one is
+also proof that the whole row is the tap target. Output defaults to the system
+temporary directory; use `--out` only for a deliberate comparison set:
 
 ```
-node tools/shoot-states.js detail-hero detail-tight detail-cancelled \
-  detail-long board-focused board-focused-scrolled board-focused-departed
+node tools/shoot-states.js detail-hero detail-direct detail-tight \
+  detail-cancelled detail-long detail-departed detail-focused
 # add --size 412x732 or --media prefers-color-scheme:light --prefix light-
 ```
+
+**Trap: a post-departure state moves two clocks.** `detail-departed` advances
+the pinned clock *and* `t.state.body.generatedAt` together. Advance only the
+clock and the seeded board is four hours old, so the client correctly withholds
+every figure — a plausible shot of the wrong screen.
 
 The `short-*` states shoot the board at **412x732** — a 412px Android with its
 browser chrome on screen, which is the frame the owner's phone actually gets and
@@ -134,8 +175,10 @@ the one six three-line rows do not fit. Each is shot twice, before and after a
 driven scroll to the end, because "the sixth service is reachable" is a claim
 about a gesture and not about a still image. The scroll-reachability invariant
 above is the one that would have caught the defect they exist for: run it
-against `overflow: hidden` and it reports `129px of board is cut off with no way
-to scroll to it` at 412x732, and 17px at 390x844.
+against `overflow: hidden` and it reports `21px of board is cut off with no way
+to scroll to it` at 412x732. At 390x844 it reports nothing any more — six 96px
+rows fit that frame, which is exactly why the 412 states are the ones that
+matter.
 
 ## measure-open.js and make-icons.sh
 

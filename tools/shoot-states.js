@@ -173,7 +173,7 @@ async function states() {
   const fx = await import(pathToFileURL(path.join(ROOT, 'web/test/fixture.js')).href);
   const {
     departuresBody, baseJourneys, journey, delay, cancel,
-    transferBody, transferJourneys, delayLeg, cancelLeg,
+    transferBody, transferJourneys, delayLeg, cancelLeg, threeLegJourney,
     TRANSFER_NOW, TRANSFER_DEPARTED_NOW
   } = fx;
 
@@ -200,7 +200,8 @@ async function states() {
       now: opts.now || TRANSFER_NOW,
       body,
       route: '#/board',
-      after: opts.after
+      after: opts.after,
+      expect: opts.expect
     };
   };
 
@@ -224,36 +225,17 @@ async function states() {
       now: opts.now || TRANSFER_NOW,
       body,
       route: '#/',
-      after: opts.after
+      after: opts.after,
+      expect: opts.expect
     };
   };
 
   const tighten = (journeys) => { delayLeg(journeys[0], 0, 5); return journeys; };
   const breakLeg = (journeys) => { cancelLeg(journeys[0], 1); return journeys; };
 
-  /* The lead journey routed Rhodes → Town Hall → Central → Bondi Junction: a
-     declared synthetic seam (the corridor returns no three-leg journey) that
-     is the only way to shoot two attached transfer facts on one row. */
   const twoChangeBoard = () => {
     const journeys = transferJourneys();
-    const lead = journeys[0];
-    const at = (hhmm) => ({ scheduled: `2026-09-01T${hhmm}:00+10:00`, estimated: `2026-09-01T${hhmm}:00+10:00` });
-    lead.legDetail[1] = {
-      ...lead.legDetail[1],
-      to: { id: '200060', name: 'Central Station', platform: 'Platform 12' },
-      arrival: at('10:02')
-    };
-    lead.legDetail.push({
-      line: { name: 'T1', mode: 'train' },
-      headsign: 'Bondi Junction',
-      from: { id: '200060', name: 'Central Station', platform: 'Platform 13' },
-      to: { id: '200080', name: 'Bondi Junction Station', platform: 'Platform 2' },
-      departure: at('10:07'),
-      arrival: at('10:22'),
-      cancelled: false
-    });
-    lead.arrival = at('10:22');
-    lead.legs = 3;
+    journeys[0] = threeLegJourney();
     return journeys;
   };
 
@@ -393,23 +375,25 @@ async function states() {
   }));
 
   return [
-    home('home-before', transferJourneys()),
-    home('home-delayed', tighten(transferJourneys())),
+    home('home-before', transferJourneys(), { expect: { status: 'Next train' } }),
+    home('home-delayed', tighten(transferJourneys()), { expect: { status: 'Next train' } }),
     home('home-cancelled', (() => {
       const value = transferJourneys();
       value[0].cancelled = true;
       value[0].legDetail[0].cancelled = true;
       return value;
-    })()),
+    })(), { expect: { status: 'Next train' } }),
     home('home-change', transferJourneys(), {
       now: Date.parse('2026-09-01T09:53:00+10:00'),
       generatedAt: '2026-09-01T09:53:00+10:00',
-      focus: transferJourneys()[0]
+      focus: transferJourneys()[0],
+      expect: { status: 'Running' }
     }),
     home('home-final', transferJourneys(), {
       now: Date.parse('2026-09-01T10:01:00+10:00'),
       generatedAt: '2026-09-01T10:01:00+10:00',
-      focus: transferJourneys()[0]
+      focus: transferJourneys()[0],
+      expect: { status: 'Running' }
     }),
 
     /* --- the smart home's own states ------------------------------------ */
@@ -417,58 +401,68 @@ async function states() {
     // No fix at all is `home-before`. With one, the top line answers distance,
     // and inside 200 m it answers AT.
     home('home-at', transferJourneys(), {
-      trips: [TRIP_TRANSFER_LOCATED], after: FIX(-33.8299, 151.0866, TRANSFER_NOW)
+      trips: [TRIP_TRANSFER_LOCATED], after: FIX(-33.8299, 151.0866, TRANSFER_NOW),
+      expect: { status: 'At Rhodes' }
     }),
     home('home-near', transferJourneys(), {
-      trips: [TRIP_TRANSFER_LOCATED], after: FIX(-33.8335, 151.0866, TRANSFER_NOW)
+      trips: [TRIP_TRANSFER_LOCATED], after: FIX(-33.8335, 151.0866, TRANSFER_NOW),
+      expect: { status: '400 m to Rhodes' }
     }),
     home('home-far', transferJourneys(), {
-      trips: [TRIP_TRANSFER_LOCATED], after: FIX(-33.8731, 151.0866, TRANSFER_NOW)
+      trips: [TRIP_TRANSFER_LOCATED], after: FIX(-33.8731, 151.0866, TRANSFER_NOW),
+      expect: { status: '4.8 km to Rhodes' }
     }),
 
     // The second leg one displayed minute late, read during the Town Hall
     // dwell: leg 1 is the relevant one, so this is RUNNING LATE.
-    home('home-late-change', lateSecond(), {
+    home('home-late', lateSecond(), {
       now: Date.parse('2026-09-01T09:53:00+10:00'),
       generatedAt: '2026-09-01T09:53:00+10:00',
-      focus: lateSecond()[0]
+      focus: lateSecond()[0],
+      expect: { status: 'Running late' }
     }),
     // The first leg late, read while riding it.
     home('home-late-first', lateFirst(), {
       now: Date.parse('2026-09-01T09:33:00+10:00'),
       generatedAt: '2026-09-01T09:33:00+10:00',
-      focus: lateFirst()[0]
+      focus: lateFirst()[0],
+      expect: { status: 'Running late' }
     }),
     // A four-hour-old snapshot carrying a stored nine-minute delay still says
     // RUNNING: a stale delta is not evidence of lateness.
     home('home-stale-focused', staleLate(), {
       now: Date.parse('2026-09-01T09:53:00+10:00'),
       generatedAt: '2026-09-01T05:53:00+10:00',
-      focus: staleLate()[0]
+      focus: staleLate()[0],
+      expect: { status: 'Running' }
     }),
     // No realtime control on either leg: nothing to be late against.
     home('home-scheduled-focused', scheduledOnly(), {
       now: Date.parse('2026-09-01T09:53:00+10:00'),
       generatedAt: '2026-09-01T09:53:00+10:00',
-      focus: scheduledOnly()[0]
+      focus: scheduledOnly()[0],
+      expect: { status: 'Running' }
     }),
     // B8: cancelled before it departs, the header hands over to the next
     // running service while the status still reads CANCELLED.
     home('home-focused-cancelled', cancelledLead(), {
       now: Date.parse('2026-09-01T09:21:00+10:00'),
       generatedAt: '2026-09-01T09:21:00+10:00',
-      focus: cancelledLead()[0]
+      focus: cancelledLead()[0],
+      expect: { status: 'Cancelled' }
     }),
     // Past the arrival: TRIP OVER, with the return offer under the header.
     home('home-over', transferJourneys(), {
       now: Date.parse('2026-09-01T10:11:00+10:00'),
       generatedAt: '2026-09-01T10:11:00+10:00',
-      focus: transferJourneys()[0]
+      focus: transferJourneys()[0],
+      expect: { status: 'Trip over' }
     }),
     home('home-five-trips', transferJourneys(), {
       trips: [TRIP_TRANSFER_LOCATED, TRIP_CENTRAL_LOCATED, TRIP_METRO, TRIP_MEADOWBANK, TRIP_EPPING],
       focus: transferJourneys()[0],
-      cache: { '200060-215020': departuresBody() }
+      cache: { '200060-215020': departuresBody() },
+      expect: { status: 'Running' }
     }),
     board('on-time', departuresBody()),
     board('past-register', departuresBody(), {
@@ -530,15 +524,36 @@ async function states() {
     /* --- the journey detail view and the focused board ------------------- */
 
     // The exemplar's own moment: 09:21 at Rhodes, the 09:24 three minutes out.
-    transfer('detail-hero', transferJourneys(), { after: OPEN_ROW(0) }),
+    transfer('detail-hero', transferJourneys(), { after: OPEN_ROW(0), expect: { rail: true } }),
+
+    // A direct journey has no change step at all, so its ladder is board and
+    // arrive: the 23:12 BMT to Parramatta, reached by tapping its own row.
+    board('detail-direct', departuresBody(), { after: OPEN_ROW(2), expect: { rail: true } }),
+
+    // B6, and the trap it hides: the clock and the body's generatedAt move
+    // TOGETHER. Advance only the clock and the board is stale, the figure is
+    // correctly withheld, and the shot is of the wrong screen.
+    transfer('detail-departed', transferJourneys(), {
+      expect: { rail: true },
+      after: `${OPEN_ROW(0)}
+  t.state.body.generatedAt = '2026-09-01T09:47:00+10:00';
+  t.now = () => ${TRANSFER_DEPARTED_NOW};
+  t.rerender();
+  await sleep(80);`
+    }),
+
+    // B2: the journey already being followed has no positive action left.
+    transfer('detail-focused', transferJourneys(), {
+      focus: transferJourneys()[0], after: OPEN_ROW(0), expect: { rail: false }
+    }),
 
     // The first leg five minutes late, so the printed 7-minute change is
     // really 2. Two times, two windows, and no claim about whether you make it.
-    transfer('detail-tight', tighten(transferJourneys()), { after: OPEN_ROW(0) }),
+    transfer('detail-tight', tighten(transferJourneys()), { after: OPEN_ROW(0), expect: { rail: true } }),
 
     // The second leg cancelled: the journey is cancelled because ANY leg is,
     // and the detail view is the only screen that says WHICH.
-    transfer('detail-cancelled', breakLeg(transferJourneys()), { after: OPEN_ROW(0) }),
+    transfer('detail-cancelled', breakLeg(transferJourneys()), { after: OPEN_ROW(0), expect: { rail: false } }),
 
     // The longest real strings on any of these corridors: nothing abbreviated,
     // the third line allowed to wrap rather than truncate (the detail view's
@@ -548,18 +563,21 @@ async function states() {
       seed: doc({ trips: [TRIP_LONG], body: longBody(), fetchedAt: TRANSFER_AT, hist: [] }),
       now: TRANSFER_NOW,
       body: longBody(),
-      after: OPEN_ROW(0)
+      after: OPEN_ROW(0),
+      expect: { rail: true }
     },
 
     transfer('focus-returns-home', transferJourneys(), {
-      after: `${OPEN_ROW(0)} document.querySelector('[data-act="focus"]').click(); await sleep(160);`
+      after: `${OPEN_ROW(0)} document.querySelector('[data-act="focus"]').click(); await sleep(160);`,
+      expect: { status: 'Running' }
     }),
 
     home('reverse-real-platforms', transferJourneys(), {
       now: Date.parse('2026-09-01T10:11:00+10:00'),
       generatedAt: '2026-09-01T10:11:00+10:00',
       focus: transferJourneys()[0],
-      after: `window.fetch = async () => new Response(${JSON.stringify(JSON.stringify(reverseBody))}, { headers: { 'Content-Type': 'application/json' } }); document.querySelector('[data-act="way-back"]').click(); await sleep(220);`
+      after: `window.fetch = async () => new Response(${JSON.stringify(JSON.stringify(reverseBody))}, { headers: { 'Content-Type': 'application/json' } }); document.querySelector('[data-act="way-back"]').click(); await sleep(220);`,
+      expect: { status: 'Next train' }
     }),
 
     // A focus never adds a board strip: the board remains exactly six slots.
@@ -678,29 +696,59 @@ function pageScript(state) {
   // Invariants checked on every state, in the browser, at the shot's viewport.
   // They are reported at console.error, which screenshot.js prints under the
   // shot, so a broken invariant cannot hide inside a plausible-looking image.
+  // The comp probes of /tmp/trains-comps-home-interaction-r6 and -r3 are the
+  // numbers below; a state declares what it means in its expect block.
   try {
     const problems = [];
+    const notes = [];
+    const expect = ${JSON.stringify(state.expect || {})};
+    const px = (value) => parseFloat(value) || 0;
+    const measures = getComputedStyle(document.body);
+    const PAD = px(measures.getPropertyValue('--sy-pad'));
+    const FIG = px(measures.getPropertyValue('--sy-fig'));
+    const near = (a, b, slack = 0.5) => Math.abs(a - b) <= slack;
+    const round = (value) => Math.round(value * 10) / 10;
     const rowEls = [...document.querySelectorAll('[data-t="row"]')];
-
-    /* The journey detail view is EXEMPT from the three-line invariant (its
-       blocks may run longer), but not from the two rules that invariant
-       serves: a figure that does not fit its column is drawn straight through
-       the time beside it, and our own copy is never ellipsised. */
-    for (const block of document.querySelectorAll('[data-t="leg"],[data-t="change"]')) {
-      const fig = block.querySelector('.mins');
-      if (fig && fig.scrollWidth > fig.clientWidth) {
-        problems.push('detail figure "' + (fig.firstChild && fig.firstChild.nodeValue)
-          + '" overflows its column: ' + fig.scrollWidth + ' > ' + fig.clientWidth);
-      }
-      for (const own of block.querySelectorAll('.warnline, .prov')) {
-        if (own.scrollWidth > own.clientWidth) problems.push('detail copy truncated: ' + own.textContent);
-      }
-    }
+    const figureRights = [];
 
     for (const row of rowEls) {
+      const box = row.getBoundingClientRect();
+      const promoted = row.classList.contains('promoted');
+
       // docs/contracts/ui.md, binding: three lines per row, in every state.
       const lines = ['.sy-t', '.sy-j', '.sy-sign'].map((s) => row.querySelector(s));
       if (lines.some((el) => !el || !el.textContent.trim())) problems.push('row is not three full lines');
+
+      // B3: a fixed ledger row, 96px on the board and 100px promoted into
+      // detail. A row that stretches to fill a sparse frame is the defect.
+      const height = promoted ? 100 : 96;
+      if (!near(box.height, height)) {
+        problems.push('the row is ' + round(box.height) + 'px, not the ledger’s ' + height);
+      }
+
+      // Ruling 29: the rule is drawn edge to edge of a row that is itself
+      // edge to edge of the region holding it. An inset rule reads as a box.
+      const rule = getComputedStyle(row, '::after');
+      if (!near(px(rule.width), box.width) || px(rule.left) !== 0) {
+        problems.push('the row rule is ' + rule.width + ' inset ' + rule.left + ' across a ' + round(box.width) + 'px row');
+      }
+      const region = row.closest('[data-scroller]');
+      if (region) {
+        const held = region.getBoundingClientRect();
+        if (!near(box.left, held.left) || !near(box.width, region.clientWidth)) {
+          problems.push('the row is inset ' + round(box.left - held.left) + 'px in its region, so its rule cannot reach both edges');
+        }
+      }
+
+      // One figure column across every row and every screen (probe: 22 + 72).
+      const fig = row.querySelector('[data-figure-column]');
+      if (fig) {
+        const right = fig.getBoundingClientRect().right;
+        figureRights.push(right);
+        if (!near(right, box.left + PAD + FIG)) {
+          problems.push('the figure column ends at ' + round(right) + ', not ' + (box.left + PAD + FIG));
+        }
+      }
       // The figure must fit its column: it has no ellipsis and nothing clips
       // it, so an overlong one is drawn straight through the departure time.
       const mins = row.querySelector('.sy-n');
@@ -708,18 +756,104 @@ function pageScript(state) {
         problems.push('figure "' + (mins.firstChild && mins.firstChild.nodeValue) + '" overflows its column: '
           + mins.scrollWidth + ' > ' + mins.clientWidth);
       }
+      // TIMETABLE ONLY does not fit the 72px column. Pre-existing and awaiting
+      // an owner ruling on the column or the word, so it is measured, not failed.
+      const prov = row.querySelector('.sy-st');
+      if (prov && prov.scrollWidth > prov.clientWidth) {
+        notes.push('provenance "' + prov.textContent.trim() + '" overflows the figure column by '
+          + (prov.scrollWidth - prov.clientWidth) + 'px');
+      }
+
+      // Every change states where it happens and which platform it boards
+      // from; a label pushed out of the frame states neither.
+      for (const gap of row.querySelectorAll('[data-transfer-gap]')) {
+        const index = gap.dataset.transferGap;
+        const at = (sel) => row.querySelector(sel + '[data-transfer-index="' + index + '"]');
+        for (const [what, el] of [['station', at('[data-transfer-station]')], ['boarding platform', at('[data-transfer-platform]')]]) {
+          if (!el) { problems.push('change ' + index + ' names no ' + what); continue; }
+          const rect = el.getBoundingClientRect();
+          if (rect.width < 1) problems.push('change ' + index + ' names no ' + what);
+          else if (rect.left < -0.5 || rect.right > innerWidth + 0.5) {
+            problems.push('change ' + index + '’s ' + what + ' "' + el.textContent.trim() + '" is outside the frame');
+          }
+        }
+      }
+
+      // Ruling 34: an upstream headsign may be ellipsised, but only once it
+      // has used the whole row.
+      const sign = row.querySelector('[data-headsign]');
+      if (sign && sign.scrollWidth > sign.clientWidth) {
+        const free = box.right - PAD - sign.getBoundingClientRect().right;
+        if (free > 1) problems.push('the headsign is ellipsised with ' + round(free) + 'px of row still free');
+      }
       // Our own copy must never be ellipsised. An upstream headsign may be.
       const note = row.querySelector('.sy-sign.note');
       if (note && note.scrollWidth > note.clientWidth) {
         problems.push('cancelled-lead note truncated: ' + note.scrollWidth + ' > ' + note.clientWidth);
       }
+
+      // B4 and ruling 36: the tight window is painted on the dwell alone, and
+      // a cancelled journey never paints one.
+      const warned = [...row.querySelectorAll('[data-seg].warn')];
+      for (const seg of warned) {
+        if (!seg.hasAttribute('data-transfer-gap')) problems.push('the tight colour is painted on a ride segment, not the dwell');
+      }
+      if (row.classList.contains('cx') && warned.length) problems.push('a cancelled row paints a tight change');
+      if (row.classList.contains('tight') && !warned.length) problems.push('a tight row paints no tight dwell');
+    }
+    if (figureRights.length && Math.max(...figureRights) - Math.min(...figureRights) > 0.5) {
+      problems.push('the figure column moves between rows: ' + figureRights.map(round).join(', '));
+    }
+
+    /* Journey detail. Its steps run on the row's own figure ladder, and its
+       chrome is the tail, the freshness line and — only when the journey is
+       neither cancelled nor already followed — the action rail. */
+    if (document.querySelector('.detail-scroll')) {
+      for (const step of document.querySelectorAll('[data-t="step"]')) {
+        const stepBox = step.getBoundingClientRect();
+        const wanted = step.classList.contains('change') ? 82 : 72;
+        if (stepBox.height < wanted - 0.5) {
+          problems.push('a ' + step.dataset.step + ' step is ' + round(stepBox.height) + 'px, not ' + wanted);
+        }
+        const time = step.querySelector('.dtime');
+        if (time) {
+          const right = time.getBoundingClientRect().right;
+          if (!near(right, stepBox.left + FIG)) {
+            problems.push('a step time ends at ' + round(right) + ', not the figure column’s ' + (stepBox.left + FIG));
+          }
+          if (figureRights.length && !near(right, figureRights[0])) {
+            problems.push('the step times and the promoted row use different figure columns: ' + round(right) + ' vs ' + round(figureRights[0]));
+          }
+          if (time.scrollWidth > time.clientWidth) problems.push('step time "' + time.textContent + '" overflows its column');
+        }
+        const label = step.querySelector('.dwhat span');
+        if (label && label.scrollWidth > label.clientWidth) problems.push('step copy truncated: ' + label.textContent.trim());
+      }
+
+      // Ruling 16: exactly 18px of air between the summary and the heavy rule.
+      const summary = document.querySelector('[data-summary]');
+      const heavy = document.querySelector('.sy-mast .sy-hr');
+      if (summary && heavy) {
+        const gap = heavy.getBoundingClientRect().top - summary.getBoundingClientRect().bottom;
+        if (!near(gap, 18)) problems.push('the summary sits ' + round(gap) + 'px above the heavy rule, not 18');
+      }
+
+      const rail = document.querySelector('.detail-rail[data-footer-rail]');
+      if (rail) {
+        const railBox = rail.getBoundingClientRect();
+        if (!near(railBox.height, 66)) problems.push('the action rail is ' + round(railBox.height) + 'px, not 66');
+        if (!near(railBox.bottom, innerHeight)) problems.push('the action rail is not flush with the frame');
+        if (document.querySelector('.detail-tail.cx')) problems.push('a cancelled journey offers an action rail');
+      }
+      if (expect.rail === false && rail) problems.push('this journey carries an action rail it should not');
+      if (expect.rail === true && !rail) problems.push('the action rail is missing');
     }
 
     for (const target of document.querySelectorAll('button,[role="button"]')) {
       const rect = target.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0 && rect.height < 43.5) {
         problems.push('tap target under 44px: ' + (target.className || target.textContent.trim())
-          + ' (' + Math.round(rect.height * 10) / 10 + 'px)');
+          + ' (' + round(rect.height) + 'px)');
       }
     }
 
@@ -739,6 +873,28 @@ function pageScript(state) {
           problems.push('time axis is ' + Math.abs(got - want).toFixed(2) + 'px off scale');
         }
       });
+    }
+
+    /* Ruling 37: in light, T1 and BMT keep their identity as a fill with paper
+       numerals while the same code as bare text stays the darkened token. */
+    if (matchMedia('(prefers-color-scheme: light)').matches) {
+      const root = getComputedStyle(document.documentElement);
+      for (const code of ['T1', 'BMT']) {
+        const fill = root.getPropertyValue('--line-fill-' + code).trim().toUpperCase();
+        const bare = root.getPropertyValue('--line-' + code).trim().toUpperCase();
+        if (fill !== '#F99D1C') problems.push('light ' + code + ' fills ' + fill + ', not #F99D1C');
+        if (bare !== '#A46204') problems.push('light ' + code + ' bare text is ' + bare + ', not #A46204');
+      }
+      for (const filled of document.querySelectorAll('.sy-cap[data-line-code],.sy-p[data-line-code],.dchip[data-line-code],.sy-r[data-line-code]')) {
+        if (filled.dataset.lineCode !== 'T1' && filled.dataset.lineCode !== 'BMT') continue;
+        const paint = getComputedStyle(filled);
+        if (paint.backgroundColor !== 'rgb(249, 157, 28)') {
+          problems.push('a light ' + filled.dataset.lineCode + ' device is filled ' + paint.backgroundColor + ', not the approved yellow');
+        }
+        if (filled.textContent.trim() && paint.color !== 'rgb(250, 249, 245)') {
+          problems.push('light ' + filled.dataset.lineCode + ' numerals are ' + paint.color + ', not paper');
+        }
+      }
     }
 
     const fromStation = document.querySelector('.hm-e.from .hm-stn');
@@ -761,6 +917,34 @@ function pageScript(state) {
     };
     if (fromTime && toTime && Math.abs(baselineOf(fromTime) - baselineOf(toTime)) > 1.01) {
       problems.push('home endpoint times do not share a baseline');
+    }
+
+    /* One status word for one journey: the header's top line and the focused
+       saved-trip row cannot disagree, and each state declares what it says. */
+    const topStatus = document.querySelector('[data-focus-status]');
+    const rowStatus = document.querySelector('[data-row-status]');
+    if (topStatus && rowStatus && topStatus.textContent.trim() !== rowStatus.textContent.trim()) {
+      problems.push('the status reads "' + topStatus.textContent.trim() + '" in the top line and "'
+        + rowStatus.textContent.trim() + '" in the saved-trip row');
+    }
+    if (expect.status !== undefined) {
+      const said = topStatus ? topStatus.textContent.trim() : null;
+      if (said !== expect.status) problems.push('the top line reads "' + said + '", not "' + expect.status + '"');
+    }
+    // LIVE says the data is live and nothing else; lateness never colours it.
+    const dot = document.querySelector('.hm-fresh .pulse');
+    const freshness = document.querySelector('.hm-fresh .lbl');
+    if (dot && freshness && freshness.textContent.trim() === 'Live') {
+      const probe = document.createElement('span');
+      probe.style.cssText = 'position:absolute;color:var(--live)';
+      document.body.appendChild(probe);
+      const live = getComputedStyle(probe).color;
+      probe.remove();
+      const painted = getComputedStyle(dot).backgroundColor;
+      if (painted !== live) {
+        problems.push('the LIVE dot is ' + painted + ', not ' + live
+          + (topStatus && topStatus.dataset.late === 'true' ? ' (the journey is late)' : ''));
+      }
     }
     if (document.querySelector('.rail')) problems.push('deleted board focus strip is still rendered');
 
@@ -803,9 +987,8 @@ function pageScript(state) {
 
        A scrolling region and the chrome beneath it: nothing in the region may
        be unreachable, the last thing in it must be whole at the end of the
-       scroll, and the chrome never paints over it or hangs below the frame.
-       The detail view's chrome is its closing rule. */
-    const region = (sel, itemSel, chromeEl, what) => {
+       scroll, and the chrome never paints over it or hangs below the frame. */
+    const scrollRegion = (sel, itemSel, chromeEl, what) => {
       const el = document.querySelector(sel);
       if (!el) return;
       const box = el.getBoundingClientRect();
@@ -827,8 +1010,10 @@ function pageScript(state) {
       }
     };
 
-    region('.sy-tl', '[data-t="row"]', null, 'board');
-    region('.legs', '[data-t="leg"],[data-t="change"]', document.querySelector('.tail'), 'journey');
+    scrollRegion('.sy-tl', '[data-t="row"]', null, 'board');
+    scrollRegion('.detail-scroll', '[data-t="step"]', document.querySelector('.detail-tail'), 'journey');
+    scrollRegion('[data-t="trip-list"]', '.tripr', document.querySelector('.hm-bar, .hm-ask'), 'trip list');
+    if (notes.length) console.warn('NOTE ' + ${JSON.stringify(state.name)} + ': ' + notes.join('; '));
     if (problems.length) console.error('INVARIANT ' + ${JSON.stringify(state.name)} + ': ' + problems.join('; '));
   } catch (e) { console.error('invariant check failed: ' + e.message); }
 

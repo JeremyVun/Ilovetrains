@@ -93,7 +93,7 @@ test('the tail owns the destination, its time and its platform', () => {
   const html = render(transferJourneys()[0]);
 
   assert.match(html, /<span class="t">10:08<\/span><span class="n">Bondi Junction<\/span><span class="lbl p">Platform 2<\/span>/);
-  assert.match(html, /<div class="detail-fresh"><span class="pulse live"><\/span>Updated 0s ago<\/div>/);
+  assert.match(html, /<div class="detail-fresh" data-t="footer"><span class="pulse live"><\/span>Updated 0s ago<\/div>/);
 });
 
 /* B6: after departure the steps behind the rider go quiet rather than

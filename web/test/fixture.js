@@ -155,3 +155,27 @@ export function cancelLeg(journey, index) {
   journey.cancelled = true;
   return journey;
 }
+
+/* The renderer's plural seam: the corridor returns no three-leg journey, so the
+   second change at Central is a declared synthetic delta (r6.js S3). */
+export function threeLegJourney() {
+  const j = structuredClone(transferJourneys()[0]);
+  const at = (hhmm) => ({ scheduled: sydney(`${hhmm}:00`), estimated: sydney(`${hhmm}:00`) });
+  j.legDetail[1] = {
+    ...j.legDetail[1],
+    to: { id: '200060', name: 'Central Station', platform: 'Platform 12' },
+    arrival: at('10:02')
+  };
+  j.legDetail.push({
+    line: { name: 'T1', mode: 'train' },
+    headsign: 'Bondi Junction',
+    from: { id: '200060', name: 'Central Station', platform: 'Platform 13' },
+    to: { id: '200080', name: 'Bondi Junction Station', platform: 'Platform 2' },
+    departure: at('10:07'),
+    arrival: at('10:22'),
+    cancelled: false
+  });
+  j.arrival = at('10:22');
+  j.legs = 3;
+  return j;
+}

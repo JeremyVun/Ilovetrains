@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { boardModel, rowLines, STALE_MS } from '../js/rowmodel.js';
 import { emptyCopy, resultRowHtml } from '../js/board.js';
 import { NOW, departuresBody, baseJourneys, journey, delay, cancel } from './fixture.js';
-import { TRANSFER_NOW, transferBody, transferJourneys, cancelLeg, delayLeg } from './fixture.js';
+import { TRANSFER_NOW, transferBody, transferJourneys, cancelLeg, delayLeg, threeLegJourney } from './fixture.js';
 
 const body = (journeys, generatedAt) => departuresBody({ journeys, generatedAt });
 
@@ -402,30 +402,6 @@ test('the four empty boards are four different sentences', () => {
 
 /* --- transfer facts, and the row they are printed on ---------------------- */
 
-/* The renderer's plural seam: the corridor returns no three-leg journey, so the
-   second change at Central is a declared synthetic delta (r6.js S3). */
-function twoChangeJourney() {
-  const j = structuredClone(transferJourneys()[0]);
-  const at = (hhmm) => ({ scheduled: `2026-09-01T${hhmm}:00+10:00`, estimated: `2026-09-01T${hhmm}:00+10:00` });
-  j.legDetail[1] = {
-    ...j.legDetail[1],
-    to: { id: '200060', name: 'Central Station', platform: 'Platform 12' },
-    arrival: at('10:02')
-  };
-  j.legDetail.push({
-    line: { name: 'T1', mode: 'train' },
-    headsign: 'Bondi Junction',
-    from: { id: '200060', name: 'Central Station', platform: 'Platform 13' },
-    to: { id: '200080', name: 'Bondi Junction Station', platform: 'Platform 2' },
-    departure: at('10:07'),
-    arrival: at('10:22'),
-    cancelled: false
-  });
-  j.arrival = at('10:22');
-  j.legs = 3;
-  return j;
-}
-
 test('a row carries each change: the station, both platforms and the window', () => {
   const m = boardModel(transferBody(), TRANSFER_NOW);
 
@@ -437,7 +413,7 @@ test('a row carries each change: the station, both platforms and the window', ()
 });
 
 test('two changes are two sets of facts, in travel order', () => {
-  const m = boardModel(transferBody({ journeys: [twoChangeJourney()] }), TRANSFER_NOW);
+  const m = boardModel(transferBody({ journeys: [threeLegJourney()] }), TRANSFER_NOW);
 
   assert.deepEqual(m.rows[0].changes.map((c) => [c.station, c.fromPlatform, c.toPlatform, c.minutes]), [
     ['Town Hall', '3', '5', 7],
@@ -508,7 +484,7 @@ test('the headsign is printed whole, and the stylesheet puts no cap on it', () =
 });
 
 test('a two-change row hides one alighting numeral and nothing else', () => {
-  const m = boardModel(transferBody({ journeys: [twoChangeJourney()] }), TRANSFER_NOW);
+  const m = boardModel(transferBody({ journeys: [threeLegJourney()] }), TRANSFER_NOW);
   const html = resultRowHtml(m.rows[0]);
 
   assert.match(html, /class="sy-row change two /);

@@ -23,7 +23,7 @@ export function detailHtml(model) {
   <div class="detail-steps">${model.steps.map(stepHtml).join('')}</div>
 </div>
 ${tailHtml(model.arrival)}
-<div class="detail-fresh${model.stale ? ' offline' : ''}"><span class="pulse ${esc(model.footer.dot)}"></span>${esc(model.footer.text)}</div>
+<div class="detail-fresh${model.stale ? ' offline' : ''}" data-t="footer"><span class="pulse ${esc(model.footer.dot)}"></span>${esc(model.footer.text)}</div>
 ${railHtml(model)}`;
 }
 
