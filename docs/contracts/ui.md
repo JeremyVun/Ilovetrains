@@ -119,6 +119,8 @@ substitutes for going back.
 - The client sends no station query before three normalized characters. Search
   answers are memoized by trimmed, whitespace-normalized, case-insensitive
   query for the browser session; failures are not memoized.
+- Enter, or the keyboard's Search key, picks the top match while matches are
+  shown; while a hint stands in for them instead, it does nothing.
 - Pending search says `Searching…`. An empty answer at four characters or fewer
   says `No match yet · keep typing`; a longer empty answer says
   `No stations match`. A failed call says `Station search is unavailable`.
@@ -176,6 +178,7 @@ substitutes for going back.
   departure minute and uses `DEPARTING` beneath it unless a more specific state
   applies. Figures beyond 99 minutes use rounded hours with a smaller `H` on
   the numeral's baseline.
+- Clock times are printed in Australia/Sydney regardless of the device's zone.
 - A departed service dissolves before the timeline closes upward. Reduced
   motion removes the transition; state variants otherwise preserve row
   geometry.

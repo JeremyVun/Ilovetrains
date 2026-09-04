@@ -9,10 +9,15 @@ export function parseIso(s) {
   return Number.isNaN(t) ? null : t;
 }
 
-/** "22:48" in the device's local timezone (the commuter is standing in it). */
+/* h23 rather than h24: en-AU would otherwise print midnight as "24:00". */
+const sydneyClock = new Intl.DateTimeFormat('en-AU', {
+  timeZone: 'Australia/Sydney', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+});
+
+/** "22:48" on Sydney's clock, which is the one the trains run on wherever the
+    phone happens to be. */
 export function clock(ms) {
-  const d = new Date(ms);
-  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  return sydneyClock.format(ms);
 }
 
 /** Minutes until departure, measured between clock minutes — so the figure

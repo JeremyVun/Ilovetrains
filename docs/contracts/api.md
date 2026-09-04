@@ -190,7 +190,10 @@ Semantics:
 Station autocomplete for trip setup. Backed by TfNSW `stop_finder`, filtered
 to train/metro stations only.
 
-- `q`: search text, min 2 chars.
+- `q`: search text, min 2 chars. It is normalised — trimmed, inner whitespace
+  collapsed to single spaces, lower-cased — before it becomes the cache key and
+  before it is sent upstream, so `Central` and `  central  ` are one entry and
+  one upstream call, and the minimum is measured in characters of that text.
 - Cache: `s-maxage=86400, stale-while-revalidate=604800` (station list is
   near-static).
 - Results are ordered best match first. `modes` lists only `"train"` and/or

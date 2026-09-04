@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  MIN_QUERY, SHORT_QUERY, COPY, queryKey, hintFor, createSearcher, fuzzyScore, rankStops
+  MIN_QUERY, SHORT_QUERY, COPY, queryKey, hintFor, createSearcher, fuzzyScore, rankStops, topPick
 } from '../js/search.js';
 
 /* --- how little we ask --------------------------------------------------- */
@@ -145,4 +145,21 @@ test('fuzzy ranking puts Rhodes first for the partial Rhode', () => {
   assert.equal(rankStops(stops, 'Rhode')[0].id, '2');
   assert.deepEqual(rankStops(stops, 'Rhode').map((stop) => stop.id).sort(), ['1', '2', '3'],
     'upstream station answers are ranked, not hidden');
+});
+
+/* --- what Enter commits to ----------------------------------------------- */
+
+test('Enter takes the top match, which is the one the ranking put first', () => {
+  const stops = rankStops([
+    { id: '1', name: 'Central Coast' },
+    { id: '2', name: 'Central Station' }
+  ], 'central');
+  assert.equal(topPick(stops, null).id, stops[0].id);
+});
+
+test('Enter does nothing while a hint stands in for the list', () => {
+  assert.equal(topPick([], null), null);
+  assert.equal(topPick([], hintFor({ query: 'cen', phase: 'pending' })), null);
+  // A hint replaces the results, so anything left in the list is not on screen.
+  assert.equal(topPick([{ id: '1', name: 'Central Station' }], { text: COPY.searching }), null);
 });

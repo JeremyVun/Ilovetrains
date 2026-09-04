@@ -4,7 +4,7 @@
 import { esc, mount, onAction, shortName } from './dom.js';
 import { getStops } from './api.js';
 import { newTripId, recordSearch } from './storage.js';
-import { MIN_QUERY, createSearcher, hintFor, queryKey, rankStops, fuzzyScore } from './search.js';
+import { MIN_QUERY, createSearcher, hintFor, queryKey, rankStops, fuzzyScore, topPick } from './search.js';
 
 export const SEARCH_DEBOUNCE_MS = 300;
 const searcher = createSearcher((query, opts) => getStops(query, opts));
@@ -100,10 +100,29 @@ export function renderSetup(root, ctx) {
     paintResults();
   }
 
+  function pick(stop) {
+    if (!stop) return;
+    picked[active] = stop;
+    ctx.update(recordSearch(ctx.doc, active, stop));
+    inputs[active].value = shortName(stop.name);
+    results = [];
+    hint = null;
+    paintResults();
+    paintSave();
+    if (active === 'from' && !picked.to) inputs.to.focus();
+    else inputs[active].blur();
+  }
+
   Object.entries(inputs).forEach(([role, input]) => {
     input.addEventListener('focus', () => {
       active = role;
       if (!input.value.trim()) showRecents(role);
+    });
+    input.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault(); // an implicit submit would reload away the half-entered pair
+      active = role;
+      pick(topPick(results, hint));
     });
     input.addEventListener('input', () => {
       active = role;
@@ -144,17 +163,7 @@ export function renderSetup(root, ctx) {
       return;
     }
     if (action === 'pick') {
-      const stop = results[Number(element.dataset.index)];
-      if (!stop) return;
-      picked[active] = stop;
-      ctx.update(recordSearch(ctx.doc, active, stop));
-      inputs[active].value = shortName(stop.name);
-      results = [];
-      hint = null;
-      paintResults();
-      paintSave();
-      if (active === 'from' && !picked.to) inputs.to.focus();
-      else inputs[active].blur();
+      pick(results[Number(element.dataset.index)]);
       return;
     }
     if (action === 'save' && !saveEl.disabled) {
