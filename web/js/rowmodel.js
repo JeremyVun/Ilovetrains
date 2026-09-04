@@ -172,6 +172,13 @@ function journeyRow(journey, nowMs, stale, opts) {
   };
 }
 
+/** The one row journey detail promotes. Unlike a board row it survives its own
+    departure: the board drops a departed service, detail is still showing the
+    journey the rider is on. */
+export function promotedRow(journey, nowMs, opts = {}) {
+  return journeyRow(journey, nowMs, Boolean(opts.stale), { ...opts, pastSource: true });
+}
+
 /* Read through `journeyDetail` so a row and the detail view can never disagree
    about a window. A cancelled service is broken, not tight: colouring its dwell
    would be the board telling the same bad news twice in two different words. */

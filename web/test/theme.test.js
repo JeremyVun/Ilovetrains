@@ -136,7 +136,7 @@ function paperRatio(value) {
    are paper in the light scheme, on every line. Ink on the light T4 blue is
    2.66:1 and fails the contract's own 3:1 bar for text on a fill. */
 test('light-scheme chip numerals are paper, and paper clears 3:1 on every line', () => {
-  assert.match(css, /@media\s*\(prefers-color-scheme:\s*light\)\s*\{\s*\.sy-cap,\s*\.sy-bar\s+\.sy-p,\s*\.hm-bdg\s*\{\s*color:\s*var\(--bg\)\s*!important/);
+  assert.match(css, /@media\s*\(prefers-color-scheme:\s*light\)\s*\{\s*\.sy-cap,\s*\.sy-bar\s+\.sy-p,\s*\.hm-bdg,\s*\.dchip\s*\{\s*color:\s*var\(--bg\)\s*!important/);
 
   for (const code of Object.keys(COLOURS)) {
     if (YELLOW_EXCEPTION.codes.includes(code)) continue;

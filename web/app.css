@@ -145,227 +145,89 @@ button { cursor: pointer; }
   text-transform: uppercase; color: var(--ink-3);
 }
 .mast .tools button:active { color: var(--ink); }
-/* One tool per screen may be the action rather than a way out: the detail
-   view's FOCUS THIS TRAIN is set in full ink where BOARD is a label. */
-.mast .tools button.on { color: var(--ink); }
 .mast .rule { height: 2px; background: var(--ink); opacity: .82; }
-.mast .lede {
-  margin-top: 12px; font-size: 14px; font-weight: 300; line-height: 1.5;
-  color: var(--ink-2);
+/* ---- journey detail (calibration: assets/comps/latest/detail-*) --------- */
+
+/* The chosen result is promoted intact at the top of detail — the board's own
+   row, rendered by board.js — and the journey under it is steps on the same
+   figure and body ladder, so the two screens read as one system (ruling 26). */
+
+.detail-kicker { margin: 8px 0; }
+.detail-title {
+  margin: 0; font-size: 29px; font-weight: 300; letter-spacing: -.025em; line-height: 1.06;
 }
-
-/* ---- departure board --------------------------------------------------- */
-
-/* "The board fills the frame" holds while the frame is tall enough for six
-   three-line rows. When it is not — a 412x732 Android with its browser chrome
-   showing, measured: 696px of rows in 567px — the frame does not get to eat the
-   sixth service. The rows scroll, the way the trips sheet below scrolls, and
-   the footer keeps its own line under them rather than being painted over one.
-   Where the frame IS tall enough nothing scrolls and nothing moves. */
-.rows {
-  flex: 1; min-height: 0; padding: 0 22px;
-  display: flex; flex-direction: column;
-  overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+.detail-title em { font-style: normal; color: var(--ink-3); font-weight: 200; padding: 0 2px; }
+/* Ruling 16: 18px of air between the summary and the heavy rule. */
+.detail-summary {
+  margin: 11px 0 18px; font-size: 14px; font-weight: 300; line-height: 1.5; color: var(--ink-2);
 }
+.detail-summary.warn { color: var(--warn); }
 
-.row {
-  display: grid; grid-template-columns: 86px 1fr;
-  gap: 0 16px; align-items: start; align-content: center;
-  /* A row is the height its three lines make it. In a scrolling frame a
-     shrinkable row squeezes instead of scrolling, which is the same lost
-     content by another route; sparse boards still distribute, below. */
-  flex: none;
-  padding: 20px 0 21px 12px;
-  border-bottom: 1px solid var(--rule);
-  position: relative;
-  transition: opacity .24s ease;
+.detail-scroll {
+  flex: 1; min-height: 0; overflow-y: auto;
+  -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
 }
-/* Fewer than six services distribute down the frame rather than leaving a
-   short list floating in a void. */
-.rows.sparse .row { flex: 1 1 auto; }
-.row.gone { opacity: 0; }
+.detail-scroll .sy-row { min-height: 100px; }
 
-/* Colour is an accent, so it marks the one service you are actually about to
-   catch. The rest name their line in coloured small caps. */
-.row.first::before {
-  content: ''; position: absolute; left: 0; top: 26px; bottom: 27px;
-  width: 2px; background: var(--stem);
+.detail-steps { padding: 0 var(--sy-pad); }
+.dstep {
+  min-height: 72px; display: grid; grid-template-columns: var(--sy-fig) 1fr;
+  column-gap: var(--sy-gap); align-items: center; border-bottom: 1px solid var(--rule);
 }
-.mins {
-  font-size: 54px; font-weight: 250; letter-spacing: -0.045em; line-height: .84;
-  color: var(--ink); text-align: right; padding-top: 2px;
-}
-.mins .prov {
-  font-size: 10px; font-weight: 600; letter-spacing: .13em; color: var(--ink-3);
-  display: block; margin-top: 9px; text-transform: uppercase;
-}
-.mins .prov.warn { color: var(--warn); }
-/* The rounded-hours contract: the numeral keeps the headline size and
-   the H is set small beside it, on the same baseline, in the figure's own
-   colour. Flat at the hero size "3H" is 91px in an 86px column. */
-.mins .unit { font-size: .40em; font-weight: 300; letter-spacing: 0; padding-left: .04em; }
-
-.body { min-width: 0; }
-/* Departure and arrival sit on one line because they are the pair you
-   actually compare; the meta line is then free to carry platform and line. */
-.dep {
-  font-size: 20px; font-weight: 400; letter-spacing: -0.01em; color: var(--ink);
-  display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap;
-}
-.dep del { color: var(--ink-3); font-size: 15px; font-weight: 300; }
-.dep .to { color: var(--ink-3); font-size: 15px; font-weight: 300; letter-spacing: 0; }
-.meta {
-  margin-top: 9px; font-size: 10.5px; font-weight: 600; letter-spacing: .15em;
-  text-transform: uppercase; color: var(--ink-3);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.meta b { color: var(--ink-2); font-weight: 600; }
-.meta i { font-style: normal; color: var(--stem); font-weight: 700; }
-.row.cx .meta i { color: var(--ink-3); }
-.dest {
-  margin-top: 7px; font-size: 14px; font-weight: 300; letter-spacing: -0.005em;
-  line-height: 19px; color: var(--ink-2);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-/* The cancelled-lead note takes the third line's slot rather than adding a
-   fourth, so the row is three lines in every state. Same line box height.
-
-   Full label idiom, at every width. "22:48 CANCELLED · NEXT TRAIN" measures 205px at
-   10px/.14em, against a 210px body column on the narrowest phone we support. */
-.dest.note {
-  font-size: 10px; font-weight: 600; letter-spacing: .14em; line-height: 19px;
-  text-transform: uppercase; color: var(--warn);
-}
-
-.row.first .mins { font-size: 78px; }
-.row.first { padding-top: 24px; padding-bottom: 26px; }
-.row.first .dep { font-size: 23px; }
-
-/* A three-character figure measures 129px against the 86px headline column.
-   It steps down one size rather than being clipped or allowed to eat the body
-   column.
-
-   Rounded hours remove the case that found this ("187" is "3H" now), but not
-   the rule: "Now" is three characters, and so is a service that rounds to ten
-   hours or more. Reachable, so kept — and the in-browser figure-overflow
-   invariant would catch it going the other way. */
-.row.wide .mins { font-size: 44px; }
-.row.first.wide .mins { font-size: 48px; }
-
-.row.late .mins, .row.late .dep > strong { color: var(--warn); }
-.row.sched .mins { color: var(--ink-2); font-weight: 200; }
-.row.sched .mins .prov { color: var(--ink-3); }
-/* No figure, because there is no wait — but the slot keeps its place in the
-   ladder so the eye still counts six services. */
-.row.cx .mins { color: var(--ink-3); font-weight: 200; font-size: 34px; }
-.row.first.cx .mins { font-size: 34px; }
-.row.cx .dep, .row.cx .dest { color: var(--ink-3); }
-.row.cx .dep strong { text-decoration: line-through; text-decoration-thickness: 1.5px; font-weight: 400; }
-.row.cx::before { background: var(--ink-3) !important; }
-
-/* Stale board contract: a countdown computed from an old cache is a lie,
-   a clock time is not. The figure slot empties but keeps its height, so the
-   board reads as "the figures are gone", not as a different layout. */
-.rows.stale .mins { min-height: 66px; }
-.rows.stale .row.first .mins { min-height: 87px; }
-/* The dimming belongs to the ROWS, not to the container. On the container it
-   also dims the one-line hint that stands in for them ("no board saved for
-   this trip yet"); 55% of the coral over paper is only 2.6:1. The only
-   sentence on the screen must remain readable. */
-.rows.stale .row { opacity: .55; }
-/* ...and a row on its way out still goes all the way out. */
-.rows .row.gone { opacity: 0; }
-
-/* The footer is never in the scroll: it is the one line that says how old the
-   board is, so it holds its place at the bottom of the frame whatever the rows
-   do. `viewport-fit=cover` means the frame reaches into the home indicator, so
-   the bottom padding is the larger of the design's 18px and that inset. */
-.ftr {
-  flex: none;
-  display: flex; align-items: center; gap: 8px;
-  padding: 15px 22px max(18px, env(safe-area-inset-bottom, 0px));
-  font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase;
+.dtime { text-align: right; font-size: 17px; font-weight: 300; color: var(--ink-2); }
+.dwhat { min-width: 0; }
+.dwhat strong { display: block; font-size: 17px; font-weight: 400; color: var(--ink); }
+.dwhat span {
+  display: flex; align-items: center; gap: 7px; margin-top: 5px;
+  font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
   color: var(--ink-3);
 }
-.ftr.offline { color: var(--warn); }
-
-/* ---- journey detail ----------------------------------------------------- */
-
-/* The journey uses the board's own row grammar: leg, change, leg in the same
-   86px + 1fr ladder. The first leg keeps the board's first-row treatment. The
-   change is bracketed by the masthead's heavy rule, with its station at the h1
-   step, as required by docs/contracts/ui.md. */
-
-.legs {
-  /* The blocks sit tight together under the rule and the page's bottom margin
-     is just margin — a journey with two legs is complete, not truncated, so
-     the board's "distribute rather than leave a hole" rule does not apply.
-     They still have to be REACHABLE: on a short frame with long names the
-     ledger scrolls, the way the board's rows do, rather than running under the
-     closing rule. */
-  flex: 0 1 auto; min-height: 0; padding: 0 22px;
-  display: flex; flex-direction: column;
-  overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+.dchip {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 21px; height: 21px; padding: 0 5px; border-radius: 3px;
+  font-size: 14px; font-weight: 700; letter-spacing: 0;
 }
-.legs .row { border-bottom: 1px solid var(--rule); flex: none; }
-.legs .row:last-child { border-bottom: 0; }
-
-/* The detail view relaxes the board's three-line invariant on the last line
-   only: that invariant exists to stop a state change
-   pushing the sixth service past the fold, and a journey has two legs, not
-   six. The longest real headsign on this corridor wraps rather than truncates. */
-.legs .dest { white-space: normal; overflow: visible; }
-
-/* Not flex: a flex row eats the space between "PLATFORM" and its number. */
-.legs .meta { position: relative; padding-right: 34px; white-space: normal; }
-.legs .meta .badge { position: absolute; right: 0; top: 0; color: var(--stem); font-weight: 700; }
-
-/* A leg that is behind you keeps its place in the ladder and loses its figure:
-   the slot empties and holds its height, exactly as the stale board's does,
-   because a countdown to something that has already happened is not a number
-   anyone can use. */
-.legs .row.done .mins { min-height: 66px; }
-.legs .row.first.done .mins { min-height: 87px; }
-.legs .row.done .dep strong, .legs .row.done .dest { color: var(--ink-2); }
-/* ...and the whole ledger dims off old data, the way the board does. */
-.legs.stale .row { opacity: .55; }
-.legs.stale .mins { min-height: 66px; }
-.legs.stale .row.first .mins { min-height: 87px; }
-
-/* The change band. Heavy rule above and below = the masthead rule, reused. */
-.chg { padding-top: 24px; padding-bottom: 25px; }
-.chg { border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink) !important; }
-.chg .mins { font-size: 54px; }
-.chg .mins .prov { color: var(--ink-2); }
-.chg h2 {
-  font-size: 29px; font-weight: 300; letter-spacing: -0.025em; line-height: 1.05;
-  color: var(--ink);
+/* The change is bracketed by the masthead's own heavy rule, with its station
+   set at the title's step. */
+.dstep.change {
+  min-height: 82px; border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink);
 }
-.chg .meta { margin-top: 10px; padding-right: 0; }
-.chg .meta b { color: var(--ink); }
-.chg .meta .arw { color: var(--ink-3); padding: 0 5px; font-weight: 400; }
-.chg .dest { color: var(--ink-2); }
-.chg .dest del { color: var(--ink-3); }
-/* A tight connection states the available times and windows without claiming
-   whether the rider will make it. Only the change uses the warning colour;
-   the arrival figure does not. */
-.chg .warnline {
-  margin-top: 8px; font-size: 10px; font-weight: 600; letter-spacing: .14em;
-  line-height: 19px; text-transform: uppercase; color: var(--warn);
-}
-.chg.tight .mins, .chg.tight .mins .prov { color: var(--warn); }
+.dstep.change .dwhat strong { font-size: 22px; font-weight: 300; }
+.dstep.change.tight .dtime, .dstep.change.tight .dwhat span { color: var(--warn); }
+.dstep.cancelled { opacity: .58; }
+.dstep.cancelled .dtime, .dstep.cancelled .dwhat strong { text-decoration: line-through; }
+/* A step behind the rider is quiet, not struck: it happened. */
+.dstep.done .dwhat strong { color: var(--ink-2); }
 
 /* The journey ends somewhere, and that platform is stated nowhere else. The
    closing rule answers the masthead's. */
-.tail { margin-top: auto; flex: none; padding: 0 22px; }
-.tail .rule { height: 2px; background: var(--ink); opacity: .82; }
-.tail .line { display: flex; align-items: baseline; gap: 10px; padding: 14px 0 0; }
-.tail .t { font-size: 20px; font-weight: 400; letter-spacing: -0.01em; color: var(--ink); }
-.tail .n { font-size: 14px; font-weight: 300; color: var(--ink-2); min-width: 0;
-           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tail .p { margin-left: auto; flex: none; padding-left: 10px; }
+.detail-tail { flex: none; padding: 0 var(--sy-pad); }
+.detail-tail .rule { height: 2px; background: var(--ink); opacity: .82; }
+.detail-tail .line {
+  display: flex; align-items: baseline; gap: 10px; min-height: 43px; padding: 11px 0 0;
+}
+.detail-tail .t { font-size: 19px; font-weight: 300; }
+.detail-tail .n {
+  font-size: 14px; font-weight: 300; color: var(--ink-2); min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.detail-tail .p { margin-left: auto; flex: none; padding-left: 10px; }
+.detail-tail .p.warn { color: var(--warn); }
 /* An arrival that is not going to happen is struck, in the board's own idiom. */
-.tail.cx .t { text-decoration: line-through; text-decoration-thickness: 1.5px; color: var(--ink-3); }
+.detail-tail.cx .t { color: var(--ink-3); text-decoration: line-through; text-decoration-thickness: 1.5px; }
+
+.detail-fresh {
+  flex: none; display: flex; align-items: center; gap: 8px; min-height: 36px;
+  padding: 0 var(--sy-pad);
+  font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+.detail-fresh.offline { color: var(--warn); }
+/* Cancelled and focused detail carry no rail, so the freshness line is what
+   the home indicator would otherwise sit on. */
+.detail-fresh:last-child { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.detail-rail button { width: 100%; }
+
 
 /* ---- setup, search, trips ---------------------------------------------- */
 
@@ -442,8 +304,7 @@ button { cursor: pointer; }
    at the full idiom (205px of copy in a 210px column, measured). */
 @media (max-width: 375px) {
   .mast { padding-left: 18px; padding-right: 18px; }
-  .rows, .sheet, .legs, .tail { padding-left: 18px; padding-right: 18px; }
-  .ftr { padding-left: 18px; padding-right: 18px; }
+  .sheet { padding-left: 18px; padding-right: 18px; }
 }
 
 /* ---- Departure board (calibration: assets/comps/latest/board-*) ------- */
@@ -787,7 +648,7 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
 .hm-bar.save button { flex: 1; justify-content: flex-start; font-size: 13px; letter-spacing: .12em; min-height: 64px; }
 
 @media (prefers-color-scheme: light) {
-  .sy-cap, .sy-bar .sy-p, .hm-bdg { color: var(--bg) !important; }
+  .sy-cap, .sy-bar .sy-p, .hm-bdg, .dchip { color: var(--bg) !important; }
 }
 @media (max-width: 375px) {
   body { --sy-pad: 18px; }
@@ -807,29 +668,17 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
      Scoped through #app because the overflow guard above (`#app > *`) carries
      an ID and so out-specifies a bare class: `max-width: 100%` was quietly
      beating `max-width: 940px`, and every desktop shot ran the full 1280px
-     measure. Verified 2026-09-01 by measuring .rows, not by reading the CSS. */
-  #app > .mast, #app > .rows, #app > .sheet, #app > .ftr,
-  #app > .legs, #app > .tail,
-  #app > .sy-mast, #app > .sy-tl, #app > .hm-c {
+     measure. Verified 2026-09-01 by measuring the scroller, not by reading
+     the CSS. */
+  #app > .mast, #app > .sheet, #app > .sy-mast, #app > .sy-tl, #app > .hm-c,
+  #app > .detail-scroll, #app > .detail-tail, #app > .detail-fresh, #app > .detail-rail {
     max-width: 940px; margin: 0 auto;
   }
-  #app > .tail { margin-top: auto; }
   .mast { padding: 26px 64px 0; }
   .mast h1 { font-size: 36px; }
   .mast .tools { margin-top: 12px; padding-bottom: 12px; }
-  .rows, .sheet, .legs, .tail { padding: 0 64px; width: 100%; }
-  .row { grid-template-columns: 132px 1fr; padding: 12px 0 13px 20px; }
-  .mins { font-size: 58px; }
-  .row.first { padding-top: 18px; padding-bottom: 19px; }
-  .row.first .mins { font-size: 76px; }
-  /* The 132px column takes three characters at full size, so the phone's
-     step-down would only make a wide desktop board smaller for nothing. */
-  .row.wide .mins { font-size: 58px; }
-  .row.first.wide .mins { font-size: 76px; }
-  .dep { font-size: 23px; }
-  .row.first .dep { font-size: 25px; }
-  .dest { font-size: 15px; }
-  .ftr { padding: 16px 64px max(22px, env(safe-area-inset-bottom, 0px)); width: 100%; }
+  .sheet { padding: 0 64px; width: 100%; }
+  #app > .detail-rail { padding-left: 64px; padding-right: 64px; }
   .sy-mast { padding-left: 64px; padding-right: 64px; }
   .sy-tl { width: 100%; }
   body { --sy-pad: 64px; --sy-fig: 120px; --sy-gap: 24px; }
@@ -840,8 +689,4 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
   .hm-c .hm-bar, .hm-c .hm-ask, .hm-c .hm-mast, .hm-c .hm-sheet {
     padding-left: 64px; padding-right: 64px;
   }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .row { transition: none; }
 }

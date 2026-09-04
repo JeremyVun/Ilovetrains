@@ -5,10 +5,11 @@ import {
   recordRide, updateStop, setHome
 } from './storage.js';
 import { distanceKm, predict } from './predict.js';
-import { boardModel } from './rowmodel.js';
+import { boardModel, promotedRow } from './rowmodel.js';
 import { journeyDetail, journeyKey, arrivalMs, departureMs } from './journey.js';
 import {
-  focusOf, setFocus, clearFocus, isFocused, focusExpired, matchJourney, refreshFocus
+  focusOf, setFocus, clearFocus, isFocused, focusExpired, matchJourney, refreshFocus,
+  directionsModel
 } from './focus.js';
 import * as Board from './board.js';
 import * as Detail from './detail.js';
@@ -349,39 +350,44 @@ function showDetail(root) {
 function detailModel() {
   if (!state.journey) return null;
   const ends = currentLeg();
-  const model = currentModel();
+  const board = currentModel();
+  const opts = { stale: board.stale, fromName: ends.from.name, toName: ends.to.name };
+  const model = journeyDetail(state.journey, now(), opts);
   return {
-    ...journeyDetail(state.journey, now(), {
-      stale: model.stale,
-      fromName: ends.from.name,
-      toName: ends.to.name
-    }),
-    footer: model.footer,
-    boardStale: model.stale
+    ...model,
+    row: detailRow(model, opts),
+    focused: isFocused(state.doc, state.journey),
+    footer: board.footer
+  };
+}
+
+/* Once the journey has left, its promoted row counts to the next thing the
+   rider does, not to a departure that has already happened: the figure and
+   provenance become the smart header's (build_plan.md B6). */
+function detailRow(model, opts) {
+  const row = promotedRow(state.journey, now(), { ...opts, fallbackHeadsign: opts.toName });
+  // A cancelled journey keeps the board's dash and its CANCELLED word.
+  if (!model.departed || model.cancelled) return row;
+  const directions = directionsModel(state.journey, now(), opts);
+  return {
+    ...row,
+    figure: directions.figure,
+    provenance: directions.provenance,
+    wide: directions.figure.length >= 3
   };
 }
 
 function renderDetail() {
   const model = detailModel();
   if (!model) { location.hash = '#/'; return; }
-  state.root.innerHTML = Detail.detailHtml({
-    model,
-    focused: isFocused(state.doc, state.journey)
-  }) + footerHtml(model);
-}
-
-function footerHtml(model) {
-  return `<div class="ftr${model.stale ? ' offline' : ''}"><span class="pulse ${model.footer.dot}"></span>${model.footer.text}</div>`;
+  state.root.innerHTML = Detail.detailHtml(model);
+  Board.clampJourneyBars(state.root);
 }
 
 function detailAction(action) {
   if (action === 'board') return ctx.go('#/board');
   if (action === 'focus') {
     ctx.update(setFocus(state.doc, state.selection, state.journey, now()));
-    return ctx.go('#/');
-  }
-  if (action === 'unfocus') {
-    ctx.update(clearFocus(state.doc));
     return ctx.go('#/');
   }
 }

@@ -8,7 +8,7 @@ import { lineFill } from './lines.js';
 
 const KNOCKOUT = new Set(['T4', 'T5', 'T9', 'CCN', 'HUN']);
 
-function chipInk(code) {
+export function chipInk(code) {
   return KNOCKOUT.has(code) ? 'var(--ink)' : 'var(--bg)';
 }
 
