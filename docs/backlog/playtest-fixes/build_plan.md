@@ -85,7 +85,7 @@ timeline element identity is unchanged and `scrollTop` equals the value read
 five seconds of idle ticks on a live board. Re-shoot
 `board-390x844-past.png` with the documented invocation and read it.
 
-Done:  — [ ]
+Done:  — [x] (8dbc4b9, merged 2026-09-05 as 67dd293)
 
 ## Phase 2 — smart header truthfulness [1, 5, 6, 7, 8, 9]
 
