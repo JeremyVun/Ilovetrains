@@ -575,15 +575,17 @@ button { cursor: pointer; }
   flex: none; display: flex; align-items: center; justify-content: space-between;
   gap: 12px; padding: 12px 22px 0; min-height: 44px;
 }
-.hm-track {
-  display: flex; align-items: center; gap: 7px; min-width: 0; min-height: 44px;
-  padding: 0 6px 0 0; text-align: left;
+/* Clips rather than ellipsises: only a station name grows this line, and
+   fitStationNames shortens one by rule instead (ruling 12). */
+.answer-kind {
+  display: flex; align-items: center; min-width: 0; min-height: 44px;
+  font-size: 11px; font-weight: 600; letter-spacing: .15em;
+  text-transform: uppercase; color: var(--ink-2);
 }
-.hm-track .t {
-  min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  font-size: 11px; font-weight: 600; letter-spacing: .15em; text-transform: uppercase; color: var(--ink-2);
-}
-.hm-track .g { flex: none; font-size: 13px; line-height: 1; color: var(--ink-3); }
+.answer-line { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+.answer-kind.status-late, .answer-kind.status-exception { color: var(--warn); }
+.status-copy { white-space: nowrap; }
+.status-late-word { margin-left: .42em; }
 .hm-fresh { display: flex; align-items: center; gap: 8px; flex: none; }
 .hm-hd {
   flex: 1 1 auto; min-height: 190px; max-height: var(--hdmax); align-content: center;
@@ -603,18 +605,21 @@ button { cursor: pointer; }
 }
 .hm-st.warn { color: var(--warn); }
 .hm-hd.late .hm-n, .hm-hd.late .hm-e.from .hm-t { color: var(--warn); }
-/* Both station/time groups share the same top and baseline (ui.md, smart home). */
+/* Ruling 25: lateness colours the figure for the next action too. */
+.hm-hd.active-late .hm-n { color: var(--warn); }
 .hm-ends { grid-column: 2; grid-row: 1; display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
 .hm-e { display: flex; flex-direction: column; min-width: 0; }
 .hm-e.to { margin-left: auto; text-align: right; }
 .hm-stn {
   font-size: var(--stn); font-weight: 300; letter-spacing: -.015em; line-height: 1.15;
-  color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: clip;
 }
 .hm-e.from .hm-stn { color: var(--ink); }
+/* Ruling 10: the smaller arrival clock's extra gap puts the two clocks on
+   one baseline while the names keep one top edge. */
 .hm-t { margin-top: 3px; line-height: 1.1; white-space: nowrap; }
 .hm-e.from .hm-t { font-size: var(--dept); font-weight: 400; letter-spacing: -.01em; color: var(--ink); }
-.hm-e.to .hm-t { font-size: var(--arrt); font-weight: 300; color: var(--ink-2); }
+.hm-e.to .hm-t { margin-top: 7px; font-size: var(--arrt); font-weight: 300; color: var(--ink-2); }
 .hm-hd .sy-j { grid-column: 1 / -1; grid-row: 2; margin-top: var(--hdgap); height: var(--jh); }
 .hm-hd .sy-cap { height: var(--caph); font-size: var(--capf); padding: 0 var(--cappad); }
 .hm-hd .sy-bar { height: var(--barh); }
@@ -656,9 +661,19 @@ button { cursor: pointer; }
 }
 .tripr {
   display: flex; flex-direction: column; justify-content: center; width: 100%;
-  text-align: left; flex: none; height: 68px; border-bottom: 1px solid var(--rule);
+  text-align: left; flex: none; position: relative; height: 72px;
+  border-bottom: 1px solid var(--rule);
 }
-.hm-in { display: flex; align-items: stretch; gap: 13px; width: 100%; min-width: 0; }
+.hm-in { display: flex; align-items: stretch; gap: 13px; width: 100%; min-width: 0; position: relative; }
+.route-cue {
+  position: absolute; right: 0; bottom: 0; padding-left: 8px; white-space: nowrap;
+  font-size: 10px; font-weight: 600; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-2);
+}
+.route-cue .arrow {
+  padding-left: 5px; font-size: 15px; font-weight: 300; letter-spacing: 0; color: var(--ink-2);
+}
+.tripr:active .route-cue, .tripr:active .hm-nm { color: var(--ink-2); }
 .hm-in > .hm-bd { flex: 1; min-width: 0; }
 .hm-spine { flex: none; width: 15px; align-self: stretch; display: flex; gap: 3px; }
 .hm-spine i { display: block; width: 3px; border-radius: 1px; }
@@ -672,12 +687,17 @@ button { cursor: pointer; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .tripr .hm-nm em { font-style: normal; color: var(--ink-3); font-weight: 200; padding: 0 4px; }
+/* The 106px is reserved for the tap cue; the ellipsis inside what is left
+   falls on metadata, never on a station name. */
 .tripr .hm-sub {
-  display: block; margin-top: 7px; font-size: 10px; font-weight: 600;
+  display: block; margin-top: 7px; padding-right: 106px; font-size: 10px; font-weight: 600;
   letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.tripr.top .hm-sub b { color: var(--ink-2); font-weight: 600; }
+.tripr.focused .hm-sub b { color: var(--ink); }
+.tripr.shown:not(.focused) .hm-sub b { color: var(--ink-2); }
+.tripr.focused .hm-sub b.status-late,
+.tripr.focused .hm-sub b.status-exception { color: var(--warn); }
 .hm-end {
   flex: none; padding: 14px 0 6px; white-space: nowrap; font-size: 10px;
   font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3);

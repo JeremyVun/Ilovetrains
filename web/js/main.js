@@ -43,6 +43,7 @@ const state = {
   loadingPast: false,
   pastExhausted: false,
   fix: null,
+  predicted: false,
   locationDismissed: false,
   offerDismissed: false,
   coordsBackfillStarted: false
@@ -111,13 +112,26 @@ function currentKey() {
   return cacheKey(ends.from.id, ends.to.id);
 }
 
-function chooseSelection() {
+function focusSelection() {
   const focus = focusOf(state.doc);
-  if (focus && !focusExpired(focus, now()) && findTrip(state.doc, focus.tripId)) {
-    return { tripId: focus.tripId, direction: focus.direction };
-  }
-  if (state.selection && findTrip(state.doc, state.selection.tripId)) return state.selection;
-  return predict(state.doc, now(), { fix: validFix() });
+  return focus && !focusExpired(focus, now()) && findTrip(state.doc, focus.tripId)
+    ? { tripId: focus.tripId, direction: focus.direction } : null;
+}
+
+function savedSelection() {
+  return state.selection && findTrip(state.doc, state.selection.tripId) ? state.selection : null;
+}
+
+/* Home leads with the focused journey; the board answers the tap that opened
+   it (build_plan.md, selection precedence). */
+function chooseSelection() {
+  const chosen = focusSelection() || savedSelection();
+  state.predicted = !chosen;
+  return chosen || predict(state.doc, now(), { fix: validFix() });
+}
+
+function explicitSelection() {
+  return savedSelection() || focusSelection() || predict(state.doc, now(), { fix: validFix() });
 }
 
 function validFix() {
@@ -141,6 +155,35 @@ function showHome(root) {
   startTimers(false);
   fetchLive();
   backfillCoordinates();
+  silentFix();
+}
+
+/* An already-granted permission is not a prompt: home may use the fix it can
+   have without asking for one on open (B7). */
+async function silentFix() {
+  if (state.fix || !navigator.geolocation || !navigator.permissions) return;
+  try {
+    if ((await navigator.permissions.query({ name: 'geolocation' })).state !== 'granted') return;
+  } catch (_) {
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(applyFix, () => {}, {
+    enableHighAccuracy: false, timeout: 8000, maximumAge: FIX_MAX_AGE_MS
+  });
+}
+
+function applyFix(position) {
+  if (state.view !== 'home') return;
+  state.fix = {
+    lat: position.coords.latitude,
+    lon: position.coords.longitude,
+    at: position.timestamp || Date.now()
+  };
+  // A fix re-answers a guess; a trip the user chose stands.
+  if (state.predicted) state.selection = predict(state.doc, now(), { fix: validFix() });
+  loadSelectedCache();
+  renderHome();
+  fetchLive();
 }
 
 function currentModel() {
@@ -200,7 +243,7 @@ function leaveDistance() {
 
 function showBoard(root) {
   state.view = 'board';
-  state.selection = chooseSelection();
+  state.selection = explicitSelection();
   state.viewRecorded = false;
   state.pastBodies = [];
   state.pastExhausted = false;
@@ -242,20 +285,11 @@ function wireTimeline() {
 }
 
 function homeAction(action, element) {
-  if (action === 'board') return ctx.go('#/board');
-  if (action === 'trip-list') {
-    state.root.querySelector('[data-t="trip-list"]')?.scrollTo({ top: 0, behavior: 'smooth' });
-    state.root.querySelector('.tripr')?.focus();
-    return;
-  }
   if (action === 'new-trip') return ctx.go('#/trips/new');
-  if (action === 'select-trip') {
+  if (action === 'open-trip') {
     state.selection = { tripId: element.dataset.id, direction: element.dataset.direction || 'forward' };
     state.offerDismissed = false;
-    loadSelectedCache();
-    renderHome();
-    fetchLive();
-    return;
+    return ctx.go('#/board');
   }
   if (action === 'way-back') {
     state.doc = clearFocus(state.doc);
@@ -293,17 +327,7 @@ function homeAction(action, element) {
 function requestLocation() {
   state.locationDismissed = true;
   if (!navigator.geolocation) { renderHome(); return; }
-  navigator.geolocation.getCurrentPosition((position) => {
-    state.fix = {
-      lat: position.coords.latitude,
-      lon: position.coords.longitude,
-      at: position.timestamp || Date.now()
-    };
-    state.selection = predict(state.doc, now(), { fix: validFix() });
-    loadSelectedCache();
-    renderHome();
-    fetchLive();
-  }, () => renderHome(), {
+  navigator.geolocation.getCurrentPosition(applyFix, () => renderHome(), {
     enableHighAccuracy: false,
     timeout: 8000,
     maximumAge: 5 * 60_000

@@ -1,8 +1,10 @@
 /* Home and smart-header model. Business rules are pure and kept out of the
    renderer so home/reversal heuristics can be tuned without touching geometry. */
 
-import { esc, shortName } from './dom.js';
-import { focusExpired, focusOf, directionsModel } from './focus.js';
+import { esc, shortName, fitStationNames } from './dom.js';
+import {
+  focusExpired, focusOf, directionsModel, focusStatus, journeyCancelled
+} from './focus.js';
 import { arrivalMs, departureMs, legsOf } from './journey.js';
 import { clock } from './time.js';
 import { journeyDeviceHtml, clampJourneyBars } from './journeybar.js';
@@ -12,6 +14,8 @@ import { distanceKm, rankTrips } from './predict.js';
 const EVENING_START = 16;
 const MORNING_END = 11;
 const HOME_EVIDENCE = 3;
+/* Inside this radius the top line answers "you are here" rather than "how far". */
+const AT_ORIGIN_KM = 0.2;
 
 export function inferHome(doc, nowMs) {
   const rides = (doc.rides || []).filter((ride) => Date.parse(ride.arrivedAt) <= nowMs);
@@ -79,10 +83,18 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
   const ends = leg(trip, selection.direction);
   const journeys = body && Array.isArray(body.journeys) ? body.journeys : [];
   const liveLead = journeys[0] || null;
-  const nextRunning = journeys.find((item) => !item.cancelled) || null;
-  const cancelledTime = !activeFocus && liveLead && liveLead.cancelled && nextRunning && nextRunning !== liveLead
-    && departureMs(liveLead) !== null ? clock(departureMs(liveLead)) : '';
-  const journey = activeFocus ? activeFocus.journey
+  const nextRunning = journeys.find((item) => !journeyCancelled(item)) || null;
+  const focusDep = activeFocus ? departureMs(activeFocus.journey) : null;
+  // B8: cancelled before it leaves, the header shows the next running service
+  // while the status still reads CANCELLED.
+  const replacement = activeFocus && journeyCancelled(activeFocus.journey)
+    && focusDep !== null && nowMs < focusDep
+    ? journeys.find((item) => !journeyCancelled(item)
+      && departureMs(item) !== null && departureMs(item) > focusDep) || null : null;
+  const cancelledTime = replacement ? clock(focusDep)
+    : !activeFocus && liveLead && journeyCancelled(liveLead) && nextRunning && nextRunning !== liveLead
+      && departureMs(liveLead) !== null ? clock(departureMs(liveLead)) : '';
+  const journey = activeFocus ? replacement || activeFocus.journey
     : nextRunning || liveLead || cachedJourney(doc, trip, selection.direction);
   const selected = activeFocus
     ? { tripId: activeFocus.tripId, direction: activeFocus.direction } : selection;
@@ -95,8 +107,9 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     if (outbound) receipt = `You rode out at ${new Date(outbound.departedAt).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: false })}. Here’s the way back.`;
   }
   if (!receipt && !activeFocus && !opts.fix && doc.history.length) {
+    // history records qualified board views, not rides (design.md, Findings).
     receipt = new Date(nowMs).getHours() < 12
-      ? 'You ride this most weekday mornings.' : 'You often take this trip around now.';
+      ? 'You check this trip most weekday mornings.' : 'You often check this trip around now.';
   }
 
   const directions = journey ? directionsModel(journey, nowMs, {
@@ -111,6 +124,7 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     from: shortName(selectedEnds.from.name),
     to: shortName(selectedEnds.to.name),
     depTime: '—', arrTime: '—', figure: '', provenance: 'TIMETABLE ONLY',
+    phase: 'pre', activeLeg: 0,
     instruction: opts.offline ? 'No saved board for this trip yet' : 'Getting the next trains…',
     progress: { at: 0, phase: 'pre' }, showBoardingPlatform: true, receipt: ''
   };
@@ -126,6 +140,12 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
       ridden: lastRidden(doc, entry.trip.id, nowMs)
     };
   });
+  const over = tripIsOver(activeFocus, nowMs);
+  const status = activeFocus ? focusStatus(activeFocus.journey, {
+    activeLeg: directions.activeLeg,
+    stale: Boolean(opts.stale),
+    over
+  }) : null;
   return {
     selected,
     trip: selectedTrip,
@@ -133,11 +153,22 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     ranked,
     home,
     focus: activeFocus,
-    over: tripIsOver(activeFocus, nowMs),
+    status,
+    top: status ? null : topLine(shortName(selectedEnds.from.name),
+      distanceKm(opts.fix, selectedEnds.from.location)),
+    over,
     freshness: opts.stale ? 'Offline' : 'Live',
     dot: opts.stale ? 'stale' : 'live',
     askLocation: Boolean(opts.askLocation)
   };
+}
+
+/* Ruling 11: the line above the header answers how far the station is, and
+   only falls back to a status word when it cannot. */
+function topLine(name, km) {
+  if (!Number.isFinite(km)) return { lead: 'Next train', name: '' };
+  if (km <= AT_ORIGIN_KM) return { lead: 'At ', name };
+  return { lead: `${formatDistance(km).replace(/ away$/, '')} to `, name };
 }
 
 export function formatDistance(km) {
@@ -155,31 +186,55 @@ export function homeHtml(model) {
     tight: d.tight,
     showBoardingPlatform: d.showBoardingPlatform
   }) : { html: '<span class="sy-j"><span class="sy-bar"></span></span>', vars: '' };
-  const tracking = `Tracking · ${shortName(d.from)} → ${shortName(d.to)}`;
-  return `<div class="hm-c home-screen">
+  const status = model.status;
+  const late = Boolean(status && status.late);
+  return `<div class="hm-c home-screen" data-phase="${esc(d.phase || 'pre')}" data-focused="${Boolean(status)}" data-relevant-leg="${status ? status.leg : -1}" data-active-delay="${status ? status.delay : 0}" data-freshness="${esc(model.freshness.toLowerCase())}">
     <div class="hm-top">
-      <button class="hm-track" data-act="trip-list"><span class="t">${esc(tracking)}</span><span class="g">⌄</span></button>
+      ${topHtml(model)}
       <span class="hm-fresh"><span class="pulse ${esc(model.dot)}"></span><span class="lbl">${esc(model.freshness)}</span></span>
     </div>
-    <button class="hm-hd${String(d.figure).length > 2 ? ' wide' : ''}${d.provenanceWarn ? ' late' : ''}" style="${device.vars}" data-act="board">
+    <section class="hm-hd${String(d.figure).length > 2 ? ' wide' : ''}${d.provenanceWarn ? ' late' : ''}${late ? ' active-late' : ''}" style="${device.vars}" data-active-late="${late}">
       <span class="hm-fig"><span class="hm-n">${figureHtml(d.figure)}</span><span class="hm-st${d.warn || d.provenanceWarn ? ' warn' : ''}">${esc(d.provenance || '')}</span></span>
       <span class="hm-ends">
-        <span class="hm-e from"><span class="hm-stn">${esc(d.from)}</span><span class="hm-t">${esc(d.depTime)}</span></span>
-        <span class="hm-e to"><span class="hm-stn">${esc(d.to)}</span><span class="hm-t">${esc(d.arrTime)}</span></span>
+        <span class="hm-e from"><span class="hm-stn" data-fit-box data-fit-name="${esc(d.from)}">${esc(d.from)}</span><span class="hm-t">${esc(d.depTime)}</span></span>
+        <span class="hm-e to"><span class="hm-stn" data-fit-box data-fit-name="${esc(d.to)}">${esc(d.to)}</span><span class="hm-t">${esc(d.arrTime)}</span></span>
       </span>
       ${device.html}
       <span class="hm-sign${d.warn ? ' note' : d.act ? ' hm-act' : ''}">${esc(d.instruction || '—')}</span>
       ${d.receipt ? `<span class="hm-rec">${esc(d.receipt)}</span>` : ''}
-    </button>
+    </section>
     ${offerHtml(model)}
     <div class="hm-rule"></div>
-    <div class="hm-ix tl" data-t="trip-list">
-      <div class="hm-anchor"><div class="l">Track another trip</div></div>
-      ${model.ranked.map(tripRowHtml).join('')}
+    <div class="hm-ix tl" data-t="trip-list" data-scroller>
+      <div class="hm-anchor"><div class="l">My trips</div></div>
+      ${model.ranked.map((entry) => tripRowHtml(entry, model)).join('')}
       <div class="hm-end">— That’s everything on this phone</div>
     </div>
-    ${model.askLocation ? locationAskHtml() : '<div class="hm-bar"><button data-act="new-trip"><span class="g">+</span>New trip</button></div>'}
+    ${model.askLocation ? locationAskHtml() : '<div class="hm-bar" data-footer-rail><button data-act="new-trip" data-tap><span class="g">+</span>New trip</button></div>'}
   </div>`;
+}
+
+function statusClass(status) {
+  return ` status-copy status-${status.kind}${status.late ? ' status-late' : ''}`;
+}
+
+/* The late word is its own span so the treatment can space and colour it. */
+function statusHtml(status) {
+  return status.late
+    ? '<span class="status-inner">Running <span class="status-late-word">late</span></span>'
+    : esc(status.text);
+}
+
+/* One flex item: two would collapse the space before the station name. */
+function topHtml(model) {
+  const status = model.status;
+  if (status) {
+    return `<span class="answer-kind${statusClass(status)}" data-focus-status data-late="${status.late}"><span class="answer-line">${statusHtml(status)}</span></span>`;
+  }
+  const top = model.top;
+  const name = top.name
+    ? `<span data-fit-name="${esc(top.name)}">${esc(top.name)}</span>` : '';
+  return `<span class="answer-kind" data-focus-status data-late="false"><span class="answer-line" data-fit-box>${esc(top.lead)}${name}</span></span>`;
 }
 
 function figureHtml(value) {
@@ -191,21 +246,31 @@ function figureHtml(value) {
 
 function badge(code) {
   const lightInk = ['T4', 'T5', 'T9', 'CCN', 'HUN'].includes(code);
-  return `<b class="hm-bdg" style="background:var(--line-${esc(code)});color:var(--${lightInk ? 'ink' : 'bg'});">${esc(code)}</b>`;
+  return `<b class="hm-bdg" style="background:var(--line-fill-${esc(code)}, var(--line-${esc(code)}));color:var(--${lightInk ? 'ink' : 'bg'});">${esc(code)}</b>`;
 }
 
-function tripRowHtml(entry) {
+function subHtml(entry, model) {
+  if (entry.selected && model.status) {
+    return `<b class="${statusClass(model.status).trim()}" data-row-status data-late="${model.status.late}">${statusHtml(model.status)}</b>`;
+  }
+  if (entry.selected) {
+    return `<b>Shown above</b>${entry.distance ? ` · ${esc(entry.distance)}` : ''}`;
+  }
+  return [entry.distance ? `<b>${esc(entry.distance)}</b>` : '', esc(entry.ridden)]
+    .filter(Boolean).join(' · ');
+}
+
+function tripRowHtml(entry, model) {
   const codes = entry.codes;
-  const spine = `<span class="hm-spine">${codes.map((code) => `<i style="background:var(--line-${esc(code)})"></i>`).join('')}</span>`;
+  const spine = `<span class="hm-spine">${codes.map((code) => `<i style="background:var(--line-fill-${esc(code)}, var(--line-${esc(code)}))"></i>`).join('')}</span>`;
   const name = codes.length > 1
     ? `${badge(codes[0])}${esc(entry.from)} <em>→</em> ${badge(codes[codes.length - 1])}${esc(entry.to)}`
     : codes.length === 1
       ? `${badge(codes[0])}${esc(entry.from)} <em>→</em> ${esc(entry.to)}`
       : `${esc(entry.from)} <em>→</em> ${esc(entry.to)}`;
-  const lead = entry.selected ? 'Tracking now' : entry.distance;
-  const sub = [lead ? `<b>${lead}</b>` : '', entry.ridden].filter(Boolean).join(' · ');
-  return `<button class="tripr${entry.selected ? ' top' : ''}" data-svc data-act="select-trip" data-id="${esc(entry.trip.id)}" data-direction="${esc(entry.direction)}">
-    <span class="hm-in">${spine}<span class="hm-bd"><span class="hm-nm">${name}</span><span class="hm-sub">${sub}</span></span></span>
+  const state = entry.selected ? model.status ? ' focused' : ' shown' : '';
+  return `<button class="tripr${state}" data-svc data-tap data-act="open-trip" data-id="${esc(entry.trip.id)}" data-direction="${esc(entry.direction)}" aria-label="Open ${esc(entry.from)} to ${esc(entry.to)} departures">
+    <span class="hm-in">${spine}<span class="hm-bd"><span class="hm-nm">${name}</span><span class="hm-sub">${subHtml(entry, model)}</span></span><span class="route-cue">Departures<span class="arrow">›</span></span></span>
   </button>`;
 }
 
@@ -232,4 +297,10 @@ function locationAskHtml() {
 
 export function finishHomeRender(root) {
   clampJourneyBars(root);
+  fitStationNames(root);
+  // Republish journeybar.js's own axis arithmetic where the probes read it.
+  root.querySelectorAll('.hm-hd .sy-bar').forEach((bar) => {
+    const spec = bar.querySelector('.sy-spec');
+    if (spec) bar.dataset.axis = spec.dataset.mins;
+  });
 }
