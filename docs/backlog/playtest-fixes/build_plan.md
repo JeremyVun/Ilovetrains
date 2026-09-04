@@ -139,7 +139,7 @@ Gate: `(cd web && npm test)`, `go test ./...`, and a node check that
 `clock(Date.parse('2026-01-15T09:00:00+11:00'))` prints `09:00` under
 `TZ=Australia/Perth`.
 
-Done:  — [ ]
+Done:  — [x] (288f31c, merged 2026-09-05)
 
 ## Phase 4 — smart header height comps round [14]
 
