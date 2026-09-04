@@ -26,8 +26,8 @@ export function lineColour(code) {
   return Object.prototype.hasOwnProperty.call(COLOURS, key) ? `var(--line-${key})` : FALLBACK;
 }
 
-/* Ruling 37: a filled device keeps the official line colour. Only bare text on
-   paper is darkened, because darkening the fill turned T1 brown. */
+/* A filled device keeps the official line colour. Only bare text on paper is
+   darkened, because darkening the fill turns T1 brown. */
 export function lineFill(code) {
   const key = String(code || '').toUpperCase();
   return Object.prototype.hasOwnProperty.call(COLOURS, key) ? `var(--line-fill-${key})` : FALLBACK;

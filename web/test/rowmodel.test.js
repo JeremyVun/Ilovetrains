@@ -432,8 +432,8 @@ test('a shortened change is tight on the row, and prints its printed window', ()
   assert.equal(m.rows[0].changes[0].tight, true);
 });
 
-/* B4: the board used to say the same bad news twice, painting a coral dwell gap
-   under a cancelled row. */
+/* Painting a coral dwell gap under a cancelled row says the same bad news
+   twice. */
 test('a change beside a cancelled leg is broken and never tight', () => {
   const broken = cancelLeg(delayLeg(transferJourneys()[0], 0, 5), 1);
   const m = boardModel(transferBody({ journeys: [broken] }), TRANSFER_NOW);
@@ -467,8 +467,8 @@ test('a cancelled row keeps its arrival and strikes it', () => {
   assert.match(resultRowHtml(m.rows[0], { promoted: true }), /sy-arx/);
 });
 
-/* Ruling 34: round 5 removed the 42% and 20% caps that shortened
-   "Gordon via Lindfield" while the row still had width. */
+/* No width cap may shorten "Gordon via Lindfield" while the row still has
+   width. */
 test('the headsign is printed whole, and the stylesheet puts no cap on it', () => {
   const m = boardModel(transferBody(), TRANSFER_NOW);
   const html = resultRowHtml(m.rows[0]);

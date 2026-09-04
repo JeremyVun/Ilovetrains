@@ -115,7 +115,7 @@ test('every line badge is readable as text in the scheme it is printed in', () =
 });
 
 /* A code's fill defaults to its bare-text value; only the light scheme splits
-   them, and only for T1 and BMT (ruling 37). */
+   them, and only for T1 and BMT. */
 function fillValue(scheme, code) {
   const raw = scheme['--line-fill-' + code] || dark['--line-fill-' + code];
   assert.ok(raw, 'app.css declares --line-fill-' + code);
@@ -132,9 +132,9 @@ function paperRatio(value) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-/* Owner ruling 2026-09-02, written into ui.md: numerals on a line-colour chip
-   are paper in the light scheme, on every line. Ink on the light T4 blue is
-   2.66:1 and fails the contract's own 3:1 bar for text on a fill. */
+/* ui.md, visual language: numerals on a line-colour chip are paper in the light
+   scheme, on every line. Ink on the light T4 blue is 2.66:1 and fails the
+   contract's own 3:1 bar for text on a fill. */
 test('light-scheme chip numerals are paper, and paper clears 3:1 on every line', () => {
   assert.match(css, /@media\s*\(prefers-color-scheme:\s*light\)\s*\{\s*\.sy-cap,\s*\.sy-bar\s+\.sy-p,\s*\.hm-bdg,\s*\.dchip\s*\{\s*color:\s*var\(--bg\)\s*!important/);
 
@@ -147,7 +147,7 @@ test('light-scheme chip numerals are paper, and paper clears 3:1 on every line',
 });
 
 /* The pair is asserted exactly, so the accepted exception can only ever be
-   changed on purpose: ruling 37 allows an imperceptible darkening after device
+   changed on purpose: ui.md allows an imperceptible darkening after device
    evidence, never a return to the brown. */
 test('light T1 and BMT fills are the exact approved yellow, an owner exception at 2.02:1', () => {
   for (const code of YELLOW_EXCEPTION.codes) {

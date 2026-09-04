@@ -85,7 +85,7 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
   const liveLead = journeys[0] || null;
   const nextRunning = journeys.find((item) => !journeyCancelled(item)) || null;
   const focusDep = activeFocus ? departureMs(activeFocus.journey) : null;
-  // B8: cancelled before it leaves, the header shows the next running service
+  // Cancelled before it leaves, the header shows the next running service
   // while the status still reads CANCELLED.
   const replacement = activeFocus && journeyCancelled(activeFocus.journey)
     && focusDep !== null && nowMs < focusDep
@@ -107,7 +107,7 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     if (outbound) receipt = `You rode out at ${new Date(outbound.departedAt).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: false })}. Here’s the way back.`;
   }
   if (!receipt && !activeFocus && !opts.fix && doc.history.length) {
-    // history records qualified board views, not rides (design.md, Findings).
+    // history records qualified board views, not rides, so the receipt says check.
     receipt = new Date(nowMs).getHours() < 12
       ? 'You check this trip most weekday mornings.' : 'You often check this trip around now.';
   }
@@ -163,8 +163,8 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
   };
 }
 
-/* Ruling 11: the line above the header answers how far the station is, and
-   only falls back to a status word when it cannot. */
+/* The line above the header answers how far the station is, and only falls
+   back to a status word when it cannot. */
 function topLine(name, km) {
   if (!Number.isFinite(km)) return { lead: 'Next train', name: '' };
   if (km <= AT_ORIGIN_KM) return { lead: 'At ', name };

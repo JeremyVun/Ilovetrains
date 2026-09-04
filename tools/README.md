@@ -138,11 +138,11 @@ What is checked, with the comp probes the numbers come from:
   when the journey is cancelled or already followed;
 - home: the endpoint names share a top edge and the clocks share a *baseline*
   (measured with a zero-height inline-block probe, because the two clocks are
-  different sizes — a shared box top is the thing ruling 10 calls wrong), one
-  status string in both the top line and the focused saved-trip row, and a
+  different sizes and a shared box top is not the shared baseline ui.md binds),
+  one status string in both the top line and the focused saved-trip row, and a
   `LIVE` dot that stays the live colour however late the journey is;
 - in the light scheme, T1 and BMT fill `#F99D1C` with paper numerals while the
-  same codes as bare text stay `#A46204` (ruling 37);
+  same codes as bare text stay `#A46204`;
 - tap targets 44px, time-axis segments on scale, no part of a scrolling region
   cut off with no way to scroll to it, its last item whole at the end of the
   scroll, and the chrome beneath it never painted over its content or pushed
@@ -198,6 +198,42 @@ names and the exemplar filenames do not match, and `--prefix` and `--size`
 change the produced filename, not the state, so rename by an explicit table and
 then **read every frame**: a stale `OFFLINE` board or a withheld figure is a
 convincing shot of the wrong screen, and so is the wrong route.
+
+The table, all thirty frames. `default` means no flags: the state carries its
+own size and the dark scheme is unsuffixed.
+
+| Exemplar | State | Invocation |
+| --- | --- | --- |
+| `board-390x844-hero.png` | `on-time` | default |
+| `board-390x844-past.png` | `past-register-scrolled` | default |
+| `board-390x844-delayed.png` | `delayed` | default |
+| `board-390x844-cancelled.png` | `cancelled` | default |
+| `board-390x844-long.png` | `long-names` | default |
+| `board-390x844-two-change.png` | `board-two-change` | default |
+| `board-390x844-hero-light.png` | `on-time` | `--media prefers-color-scheme:light` |
+| `board-412x732-hero.png` | `short-on-time` | default (the state is 412×732) |
+| `detail-390x844-hero.png` | `detail-hero` | default |
+| `detail-390x844-tight.png` | `detail-tight` | default |
+| `detail-390x844-cancelled.png` | `detail-cancelled` | default |
+| `detail-390x844-direct.png` | `detail-direct` | default |
+| `detail-390x844-long.png` | `detail-long` | default |
+| `detail-390x844-departed.png` | `detail-departed` | default |
+| `detail-390x844-focused.png` | `detail-focused` | default |
+| `detail-390x844-hero-light.png` | `detail-hero` | `--media prefers-color-scheme:light` |
+| `detail-412x732-hero.png` | `detail-hero` | `--size 412x732` |
+| `detail-412x732-tight.png` | `detail-tight` | `--size 412x732` |
+| `detail-412x732-cancelled.png` | `detail-cancelled` | `--size 412x732` |
+| `detail-412x732-long.png` | `detail-long` | `--size 412x732` |
+| `home-390x844-before.png` | `home-before` | default |
+| `home-390x844-change.png` | `home-change` | default |
+| `home-390x844-final.png` | `home-final` | default |
+| `home-390x844-tight.png` | `home-delayed` | default |
+| `home-390x844-cxl.png` | `home-cancelled` | default |
+| `home-390x844-focused-cxl.png` | `home-focused-cancelled` | default |
+| `home-390x844-late.png` | `home-late` | default |
+| `home-390x844-back.png` | `reverse-real-platforms` | default |
+| `home-390x844-before-light.png` | `home-before` | `--media prefers-color-scheme:light` |
+| `home-412x732-change.png` | `home-change` | `--size 412x732` |
 
 `docs/contracts/ui.md` lists the set; the directory holds it and nothing else,
 so a frame no state can produce is removed rather than left to rot.

@@ -34,6 +34,19 @@ geometry are binding in `docs/contracts/ui.md`; the exemplars are in
 `assets/comps/latest/`. The six rounds of owner rulings live in git history
 (`docs/backlog/board-v2/`, closed 2026-09-02).
 
+### Trip selection and journey readability — DONE 2026-09-04
+A saved-trip row opens that trip's departure board and the smart header is
+read-only, so browsing never replaces the followed train; `Take this train` on
+journey detail is the only control that focuses a journey. The board is the C1
+full-rule ledger — 96px rows, a stable figure column, edge-to-edge rules, and
+the station of every change beside the platform it is boarded from — and
+journey detail promotes the chosen row above its steps, tail and rail. The
+smart home's top line carries the distance to the origin, or the focused
+journey's `RUNNING` / `RUNNING LATE` / `CANCELLED` / `TRIP OVER` status with
+late in the warning colour. The rules and geometry are binding in
+`docs/contracts/ui.md` and `docs/contracts/client-storage.md`; every exemplar
+in `assets/comps/latest/` is shot from the built client.
+
 ## Next
 
 Decide after living with M3 on real commutes. The owner's playtest notes
@@ -71,7 +84,25 @@ Standing checks: tap targets ≥44px, six whole services at 412×732, no
 ambiguity about what is tappable, no figure without its provenance, offline
 paint from the worker, pixel agreement with the exemplars in both schemes.
 Comp round first for anything compositional; instrument first for anything
-geometric.
+geometric. Open owner questions, each an observation waiting on a ruling:
+- `TIMETABLE ONLY` overflows the 72px figure column by 24px on every past
+  timetable-only row, at both frames and both schemes; ui.md names it an open
+  defect. A ruling decides whether the column widens or the word changes, and
+  the provenance vocabulary is closed, so a new word would need drafting.
+- After departure the promoted journey-detail row's live `TO CHANGE` figure
+  paints in the board's dimmed past-row ink, while the same count in the smart
+  header is full ink. A ruling decides which ink a live figure on a past row
+  takes.
+- A journey whose first leg is cancelled has no word on its board step: the
+  step is struck and dimmed and still names the service, where the change step
+  for the same fact reads `CANCELLED`. A ruling decides whether that step gets
+  a word of its own.
+- The home top line's `LATE` word sits 4.5px right of the approved comp, and
+  cancelled detail's tail strike is 2px where the comp's is 1px. A ruling
+  decides whether either is drift worth correcting.
+- The reverse-direction home frame carries no view-based receipt, because only
+  a persisted ride supports a reverse receipt. A ruling decides whether a
+  view-based one exists at all.
 
 ### M6 — Routing that just works
 - Tune the server transfer floor (`MIN_CONNECTION_TIME`) from real

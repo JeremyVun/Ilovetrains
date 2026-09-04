@@ -23,8 +23,8 @@
   --line-BMT: #F99D1C; --line-CCN: #D11F2F; --line-SCO: #0098CD;
   --line-SHL: #00954C; --line-HUN: #833134;
 
-  /* The second colour role (ruling 37): what a FILLED device is painted, as
-     against the same line used as bare text. Only the light scheme splits them. */
+  /* The second colour role: what a FILLED device is painted, as against the
+     same line used as bare text. Only the light scheme splits them. */
   --line-fill-T1: var(--line-T1); --line-fill-T2: var(--line-T2);
   --line-fill-T3: var(--line-T3); --line-fill-T4: var(--line-T4);
   --line-fill-T5: var(--line-T5); --line-fill-T7: var(--line-T7);
@@ -73,8 +73,8 @@
     --line-BMT: #A46204; --line-CCN: #D11F2F; --line-SCO: #0079A3;
     --line-SHL: #008041; --line-HUN: #833134; /* 8.12, unchanged */
 
-    /* Ruling 37: paper on this yellow is 2.02:1, an exception the owner accepted
-       because the darkened token above makes T1 look brown and lose its identity. */
+    /* Paper on this yellow is 2.02:1, the exception ui.md's visual language
+       accepts: the darkened token above makes T1 look brown and lose its identity. */
     --line-fill-T1: #F99D1C; --line-fill-BMT: #F99D1C;
   }
 
@@ -150,14 +150,14 @@ button { cursor: pointer; }
 
 /* The chosen result is promoted intact at the top of detail — the board's own
    row, rendered by board.js — and the journey under it is steps on the same
-   figure and body ladder, so the two screens read as one system (ruling 26). */
+   figure and body ladder, so the two screens read as one system. */
 
 .detail-kicker { margin: 8px 0; }
 .detail-title {
   margin: 0; font-size: 29px; font-weight: 300; letter-spacing: -.025em; line-height: 1.06;
 }
 .detail-title em { font-style: normal; color: var(--ink-3); font-weight: 200; padding: 0 2px; }
-/* Ruling 16: 18px of air between the summary and the heavy rule. */
+/* ui.md binds 18px of air between the summary and the heavy rule. */
 .detail-summary {
   margin: 11px 0 18px; font-size: 14px; font-weight: 300; line-height: 1.5; color: var(--ink-2);
 }
@@ -359,8 +359,8 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
   column-gap: var(--sy-gap); align-items: center;
   padding: 9px var(--sy-pad) 10px; outline-offset: -2px;
 }
-/* Edge to edge, as a ledger rule (ruling 29): inset borders made each service
-   look like it leaked into the next. */
+/* Edge to edge, as a ledger rule: an inset border makes each service look
+   like it leaks into the next. */
 .sy-row::after {
   content: ''; position: absolute; left: 0; right: 0; bottom: -1px;
   height: 1px; background: var(--rule);
@@ -410,8 +410,8 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
 }
 .sy-bar .sy-p.a { background: var(--stem); color: var(--chipink); border-radius: 0 3px 3px 0; }
 .sy-bar .sy-p.b { background: var(--stem2); color: var(--chipink2); border-radius: 3px 0 0 3px; }
-/* The station you change at, hung off the platform you board from (ruling 30).
-   It overlays the headsign line rather than taking a fourth line from the row. */
+/* The station you change at, hung off the platform you board from. It overlays
+   the headsign line rather than taking a fourth line from the row. */
 .sy-pstn {
   position: absolute; top: 26px; right: -4px; min-width: max-content;
   font-size: 10px; font-weight: 600; line-height: 1; letter-spacing: .06em;
@@ -445,7 +445,7 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
 .sy-bar .sy-mk.dwell, .sy-bar .sy-mk.ride2 { --mkc: var(--stem2); }
 .sy-bar .sy-mk.done { --mkc: var(--ink-3); }
 /* Shrink-wrapped, so a full name is never cut while the row still has width
-   (ruling 34) and an ellipsis marks a real collision with the edge. */
+   and an ellipsis marks a real collision with the edge. */
 .sy-sign {
   width: max-content; max-width: 100%; margin-top: 5px; height: 20px; line-height: 20px;
   min-width: 0; font-size: 13px; font-weight: 300; color: var(--ink-2);
@@ -484,7 +484,7 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
   gap: 12px; padding: 12px 22px 0; min-height: 44px;
 }
 /* Clips rather than ellipsises: only a station name grows this line, and
-   fitStationNames shortens one by rule instead (ruling 12). */
+   fitStationNames shortens one by rule instead. */
 .answer-kind {
   display: flex; align-items: center; min-width: 0; min-height: 44px;
   font-size: 11px; font-weight: 600; letter-spacing: .15em;
@@ -513,7 +513,7 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
 }
 .hm-st.warn { color: var(--warn); }
 .hm-hd.late .hm-n, .hm-hd.late .hm-e.from .hm-t { color: var(--warn); }
-/* Ruling 25: lateness colours the figure for the next action too. */
+/* Lateness colours the figure for the next action too. */
 .hm-hd.active-late .hm-n { color: var(--warn); }
 .hm-ends { grid-column: 2; grid-row: 1; display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
 .hm-e { display: flex; flex-direction: column; min-width: 0; }
@@ -523,8 +523,8 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
   color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: clip;
 }
 .hm-e.from .hm-stn { color: var(--ink); }
-/* Ruling 10: the smaller arrival clock's extra gap puts the two clocks on
-   one baseline while the names keep one top edge. */
+/* The smaller arrival clock's extra gap puts the two clocks on one baseline
+   while the names keep one top edge. */
 .hm-t { margin-top: 3px; line-height: 1.1; white-space: nowrap; }
 .hm-e.from .hm-t { font-size: var(--dept); font-weight: 400; letter-spacing: -.01em; color: var(--ink); }
 .hm-e.to .hm-t { margin-top: 7px; font-size: var(--arrt); font-weight: 300; color: var(--ink-2); }

@@ -93,7 +93,7 @@ function departureDelayMinutes(item) {
 /* The one status the header's top line and the focused saved row share.
    Late needs fresh data, a realtime estimate on the leg the rider is actually
    waiting on, and a positive delta between printed minutes; cancellation and
-   arrival outrank it (build_plan.md, "Late status"). */
+   arrival outrank it (ui.md, smart home). */
 export function focusStatus(journey, opts = {}) {
   const state = (text, kind, late, leg, delay) => ({ text, kind, late, leg, delay });
   if (opts.over) return state('Trip over', 'complete', false, -1, 0);
@@ -228,7 +228,7 @@ export function directionsModel(value, nowMs, opts = {}) {
     if (next && next.departure !== null && nowMs < next.departure) {
       model.figure = stale ? '' : countdownFigure(minutesUntil(next.departure, nowMs));
       model.provenance = 'TO CHANGE';
-      // Ruling 3: name the station you change at, not only the platform.
+      // Directions name the station you change at, not only the platform.
       model.instruction = `Change at ${next.station}`
         + (next.toPlatform ? ` · Platform ${next.toPlatform}` : '');
       model.activeLeg = next.index;

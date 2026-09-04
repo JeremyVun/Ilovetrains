@@ -65,8 +65,8 @@ test('the real 4-minute change reads 4, and reads as tight without a delay', () 
   assert.equal(m.steps[1].label, '4 min change');
 });
 
-/* Ruling 40: the shortened change ships as the comp rendered it — the window
-   it is now, named once, with nothing struck and no earlier window beside it. */
+/* A shortened change ships as the window it is: named once, with nothing
+   struck and no earlier window beside it. */
 test('a shortened change prints its current window and only that', () => {
   const m = detail(delayLeg(transferJourneys()[0], 0, 5));
   const change = m.changes[0];
@@ -187,8 +187,8 @@ test('a journey with no legDetail renders as the single leg it describes', () =>
   assert.deepEqual(m.steps.map((s) => s.time), ['22:48', '23:17']);
 });
 
-/* B6: the steps behind the rider are quiet rather than gone — the ladder is
-   how the journey is read, and half a ladder is a different screen. */
+/* The steps behind the rider are quiet rather than gone — the ladder is how
+   the journey is read, and half a ladder is a different screen. */
 test('a step the rider is past is done, and the ones ahead are not', () => {
   const m = detail(transferJourneys()[0], TRANSFER_DEPARTED_NOW); // 09:47, riding leg 0
 

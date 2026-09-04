@@ -36,8 +36,8 @@ export function onAction(root, handler) {
   });
 }
 
-/* Ruling 12: a station name is shortened by rule until it fits, never
-   ellipsised, and wraps only when even the shortest form cannot fit. */
+/* A station name is shortened by rule until it fits, never ellipsised, and
+   wraps only when even the shortest form cannot fit. */
 const SHORTENINGS = [
   (name) => name.replace(/\s+Station$/i, ''),
   (name) => name.replace(/\s+Junction$/i, ' Jn'),

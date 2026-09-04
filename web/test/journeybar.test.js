@@ -54,8 +54,8 @@ test('a real return journey keeps its own platform numbers in ride order', () =>
   assert.match(html, />4<\/span>.*>1<\/span>/);
 });
 
-/* Ruling 37: a filled device carries the official line colour, not the darkened
-   token the light scheme needs for bare text. */
+/* A filled device carries the official line colour, not the darkened token the
+   light scheme needs for bare text. */
 test('every filled part of the device paints the fill role', () => {
   const spec = journeyBarSpec(transferJourneys()[0]);
   const device = journeyDeviceHtml(transferJourneys()[0], { caps: true, showBoardingPlatform: true });
@@ -68,7 +68,7 @@ test('every filled part of the device paints the fill role', () => {
   assert.doesNotMatch(device.html, /background:var\(--line-T[0-9]\)/, 'no bare-text token on a fill');
 });
 
-/* B4: a tight change is painted on its own dwell alone; a comfortable second
+/* A tight change is painted on its own dwell alone; a comfortable second
    change stays a hairline. */
 test('a tight change colours its own dwell and no other', () => {
   const spec = journeyBarSpec(transferJourneys()[0]);

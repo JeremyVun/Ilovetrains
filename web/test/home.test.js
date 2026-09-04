@@ -270,7 +270,7 @@ test('a station name is shortened by rule rather than ellipsised', () => {
 
 /* Focus is written by `Take this train` and cleared by the return offer or the
    30-minute expiry, and by nothing else: browsing another trip must not move
-   the journey the rider is following (ruling 18, selection precedence). */
+   the journey the rider is following (client-storage.md, Trip selection). */
 test('a saved-trip row tap selects and routes, and leaves focus alone', () => {
   const main = readFileSync(join(import.meta.dirname, '..', 'js', 'main.js'), 'utf8');
   const branch = /if \(action === 'open-trip'\) \{([\s\S]*?)\n  \}/.exec(main);

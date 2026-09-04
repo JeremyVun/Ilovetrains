@@ -102,7 +102,7 @@ test('the focus clears itself half an hour past arrival, and not a minute before
 });
 
 
-/* ---- the late rule (build_plan.md, "Late status") ------------------------ */
+/* ---- the late rule (ui.md, smart home) ---------------------------------- */
 
 const at = (time) => Date.parse(`2026-09-01T${time}:00+10:00`);
 const legOf = (journey, nowMs) => directionsModel(journey, nowMs).activeLeg;

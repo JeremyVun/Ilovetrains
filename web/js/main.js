@@ -124,7 +124,7 @@ function savedSelection() {
 }
 
 /* Home leads with the focused journey; the board answers the tap that opened
-   it (build_plan.md, selection precedence). */
+   it (client-storage.md, Trip selection). */
 function chooseSelection() {
   const chosen = focusSelection() || savedSelection();
   state.predicted = !chosen;
@@ -160,7 +160,7 @@ function showHome(root) {
 }
 
 /* An already-granted permission is not a prompt: home may use the fix it can
-   have without asking for one on open (B7). */
+   have without asking for one on open (ui.md, smart home). */
 async function silentFix() {
   if (state.fix || !navigator.geolocation || !navigator.permissions) return;
   try {
@@ -387,7 +387,7 @@ function detailModel() {
 
 /* Once the journey has left, its promoted row counts to the next thing the
    rider does, not to a departure that has already happened: the figure and
-   provenance become the smart header's (build_plan.md B6). */
+   provenance become the smart header's (ui.md, journey detail). */
 function detailRow(model, opts) {
   const row = promotedRow(state.journey, now(), { ...opts, fallbackHeadsign: opts.toName });
   // A cancelled journey keeps the board's dash and its CANCELLED word.

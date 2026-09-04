@@ -79,8 +79,8 @@ test('a cancelled journey warns in the summary, strikes its steps and offers no 
   assert.doesNotMatch(html, /data-footer-rail|Take this train/);
 });
 
-/* Ruling 39: the journey already being followed has the same shape as the
-   cancelled one. There is no manual unfocus anywhere. */
+/* The journey already being followed has the same shape as the cancelled one.
+   There is no manual unfocus anywhere. */
 test('the journey already being followed has no action rail either', () => {
   const journey = transferJourneys()[0];
 
@@ -96,9 +96,9 @@ test('the tail owns the destination, its time and its platform', () => {
   assert.match(html, /<div class="detail-fresh" data-t="footer"><span class="pulse live"><\/span>Updated 0s ago<\/div>/);
 });
 
-/* B6: after departure the steps behind the rider go quiet rather than
-   disappear, and nothing on them is struck — a step that happened is not a
-   step that was cancelled. */
+/* After departure the steps behind the rider go quiet rather than disappear,
+   and nothing on them is struck — a step that happened is not a step that was
+   cancelled. */
 test('a step behind the rider is quiet, not struck', () => {
   const html = render(transferJourneys()[0], { now: TRANSFER_DEPARTED_NOW });
 
@@ -106,8 +106,8 @@ test('a step behind the rider is quiet, not struck', () => {
   assert.doesNotMatch(html, /dstep[^"]*cancelled/);
 });
 
-/* The seam in build_plan.md: `Take this train` is the only writer of focus on
-   this screen, and detail never clears it. */
+/* client-storage.md, Focused journey: `Take this train` is the only writer of
+   focus on this screen, and detail never clears it. */
 test('the detail view writes focus once and never clears it', () => {
   const main = readFileSync(fileURLToPath(new URL('../js/main.js', import.meta.url)), 'utf8');
   const action = /function detailAction\(action\) \{[\s\S]*?\n\}/.exec(main);

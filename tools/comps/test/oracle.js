@@ -25,8 +25,8 @@ const { execFileSync } = require('child_process');
 const REPO = path.join(__dirname, '..', '..', '..');
 const ARCHIVE_COMMIT = '91aadd9';
 const ARCHIVE_PATH = 'docs/backlog/board-v2/comps-final';
-// The last commit whose exemplars the archive can still reproduce: home-interaction
-// re-shot every one of them from the real client.
+// The last commit whose exemplars the archive can still reproduce; the set on
+// disk is client shots of a later design, so the pin is what keeps this a gate.
 const EXEMPLAR_COMMIT = 'b218dd5';
 const EXEMPLAR_PATH = 'assets/comps/latest';
 // Even at the pin these two were client shots after an owner ruling; the archive's

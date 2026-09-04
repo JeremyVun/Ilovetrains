@@ -251,17 +251,26 @@ node tools/comps/test/oracle.js            # the acceptance oracle, ~1 min of Ch
 
 The oracle extracts the archived board v2 final workshop from git, scaffolds a
 round from it, shoots the archive's own job list and diffs the result against
-`assets/comps/latest/`. It passes only when every exemplar is reproduced
-**pixel-identical**. If a shot differs, find out why and fix the harness; the
-exemplars are the truth, and loosening the comparison is not a fix.
+the exemplar set **pinned in git** at `EXEMPLAR_COMMIT` (`b218dd5`, in
+`test/oracle.js`) — the last commit whose `assets/comps/latest/` was the
+archive's own shots. The set on disk is client shots of the current design and
+is not an input here, which is what keeps this a gate on the harness while the
+product moves. It passes only when every pinned exemplar is reproduced
+**pixel-identical**. If a shot differs, find out why and fix the harness or the
+pin; loosening the comparison is not a fix.
 
 ## Seams left open
 
-- **The real client carries none of these attributes yet.** Adding
-  `data-scroller`, `data-svc`, `data-tap`, `data-track`, `data-axis` and their
-  companions to `web/` would let `tools/shoot-states.js` run this same probe
-  pack against the shipped screens, which is what "the comp and the client
-  measured by the same code" is for. It is a separate product change.
+- **The track-stress vocabulary is comps-only, and the probe code is written
+  twice.** The client carries `data-scroller`, `data-svc`, `data-tap`,
+  `data-axis`, `data-seg`, `data-pin`, `data-transfer-station`,
+  `data-transfer-platform`, `data-line-code`, `data-headsign`, `data-summary`
+  and `data-footer-rail`, and `tools/shoot-states.js` measures the shipped
+  screens against the same numbers — but with its own inline copy of the
+  measurements rather than `probes.js`, so the two can drift. `data-past`,
+  `data-track`, `data-lockups`, `data-lockup-row`, `data-ink` and `data-unit`
+  exist only in comps, so the widest-legal-lockup stress never runs against the
+  real client.
 - **`tools/shoot-states.js` still owns its own state list.** It seeds the real
   client with API-response-shaped documents built from `web/test/fixture.js`,
   while this catalogue emits already-mapped view rows: the two are at different

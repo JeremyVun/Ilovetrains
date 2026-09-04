@@ -57,9 +57,9 @@ function tailHtml(arrival) {
 </div>`;
 }
 
-/* Rulings 19 and 39: a cancelled journey and the one already being followed
-   have no positive action, so the rail is absent rather than disabled. There
-   is no manual unfocus; the back control is the way out. */
+/* A cancelled journey and the one already being followed have no positive
+   action, so the rail is absent rather than disabled. There is no manual
+   unfocus; the back control is the way out. */
 function railHtml(model) {
   if (model.cancelled || model.focused) return '';
   return '<div class="hm-bar detail-rail" data-footer-rail><button data-act="focus">Take this train</button></div>';

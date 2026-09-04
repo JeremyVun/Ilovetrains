@@ -159,7 +159,7 @@ function stepsOf(legs, changes, cancelled, nowMs) {
       station: change.station,
       off: chip(lineCode(legs[index]), change.fromPlatform),
       on: chip(lineCode(legs[index + 1]), change.toPlatform),
-      // Ruling 40: the current window is the only one printed.
+      // ui.md: a tight change prints its current window and no other.
       label: broken ? 'Cancelled' : tight ? change.minutes + ' min change' : 'Board',
       tight,
       cancelled: broken,

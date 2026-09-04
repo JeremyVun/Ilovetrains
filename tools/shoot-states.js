@@ -443,8 +443,8 @@ async function states() {
       focus: scheduledOnly()[0],
       expect: { status: 'Running' }
     }),
-    // B8: cancelled before it departs, the header hands over to the next
-    // running service while the status still reads CANCELLED.
+    // Cancelled before it departs, the header hands over to the next running
+    // service while the status still reads CANCELLED.
     home('home-focused-cancelled', cancelledLead(), {
       now: Date.parse('2026-09-01T09:21:00+10:00'),
       generatedAt: '2026-09-01T09:21:00+10:00',
@@ -530,9 +530,9 @@ async function states() {
     // arrive: the 23:12 BMT to Parramatta, reached by tapping its own row.
     board('detail-direct', departuresBody(), { after: OPEN_ROW(2), expect: { rail: true } }),
 
-    // B6, and the trap it hides: the clock and the body's generatedAt move
-    // TOGETHER. Advance only the clock and the board is stale, the figure is
-    // correctly withheld, and the shot is of the wrong screen.
+    // The post-departure promoted row, and the trap it hides: the clock and the
+    // body's generatedAt move TOGETHER. Advance only the clock and the board is
+    // stale, the figure is correctly withheld, and the shot is of the wrong screen.
     transfer('detail-departed', transferJourneys(), {
       expect: { rail: true },
       after: `${OPEN_ROW(0)}
@@ -542,7 +542,7 @@ async function states() {
   await sleep(80);`
     }),
 
-    // B2: the journey already being followed has no positive action left.
+    // The journey already being followed has no positive action left.
     transfer('detail-focused', transferJourneys(), {
       focus: transferJourneys()[0], after: OPEN_ROW(0), expect: { rail: false }
     }),
@@ -597,9 +597,9 @@ async function states() {
       generatedAt: '2026-09-01T09:47:00+10:00'
     }),
 
-    /* The C1 transfer states (design.md 30, 32, 34, 36). A tight change is
-       painted on the dwell alone; a cancelled one never is, even when the
-       window is short; two changes are the renderer's plural seam. */
+    /* The transfer states. A tight change is painted on the dwell alone; a
+       cancelled one never is, even when the window is short; two changes are
+       the renderer's plural seam. */
     transfer('board-tight', tighten(transferJourneys())),
     transfer('board-cancelled-tight', breakLeg(tighten(transferJourneys()))),
     transfer('board-two-change', twoChangeBoard()),
@@ -697,8 +697,8 @@ function pageScript(state) {
   // Invariants checked on every state, in the browser, at the shot's viewport.
   // They are reported at console.error, which screenshot.js prints under the
   // shot, so a broken invariant cannot hide inside a plausible-looking image.
-  // The comp probes of /tmp/trains-comps-home-interaction-r6 and -r3 are the
-  // numbers below; a state declares what it means in its expect block.
+  // The numbers below are the ones docs/contracts/ui.md binds; a state declares
+  // what it means in its expect block.
   try {
     const problems = [];
     const notes = [];
@@ -720,15 +720,15 @@ function pageScript(state) {
       const lines = ['.sy-t', '.sy-j', '.sy-sign'].map((s) => row.querySelector(s));
       if (lines.some((el) => !el || !el.textContent.trim())) problems.push('row is not three full lines');
 
-      // B3: a fixed ledger row, 96px on the board and 100px promoted into
-      // detail. A row that stretches to fill a sparse frame is the defect.
+      // A fixed ledger row, 96px on the board and 100px promoted into detail.
+      // A row that stretches to fill a sparse frame is the defect.
       const height = promoted ? 100 : 96;
       if (!near(box.height, height)) {
         problems.push('the row is ' + round(box.height) + 'px, not the ledger’s ' + height);
       }
 
-      // Ruling 29: the rule is drawn edge to edge of a row that is itself
-      // edge to edge of the region holding it. An inset rule reads as a box.
+      // The rule is drawn edge to edge of a row that is itself edge to edge of
+      // the region holding it. An inset rule reads as a box.
       const rule = getComputedStyle(row, '::after');
       if (!near(px(rule.width), box.width) || px(rule.left) !== 0) {
         problems.push('the row rule is ' + rule.width + ' inset ' + rule.left + ' across a ' + round(box.width) + 'px row');
@@ -780,8 +780,8 @@ function pageScript(state) {
         }
       }
 
-      // Ruling 34: an upstream headsign may be ellipsised, but only once it
-      // has used the whole row.
+      // An upstream headsign may be ellipsised, but only once it has used the
+      // whole row.
       const sign = row.querySelector('[data-headsign]');
       if (sign && sign.scrollWidth > sign.clientWidth) {
         const free = box.right - PAD - sign.getBoundingClientRect().right;
@@ -793,8 +793,8 @@ function pageScript(state) {
         problems.push('cancelled-lead note truncated: ' + note.scrollWidth + ' > ' + note.clientWidth);
       }
 
-      // B4 and ruling 36: the tight window is painted on the dwell alone, and
-      // a cancelled journey never paints one.
+      // The tight window is painted on the dwell alone, and a cancelled journey
+      // never paints one.
       const warned = [...row.querySelectorAll('[data-seg].warn')];
       for (const seg of warned) {
         if (!seg.hasAttribute('data-transfer-gap')) problems.push('the tight colour is painted on a ride segment, not the dwell');
@@ -831,7 +831,7 @@ function pageScript(state) {
         if (label && label.scrollWidth > label.clientWidth) problems.push('step copy truncated: ' + label.textContent.trim());
       }
 
-      // Ruling 16: exactly 18px of air between the summary and the heavy rule.
+      // Exactly 18px of air between the summary and the heavy rule.
       const summary = document.querySelector('[data-summary]');
       const heavy = document.querySelector('.sy-mast .sy-hr');
       if (summary && heavy) {
@@ -876,8 +876,8 @@ function pageScript(state) {
       });
     }
 
-    /* Ruling 37: in light, T1 and BMT keep their identity as a fill with paper
-       numerals while the same code as bare text stays the darkened token. */
+    /* In light, T1 and BMT keep their identity as a fill with paper numerals
+       while the same code as bare text stays the darkened token. */
     if (matchMedia('(prefers-color-scheme: light)').matches) {
       const root = getComputedStyle(document.documentElement);
       for (const code of ['T1', 'BMT']) {
@@ -906,8 +906,8 @@ function pageScript(state) {
         && Math.abs(fromStation.getBoundingClientRect().top - toStation.getBoundingClientRect().top) > 0.1) {
       problems.push('home station names are vertically misaligned');
     }
-    // Ruling 10: unequal clocks, so the shared edge is the baseline, not the
-    // box top. A zero-height inline-block sits on the line box's baseline.
+    // Unequal clocks, so the shared edge is the baseline, not the box top. A
+    // zero-height inline-block sits on the line box's baseline.
     const baselineOf = (el) => {
       const probe = document.createElement('span');
       probe.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline';
