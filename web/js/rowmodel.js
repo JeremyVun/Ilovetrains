@@ -9,7 +9,7 @@
 
 import { parseIso, clock, minutesUntil, ageLabel, countdownFigure } from './time.js';
 import { lineColour, lineFill } from './lines.js';
-import { journeyDetail, journeyKey } from './journey.js';
+import { journeyDetail, journeyKey, platformNumber } from './journey.js';
 
 /* 30s refresh cadence plus margin: past this, a countdown is a claim the data
    cannot support. */
@@ -161,7 +161,7 @@ function journeyRow(journey, nowMs, stale, opts) {
     schedTime: delayMin > 0 && scheduled !== null && (!past || actual) ? clock(scheduled) : null,
     // A cancelled row keeps its arrival: it is what the next train is judged against.
     arrTime: arrivalMs === null ? null : clock(arrivalMs),
-    platform: dep.platform ? String(dep.platform).replace(/^platform\s+/i, '') : null,
+    platform: platformNumber(dep.platform) || null,
     lineCode,
     lineColour: lineColour(lineCode),
     lineFill: lineFill(lineCode),

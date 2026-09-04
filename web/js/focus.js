@@ -11,7 +11,9 @@
    departed, or the network is gone — the last snapshot stands. */
 
 import { clock, minutesUntil, countdownFigure } from './time.js';
-import { journeyKey, legsOf, arrivalMs, departureMs, effective, TIGHT_CHANGE_MIN } from './journey.js';
+import {
+  journeyDetail, journeyKey, legsOf, arrivalMs, departureMs, effective, platformNumber
+} from './journey.js';
 import { shortName } from './dom.js';
 
 /* Half an hour past arrival the journey is over and directions are clutter
@@ -126,29 +128,9 @@ export function directionsModel(value, nowMs, opts = {}) {
   const stale = Boolean(opts.stale);
   const cancelled = legs.find((leg) => leg.cancelled === true) || (journey && journey.cancelled ? first : null);
 
-  const changes = [];
-  for (let i = 1; i < legs.length; i++) {
-    const before = legs[i - 1];
-    const after = legs[i];
-    const arrival = effective(before.arrival);
-    const departure = effective(after.departure);
-    const scheduledArrival = Date.parse((before.arrival || {}).scheduled || '');
-    const scheduledDeparture = Date.parse((after.departure || {}).scheduled || '');
-    const minutes = arrival === null || departure === null ? null : minutesUntil(departure, arrival);
-    const printed = Number.isFinite(scheduledArrival) && Number.isFinite(scheduledDeparture)
-      ? minutesUntil(scheduledDeparture, scheduledArrival) : null;
-    changes.push({
-      index: i,
-      arrival,
-      departure,
-      minutes,
-      printed,
-      tight: minutes !== null && (minutes < TIGHT_CHANGE_MIN || (printed !== null && minutes < printed)),
-      station: shortName((before.to && before.to.name) || (after.from && after.from.name) || ''),
-      fromPlatform: cleanPlatform(before.to && before.to.platform),
-      toPlatform: cleanPlatform(after.from && after.from.platform)
-    });
-  }
+  // Read through journeyDetail so the header, the board row and detail can
+  // never disagree about a change window.
+  const changes = journeyDetail(journey, nowMs, opts).changes;
 
   const model = {
     journey,
@@ -191,7 +173,7 @@ export function directionsModel(value, nowMs, opts = {}) {
       : first.departure && first.departure.estimated ? '' : 'SCHEDULED';
     model.provenanceWarn = departureDelay > 0;
     if (opts.leave) {
-      model.instruction = `Leave now for Platform ${cleanPlatform(first.from && first.from.platform) || '—'}`;
+      model.instruction = `Leave now for Platform ${platformNumber(first.from && first.from.platform) || '—'}`;
       model.receipt = opts.receipt || `You’re ${opts.leave} from ${model.from}.`;
       model.act = true;
     }
@@ -219,14 +201,14 @@ export function directionsModel(value, nowMs, opts = {}) {
       model.figure = stale ? '' : countdownFigure(minutesUntil(legArrival, nowMs));
       model.provenance = hasChange ? 'TO CHANGE' : 'TO GO';
       model.instruction = `Get off at ${hasChange ? next.station : model.to}`
-        + (cleanPlatform(legs[i].to && legs[i].to.platform)
-          ? ` · Platform ${cleanPlatform(legs[i].to.platform)}` : '');
+        + (platformNumber(legs[i].to && legs[i].to.platform)
+          ? ` · Platform ${platformNumber(legs[i].to.platform)}` : '');
       model.activeLeg = i;
       phase = i === 0 ? 'ride' : 'ride2';
       break;
     }
-    if (next && next.departure !== null && nowMs < next.departure) {
-      model.figure = stale ? '' : countdownFigure(minutesUntil(next.departure, nowMs));
+    if (next && next.departureMs !== null && nowMs < next.departureMs) {
+      model.figure = stale ? '' : countdownFigure(minutesUntil(next.departureMs, nowMs));
       model.provenance = 'TO CHANGE';
       model.instruction = `Change at ${next.station}`
         + (next.toPlatform ? ` · Platform ${next.toPlatform}` : '');
@@ -238,19 +220,15 @@ export function directionsModel(value, nowMs, opts = {}) {
   model.phase = phase;
   model.progress = { at, phase };
   const risk = changes.find((change) => change.tight
-    && (change.departure === null || nowMs < change.departure));
+    && (change.departureMs === null || nowMs < change.departureMs));
   if (risk) {
     model.warn = true;
     model.tight = true;
     model.instruction = `Tight change · ${risk.minutes} min`
       + (risk.toPlatform ? ` · Platform ${risk.toPlatform}` : '');
-    if (risk.printed !== null && risk.minutes < risk.printed) {
-      model.receipt = `Printed change was ${risk.printed} min.`;
+    if (risk.printedMin !== null && risk.minutes < risk.printedMin) {
+      model.receipt = `Printed change was ${risk.printedMin} min.`;
     }
   }
   return model;
-}
-
-function cleanPlatform(value) {
-  return value ? String(value).replace(/^platform\s+/i, '') : '';
 }

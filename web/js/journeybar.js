@@ -3,18 +3,13 @@
    share of the journey at every viewport width. */
 
 import { esc } from './dom.js';
-import { effective, legsOf } from './journey.js';
+import { effective, legsOf, platformNumber } from './journey.js';
 import { lineFill } from './lines.js';
 
 const KNOCKOUT = new Set(['T4', 'T5', 'T9', 'CCN', 'HUN']);
 
 export function chipInk(code) {
   return KNOCKOUT.has(code) ? 'var(--ink)' : 'var(--bg)';
-}
-
-export function platformNumber(value) {
-  if (!value) return '';
-  return String(value).replace(/^platform\s+/i, '');
 }
 
 function positiveMinutes(from, to) {

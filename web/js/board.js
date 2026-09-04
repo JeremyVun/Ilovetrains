@@ -1,9 +1,8 @@
 /* Board v2: one mobile timeline containing past, now and future. */
 
-import { esc, shortName } from './dom.js';
+import { esc, figureHtml, shortName } from './dom.js';
 import { clock } from './time.js';
 import { journeyDeviceHtml, clampJourneyBars } from './journeybar.js';
-import { rowLines } from './rowmodel.js';
 
 export function boardHtml({ trip, direction, model, nowMs = Date.now() }) {
   const from = direction === 'reverse' ? trip.to.name : trip.from.name;
@@ -56,19 +55,6 @@ export function emptyCopy(model) {
   return 'No services in the next few hours';
 }
 
-function figureHtml(row) {
-  const value = String(row.figure || '');
-  const hours = /^(\d+)H$/.exec(value);
-  if (hours) return `${esc(hours[1])}<span class="sy-u">H</span>`;
-  if (/^\d+$/.test(value)) return `${esc(value)}<span class="sy-u">min</span>`;
-  return esc(value);
-}
-
-export function splitFigure(figure) {
-  const hours = /^(\d+)(H)$/.exec(String(figure || ''));
-  return hours ? { num: hours[1], unit: hours[2] } : { num: String(figure || ''), unit: '' };
-}
-
 /* Journey detail promotes this exact row, so it is rendered here and nowhere else. */
 export function resultRowHtml(row, opts = {}) {
   const changes = row.changes || [];
@@ -85,7 +71,7 @@ export function resultRowHtml(row, opts = {}) {
   const tap = opts.tappable === false ? ''
     : ' data-act="detail" role="button" tabindex="0"';
   return `<div class="${classes}" style="${device.vars}" data-t="row" data-svc data-key="${esc(row.key)}" data-match="${esc(row.matchKey)}"${tap}>
-    <div class="sy-fig" data-figure-column><span class="sy-n">${figureHtml(row)}</span><span class="sy-st${row.provenanceWarn ? ' warn' : ''}">${esc(row.provenance || '')}</span></div>
+    <div class="sy-fig" data-figure-column><span class="sy-n">${figureHtml(row.figure, 'sy-u')}</span><span class="sy-st${row.provenanceWarn ? ' warn' : ''}">${esc(row.provenance || '')}</span></div>
     <div class="sy-b">
       <div class="sy-t"><span class="sy-dp">${esc(row.depTime)}</span>${row.schedTime ? `<del class="sy-was">${esc(row.schedTime)}</del>` : ''}${arrivalHtml(row, opts)}</div>
       ${device.html}
@@ -127,14 +113,3 @@ export function restoreTimeline(root, saved, addedAbove = false) {
   timeline.scrollTop = saved.scrollTop + (addedAbove ? timeline.scrollHeight - saved.height : 0);
   clampJourneyBars(root);
 }
-
-export function sameRowSet(root, model) {
-  const keys = [...root.querySelectorAll('[data-t="row"]')].map((el) => el.dataset.key);
-  const rows = [...(model.pastRows || []), ...(model.futureRows || model.rows || [])];
-  return keys.length === rows.length && keys.every((key, index) => key === rows[index].key);
-}
-
-export function patch() { return false; }
-export function dissolveDeparted(_root, _model, done) { done(); }
-
-export { rowLines, shortName, clampJourneyBars };

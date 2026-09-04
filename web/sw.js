@@ -23,7 +23,7 @@
  * Bump VERSION on every deploy that changes any file in SHELL.
  */
 
-const VERSION = 'v13';
+const VERSION = 'v14';
 const SHELL_CACHE = 'shell-' + VERSION;
 const DATA_CACHE = 'data-' + VERSION;
 
@@ -51,7 +51,6 @@ const SHELL = [
   '/js/setup.js',
   '/js/storage.js',
   '/js/time.js',
-  '/js/trips.js',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/icon-maskable-512.png',

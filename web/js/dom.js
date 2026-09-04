@@ -13,6 +13,14 @@ export function shortName(name) {
   return String(name || '').replace(/\s+Station$/i, '');
 }
 
+export function figureHtml(value, unitClass) {
+  const text = String(value || '');
+  const hours = /^(\d+)H$/.exec(text);
+  if (hours) return `${esc(hours[1])}<span class="${unitClass}">H</span>`;
+  if (/^\d+$/.test(text)) return `${esc(text)}<span class="${unitClass}">min</span>`;
+  return esc(text);
+}
+
 export function mount(root, html) {
   root.innerHTML = html;
 }
