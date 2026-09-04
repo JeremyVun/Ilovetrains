@@ -200,6 +200,20 @@ vertical composition only, and the policy for the receipt row (reserved
 slot versus content-sized with a shift). Round output: a contact sheet the
 owner opens, a verdict, then the build and re-shot home exemplars.
 
+
+**Verdict 2026-09-05: direction 4, "Masthead"** (workshop
+`/tmp/trains-comps-header-height`, concept `c4-mast`; its `c4-mast.css` is
+the calibration source for the build). The whole block tightens from the
+frame top: the top line becomes an eyebrow on the frame edge, the answer
+runs on one 12px step, the heavy rule closes it. Measured at 390×844: rule
+at 214px without a receipt (282 today), 247px with one; `.hm-hd` box 187px
+and 220px. The header is content-sized (`flex: none; min-height: 0;
+max-height: none`), so a receipt appearing shifts the rule by 33px;
+accepted. Condition of the build: the top band must clear a notch,
+`padding-top: max(14px, env(safe-area-inset-top))`, because the shipped
+56px band was the only clearance and nothing in `app.css` reads the top
+inset today. All ten `home-*` exemplars are re-shot.
+
 ## Copy (Codex drafts, owner verdicts)
 
 Slot A (past provenance): superseded by the ruling that the figure returns
