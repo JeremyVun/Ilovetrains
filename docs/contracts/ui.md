@@ -386,22 +386,12 @@ The set is thirty frames:
 
 Measurements these frames carry deliberately, so nothing above reads as drift:
 the two header clocks share a baseline to within 1px, which is the tolerance
-<<<<<<< HEAD
-the instrument allows; a focused journey still shows its boarding cap and
-pre-departure progress marker before it leaves, so `home-390x844-focused-cxl`
-carries both; `detail-*-tight` shoots a change shortened by a late first leg,
-so its promoted row reads `5 MIN LATE`.
-=======
 the instrument allows; the header's heavy rule sits 214px from the frame top
 at 390×844 with no receipt, which is what the content-sized block measures;
 a focused journey still shows its boarding cap and pre-departure progress
 marker before it leaves, so `home-390x844-focused-cxl` carries both;
 `detail-*-tight` shoots a change shortened by a late first leg,
-so its promoted row reads `5 MIN LATE`. One defect is visible and open, not
-accepted: on `board-390x844-past` the provenance `TIMETABLE ONLY` overflows the
-72px figure column by 24px, which the sweep prints as a `NOTE` pending an owner
-ruling on the column or the word.
->>>>>>> fixes/p6
+so its promoted row reads `5 MIN LATE`.
 
 Client markup carries the data attributes the comps harness probes, so the
 instrument measures the built screen with the probes that judged its comps.
