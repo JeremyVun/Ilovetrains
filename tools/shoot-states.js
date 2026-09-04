@@ -313,10 +313,14 @@ async function states() {
     walk(shifted);
     return shifted;
   };
-  const pastBody = departuresBody({
-    generatedAt: NOW_ISO,
-    journeys: baseJourneys().map((value) => shiftJourney(value, -75))
-  });
+  /* Both past registers in one frame: four services with actuals, one of them
+     four minutes late, and the two the fixture has no realtime for. Only the
+     actuals rows may carry a struck scheduled time (ui.md, past data). */
+  const pastBody = (() => {
+    const journeys = baseJourneys().map((value) => shiftJourney(value, -75));
+    delay(journeys[3], 4);
+    return departuresBody({ generatedAt: NOW_ISO, journeys });
+  })();
   const reverseJourney = {
     departure: {
       scheduled: '2026-09-01T10:18:00+10:00',
@@ -502,8 +506,10 @@ async function states() {
     board('stale-departed', departuresBody(), { now: Date.parse('2026-08-31T23:05:00+10:00') }),
 
     // Caught mid-dissolve: the 22:48 service has just left, its row is fading
-    // and the list is about to close upward during its transition.
-    board('dissolve', departuresBody(), {
+    // and the list is about to close upward during its transition. The board is
+    // generated at 22:48:30 so advancing the clock to 22:49 departs one service
+    // without also making the board stale (which would withhold every figure).
+    board('dissolve', departuresBody({ generatedAt: '2026-08-31T22:48:30+10:00' }), {
       // No sleep: screenshot.js's own 120ms settle lands the capture around
       // half way through the 240ms fade, which is the only moment it exists.
       after: `t.now = () => ${NOW + 4 * 60000}; t.tick();`
@@ -649,8 +655,6 @@ async function states() {
       route: '#/setup',
       type: { role: 'from', text: 'cen', freeze: true }
     },
-    { name: 'trips-list', seed: doc({ trips: [TRIP, TRIP_2], body: departuresBody() }), now: NOW, route: '#/trips' },
-
     { name: 'desktop', seed: doc({ body: departuresBody() }), now: NOW, body: departuresBody(), size: '1280x800', desktop: true },
     {
       name: 'desktop-delayed',
@@ -720,7 +724,6 @@ function pageScript(state) {
   // what it means in its expect block.
   try {
     const problems = [];
-    const notes = [];
     const expect = ${JSON.stringify(state.expect || {})};
     const px = (value) => parseFloat(value) || 0;
     const measures = getComputedStyle(document.body);
@@ -776,11 +779,11 @@ function pageScript(state) {
         problems.push('figure "' + (mins.firstChild && mins.firstChild.nodeValue) + '" overflows its column: '
           + mins.scrollWidth + ' > ' + mins.clientWidth);
       }
-      // TIMETABLE ONLY does not fit the 72px column. Pre-existing and awaiting
-      // an owner ruling on the column or the word, so it is measured, not failed.
+      // The provenance shares the figure's 72px column and has no ellipsis, so
+      // an overlong one is drawn straight through the departure time.
       const prov = row.querySelector('.sy-st');
       if (prov && prov.scrollWidth > prov.clientWidth) {
-        notes.push('provenance "' + prov.textContent.trim() + '" overflows the figure column by '
+        problems.push('provenance "' + prov.textContent.trim() + '" overflows the figure column by '
           + (prov.scrollWidth - prov.clientWidth) + 'px');
       }
 
@@ -1033,7 +1036,6 @@ function pageScript(state) {
     scrollRegion('.sy-tl', '[data-t="row"]', null, 'board');
     scrollRegion('.detail-scroll', '[data-t="step"]', document.querySelector('.detail-tail'), 'journey');
     scrollRegion('[data-t="trip-list"]', '.tripr', document.querySelector('.hm-bar, .hm-ask'), 'trip list');
-    if (notes.length) console.warn('NOTE ' + ${JSON.stringify(state.name)} + ': ' + notes.join('; '));
     if (problems.length) console.error('INVARIANT ' + ${JSON.stringify(state.name)} + ': ' + problems.join('; '));
   } catch (e) { console.error('invariant check failed: ' + e.message); }
 

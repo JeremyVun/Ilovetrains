@@ -26,6 +26,7 @@ const LIMIT = 6;
 const PAST_STEP_MS = 60 * 60_000;
 const PAST_BOUND_MS = 24 * 60 * 60_000;
 const FIX_MAX_AGE_MS = 5 * 60_000;
+const DISSOLVE_HOLD_MS = 260;
 
 let nowFn = () => Date.now();
 const now = () => nowFn();
@@ -35,6 +36,8 @@ const state = {
   selection: null,
   body: null,
   pastBodies: [],
+  seenLive: new Map(),
+  seenKey: null,
   serverStale: false,
   offline: false,
   viewRecorded: false,
@@ -59,6 +62,19 @@ function onLiveView() {
 const timers = { tick: null, refresh: null, view: null };
 let inflight = null;
 let pastInflight = null;
+/* A tick may not rewrite a view whose markup is unchanged: the write would
+   discard the element a wheel is scrolling and cancel a smooth scroll. */
+const painted = { home: null, board: null, detail: null };
+let dissolving = null;
+
+/* The freshness age is the one thing that changes every second, so it is the
+   one thing patched outside the comparison. */
+function patchFresh(node, text) {
+  if (!node) return;
+  const last = node.lastChild;
+  if (last && last.nodeType === 3) last.textContent = text;
+  else node.appendChild(document.createTextNode(text));
+}
 
 function freshRoot() {
   const old = document.getElementById('app');
@@ -91,6 +107,8 @@ function route() {
   const hash = location.hash || '#/';
   const root = freshRoot();
   state.view = null;
+  painted.home = painted.board = painted.detail = null;
+  dissolving = null;
 
   if (hash === '#/setup' || hash === '#/trips/new') return renderSetup(root, ctx);
   if (!state.doc.trips.length) {
@@ -202,11 +220,16 @@ function applyFix(position) {
 
 function currentModel() {
   const ends = currentLeg();
+  // The train you just missed is in neither register until the last live copy
+  // of it is offered back as a past page (design.md, defect 3).
+  const pastBodies = state.view === 'board'
+    ? [...state.pastBodies, { journeys: [...state.seenLive.values()] }]
+    : state.pastBodies;
   const model = boardModel(state.body || {}, now(), {
     forceStale: state.offline,
     degraded: state.serverStale,
     fallbackHeadsign: ends.to.name,
-    pastBodies: state.pastBodies
+    pastBodies
   });
   if (!state.body) model.status = state.offline ? 'offline' : 'loading';
   return model;
@@ -228,12 +251,19 @@ function renderHome() {
     home.over = false;
     home.home.moved = null;
   }
-  const list = state.root.querySelector('[data-t="trip-list"]');
-  const scrollTop = list ? list.scrollTop : 0;
-  state.root.innerHTML = Home.homeHtml(home);
-  const nextList = state.root.querySelector('[data-t="trip-list"]');
-  if (nextList) nextList.scrollTop = scrollTop;
-  Home.finishHomeRender(state.root);
+  const freshness = home.freshness;
+  home.freshness = '';
+  const html = Home.homeHtml(home);
+  if (html !== painted.home) {
+    const list = state.root.querySelector('[data-t="trip-list"]');
+    const scrollTop = list ? list.scrollTop : 0;
+    state.root.innerHTML = html;
+    painted.home = html;
+    const nextList = state.root.querySelector('[data-t="trip-list"]');
+    if (nextList) nextList.scrollTop = scrollTop;
+    Home.finishHomeRender(state.root);
+  }
+  patchFresh(state.root.querySelector('.hm-fresh .lbl'), freshness);
 }
 
 function leaveDistance() {
@@ -261,6 +291,8 @@ function showBoard(root) {
   state.selection = explicitSelection();
   state.viewRecorded = false;
   state.pastBodies = [];
+  state.seenLive = new Map();
+  state.seenKey = currentKey();
   state.pastExhausted = false;
   state.initialBoardLanding = true;
   loadSelectedCache();
@@ -272,22 +304,58 @@ function showBoard(root) {
   fetchPast(true);
 }
 
-function renderBoard({ addedAbove = false } = {}) {
+function renderBoard({ addedAbove = false, fade = true } = {}) {
   if (state.view !== 'board') return;
-  const saved = Board.preserveTimeline(state.root);
-  state.root.innerHTML = Board.boardHtml({
+  const model = currentModel();
+  const html = Board.boardHtml({
     trip: selectedTrip(),
     direction: state.selection.direction,
-    model: currentModel(),
-    nowMs: now()
+    model,
+    nowMs: now(),
+    freshness: ''
   });
-  if (state.initialBoardLanding) {
-    Board.landAtNow(state.root);
-    state.initialBoardLanding = false;
-  } else {
-    Board.restoreTimeline(state.root, saved, addedAbove);
+  if (html !== painted.board && !(fade && beginDissolve(html, model, addedAbove))) {
+    const saved = Board.preserveTimeline(state.root);
+    state.root.innerHTML = html;
+    painted.board = html;
+    if (state.initialBoardLanding) {
+      Board.landAtNow(state.root);
+      state.initialBoardLanding = false;
+    } else {
+      Board.restoreTimeline(state.root, saved, addedAbove);
+    }
+    wireTimeline();
   }
-  wireTimeline();
+  patchFresh(state.root.querySelector('.sy-fresh .lbl'), Board.freshnessText(model));
+}
+
+/* True while a departing row is fading and the rebuild is deferred. One fade is
+   in flight at a time; anything else that changes meanwhile rebuilds at once. */
+function beginDissolve(html, model, addedAbove) {
+  if (dissolving) {
+    if (html === dissolving.html) return true;
+    clearTimeout(dissolving.timer);
+    dissolving = null;
+    return false;
+  }
+  if (painted.board === null || state.initialBoardLanding) return false;
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+  const kept = new Set(model.futureRows.map((row) => row.key));
+  const leaving = Board.markDeparting(state.root, kept);
+  if (!leaving.length) return false;
+  const pending = { html };
+  const finish = () => {
+    if (dissolving !== pending) return;
+    clearTimeout(pending.timer);
+    dissolving = null;
+    renderBoard({ addedAbove, fade: false });
+  };
+  pending.timer = setTimeout(finish, DISSOLVE_HOLD_MS);
+  leaving[0].addEventListener('transitionend', (ev) => {
+    if (ev.target === leaving[0] && ev.propertyName === 'opacity') finish();
+  });
+  dissolving = pending;
+  return true;
 }
 
 function wireTimeline() {
@@ -419,8 +487,15 @@ function detailRow(model, opts) {
 function renderDetail() {
   const model = detailModel();
   if (!model) { location.hash = '#/'; return; }
-  state.root.innerHTML = Detail.detailHtml(model);
-  clampJourneyBars(state.root);
+  const freshness = model.footer.text;
+  model.footer = { ...model.footer, text: '' };
+  const html = Detail.detailHtml(model);
+  if (html !== painted.detail) {
+    state.root.innerHTML = html;
+    painted.detail = html;
+    clampJourneyBars(state.root);
+  }
+  patchFresh(state.root.querySelector('[data-t="footer"]'), freshness);
 }
 
 function detailAction(action) {
@@ -443,6 +518,8 @@ async function fetchLive() {
       signal: inflight.signal
     });
     if (!onLiveView() || key !== currentKey()) return;
+    if (state.seenKey !== key) { state.seenLive = new Map(); state.seenKey = key; }
+    for (const journey of body.journeys || []) state.seenLive.set(journeyKey(journey), journey);
     state.body = body;
     state.serverStale = serverStale;
     state.offline = false;

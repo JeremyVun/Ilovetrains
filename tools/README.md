@@ -152,12 +152,10 @@ The scrolling regions are the board and its footer, journey detail and its
 closing rule, and the home trip list and its rail. The sweep also rejects any
 focused state that restores the deleted board strip.
 
-One measurement is printed at `console.warn` as `NOTE` instead of failing:
-`past-register` and `past-register-scrolled` each report `provenance
-"TIMETABLE ONLY" overflows the figure column by 24px`, twice — once per
-timetable-only row. It is pre-existing and no comp renders it; the owner rules
-on the column or the word, and until then the sweep stays green with the number
-in plain sight.
+A provenance that overflows the 72px figure column now fails the sweep like any
+other invariant. It was reported as a `NOTE` while `TIMETABLE ONLY` was the one
+word that did not fit; that word left the vocabulary on 2026-09-05 and the
+measurement went back to being an assertion.
 
 The transfer states (`detail-hero`, `detail-tight`, `detail-cancelled`,
 `detail-long`, `detail-departed`, `detail-focused`, `board-focused`,

@@ -4,20 +4,24 @@ import { esc, figureHtml, shortName } from './dom.js';
 import { clock } from './time.js';
 import { journeyDeviceHtml, clampJourneyBars } from './journeybar.js';
 
-export function boardHtml({ trip, direction, model, nowMs = Date.now() }) {
+export function boardHtml({ trip, direction, model, nowMs = Date.now(), freshness }) {
   const from = direction === 'reverse' ? trip.to.name : trip.from.name;
   const to = direction === 'reverse' ? trip.from.name : trip.to.name;
-  const freshness = model.stale ? model.footer.text || 'Offline' : 'Live';
+  const label = freshness === undefined ? freshnessText(model) : freshness;
   const dot = model.footer.dot || 'idle';
   return `<div class="sy-mast">
     <div class="sy-top">
       <button class="sy-home" data-act="home"><span class="g">←</span>Home</button>
-      <span class="sy-fresh"><span class="pulse ${esc(dot)}"></span><span class="lbl">${esc(freshness)}</span></span>
+      <span class="sy-fresh"><span class="pulse ${esc(dot)}"></span><span class="lbl">${esc(label)}</span></span>
     </div>
     <h1 class="sy-h1"><b>${esc(shortName(from))}</b><span class="conn"></span><b>${esc(shortName(to))}</b></h1>
     <div class="sy-hr"></div>
   </div>
   ${timelineHtml(model, nowMs)}`;
+}
+
+export function freshnessText(model) {
+  return model.stale ? model.footer.text || 'Offline' : 'Live';
 }
 
 export function timelineHtml(model, nowMs) {
@@ -100,6 +104,15 @@ export function landAtNow(root) {
   const anchor = root.querySelector('[data-t="now"]');
   if (timeline && anchor) timeline.scrollTop = anchor.offsetTop;
   clampJourneyBars(root);
+}
+
+/* A service that has left is not deleted out from under the eye: it fades
+   where it stood and the timeline closes upward afterwards (ui.md). */
+export function markDeparting(root, keptKeys) {
+  const leaving = [...root.querySelectorAll('.sy-fwd > [data-t="row"]')]
+    .filter((row) => !keptKeys.has(row.dataset.key));
+  leaving.forEach((row) => row.classList.add('departing'));
+  return leaving;
 }
 
 export function preserveTimeline(root) {

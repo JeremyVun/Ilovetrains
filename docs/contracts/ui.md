@@ -44,6 +44,9 @@ substitutes for going back.
   replaces it without layout shift. The selected trip refreshes every 30
   seconds while home, board or detail is visible, pauses while the document is
   hidden, and refreshes immediately when visibility returns.
+- The one-second tick rewrites a view only when that view's markup has changed;
+  the freshness age is patched in place on its own node. A scroll in progress, a
+  selection and keyboard focus therefore survive every tick.
 - The experience bar is a service-worker-controlled warm open with cached rows
   painted in under 500ms and a working-network departures response completed in
   under 2s. `tools/measure-open.js` measures both from the page's Performance
@@ -204,18 +207,23 @@ substitutes for going back.
   applies. Figures beyond 99 minutes use rounded hours with a smaller `H` on
   the numeral's baseline.
 - Clock times are printed in Australia/Sydney regardless of the device's zone.
-- A departed service dissolves before the timeline closes upward. Reduced
-  motion removes the transition; state variants otherwise preserve row
-  geometry.
+- A departed service dissolves before the timeline closes upward, and remains
+  in the past register from the last live estimate the client saw for it rather
+  than waiting for a past page to reach it. Reduced motion removes the
+  transition; state variants otherwise preserve row geometry.
 - The board closes with `— SIX SERVICES SHOWN` when six services are returned
   and `— END OF BOARD` otherwise; a board of three or fewer adds
   `Nothing scheduled after HH:MM.`
 
 ## Past, stale and exceptional data
 
-- A past actuals row may show elapsed time with `AGO`, actual clock times and a
-  delay. A timetable-only past row shows scheduled clock time and `TIMETABLE
-  ONLY`; it shows no elapsed figure, coral warning or punctuality claim.
+- Every past row shows elapsed time with `AGO`. An actuals row counts from the
+  actual departure and may also carry actual clock times, a struck scheduled
+  time and a delay; a timetable-only row counts from the scheduled departure in
+  the quieter scheduled weight and carries no struck time, delay, coral warning
+  or other punctuality claim. A late train whose actuals have aged out therefore
+  reads as having left on time, which the owner chose over a second register for
+  elapsed time (ruling, 2026-09-05).
 - Whether a past row has actuals is decided by its realtime data, never by its
   age or position. Where a live response and past page duplicate a service, the
   live response wins.
@@ -229,9 +237,9 @@ substitutes for going back.
   visible and a cancelled lead names the next train rather than disappearing:
   `<cancelled time> CANCELLED · NEXT TRAIN`.
 - There is no `ON TIME` label. The closed provenance vocabulary is `MIN`,
-  `DEPARTING`, `SCHEDULED`, `CANCELLED`, `n MIN LATE`, `AGO`, `TIMETABLE ONLY`,
-  `TO CHANGE` and `TO GO`. `CANCELLED` and `n MIN LATE` are in the warning
-  colour, because each names an exception. An ordinary live board countdown
+  `DEPARTING`, `SCHEDULED`, `CANCELLED`, `n MIN LATE`, `AGO`, `TO CHANGE` and
+  `TO GO`. `CANCELLED` and `n MIN LATE` are in the warning colour, because each
+  names an exception. An ordinary live board countdown
   leaves the provenance label empty because `min` is already on its numeral;
   other labels appear only when they change the figure's interpretation.
 - A response is fully stale when its `generatedAt` age exceeds 90 seconds, or
@@ -375,10 +383,7 @@ the two header clocks share a baseline to within 1px, which is the tolerance
 the instrument allows; a focused journey still shows its boarding cap and
 pre-departure progress marker before it leaves, so `home-390x844-focused-cxl`
 carries both; `detail-*-tight` shoots a change shortened by a late first leg,
-so its promoted row reads `5 MIN LATE`. One defect is visible and open, not
-accepted: on `board-390x844-past` the provenance `TIMETABLE ONLY` overflows the
-72px figure column by 24px, which the sweep prints as a `NOTE` pending an owner
-ruling on the column or the word.
+so its promoted row reads `5 MIN LATE`.
 
 Client markup carries the data attributes the comps harness probes, so the
 instrument measures the built screen with the probes that judged its comps.
