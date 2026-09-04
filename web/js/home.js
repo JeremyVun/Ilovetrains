@@ -1,7 +1,7 @@
 /* Home and smart-header model. Business rules are pure and kept out of the
    renderer so home/reversal heuristics can be tuned without touching geometry. */
 
-import { esc, shortName, fitStationNames } from './dom.js';
+import { esc, figureHtml, shortName, fitStationNames } from './dom.js';
 import {
   focusExpired, focusOf, directionsModel, focusStatus, journeyCancelled
 } from './focus.js';
@@ -194,7 +194,7 @@ export function homeHtml(model) {
       <span class="hm-fresh"><span class="pulse ${esc(model.dot)}"></span><span class="lbl">${esc(model.freshness)}</span></span>
     </div>
     <section class="hm-hd${String(d.figure).length > 2 ? ' wide' : ''}${d.provenanceWarn ? ' late' : ''}${late ? ' active-late' : ''}" style="${device.vars}" data-active-late="${late}">
-      <span class="hm-fig"><span class="hm-n">${figureHtml(d.figure)}</span><span class="hm-st${d.warn || d.provenanceWarn ? ' warn' : ''}">${esc(d.provenance || '')}</span></span>
+      <span class="hm-fig"><span class="hm-n">${figureHtml(d.figure, 'hm-u')}</span><span class="hm-st${d.warn || d.provenanceWarn ? ' warn' : ''}">${esc(d.provenance || '')}</span></span>
       <span class="hm-ends">
         <span class="hm-e from"><span class="hm-stn" data-fit-box data-fit-name="${esc(d.from)}">${esc(d.from)}</span><span class="hm-t">${esc(d.depTime)}</span></span>
         <span class="hm-e to"><span class="hm-stn" data-fit-box data-fit-name="${esc(d.to)}">${esc(d.to)}</span><span class="hm-t">${esc(d.arrTime)}</span></span>
@@ -235,13 +235,6 @@ function topHtml(model) {
   const name = top.name
     ? `<span data-fit-name="${esc(top.name)}">${esc(top.name)}</span>` : '';
   return `<span class="answer-kind" data-focus-status data-late="false"><span class="answer-line" data-fit-box>${esc(top.lead)}${name}</span></span>`;
-}
-
-function figureHtml(value) {
-  const text = String(value || '');
-  const hours = /^(\d+)H$/.exec(text);
-  if (hours) return `${esc(hours[1])}<span class="hm-u">H</span>`;
-  return /^\d+$/.test(text) ? `${esc(text)}<span class="hm-u">min</span>` : esc(text);
 }
 
 function badge(code) {

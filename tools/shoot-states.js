@@ -685,7 +685,7 @@ function pageScript(state) {
   await sleep(700);
   ` : ''}
 
-  if (t && t.state.onBoard) {
+  if (t && t.onLiveView()) {
     t.state.body = ${JSON.stringify(body)};
     t.state.offline = ${state.offline ? 'true' : 'false'};
     t.state.serverStale = false;

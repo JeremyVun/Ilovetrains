@@ -74,9 +74,9 @@ export function departureMs(journey) {
   return journey ? effective(journey.departure) : null;
 }
 
-function platformOf(place) {
-  const raw = place && place.platform;
-  return raw ? String(raw).replace(/^platform\s+/i, '') : null;
+export function platformNumber(value) {
+  if (!value) return '';
+  return String(value).replace(/^platform\s+/i, '');
 }
 
 function lineCode(leg) {
@@ -88,7 +88,7 @@ function behind(ms, nowMs) {
 }
 
 /** The window between two legs, and the two platforms it is crossed between. */
-function changeBetween(prev, next, nowMs) {
+function changeBetween(prev, next, index, nowMs) {
   const arrMs = effective(prev.arrival);
   const depMs = effective(next.departure);
   const arrScheduled = parseIso((prev.arrival || {}).scheduled);
@@ -105,14 +105,17 @@ function changeBetween(prev, next, nowMs) {
   const shrunk = minutes !== null && printedMin !== null && minutes < printedMin;
 
   return {
+    index,
     station: shortName((prev.to && prev.to.name) || (next.from && next.from.name) || ''),
-    fromPlatform: platformOf(prev.to),
-    toPlatform: platformOf(next.from),
+    fromPlatform: platformNumber(prev.to && prev.to.platform) || null,
+    toPlatform: platformNumber(next.from && next.from.platform) || null,
     minutes,
     printedMin,
     tight: !broken && minutes !== null && (minutes < TIGHT_CHANGE_MIN || shrunk),
     broken,
     done: behind(depMs, nowMs),
+    arrivalMs: arrMs,
+    departureMs: depMs,
     arrTime: arrMs === null ? null : clock(arrMs),
     depTime: depMs === null ? null : clock(depMs)
   };
@@ -143,7 +146,7 @@ function stepsOf(legs, changes, cancelled, nowMs) {
     kind: 'board',
     time: depMs === null ? '—' : clock(depMs),
     station: shortName((first.from && first.from.name) || ''),
-    chip: chip(lineCode(first), platformOf(first.from)),
+    chip: chip(lineCode(first), platformNumber(first.from && first.from.platform) || null),
     label: boardLabel(first),
     tight: false,
     cancelled: cancelled[0] === true,
@@ -171,7 +174,7 @@ function stepsOf(legs, changes, cancelled, nowMs) {
     kind: 'arrive',
     time: arrMs === null ? '—' : clock(arrMs),
     station: shortName((last.to && last.to.name) || ''),
-    chip: chip(lineCode(last), platformOf(last.to)),
+    chip: chip(lineCode(last), platformNumber(last.to && last.to.platform) || null),
     label: 'Arrive' + (finalCancelled ? ' · Journey cancelled' : ''),
     tight: false,
     cancelled: finalCancelled,
@@ -204,7 +207,7 @@ function cancelledSummary(leg) {
 export function journeyDetail(journey, nowMs, opts = {}) {
   const legs = legsOf(journey, opts);
   const changes = [];
-  for (let i = 1; i < legs.length; i++) changes.push(changeBetween(legs[i - 1], legs[i], nowMs));
+  for (let i = 1; i < legs.length; i++) changes.push(changeBetween(legs[i - 1], legs[i], i, nowMs));
 
   // A journey the API cancels without naming a leg is cancelled in all of
   // them, which is what the struck board row already says.
@@ -236,7 +239,7 @@ export function journeyDetail(journey, nowMs, opts = {}) {
     arrival: {
       time: arrTime,
       station: shortName((last.to && last.to.name) || opts.toName || ''),
-      platform: platformOf(last.to),
+      platform: platformNumber(last.to && last.to.platform) || null,
       cancelled: cancelled[legs.length - 1] === true
     }
   };

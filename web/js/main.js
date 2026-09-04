@@ -12,6 +12,7 @@ import {
   directionsModel
 } from './focus.js';
 import * as Board from './board.js';
+import { clampJourneyBars } from './journeybar.js';
 import * as Detail from './detail.js';
 import * as Home from './home.js';
 import { renderSetup } from './setup.js';
@@ -49,9 +50,10 @@ const state = {
   offerDismissed: false,
   coordsBackfillStarted: false
 };
-Object.defineProperty(state, 'onBoard', {
-  get() { return ['home', 'board', 'detail'].includes(state.view); }
-});
+
+function onLiveView() {
+  return ['home', 'board', 'detail'].includes(state.view);
+}
 
 const timers = { tick: null, refresh: null, view: null };
 let inflight = null;
@@ -405,7 +407,7 @@ function renderDetail() {
   const model = detailModel();
   if (!model) { location.hash = '#/'; return; }
   state.root.innerHTML = Detail.detailHtml(model);
-  Board.clampJourneyBars(state.root);
+  clampJourneyBars(state.root);
 }
 
 function detailAction(action) {
@@ -417,7 +419,7 @@ function detailAction(action) {
 }
 
 async function fetchLive() {
-  if (!['home', 'board', 'detail'].includes(state.view) || document.hidden) return;
+  if (!onLiveView() || document.hidden) return;
   const ends = currentLeg();
   const key = currentKey();
   if (inflight) inflight.abort();
@@ -427,7 +429,7 @@ async function fetchLive() {
       limit: LIMIT,
       signal: inflight.signal
     });
-    if (!['home', 'board', 'detail'].includes(state.view) || key !== currentKey()) return;
+    if (!onLiveView() || key !== currentKey()) return;
     state.body = body;
     state.serverStale = serverStale;
     state.offline = false;
@@ -543,7 +545,7 @@ async function backfillCoordinates() {
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { stopTimers(); return; }
-  if (!['home', 'board', 'detail'].includes(state.view)) return;
+  if (!onLiveView()) return;
   startTimers(state.view === 'board');
   fetchLive();
 });
@@ -557,6 +559,7 @@ window.__trains = {
   refresh: fetchLive,
   older: () => fetchPast(false),
   rerender: renderCurrent,
+  onLiveView,
   tick: renderCurrent,
   route
 };
