@@ -101,9 +101,8 @@ geolocation term, location ask).
 Seam contract:
 - `directionsModel(journey, nowMs, opts).tight` is true in every phase while
   a tight change lies ahead; `changes` come from `journeyDetail`.
-  Instruction strings per design.md "Copy"; the builder wires the seams with
-  the recommended candidates and expects a one-sweep string replacement.
-- The riding tight instruction keeps the get-off station and platform.
+  Instruction strings are unchanged (design.md "Copy"); only `tight` and
+  the paint before departure change.
 - Later-leg cancellation after departure: the instruction names the
   cancelled leg's departure clock time and its `from` station; `warn` true;
   the figure keeps counting to the next action (get off / change) rather
