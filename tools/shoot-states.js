@@ -186,6 +186,32 @@ async function states() {
   const tighten = (journeys) => { delayLeg(journeys[0], 0, 5); return journeys; };
   const breakLeg = (journeys) => { cancelLeg(journeys[0], 1); return journeys; };
 
+  /* The lead journey routed Rhodes → Town Hall → Central → Bondi Junction: a
+     declared synthetic seam (the corridor returns no three-leg journey) that
+     is the only way to shoot two attached transfer facts on one row. */
+  const twoChangeBoard = () => {
+    const journeys = transferJourneys();
+    const lead = journeys[0];
+    const at = (hhmm) => ({ scheduled: `2026-09-01T${hhmm}:00+10:00`, estimated: `2026-09-01T${hhmm}:00+10:00` });
+    lead.legDetail[1] = {
+      ...lead.legDetail[1],
+      to: { id: '200060', name: 'Central Station', platform: 'Platform 12' },
+      arrival: at('10:02')
+    };
+    lead.legDetail.push({
+      line: { name: 'T1', mode: 'train' },
+      headsign: 'Bondi Junction',
+      from: { id: '200060', name: 'Central Station', platform: 'Platform 13' },
+      to: { id: '200080', name: 'Bondi Junction Station', platform: 'Platform 2' },
+      departure: at('10:07'),
+      arrival: at('10:22'),
+      cancelled: false
+    });
+    lead.arrival = at('10:22');
+    lead.legs = 3;
+    return journeys;
+  };
+
   /* Sydney Olympic Park → Strathfield → Mount Victoria: a real journey shape
      carrying the longest station names and the longest headsign the board has
      ever had to print. */
@@ -433,6 +459,13 @@ async function states() {
       now: TRANSFER_DEPARTED_NOW,
       generatedAt: '2026-09-01T09:47:00+10:00'
     }),
+
+    /* The C1 transfer states (design.md 30, 32, 34, 36). A tight change is
+       painted on the dwell alone; a cancelled one never is, even when the
+       window is short; two changes are the renderer's plural seam. */
+    transfer('board-tight', tighten(transferJourneys())),
+    transfer('board-cancelled-tight', breakLeg(tighten(transferJourneys()))),
+    transfer('board-two-change', twoChangeBoard()),
 
     { name: 'first-run', seed: doc({ trips: [], hist: [] }), now: NOW, route: '#/setup' },
     {
