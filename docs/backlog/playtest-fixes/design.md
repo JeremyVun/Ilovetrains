@@ -207,10 +207,15 @@ with `AGO`.
 Slot D (loading provenance): empty. Accepted 2026-09-05 as the only honest
 option.
 
-Slot B (tight change before departure), slot B′ (tight change while riding)
-and slot C (later leg cancelled while riding): candidates drafted, verdict
-pending; recorded here when given. Until then the builder wires the seams
-with the recommended candidates and the strings are replaced in one sweep.
+Slot C (later leg cancelled while riding): owner ruling 2026-09-05, "all
+the suggested are too long": the line is `<HH:MM> FROM <STATION> CANCELLED`,
+naming the cancelled leg's departure clock time and its boarding station,
+e.g. `09:58 FROM TOWN HALL CANCELLED`, in the header's uppercase label idiom
+with `warn` set. The top line's `CANCELLED` status is unchanged.
+
+Slot B (tight change before departure) and slot B′ (tight change while
+riding): the owner rejected Codex's receipt line "The timetable allowed
+7 min." (2026-09-05). Instruction verdict pending; recorded here when given.
 
 ## Rejected
 
