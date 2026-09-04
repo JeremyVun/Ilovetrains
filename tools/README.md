@@ -39,8 +39,14 @@ axis geometry) are keyed on data attributes documented in `comps/README.md`,
 and each one has a fixture with a planted defect proving it bites.
 
 The gates are `node --test 'tools/comps/test/*.test.js'` and
-`node tools/comps/test/oracle.js`, which reproduces every calibration exemplar
-in `assets/comps/latest/` pixel-identically from the archived board v2 workshop.
+`node tools/comps/test/oracle.js`, which reproduces the exemplar set
+pixel-identically from the archived board v2 workshop. It reads that set from
+git at `EXEMPLAR_COMMIT` (`b218dd5`), the last commit whose
+`assets/comps/latest/` still *was* the archive's own shots, not from disk: the
+exemplars shipping today are client shots of a later design, so pinning is what
+keeps this a gate on the harness while the product moves on. Both trees come
+out of git, so the oracle needs nothing but the repository. A difference is a
+defect in the harness or in the pin — report it, never widen the threshold.
 
 ## screenshot.js
 
@@ -155,8 +161,12 @@ The transfer states (`detail-hero`, `detail-tight`, `detail-cancelled`,
 `board-cancelled-tight`, `board-two-change`) run on the transfer corridor from
 `web/test/fixture.js`; `detail-direct` runs on the Central → Parramatta board.
 Every `detail-*` state reaches the view by CLICKING a board row, so each one is
-also proof that the whole row is the tap target. Output defaults to the system
-temporary directory; use `--out` only for a deliberate comparison set:
+also proof that the whole row is the tap target — every one except
+`detail-long`, which is **broken**: it declares no `route`, so it opens on home,
+its row click finds nothing, and the rejected `--eval` promise is swallowed (see
+the trap below). It photographs home and checks no invariant. Giving that state
+`route: '#/board'` is the whole fix. Output defaults to the system temporary
+directory; use `--out` only for a deliberate comparison set:
 
 ```
 node tools/shoot-states.js detail-hero detail-direct detail-tight \
@@ -168,6 +178,26 @@ node tools/shoot-states.js detail-hero detail-direct detail-tight \
 the pinned clock *and* `t.state.body.generatedAt` together. Advance only the
 clock and the seeded board is four hours old, so the client correctly withholds
 every figure — a plausible shot of the wrong screen.
+
+**Trap: a state's driving script can fail in silence.** `screenshot.js` awaits
+`--eval` through `Runtime.evaluate`, which returns a rejected promise in its
+*result* rather than raising `Runtime.exceptionThrown`; nothing reads it. A
+throw in a state's `after` therefore skips the rest of the page script —
+including every invariant — and still shoots, exits 0 and prints no warning. A
+green sweep is not proof a state rendered: read the frame.
+
+### Re-shooting `assets/comps/latest/`
+
+The exemplars are `shoot-states.js` frames renamed. One sweep per frame and
+scheme, each with its own `CDP_PORT`, `--out` and a throwaway profile (the
+default); two in parallel roughly halves the wall clock, four do not. The state
+names and the exemplar filenames do not match, and `--prefix` and `--size`
+change the produced filename, not the state, so rename by an explicit table and
+then **read every frame**: a stale `OFFLINE` board or a withheld figure is a
+convincing shot of the wrong screen, and so is the wrong route.
+
+`docs/contracts/ui.md` lists the set; the directory holds it and nothing else,
+so a frame no state can produce is removed rather than left to rot.
 
 The `short-*` states shoot the board at **412x732** — a 412px Android with its
 browser chrome on screen, which is the frame the owner's phone actually gets and
