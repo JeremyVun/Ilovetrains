@@ -166,6 +166,18 @@ Semantics:
   may still shrink in realtime, which the client shows with its tight-change
   treatment. The proxy asks upstream for spare candidates, drops unsafe
   journeys before applying the public `limit`, and never rewrites times.
+- Multi-service journeys also meet a planned connection ceiling, default 60
+  minutes and tunable with `MAX_CONNECTION_TIME` (same duration format; `0`
+  disables it). A journey whose longest planned change exceeds the ceiling is
+  dropped when a later-departing journey that is itself served arrives
+  before that wait would have ended. The rule exists because upstream
+  answers "next departures" one train at a time and never charges for
+  waiting: after a line closes for the night it offers the last train out
+  with a three-hour wait at the change, arriving twenty minutes before the
+  first sane trip of the morning (observed Rhodes → Bondi Junction,
+  2026-09-03). The last train of the night keeps its long change when nothing
+  later arrives in time, and a change under the ceiling is never judged.
+  Dropped before `limit`, like the floor.
 - `generatedAt` is when the data was fetched from TfNSW, not when the response
   was written, so a client can always compute the age of what it is showing.
   It is the fetch time even for a past window, so it is unrelated to `at`: a

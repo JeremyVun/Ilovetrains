@@ -136,11 +136,32 @@ func serveableModes(classes []int) []string {
 // echoed back as requested so the response is a pure function of the query;
 // station names come from the journeys themselves.
 func mapTrip(body []byte, fromID, toID string, limit int, generatedAt time.Time, loc *time.Location) (*DeparturesResponse, error) {
-	return mapTripWithMinimum(body, fromID, toID, limit, generatedAt, loc, DefaultMinimumConnectionTime)
+	return mapTripWithPolicy(body, fromID, toID, limit, generatedAt, loc, defaultConnectionPolicy())
 }
 
-func mapTripWithMinimum(body []byte, fromID, toID string, limit int, generatedAt time.Time,
-	loc *time.Location, minimumConnection time.Duration) (*DeparturesResponse, error) {
+// connectionPolicy bounds the planned change between two services. Zero
+// disables either bound.
+type connectionPolicy struct {
+	Minimum time.Duration
+	Maximum time.Duration
+}
+
+func defaultConnectionPolicy() connectionPolicy {
+	return connectionPolicy{Minimum: DefaultMinimumConnectionTime, Maximum: DefaultMaximumConnectionTime}
+}
+
+// plannedJourney is a mapped journey with the planned times the pruning rules
+// read, so they judge the printed plan the same way the connection floor does.
+type plannedJourney struct {
+	journey       Journey
+	effective     time.Time
+	departure     time.Time
+	arrival       time.Time
+	longestChange time.Duration
+}
+
+func mapTripWithPolicy(body []byte, fromID, toID string, limit int, generatedAt time.Time,
+	loc *time.Location, policy connectionPolicy) (*DeparturesResponse, error) {
 	var raw tripResponse
 	if err := json.Unmarshal(body, &raw); err != nil {
 		return nil, fmt.Errorf("%w: decoding trip: %v", ErrUpstream, err)
@@ -153,11 +174,7 @@ func mapTripWithMinimum(body []byte, fromID, toID string, limit int, generatedAt
 		Journeys:    []Journey{},
 	}
 
-	type sortable struct {
-		journey   Journey
-		effective time.Time
-	}
-	var rows []sortable
+	var rows []plannedJourney
 
 	for _, j := range raw.Journeys {
 		legs, serveable := serviceLegs(j)
@@ -166,7 +183,7 @@ func mapTripWithMinimum(body []byte, fromID, toID string, limit int, generatedAt
 		if !serveable || len(legs) == 0 {
 			continue
 		}
-		if !connectionFloorMet(legs, minimumConnection) {
+		if !connectionFloorMet(legs, policy.Minimum) {
 			continue
 		}
 		first, last := legs[0], legs[len(legs)-1]
@@ -180,7 +197,7 @@ func mapTripWithMinimum(body []byte, fromID, toID string, limit int, generatedAt
 		estArr := realtime(last, last.Destination.ArrivalTimeEstimated)
 
 		mode, _ := modeName(first.Transportation.Product.Class)
-		row := sortable{
+		row := plannedJourney{
 			journey: Journey{
 				Departure: Departure{
 					Scheduled: formatTime(schedDep, loc),
@@ -203,7 +220,10 @@ func mapTripWithMinimum(body []byte, fromID, toID string, limit int, generatedAt
 				Legs:      len(legs),
 				LegDetail: legDetail(legs, loc),
 			},
-			effective: effective(estDep, schedDep),
+			effective:     effective(estDep, schedDep),
+			departure:     schedDep,
+			arrival:       schedArr,
+			longestChange: longestConnection(legs),
 		}
 		rows = append(rows, row)
 
@@ -218,6 +238,7 @@ func mapTripWithMinimum(body []byte, fromID, toID string, limit int, generatedAt
 	sort.SliceStable(rows, func(i, j int) bool {
 		return rows[i].effective.Before(rows[j].effective)
 	})
+	rows = pruneLongWaits(rows, policy.Maximum)
 	for i, row := range rows {
 		if limit > 0 && i >= limit {
 			break
@@ -242,6 +263,50 @@ func connectionFloorMet(legs []leg, minimum time.Duration) bool {
 		}
 	}
 	return true
+}
+
+func longestConnection(legs []leg) time.Duration {
+	var longest time.Duration
+	for i := 1; i < len(legs); i++ {
+		arrival, arrivalOK := parseTime(legs[i-1].Destination.ArrivalTimePlanned)
+		departure, departureOK := parseTime(legs[i].Origin.DepartureTimePlanned)
+		if arrivalOK && departureOK && departure.Sub(arrival) > longest {
+			longest = departure.Sub(arrival)
+		}
+	}
+	return longest
+}
+
+// Upstream never charges for waiting, so after a line closes it offers the
+// last train out with a three-hour change to arrive minutes before the first
+// sane morning trip. Judged latest-first so only surviving journeys count as
+// the better alternative; the last train of the night keeps its long change.
+func pruneLongWaits(rows []plannedJourney, ceiling time.Duration) []plannedJourney {
+	if ceiling <= 0 {
+		return rows
+	}
+	kept := make([]plannedJourney, 0, len(rows))
+	for i := len(rows) - 1; i >= 0; i-- {
+		row := rows[i]
+		if row.longestChange > ceiling && laterArrivesWithin(kept, row) {
+			continue
+		}
+		kept = append(kept, row)
+	}
+	for i, j := 0, len(kept)-1; i < j; i, j = i+1, j-1 {
+		kept[i], kept[j] = kept[j], kept[i]
+	}
+	return kept
+}
+
+func laterArrivesWithin(later []plannedJourney, row plannedJourney) bool {
+	deadline := row.arrival.Add(row.longestChange)
+	for _, candidate := range later {
+		if candidate.departure.After(row.departure) && candidate.arrival.Before(deadline) {
+			return true
+		}
+	}
+	return false
 }
 
 // serviceLegs returns the train/metro legs of a journey, dropping walking

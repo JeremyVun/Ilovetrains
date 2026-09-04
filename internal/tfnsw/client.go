@@ -35,6 +35,10 @@ const (
 	// DefaultMinimumConnectionTime is the planning floor, not a warning
 	// threshold. A journey below it is never offered.
 	DefaultMinimumConnectionTime = 3 * time.Minute
+	// DefaultMaximumConnectionTime is the planning ceiling. A journey whose
+	// change exceeds it is offered only when nothing later arrives before
+	// that wait would have ended; see pruneLongWaits.
+	DefaultMaximumConnectionTime = 60 * time.Minute
 )
 
 // Client talks to the TfNSW Trip Planner. The API key is held only here and is
@@ -45,6 +49,7 @@ type Client struct {
 	AttemptTimeout        time.Duration
 	MaxAttempts           int
 	MinimumConnectionTime time.Duration
+	MaximumConnectionTime time.Duration
 
 	apiKey string
 	loc    *time.Location
@@ -67,6 +72,7 @@ func NewClient(apiKey string) (*Client, error) {
 		AttemptTimeout:        defaultAttemptTimeout,
 		MaxAttempts:           defaultMaxAttempts,
 		MinimumConnectionTime: DefaultMinimumConnectionTime,
+		MaximumConnectionTime: DefaultMaximumConnectionTime,
 		apiKey:                apiKey,
 		loc:                   loc,
 		now:                   time.Now,
@@ -146,7 +152,8 @@ func (c *Client) Departures(ctx context.Context, from, to string, limit int, at 
 	// generatedAt stays the fetch time, not the window: a client must always be
 	// able to compute how old the data it is showing is, including for a past
 	// window whose rows are hours older than the response.
-	resp, err := mapTripWithMinimum(body, from, to, limit, now, c.loc, c.MinimumConnectionTime)
+	policy := connectionPolicy{Minimum: c.MinimumConnectionTime, Maximum: c.MaximumConnectionTime}
+	resp, err := mapTripWithPolicy(body, from, to, limit, now, c.loc, policy)
 	if err != nil {
 		return nil, err
 	}

@@ -858,3 +858,182 @@ func TestJourneyJSONKeepsUnknownValuesExplicitlyNull(t *testing.T) {
 		}
 	}
 }
+
+// service builds one train leg in upstream shape. Times are Sydney local and
+// are converted to the UTC upstream emits.
+func service(t *testing.T, line, from, dep, to, arr string) leg {
+	t.Helper()
+	utc := func(local string) string {
+		parsed, err := time.ParseInLocation("2006-01-02 15:04", local, sydney(t))
+		if err != nil {
+			t.Fatalf("parsing %q: %v", local, err)
+		}
+		return parsed.UTC().Format("2006-01-02T15:04:05Z")
+	}
+	station := func(name string) place {
+		return place{Type: "platform", Name: name + " Station, Platform 1",
+			Parent: &place{Type: "stop", Name: name + " Station"}}
+	}
+	origin, destination := station(from), station(to)
+	origin.DepartureTimePlanned = utc(dep)
+	destination.ArrivalTimePlanned = utc(arr)
+	return leg{
+		Origin:         origin,
+		Destination:    destination,
+		Transportation: &transportation{Number: line, Product: product{Class: classTrain}},
+	}
+}
+
+func tripBody(t *testing.T, journeys ...[]leg) []byte {
+	t.Helper()
+	var raw tripResponse
+	for _, legs := range journeys {
+		raw.Journeys = append(raw.Journeys, journey{Interchanges: len(legs) - 1, Legs: legs})
+	}
+	body, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	return body
+}
+
+// The T4 Bondi Junction branch closed for the night at 21:32 on 2026-09-03.
+// These are the five journeys upstream then offered from Rhodes at 21:16,
+// as served by production: two overnight waits and three morning trips.
+func bondiClosedForTheNight(t *testing.T) []byte {
+	t.Helper()
+	return tripBody(t,
+		[]leg{
+			service(t, "T9", "Rhodes", "2026-09-03 23:54", "Town Hall", "2026-09-04 00:21"),
+			service(t, "T4", "Town Hall", "2026-09-04 04:42", "Bondi Junction", "2026-09-04 04:52"),
+		},
+		[]leg{
+			service(t, "T9", "Rhodes", "2026-09-04 00:31", "Epping", "2026-09-04 00:42"),
+			service(t, "CCN", "Epping", "2026-09-04 04:00", "Redfern", "2026-09-04 04:22"),
+			service(t, "T4", "Redfern", "2026-09-04 04:36", "Bondi Junction", "2026-09-04 04:52"),
+		},
+		[]leg{
+			service(t, "T9", "Rhodes", "2026-09-04 04:24", "Town Hall", "2026-09-04 04:51"),
+			service(t, "T4", "Town Hall", "2026-09-04 05:02", "Bondi Junction", "2026-09-04 05:12"),
+		},
+		[]leg{
+			service(t, "T9", "Rhodes", "2026-09-04 04:39", "Town Hall", "2026-09-04 05:06"),
+			service(t, "T4", "Town Hall", "2026-09-04 05:12", "Bondi Junction", "2026-09-04 05:22"),
+		},
+		[]leg{
+			service(t, "T9", "Rhodes", "2026-09-04 04:54", "Town Hall", "2026-09-04 05:21"),
+			service(t, "T4", "Town Hall", "2026-09-04 05:32", "Bondi Junction", "2026-09-04 05:42"),
+		},
+	)
+}
+
+func departures(resp *DeparturesResponse) []string {
+	var out []string
+	for _, j := range resp.Journeys {
+		out = append(out, j.Departure.Scheduled[11:16])
+	}
+	return out
+}
+
+func TestMapTripPrunesOvernightWaitsWhenLeavingLaterArrivesSooner(t *testing.T) {
+	got, err := mapTrip(bondiClosedForTheNight(t), "213820", "202210", 10,
+		mustParse(t, "2026-09-03T11:16:00Z"), sydney(t))
+	if err != nil {
+		t.Fatalf("mapTrip: %v", err)
+	}
+	want := []string{"04:24", "04:39", "04:54"}
+	if fmt.Sprint(departures(got)) != fmt.Sprint(want) {
+		t.Fatalf("departures = %v, want the morning trips only %v", departures(got), want)
+	}
+}
+
+func TestMapTripKeepsTheLastTrainWithALongChange(t *testing.T) {
+	// A 70-minute change is unpleasant but it is the last way home tonight:
+	// the next journey arrives hours after that wait would have ended.
+	body := tripBody(t,
+		[]leg{
+			service(t, "T9", "Rhodes", "2026-09-03 23:54", "Strathfield", "2026-09-04 00:05"),
+			service(t, "CCN", "Strathfield", "2026-09-04 01:15", "Gosford", "2026-09-04 02:30"),
+		},
+		[]leg{
+			service(t, "T9", "Rhodes", "2026-09-04 04:24", "Strathfield", "2026-09-04 04:35"),
+			service(t, "CCN", "Strathfield", "2026-09-04 04:45", "Gosford", "2026-09-04 06:00"),
+		},
+	)
+	got, err := mapTrip(body, "213820", "2151234", 10, mustParse(t, "2026-09-03T11:16:00Z"), sydney(t))
+	if err != nil {
+		t.Fatalf("mapTrip: %v", err)
+	}
+	want := []string{"23:54", "04:24"}
+	if fmt.Sprint(departures(got)) != fmt.Sprint(want) {
+		t.Fatalf("departures = %v, want both %v", departures(got), want)
+	}
+}
+
+func TestMapTripCeilingDoesNotTouchOrdinaryChanges(t *testing.T) {
+	// A 25-minute change on a sparse timetable is a real choice, not camping,
+	// even though the next journey arrives only 15 minutes later.
+	body := tripBody(t,
+		[]leg{
+			service(t, "T9", "Rhodes", "2026-09-03 22:00", "Central", "2026-09-03 22:30"),
+			service(t, "T4", "Central", "2026-09-03 22:55", "Bondi Junction", "2026-09-03 23:05"),
+		},
+		[]leg{
+			service(t, "T9", "Rhodes", "2026-09-03 22:30", "Central", "2026-09-03 23:00"),
+			service(t, "T4", "Central", "2026-09-03 23:10", "Bondi Junction", "2026-09-03 23:20"),
+		},
+	)
+	got, err := mapTrip(body, "213820", "202210", 10, mustParse(t, "2026-09-03T11:16:00Z"), sydney(t))
+	if err != nil {
+		t.Fatalf("mapTrip: %v", err)
+	}
+	if len(got.Journeys) != 2 {
+		t.Fatalf("departures = %v, want both journeys kept", departures(got))
+	}
+}
+
+func TestMapTripZeroCeilingDisablesPruning(t *testing.T) {
+	policy := connectionPolicy{Minimum: DefaultMinimumConnectionTime}
+	got, err := mapTripWithPolicy(bondiClosedForTheNight(t), "213820", "202210", 10,
+		mustParse(t, "2026-09-03T11:16:00Z"), sydney(t), policy)
+	if err != nil {
+		t.Fatalf("mapTrip: %v", err)
+	}
+	if len(got.Journeys) != 5 {
+		t.Fatalf("departures = %v, want all five with the ceiling off", departures(got))
+	}
+}
+
+func TestMapTripPruningHappensBeforeLimit(t *testing.T) {
+	got, err := mapTrip(bondiClosedForTheNight(t), "213820", "202210", 2,
+		mustParse(t, "2026-09-03T11:16:00Z"), sydney(t))
+	if err != nil {
+		t.Fatalf("mapTrip: %v", err)
+	}
+	want := []string{"04:24", "04:39"}
+	if fmt.Sprint(departures(got)) != fmt.Sprint(want) {
+		t.Fatalf("departures = %v, want %v", departures(got), want)
+	}
+}
+
+func TestMapTripKeepsAnEarlierArrivalWhenTheWaitEqualsTheGap(t *testing.T) {
+	// Connection every 90 minutes, 90-minute wait: leaving later arrives
+	// exactly 90 minutes later. The earlier arrival is still worth having.
+	body := tripBody(t,
+		[]leg{
+			service(t, "T9", "Rhodes", "2026-09-06 08:00", "Central", "2026-09-06 08:30"),
+			service(t, "SHL", "Central", "2026-09-06 10:00", "Moss Vale", "2026-09-06 12:00"),
+		},
+		[]leg{
+			service(t, "T9", "Rhodes", "2026-09-06 09:30", "Central", "2026-09-06 10:00"),
+			service(t, "SHL", "Central", "2026-09-06 11:30", "Moss Vale", "2026-09-06 13:30"),
+		},
+	)
+	got, err := mapTrip(body, "213820", "2577112", 10, mustParse(t, "2026-09-05T21:00:00Z"), sydney(t))
+	if err != nil {
+		t.Fatalf("mapTrip: %v", err)
+	}
+	if len(got.Journeys) != 2 {
+		t.Fatalf("departures = %v, want both journeys kept", departures(got))
+	}
+}

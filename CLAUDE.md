@@ -59,8 +59,8 @@ go run ./cmd/server
 ```
 
 Open http://localhost:8080. Runtime variables are `TFNSW_API_KEY` (required),
-`PORT` (default `8080`), `WEB_DIR` (default `./web`) and
-`MIN_CONNECTION_TIME` (default `3m`).
+`PORT` (default `8080`), `WEB_DIR` (default `./web`),
+`MIN_CONNECTION_TIME` (default `3m`) and `MAX_CONNECTION_TIME` (default `60m`).
 
 Primary test gates:
 

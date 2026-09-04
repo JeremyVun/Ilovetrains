@@ -92,6 +92,17 @@ by payload content, not systemMessages.
   platform change inside one station may have no walking leg at all**
   (verified: Town Hall Platform 3 → Platform 5 is just a gap between two
   service legs), so a client cannot rely on a walk leg to detect a transfer.
+- **Waiting is free to the planner, and the trip count is a maximum, not a
+  promise** (observed 2026-09-03, Rhodes `213820` → Bondi Junction `202210`
+  at 21:16 with buses excluded, the night the T4 branch closed at 21:32).
+  `calcNumberOfTrips=20` returned 5 journeys: the last T9 out at 23:54 with a
+  4 h 21 min wait at Town Hall, the last T9 north at 00:31 with a 3 h 18 min
+  wait at Epping for the first Central Coast train, then the three sane
+  morning trips from 04:24. Each successive journey departs after the
+  previous one and optimises its own arrival; nothing penalises the wait at a
+  change. The server's connection ceiling (`docs/contracts/api.md`) exists
+  for this. Direct pairs asked for 20 and got 4, so a board is short, not
+  padded, once the search crosses into the next service day.
 - Journey shape: `interchanges` (transfer count), `legs[]`. Leg:
   - `origin.departureTimePlanned` / `departureTimeEstimated`,
     `destination.arrivalTimePlanned` / `arrivalTimeEstimated`

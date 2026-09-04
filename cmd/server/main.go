@@ -8,6 +8,9 @@
 //	WEB_DIR         static client directory, default ./web (optional)
 //	TFNSW_BASE_URL  upstream base, default the TfNSW gateway
 //	MIN_CONNECTION_TIME minimum planned transfer, default 3m (Go duration)
+//	MAX_CONNECTION_TIME longest planned transfer offered while a later
+//	                    departure arrives sooner than that wait ends,
+//	                    default 60m (Go duration)
 package main
 
 import (
@@ -58,6 +61,13 @@ func run() error {
 			return errors.New("MIN_CONNECTION_TIME must be a non-negative Go duration")
 		}
 		client.MinimumConnectionTime = minimum
+	}
+	if value := os.Getenv("MAX_CONNECTION_TIME"); value != "" {
+		maximum, parseErr := time.ParseDuration(value)
+		if parseErr != nil || maximum < 0 {
+			return errors.New("MAX_CONNECTION_TIME must be a non-negative Go duration")
+		}
+		client.MaximumConnectionTime = maximum
 	}
 
 	webDir := envOr("WEB_DIR", "./web")
