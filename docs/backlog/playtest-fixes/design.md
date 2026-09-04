@@ -56,8 +56,9 @@ Mechanism: the risk is computed once, before the phase branches, from the
 duplicate computation in focus.js is deleted). `model.tight` is true in every
 phase while the tight change is still ahead (`nowMs < change.departure`).
 The dwell segment paints in the warning colour in every phase. The
-instruction line names the change in every phase; the riding variant keeps
-the get-off station and platform. Copy below.
+instruction strings do not change (owner ruling under "Copy"): before
+departure the line is still the headsign, so the paint alone carries the
+warning there.
 
 ### 2. The whole screen is rebuilt every second (`web/js/main.js`)
 
@@ -213,9 +214,13 @@ naming the cancelled leg's departure clock time and its boarding station,
 e.g. `09:58 FROM TOWN HALL CANCELLED`, in the header's uppercase label idiom
 with `warn` set. The top line's `CANCELLED` status is unchanged.
 
-Slot B (tight change before departure) and slot B′ (tight change while
-riding): the owner rejected Codex's receipt line "The timetable allowed
-7 min." (2026-09-05). Instruction verdict pending; recorded here when given.
+Slot B (tight change): owner ruling 2026-09-05, "Today's copy is fine."
+Every instruction string stays as shipped: the headsign before departure,
+`Get off at <station> · Platform <n>` riding, `Change at <station> ·
+Platform <n>` dwelling, and `Tight change · <n> min · Platform <n>` in place
+of either once the change is tight. The receipt `Printed change was <n>
+min.` stays. Only the paint changes: the dwell segment is warning-coloured
+in every phase, including before departure. Codex's drafts are rejected.
 
 ## Rejected
 
