@@ -37,7 +37,7 @@ Gate: `(cd web && npm test)`, `go test ./...`, `node --test
 'tools/comps/test/*.test.js'`, and `grep -rn "trips.js\|splitFigure\|sameRowSet\|onBoard\|cleanPlatform" web tools` finds nothing. `web/test/sw.test.js`
 passes with the SHELL list one entry shorter.
 
-Done: landed on `main` as one merge.  — [ ]
+Done: landed on `main` as one merge.  — [x] (aabb34d, merged 2026-09-05)
 
 ## Phase 1 — board rendering [2, 3, 4] and hidden scrollbars
 
