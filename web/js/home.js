@@ -162,6 +162,8 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     };
   });
   const over = tripIsOver(activeFocus, nowMs);
+  // A board still in the post is not offline; the pill rests until it answers.
+  const waiting = !body && !opts.offline;
   const status = activeFocus ? focusStatus(activeFocus.journey, {
     activeLeg: directions.activeLeg,
     stale: Boolean(opts.stale),
@@ -178,8 +180,8 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     top: status ? null : topLine(shortName(selectedEnds.from.name),
       distanceKm(opts.fix, selectedEnds.from.location)),
     over,
-    freshness: opts.stale ? 'Offline' : 'Live',
-    dot: opts.stale ? 'stale' : 'live',
+    freshness: waiting ? '' : opts.stale ? 'Offline' : 'Live',
+    dot: waiting ? 'idle' : opts.stale ? 'stale' : 'live',
     askLocation: Boolean(opts.askLocation)
   };
 }

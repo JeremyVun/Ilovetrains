@@ -185,23 +185,33 @@ function showHome(root) {
 /* An already-granted permission is not a prompt: home may use the fix it can
    have without asking for one on open (ui.md, smart home). */
 async function silentFix() {
-  if (state.fix || !navigator.geolocation || !navigator.permissions) return;
-  try {
-    state.geoPermission = (await navigator.permissions.query({ name: 'geolocation' })).state;
-  } catch (_) {
+  if (state.fix) return;
+  state.geoPermission = await geoPermissionState();
+  if (state.geoPermission !== 'granted') {
+    renderHome();
     return;
   }
-  if (state.geoPermission !== 'granted') return;
   navigator.geolocation.getCurrentPosition(applyFix, () => {}, {
     enableHighAccuracy: false, timeout: 8000, maximumAge: FIX_MAX_AGE_MS
   });
 }
 
-/* Asking is a favour, not a habit: a decline is persisted for 30 days and an
-   answered permission needs no panel at all (client-storage.md). */
+async function geoPermissionState() {
+  if (!navigator.geolocation) return 'unavailable';
+  if (!navigator.permissions) return 'prompt';
+  try {
+    return (await navigator.permissions.query({ name: 'geolocation' })).state;
+  } catch (_) {
+    return 'prompt';
+  }
+}
+
+/* Asking is a favour, not a habit: a decline is persisted for 30 days, an
+   answered permission needs no panel at all, and the panel waits until the
+   permission state is known rather than flashing for a tick (client-storage.md). */
 function shouldAskLocation() {
   if (state.doc.trips.length < 2 || state.fix || state.locationDismissed) return false;
-  if (state.geoPermission === 'denied' || state.geoPermission === 'granted') return false;
+  if (state.geoPermission !== 'prompt') return false;
   const declined = Date.parse((state.doc.locationAsk || {}).declinedAt || '');
   return !Number.isFinite(declined) || now() - declined >= LOCATION_ASK_QUIET_MS;
 }

@@ -141,7 +141,13 @@ substitutes for going back.
   around now.`), never that they ride it. Only a persisted ride supports the
   reverse-direction receipt.
 - Location permission is requested contextually, never on first load. Missing
-  or denied location degrades silently to device history and time. `Not now`
+  or denied location degrades silently to device history and time.
+- The panel that asks for location appears only once the permission state is
+  known to be askable; a denied or granted permission never shows it, and it
+  never flashes before the query answers.
+- While the first board for the selected trip is still in the post, the
+  freshness pill is empty with its resting dot, as on the board; `OFFLINE`
+  appears only once a request has failed. `Not now`
   is remembered: the panel stays away for 30 days across reloads, and a
   permission the browser already reports as `granted` or `denied` suppresses
   it entirely.

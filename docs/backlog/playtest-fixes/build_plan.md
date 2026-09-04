@@ -165,7 +165,7 @@ predecessor with `tools/comps/diff.js` so every changed band is named and
 expected. Report per defect: proven fixed, with the instrument that proved
 it.
 
-Done:  — [ ]
+Done:  — [x] (7328d75, merged 2026-09-05; its two deferred findings fixed on main)
 
 ## Phase 6 — header build after the verdict [14]
 

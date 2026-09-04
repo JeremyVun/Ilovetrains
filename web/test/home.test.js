@@ -391,3 +391,10 @@ test('the controller tells home what it predicted, and persists a decline', () =
   assert.ok(branch, 'homeAction still handles the decline');
   assert.match(branch[1], /ctx\.update\(declineLocation\(state\.doc, now\(\)\)\)/);
 });
+
+test('the freshness pill rests while the first board is still in the post', () => {
+  const waiting = homeModel(homeDoc(), HOME_SELECTION, null, at('09:21'), { stale: true, offline: false });
+  assert.deepEqual([waiting.freshness, waiting.dot], ['', 'idle']);
+  const offline = homeModel(homeDoc(), HOME_SELECTION, null, at('09:21'), { stale: true, offline: true });
+  assert.deepEqual([offline.freshness, offline.dot], ['Offline', 'stale']);
+});
