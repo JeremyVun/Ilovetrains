@@ -262,7 +262,10 @@ substitutes for going back.
   leg's colour and the boarding platform numeral in the next leg's colour.
   Platform markers overlay the axis and do not consume its width.
 - Directions count to the next required action and use `TO CHANGE` or `TO GO`.
-  The boarding-platform cap disappears after boarding.
+  The instruction line names the station and platform of that action: while
+  riding, `Get off at <station> · Platform <n>`; while dwelling at a change,
+  `Change at <station> · Platform <n>`. The platform clause is omitted when
+  upstream gives none. The boarding-platform cap disappears after boarding.
 - The progress marker moves continuously from timetable and live estimates. It
   is an inference from time, never a claim of continuous location tracking.
 

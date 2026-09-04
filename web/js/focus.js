@@ -228,7 +228,6 @@ export function directionsModel(value, nowMs, opts = {}) {
     if (next && next.departure !== null && nowMs < next.departure) {
       model.figure = stale ? '' : countdownFigure(minutesUntil(next.departure, nowMs));
       model.provenance = 'TO CHANGE';
-      // Directions name the station you change at, not only the platform.
       model.instruction = `Change at ${next.station}`
         + (next.toPlatform ? ` · Platform ${next.toPlatform}` : '');
       model.activeLeg = next.index;
