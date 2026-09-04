@@ -125,7 +125,7 @@ each state's `expect` block; a new shoot-states state `home-tight-before`
 the dwell segment carries `data-tight-gap="true"` and the instruction names
 the change station.
 
-Done:  — [ ]
+Done:  — [x] (9ff5fa8, merged 2026-09-05)
 
 ## Phase 3 — small disjoint fixes [10, 11, 12]
 
@@ -151,7 +151,7 @@ only, both frames, both schemes, the home scenarios `before`, `leave`,
 owner's browser by the orchestrator. Output: the sheet, `OPTIONS.md`, and a
 report naming the recommendation and the condition under which it flips.
 
-Done when the owner has ruled and the ruling is recorded in `design.md`.  — [ ]
+Done when the owner has ruled and the ruling is recorded in `design.md`.  — [x] (verdict 2026-09-05: 4 · Masthead)
 
 ## Phase 5 — verification wave
 
