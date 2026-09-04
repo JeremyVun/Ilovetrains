@@ -71,6 +71,10 @@ export function locationFactor(fix, origin) {
   return 0.3;
 }
 
+/* A floor so a fix can answer where no history can: 0.01 × 2.5 beats
+   0.01 × 1.0. Any real history dwarfs it. */
+export const PREDICT_FLOOR = 0.01;
+
 export function scoreAll(doc, nowMs, opts = {}) {
   const out = [];
   for (const trip of doc.trips) {
@@ -81,7 +85,7 @@ export function scoreAll(doc, nowMs, opts = {}) {
         tripId: trip.id,
         direction,
         baseScore,
-        score: baseScore * locationFactor(opts.fix, origin),
+        score: (baseScore + PREDICT_FLOOR) * locationFactor(opts.fix, origin),
         distanceKm: distanceKm(opts.fix, origin && origin.location)
       });
     }

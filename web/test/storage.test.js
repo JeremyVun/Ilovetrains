@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import {
   STORAGE_KEY, HISTORY_CAP, TRIPS_CAP, emptyDoc, parseDoc, serializeDoc, cacheKey, leg,
   addTrip, removeTrip, moveTrip, recordView, recordSearch, recordRide, updateStop,
-  putCache, getCache, loadDoc, saveDoc
+  putCache, getCache, loadDoc, saveDoc, declineLocation, LOCATION_ASK_QUIET_MS
 } from '../js/storage.js';
 
 const CENTRAL = { id: '200060', name: 'Central Station' };
@@ -185,4 +185,19 @@ test('completed rides deduplicate on planned departure when realtime changes', (
   doc = recordRide(doc, { tripId: 't1', direction: 'forward' }, refreshed, CENTRAL, PARRA);
   assert.equal(doc.rides.length, 1);
   assert.equal(doc.rides[0].scheduledDeparture, scheduled);
+});
+
+
+test('a declined location ask is remembered, and a malformed one is dropped', () => {
+  const atMs = Date.parse('2026-09-01T09:21:00+10:00');
+  const doc = declineLocation(docWithTrips(), atMs);
+  assert.deepEqual(doc.locationAsk, { declinedAt: '2026-08-31T23:21:00.000Z' });
+  assert.deepEqual(parseDoc(serializeDoc(doc)).locationAsk, doc.locationAsk);
+
+  // Absent means never declined: a document written before this shipped needs
+  // no migration.
+  assert.equal(parseDoc(serializeDoc(docWithTrips())).locationAsk, undefined);
+  assert.equal(parseDoc(JSON.stringify({ locationAsk: { declinedAt: 7 } })).locationAsk, undefined);
+  assert.equal(parseDoc(JSON.stringify({ locationAsk: 'nope' })).locationAsk, undefined);
+  assert.equal(LOCATION_ASK_QUIET_MS, 30 * 86_400_000);
 });

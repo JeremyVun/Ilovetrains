@@ -9,11 +9,12 @@ import { arrivalMs, departureMs, legsOf } from './journey.js';
 import { clock } from './time.js';
 import { journeyDeviceHtml, clampJourneyBars } from './journeybar.js';
 import { cacheKey, leg } from './storage.js';
-import { distanceKm, rankTrips } from './predict.js';
+import { dayTypeMatch, distanceKm, hourProximity, isWeekend, rankTrips } from './predict.js';
 
 const EVENING_START = 16;
 const MORNING_END = 11;
 const HOME_EVIDENCE = 3;
+const RECEIPT_EVIDENCE = 3;
 /* Inside this radius the top line answers "you are here" rather than "how far". */
 const AT_ORIGIN_KM = 0.2;
 
@@ -50,6 +51,22 @@ export function tripIsOver(focus, nowMs) {
   if (!focus) return false;
   const arrival = arrivalMs(focus.journey);
   return arrival !== null && nowMs > arrival;
+}
+
+/* The evidence a view-history receipt is allowed to claim: past views of this
+   very (trip, direction) that the predictor itself counted — same day type,
+   near this hour — and the distinct days they fall on. */
+function viewEvidence(doc, selected, nowMs) {
+  const days = new Set();
+  let events = 0;
+  for (const event of doc.history) {
+    if (event.tripId !== selected.tripId || event.direction !== selected.direction) continue;
+    const t = Date.parse(event.t);
+    if (Number.isNaN(t) || hourProximity(t, nowMs) <= 0 || dayTypeMatch(t, nowMs) !== 1) continue;
+    events += 1;
+    days.add(new Date(t).toDateString());
+  }
+  return { events, days: days.size };
 }
 
 function lastRidden(doc, tripId, nowMs) {
@@ -106,10 +123,14 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     const outbound = (doc.rides || []).filter((ride) => ride.tripId === selectedTrip.id && ride.direction === 'forward').at(-1);
     if (outbound) receipt = `You rode out at ${new Date(outbound.departedAt).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: false })}. Here’s the way back.`;
   }
-  if (!receipt && !activeFocus && !opts.fix && doc.history.length) {
+  if (!receipt && opts.predicted && !activeFocus && !opts.fix && doc.trips.length >= 2) {
+    const evidence = viewEvidence(doc, selected, nowMs);
     // history records qualified board views, not rides, so the receipt says check.
-    receipt = new Date(nowMs).getHours() < 12
-      ? 'You check this trip most weekday mornings.' : 'You often check this trip around now.';
+    if (evidence.events >= RECEIPT_EVIDENCE) {
+      receipt = !isWeekend(nowMs) && new Date(nowMs).getHours() < 12
+        && evidence.days >= RECEIPT_EVIDENCE
+        ? 'You check this trip most weekday mornings.' : 'You often check this trip around now.';
+    }
   }
 
   const directions = journey ? directionsModel(journey, nowMs, {
@@ -123,7 +144,7 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     journey: null,
     from: shortName(selectedEnds.from.name),
     to: shortName(selectedEnds.to.name),
-    depTime: '—', arrTime: '—', figure: '', provenance: 'TIMETABLE ONLY',
+    depTime: '—', arrTime: '—', figure: '', provenance: '',
     phase: 'pre', activeLeg: 0,
     instruction: opts.offline ? 'No saved board for this trip yet' : 'Getting the next trains…',
     progress: { at: 0, phase: 'pre' }, showBoardingPlatform: true, receipt: ''

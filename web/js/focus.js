@@ -126,11 +126,22 @@ export function directionsModel(value, nowMs, opts = {}) {
     : Math.floor(nowMs / 60000) - Math.floor(depMs / 60000);
   const at = depMs === null ? 0 : Math.max(0, Math.min(1, elapsed / total));
   const stale = Boolean(opts.stale);
-  const cancelled = legs.find((leg) => leg.cancelled === true) || (journey && journey.cancelled ? first : null);
+  const cancelledIndex = legs.findIndex((leg) => leg.cancelled === true);
+  const cancelled = cancelledIndex >= 0 ? legs[cancelledIndex]
+    : (journey && journey.cancelled ? first : null);
 
   // Read through journeyDetail so the header, the board row and detail can
   // never disagree about a change window.
   const changes = journeyDetail(journey, nowMs, opts).changes;
+  // Computed before the phase branches: a change still ahead is at risk while
+  // the rider is waiting for the train too, not only once aboard.
+  const risk = changes.find((change) => change.tight
+    && (change.departureMs === null || nowMs < change.departureMs));
+
+  /* The leg that left fine is not the leg that was cancelled: once under way,
+     the header names the cancelled leg instead of offering a next train. */
+  const ridingCancelled = !opts.cancelledTime && cancelledIndex > 0
+    && depMs !== null && arrMs !== null && nowMs >= depMs && nowMs < arrMs;
 
   const model = {
     journey,
@@ -148,14 +159,15 @@ export function directionsModel(value, nowMs, opts = {}) {
     warn: false,
     // Separate from `warn`: a cancellation warns in words, but its connection
     // is not at risk, and only risk may paint the transfer gap (ui.md).
-    tight: false,
+    tight: Boolean(risk),
     provenanceWarn: false,
     receipt: opts.receipt || '',
     changes
   };
 
-  if (opts.cancelledTime || cancelled) {
+  if (!ridingCancelled && (opts.cancelledTime || cancelled)) {
     model.warn = true;
+    model.tight = false;
     model.figure = depMs === null || stale ? '' : countdownFigure(minutesUntil(depMs, nowMs));
     model.provenance = '';
     model.instruction = `${opts.cancelledTime || model.depTime} CANCELLED · NEXT TRAIN`;
@@ -219,16 +231,21 @@ export function directionsModel(value, nowMs, opts = {}) {
   }
   model.phase = phase;
   model.progress = { at, phase };
-  const risk = changes.find((change) => change.tight
-    && (change.departureMs === null || nowMs < change.departureMs));
   if (risk) {
     model.warn = true;
-    model.tight = true;
     model.instruction = `Tight change · ${risk.minutes} min`
       + (risk.toPlatform ? ` · Platform ${risk.toPlatform}` : '');
     if (risk.printedMin !== null && risk.minutes < risk.printedMin) {
       model.receipt = `Printed change was ${risk.printedMin} min.`;
     }
+  }
+  if (ridingCancelled) {
+    const lost = legs[cancelledIndex];
+    const lostDep = effective(lost.departure);
+    model.warn = true;
+    model.tight = false;
+    model.instruction = `${lostDep === null ? '—' : clock(lostDep)} from `
+      + `${shortName((lost.from && lost.from.name) || '')} cancelled`;
   }
   return model;
 }

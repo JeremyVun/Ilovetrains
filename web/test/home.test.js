@@ -241,13 +241,89 @@ test('a saved-trip row opens that trip’s departures and the header is read-onl
   assert.ok(html.includes('<div class="l">My trips</div>'));
 });
 
-test('view-history receipts say check, not ride', () => {
-  const doc = { ...homeDoc(), history: [{ tripId: 't1', direction: 'forward', t: '2026-08-28T09:20:00+10:00' }] };
-  const morning = homeModel(doc, HOME_SELECTION, transferBody(), at('09:21'), {});
-  const afternoon = homeModel(doc, HOME_SELECTION, transferBody(), at('15:21'), {});
+/* A receipt names evidence or it does not appear (ui.md, smart home). */
 
-  assert.equal(morning.directions.receipt, 'You check this trip most weekday mornings.');
-  assert.equal(afternoon.directions.receipt, 'You often check this trip around now.');
+const SECOND_TRIP = {
+  id: 't2',
+  from: { id: '200060', name: 'Central Station' },
+  to: { id: '215020', name: 'Parramatta Station' },
+  createdAt: new Date(0).toISOString()
+};
+
+const views = (times) => times.map((t) => ({ tripId: 't1', direction: 'forward', t }));
+
+function receiptDoc(history, trips = [HOME_TRIP, SECOND_TRIP]) {
+  return { ...emptyDoc(), trips, history };
+}
+
+const receiptOf = (doc, nowMs, opts = {}) =>
+  homeModel(doc, HOME_SELECTION, transferBody(), nowMs, { predicted: true, ...opts })
+    .directions.receipt;
+
+const SATURDAY_0921 = Date.parse('2026-09-05T09:21:00+10:00');
+
+test('a view-history receipt needs three matching views across three days', () => {
+  const doc = receiptDoc(views([
+    '2026-08-27T09:20:00+10:00', '2026-08-28T09:10:00+10:00', '2026-08-31T09:40:00+10:00'
+  ]));
+  assert.equal(receiptOf(doc, at('09:21')), 'You check this trip most weekday mornings.');
+
+  const afternoon = receiptDoc(views([
+    '2026-08-27T15:20:00+10:00', '2026-08-28T15:10:00+10:00', '2026-08-31T15:40:00+10:00'
+  ]));
+  assert.equal(receiptOf(afternoon, at('15:21')), 'You often check this trip around now.');
+
+  // Three views, but all on one morning: no weekly habit to claim.
+  const oneDay = receiptDoc(views([
+    '2026-08-31T09:00:00+10:00', '2026-08-31T09:20:00+10:00', '2026-08-31T09:40:00+10:00'
+  ]));
+  assert.equal(receiptOf(oneDay, at('09:21')), 'You often check this trip around now.');
+});
+
+test('thin or unearned evidence prints no receipt at all', () => {
+  const history = views([
+    '2026-08-27T09:20:00+10:00', '2026-08-28T09:10:00+10:00', '2026-08-31T09:40:00+10:00'
+  ]);
+  const doc = receiptDoc(history);
+
+  assert.equal(receiptOf(doc, at('09:21'), { predicted: false }), '', 'an explicit tap needs no receipt');
+  assert.equal(receiptOf(receiptDoc(history, [HOME_TRIP]), at('09:21')), '',
+    'one saved trip is no leap');
+  assert.equal(receiptOf(receiptDoc(history.slice(0, 2)), at('09:21')), '', 'two views are not a habit');
+  assert.equal(receiptOf(receiptDoc(views(['2026-08-27T14:20:00+10:00',
+    '2026-08-28T14:10:00+10:00', '2026-08-31T14:40:00+10:00'])), at('09:21')), '',
+  'views three hours from now are not evidence about now');
+});
+
+test('a weekday habit is not a Saturday habit', () => {
+  const weekday = receiptDoc(views([
+    '2026-08-27T09:20:00+10:00', '2026-08-28T09:10:00+10:00', '2026-08-31T09:40:00+10:00'
+  ]));
+  assert.equal(receiptOf(weekday, SATURDAY_0921), '');
+
+  const weekend = receiptDoc(views([
+    '2026-08-22T09:20:00+10:00', '2026-08-23T09:10:00+10:00', '2026-08-29T09:40:00+10:00'
+  ]));
+  assert.equal(receiptOf(weekend, SATURDAY_0921), 'You often check this trip around now.');
+});
+
+test('a focused journey and a located user keep the receipt slot for their own copy', () => {
+  const doc = receiptDoc(views([
+    '2026-08-27T09:20:00+10:00', '2026-08-28T09:10:00+10:00', '2026-08-31T09:40:00+10:00'
+  ]));
+  assert.equal(receiptOf(doc, at('09:21'), { fix: { lat: -33.8299, lon: 151.0866 } }), '');
+
+  const focused = { ...doc, focus: {
+    tripId: 't1', direction: 'forward', focusedAt: '2026-09-01T09:21:00+10:00',
+    journey: transferJourneys()[0]
+  } };
+  assert.equal(receiptOf(focused, at('09:21')), '');
+});
+
+test('the first paint claims no provenance it does not have', () => {
+  const model = homeModel({ ...emptyDoc(), trips: [HOME_TRIP] }, HOME_SELECTION, null, at('09:21'), {});
+  assert.equal(model.directions.provenance, '');
+  assert.equal(model.directions.instruction, 'Getting the next trains…');
 });
 
 test('a station name is shortened by rule rather than ellipsised', () => {
@@ -280,4 +356,16 @@ test('a saved-trip row tap selects and routes, and leaves focus alone', () => {
   assert.match(branch[1], /ctx\.go\('#\/board'\)/);
   assert.ok(!/focus/i.test(branch[1]), 'the row tap does not touch focus');
   assert.equal(main.match(/setFocus\(/g).length, 1, 'only journey detail writes focus');
+});
+
+
+/* The three wires home needs from the controller: the receipt may only claim a
+   prediction, and a declined location ask must outlive the page. */
+test('the controller tells home what it predicted, and persists a decline', () => {
+  const main = readFileSync(join(import.meta.dirname, '..', 'js', 'main.js'), 'utf8');
+  const branch = /if \(action === 'skip-location'\) \{([\s\S]*?)\n  \}/.exec(main);
+
+  assert.match(main, /predicted: state\.predicted/);
+  assert.ok(branch, 'homeAction still handles the decline');
+  assert.match(branch[1], /ctx\.update\(declineLocation\(state\.doc, now\(\)\)\)/);
 });

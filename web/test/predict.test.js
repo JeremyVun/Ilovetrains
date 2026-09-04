@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 import {
   predict, scoreCandidate, scoreAll, dayTypeMatch, hourProximity, recencyDecay,
-  distanceKm, locationFactor, rankTrips
+  distanceKm, locationFactor, rankTrips, PREDICT_FLOOR
 } from '../js/predict.js';
 import { emptyDoc, addTrip, recordView } from '../js/storage.js';
 
@@ -167,4 +167,46 @@ test('an explicit trip switch outranks the prediction in the home list', () => {
     selection: { tripId: 'other', direction: 'reverse' }
   });
   assert.deepEqual([ranked[0].trip.id, ranked[0].direction, ranked[0].selected], ['other', 'reverse', true]);
+});
+
+
+/* ---- the location floor (design.md 8) ----------------------------------- */
+
+const LOCATED = trip('home',
+  { ...CENTRAL, location: { lat: -33.8832, lon: 151.2069 } },
+  { ...PARRA, location: { lat: -33.8172, lon: 151.0050 } });
+const AT_PARRA = { lat: -33.8172, lon: 151.0050 };
+
+function locatedDoc(events = []) {
+  return {
+    ...emptyDoc(),
+    trips: [LOCATED],
+    history: events.map(([direction, t]) => ({ tripId: 'home', direction, t: new Date(t).toISOString() }))
+  };
+}
+
+test('standing at the destination with no history, the way back wins on location alone', () => {
+  const scores = Object.fromEntries(scoreAll(locatedDoc(), MON_0800, { fix: AT_PARRA })
+    .map((c) => [c.direction, c.score]));
+
+  assert.ok(Math.abs(scores.reverse - PREDICT_FLOOR * 2.5) < 1e-12);
+  assert.ok(Math.abs(scores.forward - PREDICT_FLOOR * 0.3) < 1e-12);
+  assert.deepEqual(predict(locatedDoc(), MON_0800, { fix: AT_PARRA }),
+    { tripId: 'home', direction: 'reverse' });
+});
+
+test('without a fix the floor is the same everywhere, so lastViewed still answers', () => {
+  const d = { ...doc([], { tripId: 'other', direction: 'reverse' }) };
+  assert.deepEqual(scoreAll(d, MON_0800).map((c) => c.score),
+    [PREDICT_FLOOR, PREDICT_FLOOR, PREDICT_FLOOR, PREDICT_FLOOR]);
+  assert.deepEqual(predict(d, MON_0800), { tripId: 'other', direction: 'reverse' });
+});
+
+test('one real view outweighs the floor even from the wrong end of the line', () => {
+  const d = locatedDoc([['forward', MON_0800 - 86_400_000]]);
+  const scores = Object.fromEntries(scoreAll(d, MON_0800, { fix: AT_PARRA })
+    .map((c) => [c.direction, c.score]));
+
+  assert.ok(scores.forward > scores.reverse, 'history dominates the floor');
+  assert.deepEqual(predict(d, MON_0800, { fix: AT_PARRA }), { tripId: 'home', direction: 'forward' });
 });

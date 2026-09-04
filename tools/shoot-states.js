@@ -464,6 +464,25 @@ async function states() {
       cache: { '200060-215020': departuresBody() },
       expect: { status: 'Running' }
     }),
+    /* The corridor's real four-minute change, read before its train has left:
+       the gap is already painted and the instruction is still the headsign. */
+    home('home-tight-before', transferJourneys(), {
+      now: Date.parse('2026-09-01T10:30:00+10:00'),
+      generatedAt: '2026-09-01T10:30:00+10:00',
+      focus: transferJourneys()[5],
+      expect: { status: 'Running' },
+      after: `
+  {
+    const gap = document.querySelector('.hm-hd [data-tight-gap="true"]');
+    if (!gap) console.error('the tight change is not painted before departure');
+    const sign = document.querySelector('.hm-sign');
+    const said = sign ? sign.textContent.trim() : null;
+    if (said !== 'Gordon via Lindfield') {
+      console.error('the instruction reads "' + said + '", not the headsign');
+    }
+  }
+`
+    }),
     board('on-time', departuresBody()),
     board('past-register', departuresBody(), {
       after: `t.state.pastBodies = [${JSON.stringify(pastBody)}]; t.state.initialBoardLanding = true; t.rerender(); await sleep(80);`

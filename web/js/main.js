@@ -2,7 +2,7 @@
 
 import {
   loadDoc, saveDoc, addTrip, findTrip, leg, cacheKey, putCache, getCache, recordView,
-  recordRide, updateStop, setHome
+  recordRide, updateStop, setHome, declineLocation, LOCATION_ASK_QUIET_MS
 } from './storage.js';
 import { distanceKm, predict } from './predict.js';
 import { boardModel, promotedRow } from './rowmodel.js';
@@ -46,6 +46,7 @@ const state = {
   pastExhausted: false,
   fix: null,
   predicted: false,
+  geoPermission: null,
   locationDismissed: false,
   offerDismissed: false,
   coordsBackfillStarted: false
@@ -166,13 +167,23 @@ function showHome(root) {
 async function silentFix() {
   if (state.fix || !navigator.geolocation || !navigator.permissions) return;
   try {
-    if ((await navigator.permissions.query({ name: 'geolocation' })).state !== 'granted') return;
+    state.geoPermission = (await navigator.permissions.query({ name: 'geolocation' })).state;
   } catch (_) {
     return;
   }
+  if (state.geoPermission !== 'granted') return;
   navigator.geolocation.getCurrentPosition(applyFix, () => {}, {
     enableHighAccuracy: false, timeout: 8000, maximumAge: FIX_MAX_AGE_MS
   });
+}
+
+/* Asking is a favour, not a habit: a decline is persisted for 30 days and an
+   answered permission needs no panel at all (client-storage.md). */
+function shouldAskLocation() {
+  if (state.doc.trips.length < 2 || state.fix || state.locationDismissed) return false;
+  if (state.geoPermission === 'denied' || state.geoPermission === 'granted') return false;
+  const declined = Date.parse((state.doc.locationAsk || {}).declinedAt || '');
+  return !Number.isFinite(declined) || now() - declined >= LOCATION_ASK_QUIET_MS;
 }
 
 function applyFix(position) {
@@ -204,12 +215,13 @@ function currentModel() {
 function renderHome() {
   if (state.view !== 'home') return;
   const model = currentModel();
-  const askLocation = state.doc.trips.length >= 2 && !state.fix && !state.locationDismissed;
+  const askLocation = shouldAskLocation();
   const home = Home.homeModel(state.doc, state.selection, state.body, now(), {
     fix: validFix(),
     stale: model.stale,
     offline: state.offline,
     askLocation,
+    predicted: state.predicted,
     leave: leaveDistance()
   });
   if (state.offerDismissed) {
@@ -314,6 +326,7 @@ function homeAction(action, element) {
   }
   if (action === 'skip-location') {
     state.locationDismissed = true;
+    ctx.update(declineLocation(state.doc, now()));
     renderHome();
     return;
   }
