@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { COLOURS } from '../js/lines.js';
+import { COLOURS, lineColour, lineFill } from '../js/lines.js';
 
 const css = readFileSync(fileURLToPath(new URL('../app.css', import.meta.url)), 'utf8')
   .replace(/\/\*[\s\S]*?\*\//g, ' ');
@@ -114,19 +114,50 @@ test('every line badge is readable as text in the scheme it is printed in', () =
   }
 });
 
+/* A code's fill defaults to its bare-text value; only the light scheme splits
+   them, and only for T1 and BMT (ruling 37). */
+function fillValue(scheme, code) {
+  const raw = scheme['--line-fill-' + code] || dark['--line-fill-' + code];
+  assert.ok(raw, 'app.css declares --line-fill-' + code);
+  const reference = /^var\(\s*(--[\w-]+)\s*\)$/.exec(raw);
+  return reference ? scheme[reference[1]] : raw;
+}
+
+/* The exception the owner accepted with its measurement, not with a waiver. */
+const YELLOW_EXCEPTION = { codes: ['T1', 'BMT'], fill: '#F99D1C', ink: '#FAF9F5', ratio: 2.02 };
+
+function paperRatio(value) {
+  const paper = rgb(light['--bg'], [0, 0, 0]);
+  const [hi, lo] = [luminance(paper), luminance(rgb(value, paper))].sort((a, b) => b - a);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
 /* Owner ruling 2026-09-02, written into ui.md: numerals on a line-colour chip
    are paper in the light scheme, on every line. Ink on the light T4 blue is
    2.66:1 and fails the contract's own 3:1 bar for text on a fill. */
 test('light-scheme chip numerals are paper, and paper clears 3:1 on every line', () => {
   assert.match(css, /@media\s*\(prefers-color-scheme:\s*light\)\s*\{\s*\.sy-cap,\s*\.sy-bar\s+\.sy-p,\s*\.hm-bdg\s*\{\s*color:\s*var\(--bg\)\s*!important/);
 
-  const paper = rgb(light['--bg'], [0, 0, 0]);
   for (const code of Object.keys(COLOURS)) {
-    const fill = rgb(light['--line-' + code], paper);
-    const [hi, lo] = [luminance(paper), luminance(fill)].sort((a, b) => b - a);
-    const measured = (hi + 0.05) / (lo + 0.05);
+    if (YELLOW_EXCEPTION.codes.includes(code)) continue;
+    const measured = paperRatio(fillValue(light, code));
     assert.ok(measured >= 3,
-      `paper on the light --line-${code} is ${measured.toFixed(2)}:1, wanted >= 3`);
+      `paper on the light --line-fill-${code} is ${measured.toFixed(2)}:1, wanted >= 3`);
+  }
+});
+
+/* The pair is asserted exactly, so the accepted exception can only ever be
+   changed on purpose: ruling 37 allows an imperceptible darkening after device
+   evidence, never a return to the brown. */
+test('light T1 and BMT fills are the exact approved yellow, an owner exception at 2.02:1', () => {
+  for (const code of YELLOW_EXCEPTION.codes) {
+    assert.equal(fillValue(light, code).toUpperCase(), YELLOW_EXCEPTION.fill);
+    assert.equal(light['--bg'].toUpperCase(), YELLOW_EXCEPTION.ink);
+    const measured = paperRatio(fillValue(light, code));
+    assert.ok(Math.abs(measured - YELLOW_EXCEPTION.ratio) < 0.01,
+      `the accepted exception measures ${measured.toFixed(2)}:1, recorded as ${YELLOW_EXCEPTION.ratio}:1`);
+    assert.notEqual(fillValue(light, code).toUpperCase(), light['--line-' + code].toUpperCase(),
+      'the fill role is the one that keeps the line identity; bare text stays darkened');
   }
 });
 
@@ -137,14 +168,26 @@ test('lines.js and app.css agree on which lines exist, and on the dark values', 
   const declared = new Set(
     [...css.matchAll(/--line-([\w]+)\s*:/g)].map((m) => m[1])
   );
+  const filled = new Set(
+    [...css.matchAll(/--line-fill-([\w]+)\s*:/g)].map((m) => m[1])
+  );
   for (const [code, value] of Object.entries(COLOURS)) {
     assert.ok(declared.has(code), 'app.css declares --line-' + code);
+    assert.ok(filled.has(code), 'app.css declares --line-fill-' + code);
     assert.equal(dark['--line-' + code].toUpperCase(), value.toUpperCase(),
       `--line-${code} matches lines.js`);
     assert.ok(light['--line-' + code], 'the light scheme prints --line-' + code + ' too');
+    // Dark is one colour twice: the split is a light-scheme fact only.
+    assert.equal(fillValue(dark, code).toUpperCase(), value.toUpperCase(),
+      `--line-fill-${code} is the line colour in the dark scheme`);
+    assert.equal(lineFill(code), `var(--line-fill-${code})`);
+    assert.equal(lineColour(code), `var(--line-${code})`);
   }
   for (const code of declared) {
     assert.ok(code in COLOURS, 'app.css declares no line lines.js has never heard of: ' + code);
+  }
+  for (const code of filled) {
+    assert.ok(code in COLOURS, 'app.css fills no line lines.js has never heard of: ' + code);
   }
 });
 

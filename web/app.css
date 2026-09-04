@@ -23,6 +23,17 @@
   --line-BMT: #F99D1C; --line-CCN: #D11F2F; --line-SCO: #0098CD;
   --line-SHL: #00954C; --line-HUN: #833134;
 
+  /* The second colour role (ruling 37): what a FILLED device is painted, as
+     against the same line used as bare text. Only the light scheme splits them. */
+  --line-fill-T1: var(--line-T1); --line-fill-T2: var(--line-T2);
+  --line-fill-T3: var(--line-T3); --line-fill-T4: var(--line-T4);
+  --line-fill-T5: var(--line-T5); --line-fill-T7: var(--line-T7);
+  --line-fill-T8: var(--line-T8); --line-fill-T9: var(--line-T9);
+  --line-fill-M1: var(--line-M1);
+  --line-fill-BMT: var(--line-BMT); --line-fill-CCN: var(--line-CCN);
+  --line-fill-SCO: var(--line-SCO); --line-fill-SHL: var(--line-SHL);
+  --line-fill-HUN: var(--line-HUN);
+
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
@@ -61,6 +72,10 @@
     --line-M1: #157B7F; /* 4.78 */
     --line-BMT: #A46204; --line-CCN: #D11F2F; --line-SCO: #0079A3;
     --line-SHL: #008041; --line-HUN: #833134; /* 8.12, unchanged */
+
+    /* Ruling 37: paper on this yellow is 2.02:1, an exception the owner accepted
+       because the darkened token above makes T1 look brown and lose its identity. */
+    --line-fill-T1: #F99D1C; --line-fill-BMT: #F99D1C;
   }
 
   /* Antialiasing is the one rule that must NOT carry over. `antialiased`
@@ -454,15 +469,19 @@ button { cursor: pointer; }
 }
 .sy-hr { height: 2px; background: var(--ink); opacity: .82; }
 
+/* Journey detail promotes the same row, so the measure lives on the document
+   rather than on the board's scroller. */
+body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
+
 .sy-tl {
-  flex: 1; min-height: 0; position: relative; padding: 0 22px;
+  flex: 1; min-height: 0; position: relative;
   display: flex; flex-direction: column; overflow-y: auto;
   -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
-  --sy-slots: 6; --sy-anchor: 32px;
+  --sy-anchor: 32px;
 }
 .sy-fwd { flex: none; height: 100%; min-height: 100%; display: flex; flex-direction: column; }
 .sy-fwd.void { height: auto; min-height: 0; }
-.sy-now { flex: none; height: var(--sy-anchor); }
+.sy-now { flex: none; height: var(--sy-anchor); padding: 0 var(--sy-pad); }
 .sy-now .r { height: 2px; background: var(--ink); opacity: .85; }
 .sy-now.top .r { display: none; }
 .sy-now.top .l { padding-top: 9px; }
@@ -470,49 +489,85 @@ button { cursor: pointer; }
   padding: 7px 0 9px; font-size: 11px; font-weight: 600; letter-spacing: .18em;
   text-transform: uppercase; color: var(--ink);
 }
+/* A fixed row, not a share of the frame: stretched rows made three services
+   look like a full page, and a short frame squeezed the sixth instead of
+   scrolling to it. */
 .sy-row {
-  flex: none; align-content: center;
-  height: calc((100% - var(--sy-anchor)) / var(--sy-slots)); min-height: min-content;
-  display: grid; grid-template-columns: 81px 1fr; column-gap: 14px;
-  padding: 0; border-bottom: 1px solid var(--rule); outline-offset: -2px;
+  flex: none; position: relative; min-height: 96px;
+  display: grid; grid-template-columns: var(--sy-fig) minmax(0, 1fr);
+  column-gap: var(--sy-gap); align-items: center;
+  padding: 9px var(--sy-pad) 10px; outline-offset: -2px;
 }
-.sy-fig { grid-column: 1; grid-row: 1 / 4; text-align: left; }
-/* No min-height: the ROW is the 44px tap target, and a floor here drops the
-   stepped-down cancelled row's provenance label 15px below every other one. */
+/* Edge to edge, as a ledger rule (ruling 29): inset borders made each service
+   look like it leaked into the next. */
+.sy-row::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px;
+  height: 1px; background: var(--rule);
+}
+.sy-fig { grid-column: 1; align-self: center; min-width: 0; text-align: right; }
 .sy-fig .sy-n {
   display: block; white-space: nowrap;
-  font-size: 52px; font-weight: 250; letter-spacing: -.045em; line-height: .84; color: var(--ink);
+  font-size: 45px; font-weight: 250; letter-spacing: -.045em; line-height: .84; color: var(--ink);
 }
 .sy-fig .sy-u {
   font-size: .21em; font-weight: 400; letter-spacing: .01em; padding-left: .03em; color: var(--ink-2);
 }
-.sy-row.wide .sy-fig .sy-n { font-size: 40px; }
+.sy-row.wide .sy-fig .sy-n { font-size: 31px; }
 .sy-fig .sy-st {
-  display: block; margin-top: 7px; min-height: 13px; white-space: nowrap;
-  font-size: 10px; font-weight: 600; letter-spacing: .13em; text-transform: uppercase; color: var(--ink-3);
+  display: block; margin-top: 6px; min-height: 12px; white-space: nowrap;
+  font-size: 9px; font-weight: 600; letter-spacing: .13em; text-transform: uppercase; color: var(--ink-3);
 }
 .sy-fig .sy-st.warn { color: var(--warn); }
-.sy-t { grid-column: 2; grid-row: 1; display: flex; align-items: baseline; min-width: 0; }
-.sy-dp { font-size: 20px; font-weight: 400; letter-spacing: -.01em; color: var(--ink); }
-.sy-ar { margin-left: auto; padding-left: 12px; font-size: 17px; font-weight: 300; color: var(--ink-2); }
-.sy-j { grid-column: 2; grid-row: 2; margin-top: 5px; display: flex; align-items: center; height: 24px; min-width: 0; }
-.sy-cap {
-  flex: none; height: 24px; display: flex; align-items: center; padding: 0 9px;
-  border-radius: 3px 0 0 3px; white-space: nowrap; background: var(--stem); color: var(--chipink);
-  font-size: 14px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase;
+.sy-b { grid-column: 2; min-width: 0; }
+.sy-t { display: flex; align-items: baseline; min-width: 0; line-height: 1; }
+.sy-dp { font-size: 18px; font-weight: 300; letter-spacing: -.005em; color: var(--ink); }
+.sy-was {
+  margin-left: 7px; flex: none; font-size: 13px; font-weight: 300; color: var(--ink-3);
+  text-decoration: line-through; text-decoration-thickness: 1.5px;
 }
-.sy-bar { flex: 1; min-width: 0; position: relative; height: 8px; }
+.sy-ar { margin-left: auto; padding-left: 8px; font-size: 16px; font-weight: 300; color: var(--ink-2); }
+.sy-ar.cx { display: flex; align-items: baseline; gap: 7px; color: var(--ink-3); }
+.sy-ar.cx del { text-decoration-thickness: 1.5px; }
+.sy-arx {
+  font-size: 9px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--warn);
+}
+.sy-j { display: flex; align-items: center; height: 22px; margin-top: 6px; min-width: 0; }
+.sy-cap {
+  flex: none; height: 22px; display: flex; align-items: center; padding: 0 7px;
+  border-radius: 3px 0 0 3px; white-space: nowrap; background: var(--stem); color: var(--chipink);
+  font-size: 14px; font-weight: 700; text-transform: uppercase;
+}
+.sy-bar { flex: 1; min-width: 0; position: relative; height: 7px; }
 .sy-bar > span { position: absolute; top: 0; bottom: 0; display: block; }
 .sy-bar .sy-spec { display: none; }
 .sy-bar .sy-g0 { background: var(--rule); }
 .sy-bar .sy-g0.warn { background: var(--warn); }
 .sy-bar .sy-p {
-  top: 50%; transform: translateY(-50%); bottom: auto; height: 24px;
+  top: 50%; transform: translateY(-50%); bottom: auto; height: 22px; z-index: 2;
   display: flex; align-items: center; justify-content: center; padding: 0 5px; min-width: 19px;
-  font-size: 14px; font-weight: 700; letter-spacing: .02em;
+  font-size: 14px; font-weight: 700;
 }
 .sy-bar .sy-p.a { background: var(--stem); color: var(--chipink); border-radius: 0 3px 3px 0; }
 .sy-bar .sy-p.b { background: var(--stem2); color: var(--chipink2); border-radius: 3px 0 0 3px; }
+/* The station you change at, hung off the platform you board from (ruling 30).
+   It overlays the headsign line rather than taking a fourth line from the row. */
+.sy-pstn {
+  position: absolute; top: 26px; right: -4px; min-width: max-content;
+  font-size: 10px; font-weight: 600; line-height: 1; letter-spacing: .06em;
+  text-align: right; text-transform: uppercase; color: var(--ink-2);
+}
+.sy-pstn::before {
+  content: ''; position: absolute; right: 12px; top: -8px; width: 1px; height: 6px; background: var(--ink-3);
+}
+.sy-row.two .sy-pstn[data-transfer-index="1"] { left: 0; right: auto; text-align: left; }
+/* At the real corridor's spacing the two labels abut; the gutter is taken from
+   the first, whose tick keeps its place over the pin. */
+.sy-row.two .sy-pstn[data-transfer-index="0"] { padding-right: 8px; }
+.sy-row.two .sy-pstn[data-transfer-index="1"]::before { left: 8px; right: auto; }
+/* The second alighting numeral is the only fact the row can lose and still say
+   where to get off and what to board. */
+.sy-row.two .sy-bar .sy-p.a[data-transfer-index="1"] { display: none; }
+.sy-row.two .sy-sign { min-width: 56px; }
 .sy-bar .sy-dim { left: 0; background: var(--bg); opacity: .62; }
 .sy-bar .sy-mk { top: -2px; bottom: -2px; width: 8px; margin-left: -4px; background: var(--bg); }
 .sy-bar .sy-mk::after {
@@ -528,34 +583,26 @@ button { cursor: pointer; }
 .sy-bar .sy-mk.ride { --mkc: var(--stem); }
 .sy-bar .sy-mk.dwell, .sy-bar .sy-mk.ride2 { --mkc: var(--stem2); }
 .sy-bar .sy-mk.done { --mkc: var(--ink-3); }
+/* Shrink-wrapped, so a full name is never cut while the row still has width
+   (ruling 34) and an ellipsis marks a real collision with the edge. */
 .sy-sign {
-  grid-column: 2; grid-row: 3; margin-top: 6px; min-width: 0;
-  font-size: 14px; font-weight: 300; line-height: 18px; color: var(--ink-2);
+  width: max-content; max-width: 100%; margin-top: 5px; height: 20px; line-height: 20px;
+  min-width: 0; font-size: 13px; font-weight: 300; color: var(--ink-2);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .sy-sign.note {
   font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
-  color: var(--warn); line-height: 18px;
-}
-.sy-was {
-  margin-left: 8px; flex: none; font-size: 15px; font-weight: 300; color: var(--ink-3);
-  text-decoration: line-through; text-decoration-thickness: 1.5px;
+  color: var(--warn);
 }
 .sy-row.sched .sy-n { color: var(--ink-2); font-weight: 200; }
 .sy-row.late:not(.past) .sy-n, .sy-row.late .sy-dp { color: var(--warn); }
-.sy-row.cx .sy-n { font-size: 34px; color: var(--ink-3); font-weight: 200; }
-.sy-row.cx .sy-u { display: none; }
+.sy-row.cx .sy-n, .sy-row.past .sy-n { color: var(--ink-3); }
 .sy-row.cx .sy-dp { color: var(--ink-3); text-decoration: line-through; text-decoration-thickness: 1.5px; }
-.sy-row.cx .sy-ar, .sy-row.cx .sy-sign { color: var(--ink-3); }
-.sy-row.cx .sy-cap { opacity: .3; }
-.sy-row.cx .sy-bar > span { opacity: .26; }
-.sy-row.past .sy-n, .sy-row.past .sy-dp { color: var(--ink-2); }
-.sy-row.past .sy-u, .sy-row.past .sy-ar, .sy-row.past .sy-sign { color: var(--ink-3); }
-.sy-row.past .sy-j { opacity: .62; }
-.sy-row.past.tt .sy-n { color: var(--ink-3); font-weight: 200; }
-.sy-row.past.tt .sy-j { opacity: .46; }
+.sy-row.cx .sy-sign { color: var(--ink-3); }
+.sy-row.cx .sy-j { opacity: .3; }
+.sy-row.past .sy-b { color: var(--ink-3); }
 .sy-row.past.late .sy-dp { color: var(--warn); }
-.sy-end { flex: none; padding: 20px 0 18px; }
+.sy-end { flex: none; padding: 15px var(--sy-pad) 18px; }
 .sy-end b {
   display: block; white-space: nowrap; font-size: 10px; font-weight: 600;
   letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3);
@@ -616,9 +663,9 @@ button { cursor: pointer; }
 .hm-e.from .hm-t { font-size: var(--dept); font-weight: 400; letter-spacing: -.01em; color: var(--ink); }
 .hm-e.to .hm-t { font-size: var(--arrt); font-weight: 300; color: var(--ink-2); }
 .hm-hd .sy-j { grid-column: 1 / -1; grid-row: 2; margin-top: var(--hdgap); height: var(--jh); }
-.hm-hd .sy-cap { height: var(--caph); font-size: var(--capf); padding: 0 var(--cappad); }
+.hm-hd .sy-cap { height: var(--caph); font-size: var(--capf); padding: 0 var(--cappad); letter-spacing: .02em; }
 .hm-hd .sy-bar { height: var(--barh); }
-.hm-hd .sy-bar .sy-p { height: var(--caph); font-size: var(--capf); padding: 0 7px; min-width: 24px; }
+.hm-hd .sy-bar .sy-p { height: var(--caph); font-size: var(--capf); padding: 0 7px; min-width: 24px; letter-spacing: .02em; }
 .hm-sign {
   grid-column: 1 / -1; grid-row: 3; margin-top: calc(var(--hdgap) - 2px); min-width: 0;
   font-size: var(--signf); font-weight: 300; line-height: 1.3; color: var(--ink-2);
@@ -743,7 +790,8 @@ button { cursor: pointer; }
   .sy-cap, .sy-bar .sy-p, .hm-bdg { color: var(--bg) !important; }
 }
 @media (max-width: 375px) {
-  .sy-mast, .sy-tl, .hm-top, .hm-hd, .hm-offer, .hm-ix, .hm-bar, .hm-ask, .hm-mast, .hm-sheet {
+  body { --sy-pad: 18px; }
+  .sy-mast, .hm-top, .hm-hd, .hm-offer, .hm-ix, .hm-bar, .hm-ask, .hm-mast, .hm-sheet {
     padding-left: 18px; padding-right: 18px;
   }
   .sy-cap { padding-left: 6px; padding-right: 6px; }
@@ -783,8 +831,10 @@ button { cursor: pointer; }
   .dest { font-size: 15px; }
   .ftr { padding: 16px 64px max(22px, env(safe-area-inset-bottom, 0px)); width: 100%; }
   .sy-mast { padding-left: 64px; padding-right: 64px; }
-  .sy-tl { padding-left: 64px; padding-right: 64px; width: 100%; }
-  .sy-row { grid-template-columns: 120px 1fr; column-gap: 24px; }
+  .sy-tl { width: 100%; }
+  body { --sy-pad: 64px; --sy-fig: 120px; --sy-gap: 24px; }
+  .sy-fig .sy-n { font-size: 52px; }
+  .sy-row.wide .sy-fig .sy-n { font-size: 40px; }
   .hm-c { width: 100%; }
   .hm-c .hm-top, .hm-c .hm-hd, .hm-c .hm-offer, .hm-c .hm-ix,
   .hm-c .hm-bar, .hm-c .hm-ask, .hm-c .hm-mast, .hm-c .hm-sheet {

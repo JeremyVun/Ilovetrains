@@ -2,7 +2,6 @@
 
 import { esc, shortName } from './dom.js';
 import { clock } from './time.js';
-import { journeyDetail } from './journey.js';
 import { journeyDeviceHtml, clampJourneyBars } from './journeybar.js';
 import { rowLines } from './rowmodel.js';
 
@@ -28,11 +27,11 @@ export function timelineHtml(model, nowMs) {
   const nowClass = past.length ? '' : ' top';
   const futureClass = future.length ? '' : ' void';
   const empty = model.empty && !past.length;
-  return `<div class="sy-tl tl${empty ? ' empty' : ''}" data-t="timeline">
-    ${past.map(rowHtml).join('')}
+  return `<div class="sy-tl tl${empty ? ' empty' : ''}" data-t="timeline" data-scroller>
+    ${past.map((row) => resultRowHtml(row)).join('')}
     <div class="sy-fwd${futureClass}">
       <div class="sy-now${nowClass}" id="board-now" data-t="now"><div class="r"></div><div class="l">Now · ${esc(clock(nowMs))}</div></div>
-      ${future.map(rowHtml).join('')}
+      ${future.map((row) => resultRowHtml(row)).join('')}
       ${future.length ? endMark(future) : emptyState(model)}
     </div>
   </div>`;
@@ -43,9 +42,11 @@ function emptyState(model) {
 }
 
 function endMark(rows) {
-  if (rows.length > 3) return '';
+  if (rows.length >= 6) return '<div class="sy-end"><b>— Six services shown</b></div>';
   const last = rows[rows.length - 1];
-  return `<div class="sy-end"><b>— End of board</b><span>Nothing scheduled after ${esc(last.depTime)}.</span></div>`;
+  const nothing = rows.length > 3 ? ''
+    : `<span>Nothing scheduled after ${esc(last.depTime)}.</span>`;
+  return `<div class="sy-end"><b>— End of board</b>${nothing}</div>`;
 }
 
 export function emptyCopy(model) {
@@ -68,23 +69,44 @@ export function splitFigure(figure) {
   return hours ? { num: hours[1], unit: hours[2] } : { num: String(figure || ''), unit: '' };
 }
 
-function rowHtml(row) {
-  const detail = journeyDetail(row.journey, row.effectiveMs || Date.now());
-  const tight = detail.changes.some((change) => change.tight);
+/* Journey detail promotes this exact row, so it is rendered here and nowhere else. */
+export function resultRowHtml(row, opts = {}) {
+  const changes = row.changes || [];
   const device = journeyDeviceHtml(row.journey, {
     caps: true,
-    tight,
-    showBoardingPlatform: true
+    showBoardingPlatform: true,
+    changes,
+    stations: true
   });
-  const classes = ['sy-row', row.past ? 'past' : '', row.pastKind === 'actual' ? 'ac' : '',
-    row.pastKind === 'timetable' ? 'tt' : '', row.kind, row.wide ? 'wide' : ''].filter(Boolean).join(' ');
-  const warning = tight ? `Tight change · ${detail.changes[0].minutes} min` : row.note;
-  return `<div class="${classes}" style="${device.vars}" data-t="row" data-svc data-key="${esc(row.key)}" data-match="${esc(row.matchKey)}" data-act="detail" role="button" tabindex="0">
-    <div class="sy-fig"><span class="sy-n">${figureHtml(row)}</span><span class="sy-st${row.provenanceWarn ? ' warn' : ''}">${esc(row.provenance || '')}</span></div>
-    <div class="sy-t"><span class="sy-dp">${esc(row.depTime)}</span>${row.schedTime ? `<del class="sy-was">${esc(row.schedTime)}</del>` : ''}<span class="sy-ar">${esc(row.arrTime || '—')}</span></div>
-    ${device.html}
-    <div class="sy-sign${warning ? ' note' : ''}">${warning ? esc(warning) : esc(row.headsign || '—')}</div>
+  const classes = ['sy-row', changes.length ? 'change' : 'direct',
+    changes.length > 1 ? 'two' : '', changes.some((c) => c.tight) ? 'tight' : '',
+    row.past ? 'past' : '', row.kind, row.wide ? 'wide' : '',
+    opts.promoted ? 'promoted' : ''].filter(Boolean).join(' ');
+  const tap = opts.tappable === false ? ''
+    : ' data-act="detail" role="button" tabindex="0"';
+  return `<div class="${classes}" style="${device.vars}" data-t="row" data-svc data-key="${esc(row.key)}" data-match="${esc(row.matchKey)}"${tap}>
+    <div class="sy-fig" data-figure-column><span class="sy-n">${figureHtml(row)}</span><span class="sy-st${row.provenanceWarn ? ' warn' : ''}">${esc(row.provenance || '')}</span></div>
+    <div class="sy-b">
+      <div class="sy-t"><span class="sy-dp">${esc(row.depTime)}</span>${row.schedTime ? `<del class="sy-was">${esc(row.schedTime)}</del>` : ''}${arrivalHtml(row, opts)}</div>
+      ${device.html}
+      ${signHtml(row)}
+    </div>
   </div>`;
+}
+
+/* Only the promoted row has room to name the cancellation in words; the board
+   already says it in the figure slot. */
+function arrivalHtml(row, opts) {
+  const time = esc(row.arrTime || '—');
+  if (!row.cancelled) return `<span class="sy-ar" data-result-arrival>${time}</span>`;
+  const word = opts.promoted ? '<span class="sy-arx">Cancelled</span>' : '';
+  return `<span class="sy-ar cx" data-result-arrival data-cancelled-final="true"><del>${time}</del>${word}</span>`;
+}
+
+function signHtml(row) {
+  if (row.note) return `<div class="sy-sign note">${esc(row.note)}</div>`;
+  const headsign = row.headsign || '—';
+  return `<div class="sy-sign" data-headsign data-full-headsign="${esc(headsign)}">${esc(headsign)}</div>`;
 }
 
 export function landAtNow(root) {

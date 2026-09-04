@@ -3,9 +3,13 @@ process.env.TZ = 'Australia/Sydney'; // the board is read standing in it
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { boardModel, rowLines, STALE_MS } from '../js/rowmodel.js';
-import { emptyCopy } from '../js/board.js';
+import { emptyCopy, resultRowHtml } from '../js/board.js';
 import { NOW, departuresBody, baseJourneys, journey, delay, cancel } from './fixture.js';
+import { TRANSFER_NOW, transferBody, transferJourneys, cancelLeg, delayLeg } from './fixture.js';
 
 const body = (journeys, generatedAt) => departuresBody({ journeys, generatedAt });
 
@@ -394,4 +398,134 @@ test('the four empty boards are four different sentences', () => {
   const copies = [loading, offline, staleEmpty, fresh].map(emptyCopy);
   assert.equal(new Set(copies).size, 4, 'each nothing says which nothing it is');
   for (const copy of copies) assert.ok(copy.trim().length > 0);
+});
+
+/* --- transfer facts, and the row they are printed on ---------------------- */
+
+/* The renderer's plural seam: the corridor returns no three-leg journey, so the
+   second change at Central is a declared synthetic delta (r6.js S3). */
+function twoChangeJourney() {
+  const j = structuredClone(transferJourneys()[0]);
+  const at = (hhmm) => ({ scheduled: `2026-09-01T${hhmm}:00+10:00`, estimated: `2026-09-01T${hhmm}:00+10:00` });
+  j.legDetail[1] = {
+    ...j.legDetail[1],
+    to: { id: '200060', name: 'Central Station', platform: 'Platform 12' },
+    arrival: at('10:02')
+  };
+  j.legDetail.push({
+    line: { name: 'T1', mode: 'train' },
+    headsign: 'Bondi Junction',
+    from: { id: '200060', name: 'Central Station', platform: 'Platform 13' },
+    to: { id: '200080', name: 'Bondi Junction Station', platform: 'Platform 2' },
+    departure: at('10:07'),
+    arrival: at('10:22'),
+    cancelled: false
+  });
+  j.arrival = at('10:22');
+  j.legs = 3;
+  return j;
+}
+
+test('a row carries each change: the station, both platforms and the window', () => {
+  const m = boardModel(transferBody(), TRANSFER_NOW);
+
+  assert.deepEqual(m.rows[0].changes, [{
+    station: 'Town Hall', fromPlatform: '3', toPlatform: '5',
+    minutes: 7, printed: 7, tight: false, broken: false
+  }]);
+  assert.equal(m.rows[0].changes[0].station, 'Town Hall', 'the station a browsing user needs, without opening detail');
+});
+
+test('two changes are two sets of facts, in travel order', () => {
+  const m = boardModel(transferBody({ journeys: [twoChangeJourney()] }), TRANSFER_NOW);
+
+  assert.deepEqual(m.rows[0].changes.map((c) => [c.station, c.fromPlatform, c.toPlatform, c.minutes]), [
+    ['Town Hall', '3', '5', 7],
+    ['Central', '12', '13', 5]
+  ]);
+});
+
+/* Floored to the printed clock minute, like journey.js: the row and the detail
+   view can never disagree about a window. */
+test('a shortened change is tight on the row, and prints its printed window', () => {
+  const late = delayLeg(transferJourneys()[0], 0, 5);
+  const m = boardModel(transferBody({ journeys: [late] }), TRANSFER_NOW);
+
+  assert.equal(m.rows[0].changes[0].minutes, 2);
+  assert.equal(m.rows[0].changes[0].printed, 7);
+  assert.equal(m.rows[0].changes[0].tight, true);
+});
+
+/* B4: the board used to say the same bad news twice, painting a coral dwell gap
+   under a cancelled row. */
+test('a change beside a cancelled leg is broken and never tight', () => {
+  const broken = cancelLeg(delayLeg(transferJourneys()[0], 0, 5), 1);
+  const m = boardModel(transferBody({ journeys: [broken] }), TRANSFER_NOW);
+
+  assert.equal(m.rows[0].changes[0].broken, true);
+  assert.equal(m.rows[0].changes[0].tight, false);
+  assert.doesNotMatch(resultRowHtml(m.rows[0]), /tight-gap/);
+});
+
+test('a journey cancelled with no leg named still cannot paint a tight change', () => {
+  const cancelled = delayLeg(transferJourneys()[0], 0, 5);
+  cancelled.cancelled = true;
+  const m = boardModel(transferBody({ journeys: [cancelled] }), TRANSFER_NOW);
+
+  assert.equal(m.rows[0].changes[0].tight, false);
+  assert.doesNotMatch(resultRowHtml(m.rows[0]), /tight-gap/);
+});
+
+/* --- the row markup the detail view promotes ------------------------------ */
+
+test('a cancelled row keeps its arrival and strikes it', () => {
+  const cancelled = cancel(structuredClone(baseJourneys()[0]));
+  const m = boardModel(body([cancelled, ...baseJourneys().slice(1)]), NOW);
+  const html = resultRowHtml(m.rows[0]);
+
+  assert.equal(m.rows[0].arrTime, '23:17', 'the arrival is what the next train is judged against');
+  assert.match(html, /data-cancelled-final="true"/);
+  assert.match(html, /<del>23:17<\/del>/);
+  assert.match(html, /class="sy-dp"/);
+  assert.doesNotMatch(html, /sy-arx/, 'the board says CANCELLED in the figure slot, not twice');
+  assert.match(resultRowHtml(m.rows[0], { promoted: true }), /sy-arx/);
+});
+
+/* Ruling 34: round 5 removed the 42% and 20% caps that shortened
+   "Gordon via Lindfield" while the row still had width. */
+test('the headsign is printed whole, and the stylesheet puts no cap on it', () => {
+  const m = boardModel(transferBody(), TRANSFER_NOW);
+  const html = resultRowHtml(m.rows[0]);
+
+  assert.match(html, /data-full-headsign="Gordon via Lindfield"/);
+  assert.match(html, />Gordon via Lindfield</);
+
+  const rule = /\n\.sy-sign\s*\{([^}]*)\}/.exec(
+    readFileSync(fileURLToPath(new URL('../app.css', import.meta.url)), 'utf8'));
+  assert.ok(rule, '.sy-sign is styled');
+  assert.match(rule[1], /max-width:\s*100%/);
+  assert.doesNotMatch(rule[1], /max-width:\s*\d?\d%/, 'no fractional width cap');
+});
+
+test('a two-change row hides one alighting numeral and nothing else', () => {
+  const m = boardModel(transferBody({ journeys: [twoChangeJourney()] }), TRANSFER_NOW);
+  const html = resultRowHtml(m.rows[0]);
+
+  assert.match(html, /class="sy-row change two /);
+  assert.match(html, /data-transfer-station data-transfer-index="0">Town Hall</);
+  assert.match(html, /data-transfer-station data-transfer-index="1">Central</);
+  assert.match(html, /data-pin="b"[^>]*data-transfer-index="1"/);
+  assert.match(html, /data-pin="a"[^>]*data-transfer-index="1"/, 'still rendered; the stylesheet hides it');
+});
+
+test('the row keeps the hooks the client and the instruments drive it by', () => {
+  const m = boardModel(transferBody(), TRANSFER_NOW);
+  const html = resultRowHtml(m.rows[0]);
+
+  for (const hook of ['data-t="row"', 'data-svc', 'data-key=', 'data-match=', 'data-act="detail"',
+    'role="button"', 'tabindex="0"', 'data-axis=', 'data-seg', 'data-headsign', 'data-result-arrival']) {
+    assert.ok(html.includes(hook), 'the row carries ' + hook);
+  }
+  assert.doesNotMatch(resultRowHtml(m.rows[0], { tappable: false }), /data-act/,
+    'the promoted row on detail is not a tap target');
 });

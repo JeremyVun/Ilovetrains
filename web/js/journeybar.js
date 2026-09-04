@@ -4,8 +4,13 @@
 
 import { esc } from './dom.js';
 import { effective, legsOf } from './journey.js';
+import { lineFill } from './lines.js';
 
 const KNOCKOUT = new Set(['T4', 'T5', 'T9', 'CCN', 'HUN']);
+
+function chipInk(code) {
+  return KNOCKOUT.has(code) ? 'var(--ink)' : 'var(--bg)';
+}
 
 export function platformNumber(value) {
   if (!value) return '';
@@ -43,10 +48,13 @@ export function journeyBarSpec(journey, opts = {}) {
 export function journeyVars(spec) {
   const first = spec.legs[0] || {};
   const second = spec.legs[1] || first;
-  const ink = (code) => KNOCKOUT.has(code) ? 'var(--ink)' : 'var(--bg)';
-  return `--stem:var(--line-${esc(first.code || 'T7')});`
-    + `--stem2:var(--line-${esc(second.code || first.code || 'T7')});`
-    + `--chipink:${ink(first.code)};--chipink2:${ink(second.code)};`;
+  return `--stem:${lineFill(first.code || 'T7')};`
+    + `--stem2:${lineFill(second.code || first.code || 'T7')};`
+    + `--chipink:${chipInk(first.code)};--chipink2:${chipInk(second.code)};`;
+}
+
+function changeAt(opts, index) {
+  return Array.isArray(opts.changes) ? opts.changes[index] || null : null;
 }
 
 /** Render every segment by cumulative percentages. Supports any leg count;
@@ -60,16 +68,22 @@ export function journeyBarHtml(spec, opts = {}) {
   spec.legs.forEach((leg, index) => {
     const start = cursor / total * 100;
     const end = (cursor + leg.minutes) / total * 100;
-    html += `<span class="sy-r ${index === 0 ? 'a' : index === 1 ? 'b' : ''} leg-${index}" style="left:${start}%;width:${end - start}%;background:var(--line-${esc(leg.code || 'T7')})"></span>`;
+    html += `<span class="sy-r${index === 0 ? ' a' : index === 1 ? ' b' : ''} leg-${index}" data-seg data-line-code="${esc(leg.code)}" style="left:${start}%;width:${end - start}%;background:${lineFill(leg.code || 'T7')}"></span>`;
     cursor += leg.minutes;
     if (index < spec.legs.length - 1) {
+      const change = changeAt(opts, index);
+      const tight = change ? change.tight === true : Boolean(opts.tight);
       const dwell = spec.dwells[index] || 0;
       const dwellStart = cursor / total * 100;
       const dwellEnd = (cursor + dwell) / total * 100;
-      html += `<span class="sy-g0${opts.tight ? ' warn' : ''}" style="left:${dwellStart}%;width:${dwellEnd - dwellStart}%"></span>`;
+      html += `<span class="sy-g0${tight ? ' warn' : ''}" data-seg data-transfer-gap="${index}"${tight ? ' data-tight-gap="true"' : ''} style="left:${dwellStart}%;width:${dwellEnd - dwellStart}%"></span>`;
       if (opts.caps !== false && leg.toPlatform && spec.legs[index + 1].fromPlatform) {
-        caps += `<span class="sy-p a" style="right:${100 - dwellStart}%">${esc(leg.toPlatform)}</span>`
-          + `<span class="sy-p b" style="left:${dwellEnd}%">${esc(spec.legs[index + 1].fromPlatform)}</span>`;
+        const next = spec.legs[index + 1];
+        const station = opts.stations && change && change.station
+          ? `<span class="sy-pstn" data-transfer-station data-transfer-index="${index}">${esc(change.station)}</span>` : '';
+        const paint = (code) => `background:${lineFill(code || 'T7')};color:${chipInk(code)}`;
+        caps += `<span class="sy-p a" data-pin="a" data-line-code="${esc(leg.code)}" data-transfer-index="${index}" style="right:${100 - dwellStart}%;${paint(leg.code)}">${esc(leg.toPlatform)}</span>`
+          + `<span class="sy-p b" data-pin="b" data-next-platform-marker data-transfer-platform data-line-code="${esc(next.code)}" data-transfer-index="${index}" style="left:${dwellEnd}%;${paint(next.code)}"><span class="sy-pv">${esc(next.fromPlatform)}</span>${station}</span>`;
       }
       cursor += dwell;
     }
@@ -89,11 +103,11 @@ export function journeyDeviceHtml(journey, opts = {}) {
   const spec = journeyBarSpec(journey, opts);
   const first = spec.legs[0] || {};
   const cap = opts.showBoardingPlatform === false || !first.fromPlatform
-    ? '' : `<span class="sy-cap">Platform ${esc(first.fromPlatform)}</span>`;
+    ? '' : `<span class="sy-cap" data-line-code="${esc(first.code)}">Platform ${esc(first.fromPlatform)}</span>`;
   return {
     spec,
     vars: journeyVars(spec),
-    html: `<span class="sy-j">${cap}<span class="sy-bar">${journeyBarHtml(spec, opts)}</span></span>`
+    html: `<span class="sy-j">${cap}<span class="sy-bar" data-axis="${esc(axisSignature(spec))}">${journeyBarHtml(spec, opts)}</span></span>`
   };
 }
 

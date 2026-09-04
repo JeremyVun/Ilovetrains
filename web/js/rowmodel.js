@@ -8,8 +8,8 @@
    past the fold. `rowLines()` is that invariant, written down. */
 
 import { parseIso, clock, minutesUntil, ageLabel, countdownFigure } from './time.js';
-import { lineColour } from './lines.js';
-import { journeyKey } from './journey.js';
+import { lineColour, lineFill } from './lines.js';
+import { journeyDetail, journeyKey } from './journey.js';
 
 /* 30s refresh cadence plus margin: past this, a countdown is a claim the data
    cannot support. */
@@ -18,12 +18,6 @@ const LIVE_DOT_MS = 45_000;
 
 /* The contract copy fits the full label idiom at every supported width. */
 export const CANCELLED_LEAD_NOTE = (time) => time + ' cancelled · next train';
-
-/* Past 99 minutes the figure changes unit rather
-   than growing a third digit. "187" is arithmetically true and unreadable —
-   the clock time beside it already says 03:53 better than three digits do.
-   The rule itself is `countdownFigure` in time.js, shared with the journey
-   detail view and the smart directions header so they can never disagree. */
 
 export function boardModel(body, nowMs, opts = {}) {
   const staleMs = opts.staleMs ?? STALE_MS;
@@ -147,11 +141,8 @@ function journeyRow(journey, nowMs, stale, opts) {
     effectiveMs: effective,
     journey,
     first: false,
-    // Three characters measure 129px in the 86px headline figure column.
-    // Rounded hours remove the three-digit case ("187" is "3H"), but three
-    // characters are still
-    // reachable two ways: "Now", and a service far enough out to round to ten
-    // hours or more ("10H"). The row says so and the stylesheet sizes it down.
+    // "Now" and a rounded "10H" are the two reachable three-character figures;
+    // the stylesheet sizes them down rather than let them leave the column.
     wide: figure.length >= 3,
     cancelled,
     past,
@@ -173,10 +164,27 @@ function journeyRow(journey, nowMs, stale, opts) {
     platform: dep.platform ? String(dep.platform).replace(/^platform\s+/i, '') : null,
     lineCode,
     lineColour: lineColour(lineCode),
+    lineFill: lineFill(lineCode),
     headsign: journey.destinationHeadsign || opts.fallbackHeadsign || '',
     transfers: typeof journey.legs === 'number' && journey.legs > 1,
+    changes: changesOf(journey, nowMs, cancelled),
     note: null
   };
+}
+
+/* Read through `journeyDetail` so a row and the detail view can never disagree
+   about a window. A cancelled service is broken, not tight: colouring its dwell
+   would be the board telling the same bad news twice in two different words. */
+function changesOf(journey, nowMs, cancelled) {
+  return journeyDetail(journey, nowMs).changes.map((change) => ({
+    station: change.station,
+    fromPlatform: change.fromPlatform,
+    toPlatform: change.toPlatform,
+    minutes: change.minutes,
+    printed: change.printedMin,
+    tight: change.tight && !cancelled,
+    broken: change.broken || cancelled
+  }));
 }
 
 /* The lead row carries the colour stem. When the lead is cancelled the board
