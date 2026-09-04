@@ -95,7 +95,7 @@ const TIMING_EVAL = `(async () => {
     apiResponseEndMs: api ? Math.round(api.responseEnd) : null,
     apiFromServiceWorker: api ? Boolean(api.workerStart) : null,
     rowsOnScreen: document.querySelectorAll('[data-t="row"]').length,
-    figures: [...document.querySelectorAll('[data-t="figure"]')].map((e) => e.firstChild && e.firstChild.nodeValue).slice(0, 3)
+    figures: [...document.querySelectorAll('[data-figure-column] .sy-n')].map((e) => e.textContent.trim()).slice(0, 3)
   }));
 })()`;
 
