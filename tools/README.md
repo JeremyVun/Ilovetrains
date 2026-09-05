@@ -154,16 +154,19 @@ block (the status string its top line must read, whether journey detail may
 carry an action rail), so the assertion lives beside the seed that causes it.
 What is checked, with the comp probes the numbers come from:
 
-- three full lines per board row, and a 96px row (100px promoted into detail)
+- three full lines per board row, and a 96px row (at least 100px in detail)
   with its rule drawn edge to edge of a row that is itself edge to edge of the
   region holding it;
-- one figure column everywhere: every row figure and every detail step time
-  ends at `--sy-pad` + `--sy-fig` (22 + 72 on a phone), and they agree with
-  each other;
+- one figure column per view: detail uses 68px, the phone board uses 72px;
+  each row figure and detail step time ends at `--sy-pad` + `--sy-fig`;
 - the figure fits that column, and our own copy is never ellipsised — an
   upstream headsign may be, but only once it has used the whole row;
 - every change on a row names its station and its boarding platform, inside
   the frame;
+- actual text ranges keep transfer names clear of headsigns, boarding markers
+  clear of each other, and step text/chips at least 4px inside their dividers;
+- board endpoint names stay inside their title, and change instructions
+  visibly name the onward line code;
 - the tight window is painted on the dwell segment alone, never on a ride
   segment and never on a cancelled row;
 - journey detail: steps 72px (change steps 82px), 18px between the summary and
@@ -191,6 +194,11 @@ A provenance that overflows the 72px figure column now fails the sweep like any
 other invariant. It was reported as a `NOTE` while `TIMETABLE ONLY` was the one
 word that did not fit; that word left the vocabulary on 2026-09-05 and the
 measurement went back to being an assertion.
+
+`journey-geometry.js` checks text fragments, including wrapped lines. A label
+can fit the viewport and report no horizontal overflow while overlapping a
+headsign or touching the next step's divider; element widths alone do not
+prove those cases. The shooter runs these checks in every seeded state.
 
 The transfer states (`detail-hero`, `detail-tight`, `detail-cancelled`,
 `detail-long`, `detail-departed`, `detail-focused`, `board-focused`,

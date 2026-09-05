@@ -258,6 +258,10 @@ substitutes for going back.
   go to are both readable without opening detail. On a two-change row the
   second station label left-aligns and the second change's alighting pin is
   hidden.
+- Ferry changes and transfers between different stops give the transfer name
+  its own band above the headsign, within the same 96px row. A platform pin
+  clamped against the boarding cap has a 2px ground-colour outline so the two
+  labels remain distinct.
 - A tight change paints the dwell segment of the journey axis in the warning
   colour, and nothing else: never a ride segment, and never on a cancelled row.
   The row does not name the window; journey detail does.
@@ -333,17 +337,22 @@ substitutes for going back.
   warning colour, naming the cancelled leg's departure time and station. The
   summary states no journey duration, because a delay that leaves the arrival
   alone would make the journey read as faster.
-- Under the rule the chosen board row is promoted intact at 100px, in the same
-  grammar and the same figure column it had on the board. It is not a tap
-  target. A cancelled journey's promoted row keeps the board's cancelled
-  treatment.
+- Under the rule the chosen board row keeps the board's grammar, at least
+  100px tall. Detail uses a 68px figure column, shared by the promoted row
+  and step times; the board retains 72px. Transfer labels and headsigns must
+  remain separate and readable, with extra row height when needed. The
+  promoted row is not a tap target. A cancelled journey keeps the board's
+  cancelled treatment.
 - The journey then reads as steps in travel order: a board step, one step per
-  change, an arrive step. Steps are 72px, change steps 82px with a heavy rule
-  above and below. Each states a time, a station and a platform chip in its
+  change, an arrive step. Steps are at least 72px, change steps at least 82px
+  with a heavy rule above and below. Wrapped names and instructions expand
+  the step; text and chips stay at least 4px clear of each divider. Each states a time, a station and a platform chip in its
   line's colour with a label — `BOARD <code> · <headsign>`, then `GET OFF` and
-  `BOARD · <place> <label>` across a change's two chips, then `ARRIVE`, which
+  `BOARD <code> · <headsign>` across a change's two chips, with the complete
+  boarding place, then `ARRIVE`, which
   becomes `ARRIVE · JOURNEY CANCELLED` when the final leg is cancelled. The
-  boarded leg supplies `<place>`, and the full label includes any side.
+  boarded leg supplies the place, and its full label keeps the wharf and side
+  together.
 - Every service leg names its line code and headsign. A cancelled leg stays in
   place and marks the journey broken; the client does not invent or substitute
   a replacement service absent from the API response. The final arrival is

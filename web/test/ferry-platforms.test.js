@@ -49,7 +49,7 @@ test('side-only and named wharves stay visible while their chips use a dash', ()
     focused: false,
     footer: { dot: 'live', text: 'Live' }
   });
-  assert.match(html, /Board · <span class="dside">Side A<\/span>/);
+  assert.match(html, /Board F8 · Balmain · <span class="dside">Side A<\/span>/);
   assert.match(html, /<span class="lbl p">Balmain Wharf<\/span>/);
   assert.doesNotMatch(html, /Wharf Side A|Wharf Balmain Wharf/);
 
@@ -77,4 +77,13 @@ test('a walk between hubs names both endpoints and boards at the second', () => 
 
   const device = journeyDeviceHtml(walkChange, { caps: true, changes: detail.changes, stations: true });
   assert.match(device.html, />Wynyard → Barangaroo Wharf<\/span>/);
+
+  const html = detailHtml({
+    ...detail,
+    row: promotedRow(walkChange, Date.parse('2026-09-05T16:10:00+10:00')),
+    focused: false,
+    footer: { dot: 'live', text: 'Live' }
+  });
+  assert.match(html, /class="sy-row change distinct-stop [^"]*promoted"/);
+  assert.match(html, /Board F4 · Balmain East · Wharf 2, <span class="dside">Side B<\/span>/);
 });

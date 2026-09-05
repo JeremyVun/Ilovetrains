@@ -71,6 +71,8 @@ export function resultRowHtml(row, opts = {}) {
   });
   const classes = ['sy-row', changes.length ? 'change' : 'direct',
     changes.length > 1 ? 'two' : '', changes.some((c) => c.tight) ? 'tight' : '',
+    changes.some((c) => c.fromStation && c.toStation && c.fromStation !== c.toStation) ? 'distinct-stop' : '',
+    changes.some((c) => c.fromPlace === 'Wharf' || c.toPlace === 'Wharf') ? 'ferry-change' : '',
     row.past ? 'past' : '', row.kind, row.wide ? 'wide' : '',
     opts.promoted ? 'promoted' : ''].filter(Boolean).join(' ');
   const tap = opts.tappable === false ? ''

@@ -43,6 +43,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { journeyGeometryProblems } = require('./journey-geometry');
 
 const ROOT = path.resolve(__dirname, '..');
 const DEFAULT_OUT = path.join(os.tmpdir(), 'trains-states');
@@ -1046,12 +1047,16 @@ async function states() {
       after: FIX(-33.861351, 151.210813, Date.parse('2026-09-05T15:43:00+10:00')),
       expect: { status: 'Running', copy: ['Leave now for Wharf 3, Side A'], ferryCodes: ['F1'] }
     }),
+    ferry('ferry-distinct-stop-board', balmainEastBody(), {
+      trip: TRIP_BALMAIN_EAST,
+      expect: { copy: ['Wynyard → Barangaroo'], ferryCodes: ['F4'] }
+    }),
     ferry('ferry-distinct-stop-detail', balmainEastBody(), {
       trip: TRIP_BALMAIN_EAST,
       after: OPEN_ROW(1),
       expect: {
         rail: true,
-        copy: ['Wynyard → Barangaroo', 'Board · Wharf 2, Side B', 'Take this train'],
+        copy: ['Wynyard → Barangaroo', 'Board F4 · Balmain East', 'Wharf 2, Side B', 'Take this train'],
         aria: ['Wharf 2, Side B · F4'],
         ferryCodes: ['F4']
       }
@@ -1079,7 +1084,7 @@ async function states() {
       after: OPEN_ROW(1),
       expect: {
         rail: true,
-        copy: ['arrives 16:07', 'Board · Wharf 3, Side A', 'Take this train'],
+        copy: ['arrives 16:07', 'Board F1 · Manly', 'Wharf 3, Side A', 'Take this train'],
         aria: ['Wharf 3, Side A · F1'],
         ferryCodes: ['F1']
       }
@@ -1090,7 +1095,7 @@ async function states() {
       after: OPEN_ROW(0),
       expect: {
         rail: true,
-        copy: ['arrives 16:00', 'Board · Wharf 2, Side A', 'Take this train'],
+        copy: ['arrives 16:00', 'Board MFF · Manly', 'Wharf 2, Side A', 'Take this train'],
         aria: ['Wharf 2, Side A · MFF'],
         ferryCodes: ['MFF']
       }
@@ -1306,12 +1311,11 @@ function pageScript(state) {
   // The numbers below are the ones docs/contracts/ui.md binds; a state declares
   // what it means in its expect block.
   try {
-    const problems = [];
+    const problems = (${journeyGeometryProblems.toString()})(document);
     const expect = ${JSON.stringify(state.expect || {})};
     const px = (value) => parseFloat(value) || 0;
     const measures = getComputedStyle(document.body);
     const PAD = px(measures.getPropertyValue('--sy-pad'));
-    const FIG = px(measures.getPropertyValue('--sy-fig'));
     const near = (a, b, slack = 0.5) => Math.abs(a - b) <= slack;
     const round = (value) => Math.round(value * 10) / 10;
     const rowEls = [...document.querySelectorAll('[data-t="row"]')];
@@ -1320,15 +1324,16 @@ function pageScript(state) {
     for (const row of rowEls) {
       const box = row.getBoundingClientRect();
       const promoted = row.classList.contains('promoted');
+      const rowFigure = px(getComputedStyle(row).getPropertyValue('--sy-fig'));
 
       // docs/contracts/ui.md, binding: three lines per row, in every state.
       const lines = ['.sy-t', '.sy-j', '.sy-sign'].map((s) => row.querySelector(s));
       if (lines.some((el) => !el || !el.textContent.trim())) problems.push('row is not three full lines');
 
-      // A fixed ledger row, 96px on the board and 100px promoted into detail.
-      // A row that stretches to fill a sparse frame is the defect.
+      // Long transfer instructions may expand a promoted row.
       const height = promoted ? 100 : 96;
-      if (!near(box.height, height)) {
+      const canGrow = promoted && row.classList.contains('change');
+      if (canGrow ? box.height < height - 0.5 : !near(box.height, height)) {
         problems.push('the row is ' + round(box.height) + 'px, not the ledger’s ' + height);
       }
 
@@ -1351,8 +1356,8 @@ function pageScript(state) {
       if (fig) {
         const right = fig.getBoundingClientRect().right;
         figureRights.push(right);
-        if (!near(right, box.left + PAD + FIG)) {
-          problems.push('the figure column ends at ' + round(right) + ', not ' + (box.left + PAD + FIG));
+        if (!near(right, box.left + PAD + rowFigure)) {
+          problems.push('the figure column ends at ' + round(right) + ', not ' + (box.left + PAD + rowFigure));
         }
       }
       // The figure must fit its column: it has no ellipsis and nothing clips
@@ -1417,6 +1422,7 @@ function pageScript(state) {
     if (document.querySelector('.detail-scroll')) {
       for (const step of document.querySelectorAll('[data-t="step"]')) {
         const stepBox = step.getBoundingClientRect();
+        const stepFigure = px(getComputedStyle(step).getPropertyValue('--sy-fig'));
         const wanted = step.classList.contains('change') ? 82 : 72;
         if (stepBox.height < wanted - 0.5) {
           problems.push('a ' + step.dataset.step + ' step is ' + round(stepBox.height) + 'px, not ' + wanted);
@@ -1424,8 +1430,8 @@ function pageScript(state) {
         const time = step.querySelector('.dtime');
         if (time) {
           const right = time.getBoundingClientRect().right;
-          if (!near(right, stepBox.left + FIG)) {
-            problems.push('a step time ends at ' + round(right) + ', not the figure column’s ' + (stepBox.left + FIG));
+          if (!near(right, stepBox.left + stepFigure)) {
+            problems.push('a step time ends at ' + round(right) + ', not the figure column’s ' + (stepBox.left + stepFigure));
           }
           if (figureRights.length && !near(right, figureRights[0])) {
             problems.push('the step times and the promoted row use different figure columns: ' + round(right) + ' vs ' + round(figureRights[0]));

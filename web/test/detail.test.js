@@ -56,7 +56,9 @@ test('every step states a platform chip in its own line colour', () => {
     ['T4', 'var(--line-fill-T4)', 'var(--ink)', '2']
   ]);
   assert.match(html, /Board T9 · Gordon via Lindfield/);
-  assert.match(html, / Get off &nbsp;→&nbsp; /);
+  assert.match(html, /class="dact-unit"><b[^>]*>3<\/b><span>Get off<\/span><\/span>/);
+  assert.match(html, /class="darrow">→<\/span>/);
+  assert.match(html, /class="dact-unit board"><b[^>]*>5<\/b><span class="dact-copy"><span>Board T4 · Bondi Junction · Platform 5<\/span>/);
 });
 
 test('ferry detail keeps the side accessible while its chip stays compact', () => {
@@ -80,7 +82,8 @@ test('ferry detail keeps the side accessible while its chip stays compact', () =
     focused: false,
     footer: { dot: 'live', text: 'Live' }
   });
-  assert.match(mixedHtml, />3<\/b> Board · Wharf 3, <span class="dside">Side A<\/span>/);
+  assert.match(mixedHtml, /class="sy-row change [^"]*ferry-change[^"]*promoted"/);
+  assert.match(mixedHtml, /class="dact-unit board"><b[^>]*>3<\/b><span class="dact-copy"><span>Board F1 · Manly · Wharf 3, <span class="dside">Side A<\/span>/);
 });
 
 test('a tight change is the only step that carries the warning', () => {

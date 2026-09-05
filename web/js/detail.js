@@ -32,13 +32,16 @@ function stepHtml(step) {
     step.cancelled ? 'cancelled' : '', step.done ? 'done' : ''].filter(Boolean).join(' ');
   return `<div class="${classes}" data-t="step" data-step="${esc(step.kind)}">`
     + `<span class="dtime">${esc(step.time)}</span>`
-    + `<span class="dwhat"><strong>${esc(step.station)}</strong><span>${actHtml(step)}</span></span></div>`;
+    + `<span class="dwhat"><strong>${esc(step.station)}</strong>${actHtml(step)}</span></div>`;
 }
 
 function actHtml(step) {
-  if (step.kind !== 'change') return chipHtml(step.chip) + ' ' + esc(step.label);
+  if (step.kind !== 'change') return `<span>${chipHtml(step.chip)} ${esc(step.label)}</span>`;
+  const note = step.label === 'Board' ? '' : `<span class="dchange-note">${esc(step.label)}</span>`;
   const place = step.boardingPlace ? ' · ' + boardingPlaceHtml(step.boardingPlace) : '';
-  return chipHtml(step.off) + ' Get off &nbsp;→&nbsp; ' + chipHtml(step.on) + ' ' + esc(step.label) + place;
+  return `<span class="dchange-act"><span class="dact-unit">${chipHtml(step.off)}<span>Get off</span></span>`
+    + `<span class="darrow">→</span><span class="dact-unit board">${chipHtml(step.on)}`
+    + `<span class="dact-copy">${note}<span>${esc(step.serviceLabel)}${place}</span></span></span></span>`;
 }
 
 function boardingPlaceHtml(value) {

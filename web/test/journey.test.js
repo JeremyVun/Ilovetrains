@@ -37,6 +37,7 @@ test('the journey prints as board, change, arrive in travel order', () => {
     code: 'T4', colourKey: 'T4', platform: '5', location: 'Platform 5', place: 'Platform'
   });
   assert.equal(change.label, 'Board');
+  assert.equal(change.serviceLabel, 'Board T4 · Bondi Junction');
   assert.deepEqual([arrive.time, arrive.station], ['10:08', 'Bondi Junction']);
   assert.deepEqual(arrive.chip, {
     code: 'T4', colourKey: 'T4', platform: '2', location: 'Platform 2', place: 'Platform'

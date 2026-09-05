@@ -160,8 +160,14 @@ button { cursor: pointer; }
 .detail-scroll {
   flex: 1; min-height: 0; overflow-y: auto;
   -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+  --sy-fig: 68px;
 }
 .detail-scroll .sy-row { min-height: 100px; }
+.sy-row.distinct-stop, .sy-row.ferry-change { padding-top: 4px; padding-bottom: 5px; }
+.sy-row.distinct-stop .sy-sign, .sy-row.ferry-change .sy-sign { margin-top: 16px; }
+.sy-row .sy-p[data-clamped="1"] {
+  border-radius: 3px; box-shadow: 0 0 0 2px var(--bg);
+}
 
 .detail-steps { padding: 0 var(--sy-pad); }
 .dstep {
@@ -171,12 +177,22 @@ button { cursor: pointer; }
 .dtime { text-align: right; font-size: 17px; font-weight: 300; color: var(--ink-2); }
 .dwhat { min-width: 0; }
 .dwhat strong { display: block; font-size: 17px; font-weight: 400; color: var(--ink); }
-.dwhat span {
+.dwhat > span {
   display: flex; align-items: center; gap: 7px; margin-top: 5px;
   font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
   color: var(--ink-3);
 }
 .dwhat span.dside { display: inline; margin-top: 0; white-space: nowrap; }
+.dwhat > .dchange-act {
+  display: grid; grid-template-columns: max-content max-content minmax(0, 1fr);
+  align-items: start;
+}
+.dchange-act .dact-unit { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.dchange-act .dact-unit.board { min-width: 0; align-items: start; white-space: normal; }
+.dchange-act .dact-copy { min-width: 0; line-height: 1.35; }
+.dchange-act .dact-copy > span { display: block; }
+.dchange-act .dact-copy .dchange-note { color: inherit; }
+.dchange-act .darrow { padding-top: 4px; }
 .dchip {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 21px; height: 21px; padding: 0 5px; border-radius: 3px;
@@ -185,9 +201,10 @@ button { cursor: pointer; }
 /* The change is bracketed by the masthead's own heavy rule, with its station
    set at the title's step. */
 .dstep.change {
-  min-height: 82px; border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink);
+  min-height: 82px; padding: 10px 0;
+  border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink);
 }
-.dstep.change .dwhat strong { font-size: 22px; font-weight: 300; }
+.dstep.change .dwhat strong { font-size: 22px; font-weight: 300; line-height: 1.15; }
 .dstep.change.tight .dtime, .dstep.change.tight .dwhat span { color: var(--warn); }
 .dstep.cancelled { opacity: .58; }
 .dstep.cancelled .dtime, .dstep.cancelled .dwhat strong { text-decoration: line-through; }
@@ -245,7 +262,9 @@ button { cursor: pointer; }
   display: flex; align-items: center; gap: 13px; margin: 2px 0 9px;
   font-size: 29px; font-weight: 300; letter-spacing: -.025em; line-height: 1.06;
 }
-.sy-h1 b { font-weight: 300; white-space: nowrap; }
+.sy-h1 b { font-weight: 300; }
+.sy-h1 b:first-child { flex: none; white-space: nowrap; }
+.sy-h1 b:last-child { min-width: 0; text-align: right; }
 .sy-h1 .conn { flex: 1; min-width: 14px; height: 1px; background: var(--rule-2); position: relative; }
 .sy-h1 .conn::after {
   content: ''; position: absolute; right: 0; top: -3px;

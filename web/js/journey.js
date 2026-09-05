@@ -217,6 +217,7 @@ function stepsOf(legs, changes, cancelled, nowMs) {
       on: chip(legs[index + 1], change.toLabel),
       // ui.md: a tight change prints its current window and no other.
       label: broken ? 'Cancelled' : tight ? change.minutes + ' min change' : 'Board',
+      serviceLabel: boardLabel(legs[index + 1]),
       boardingPlace: broken ? '' : change.toLabel || '',
       tight,
       cancelled: broken,
