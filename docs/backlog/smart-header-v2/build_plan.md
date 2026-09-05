@@ -245,7 +245,40 @@ the two rows, no lede), and the location-panel paragraph left as is.
 Then `node tools/shoot-states.js` passes on every existing state (no
 regression) before phase 4 adds states.
 
-## Phase 4 — verification wave — DONE marker: `phase 4 done`
+## Phase 4 — verification wave — DONE marker: `phase 4 done` — IN PROGRESS, stopped by the owner 2026-09-05
+
+Progress when stopped (branch `shv2-p4`, worktree `/private/tmp/shv2-p4`):
+
+- Done and committed: fixture station ids corrected against the index
+  (`4f136bf`); a `geo`/`permission` seam in the shooter with the eight new
+  states, and its README notes (`e0f9db8`); four exemplars
+  `home-390x844-inferred.png`, `home-390x844-inferred-light.png`,
+  `home-390x844-just-added.png`, `setup-390x844-origin.png` with the
+  `ui.md` calibration list and the README table updated (`0fde902`).
+- Committed with the progress note, not re-run: the shooter's contrast probe
+  had a vacuous regex (`[\d.]+` lost its backslash inside the page-script
+  template literal), so every contrast check it reported passed without
+  measuring anything. The one-character fix is in; the sweep has NOT been
+  re-run with it and the strip/mark contrast ratios are therefore unverified.
+- Not started: the agent's final report (sweep count, measurement table,
+  defects found, strings not in the copy list, owner verdicts), the
+  `measure-open.js` run or skip note, re-shooting `first-run` if the
+  `Use my location` row changed its frame, the phase 4 done marker.
+- Resume by re-running the full sweep on the branch
+  (`python3 -m http.server <port> --directory web`, private `CDP_PORT`,
+  `node tools/shoot-states.js --url http://localhost:<port>`), reading every
+  new frame, and finishing the list above.
+
+Stack state: phases 0–1 are on `main` (`b0049f2`). Phases 2–4 are on the
+`shv2-p2` → `shv2-p3` → `shv2-p4` stack and NOT on `main`: the merge was
+blocked because another session (the `metro` design session) holds
+uncommitted edits to `docs/contracts/ui.md`, which the merge touches. Merge
+`shv2-p4` into `main` once that file is committed; expect trivial conflicts
+in this file and `design.md` only.
+
+Owner verdicts still open (recorded in `design.md`): `Now` over `AGO` for an
+early arrival; the 23 out-of-NSW terminals in the index; the real-phone
+`coords.speed` check.
 
 Phase 0 and 3 handoff (2026-09-05), binding for this phase:
 

@@ -1203,7 +1203,7 @@ function pageScript(state) {
     /* The smart header's own furniture. The numbers are the comps round's
        measurements (docs/backlog/smart-header-v2, OPTIONS-r1.md section 2). */
     const light = matchMedia('(prefers-color-scheme: light)').matches;
-    const channels = (value) => (String(value).match(/[\d.]+/g) || []).map(Number);
+    const channels = (value) => (String(value).match(/[\\d.]+/g) || []).map(Number);
     const luminance = (rgb) => {
       const linear = (v) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
       return 0.2126 * linear(rgb[0]) + 0.7152 * linear(rgb[1]) + 0.0722 * linear(rgb[2]);
