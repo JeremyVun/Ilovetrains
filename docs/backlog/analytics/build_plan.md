@@ -133,9 +133,13 @@ Seam, in `main.js`:
   `analytics = createAnalytics({enabled: isEnabled({hostname:
   location.hostname, gpc: navigator.globalPrivacyControl, dnt:
   navigator.doNotTrack, storage: localStorage}), storage: localStorage,
-  fetchFn: fetch, beacon: navigator.sendBeacon?.bind(navigator),
-  schedule: idle-deferred 10 s, getDoc: () => state.doc})`, then
-  `install(analytics)`. Exposed as `window.__trains.analytics` (its
+  fetchFn: fetch, schedule: idle-deferred 10 s, getDoc: () =>
+  state.doc})`, then `install(analytics)`. Omit `beacon`: as built, the
+  module's default beacon is a guarded `navigator.sendBeacon` sending a
+  `text/plain` Blob, and a bound `sendBeacon` would post a raw string
+  instead. As built, `queue` on the instance is a function that re-reads
+  storage, `schedule` is armed only when enabled, and `variant` returns
+  `null` for an unknown experiment id. Exposed as `window.__trains.analytics` (its
   `events` ledger is what the shooter reads).
 - Client state gains `headerKind` (null until home shows an answer),
   `lastShown` (a string `${kind}:${tripId}:${direction}`), `tapped`

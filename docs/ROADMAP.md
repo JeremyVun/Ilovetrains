@@ -60,7 +60,9 @@ journeys, and a three-vote home inference. Candidate work, all to be judged
 by whether the header answers the user's real intent more often:
 - **Measure before tuning.** Record, on the device only, whether the
   header's pick was the trip the user then acted on (tapped, focused) or
-  corrected away from. Without a hit rate, tuning is guessing.
+  corrected away from. Without a hit rate, tuning is guessing. Opened as
+  `docs/backlog/analytics/` (owner, 2026-09-05): analytics and A/B testing
+  from the start, first experiment the inferred travel-mode strip.
 - **Better signals over harder guessing**: use the time of the last ride
   and the trip's own duration to judge "trip over" and "on the way back";
   weekday/weekend and public-holiday awareness; a walking-distance term that
@@ -169,4 +171,10 @@ detection via background location, notifications. OS-rendered artifacts
   of *looks*, not rides, and must be named as whatever it really measures.
   Needs ride detection first (M8); the PWA cannot observe it today.
 - General A→B trip planner.
-- Other modes: bus, ferry, light rail.
+- Other modes: bus, ferry, light rail. Metro is not one of them: product
+  class 2 has been served beside class 1 since M1, including train+metro
+  changes, and the owner closed a metro item as already built (2026-09-05;
+  the copy ruling is in `docs/contracts/ui.md`). Metro loose ends worth a
+  live probe when a key is at hand: the only metro fixture answered three
+  journeys when asked for six on a ten-minute headway, and no metro-only
+  station has been searched live.
