@@ -7,6 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import vm from 'node:vm';
 
 const WEB = path.resolve(import.meta.dirname, '..');
 const source = fs.readFileSync(path.join(WEB, 'sw.js'), 'utf8');
@@ -16,6 +17,38 @@ function shellList() {
   assert.ok(block, 'sw.js must declare `const SHELL = [...]`');
   return [...block[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
 }
+
+test('a new worker reloads every shell asset before taking over', async () => {
+  const handlers = new Map();
+  let requests;
+  let finishDownload;
+  let tookOver = false;
+  const downloaded = new Promise((resolve) => { finishDownload = resolve; });
+  const origin = 'https://ilovetrains.jeremyvun.com';
+  vm.runInNewContext(source, {
+    Request: class extends Request {
+      constructor(url, options) { super(new URL(url, origin), options); }
+    },
+    self: {
+      addEventListener: (name, handler) => handlers.set(name, handler),
+      skipWaiting: () => { tookOver = true; }
+    },
+    caches: { open: async () => ({ addAll: (items) => { requests = items; return downloaded; } }) }
+  });
+  let installing;
+  handlers.get('install')({ waitUntil: (work) => { installing = work; } });
+  await Promise.resolve();
+  assert.equal(tookOver, false);
+  assert.equal(requests.length, shellList().length);
+  for (const request of requests) {
+    assert.ok(request instanceof Request);
+    assert.equal(request.cache, 'reload', request.url);
+  }
+  assert.deepEqual(Array.from(requests, (request) => new URL(request.url).pathname), shellList());
+  finishDownload();
+  await installing;
+  assert.equal(tookOver, true);
+});
 
 test('precache requests are unique so cache.addAll can install atomically', () => {
   const shell = shellList();

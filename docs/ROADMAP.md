@@ -69,11 +69,11 @@ the destination before daily home votes, and movement can infer travel on
 the last shown departure. Without a nearby station, the original history
 score and location term still apply. Candidate work is judged by whether
 the header answers the user's real intent more often:
-- **Measure before tuning.** Record, on the device only, whether the
-  header's pick was the trip the user then acted on (tapped, focused) or
-  corrected away from. Without a hit rate, tuning is guessing. Opened as
-  `docs/backlog/analytics/` (owner, 2026-09-05): analytics and A/B testing
-  from the start, first experiment the inferred travel-mode strip.
+- **Measure before tuning — shipped.** Anonymous counters record the
+  header's answer kind and whether it was acted on or corrected. Usage
+  bands replace device identifiers; the inferred strip compares A3 below
+  the rule with A2 in the receipt slot. Vocabulary and measurement limits
+  are in `docs/contracts/analytics.md`.
 - **Better signals over harder guessing**: public-holiday awareness and
   ride detection once a native client can observe it. Location-first origins,
   daily home votes and inferred travel are now the baseline to measure.

@@ -63,6 +63,9 @@ substitutes for going back.
   network-first API cache. An API fallback preserves the response's original
   `generatedAt`; if neither network nor cache can answer, the request rejects
   and the client enters its offline state. `/healthz` is never cached.
+- Installing a new shell reloads every precache request from the network;
+  it must not reuse old bytes from the browser's HTTP cache. A new cache name
+  alone does not prove that a returning browser received the new code.
 - Service-worker registration runs after window load so it cannot delay first
   paint. Every change to a file in `web/sw.js`'s `SHELL` list updates `VERSION`
   in the same change; the shell list must contain every module and icon needed

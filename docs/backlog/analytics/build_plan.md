@@ -12,7 +12,8 @@ verification, not code.
 Build audit (2026-09-05): analytics phases 0 and 1 are complete. The
 smart-header dependency is now on main, including storage and controller
 integration. Analytics controller instrumentation and A2 are built and unit-tested.
-The browser verification matrix and production readback remain in progress.
+The browser verification matrix is complete. Deployment succeeded with
+worker v20; protected production readback remains.
 The header's physical-phone speed observation remains in its own backlog.
 
 The same audit fixed three transport defects: overlapping flushes now share
@@ -25,8 +26,11 @@ data or caller-supplied `u` into `track`.
 
 Verification: all 273 web tests and `go test ./...` pass. The first real-client
 flows verify exact event order, setup cancellation, repeated actions and
-zero local analytics requests. Phase 4 owns the remaining size/scheme and
-enabled-host checks; phase 5 owns deployment and authenticated readback.
+zero local analytics requests. The required 390×844/412×732 matrix passes
+in both schemes; A2 and its long destination also pass at 360×780. A2
+measures a 258.25px rule and 44px CHANGE target. The local production-host
+probe verifies first-open assignment/payload and GPC/DNT/blocked-storage
+silence. Phase 5 owns deployment and authenticated readback.
 
 Global rules for every phase:
 
@@ -282,7 +286,7 @@ Gate: `home.test.js` pins the model's `strip` placement per variant and
 the receipt slot's content under each; `npm test` green; `VERSION`
 bumped.
 
-## Phase 4 — verification wave — DONE marker: `analytics phase 4 done`
+## Phase 4 — verification wave — DONE: `analytics phase 4 done`
 
 Owns: `tools/shoot-states.js`, `tools/README.md`,
 `assets/comps/latest/` (A2 exemplar only), `docs/contracts/ui.md`
@@ -329,7 +333,24 @@ Work:
 Gate: `node tools/shoot-states.js` green across the listed states at
 390×844 and 412×732 in both schemes; `npm test` green.
 
-## Phase 5 — deploy and closeout
+## Phase 5 — deploy and closeout — DEPLOYED; FINAL READBACK PENDING
+
+Implementation commit `f9f2c9d`; multi-architecture registry image
+`sha256:5f6e994fd34133d97d0840f1d4664ea04d3a0671a3ca3c85d781f4914e57bfb6`.
+Deploy job `a892c11ef75884b30a230c6b6e31cccf` succeeded. Production health is
+200, `/sw.js` is v20, and `/js/main.js` matches the verified source SHA-256
+`bdf4ce3fc22cbdae237bb76d6ec8511715249dd83047e13ead5f8860e6e6d940`.
+The protected stats endpoint returns 401. Permission to read only its
+`ANALYTICS_READ_KEY` from the infra analytics secret file has been requested;
+no `.env` file has been read. Keep this item until the final readback is
+verified. Durable rules now live in `docs/contracts/analytics.md`, with
+storage, UI, API, project and tool references updated.
+
+The preserved returning profile caught v20 installing old HTTP-cached
+controller bytes despite the new cache name. v21 reloads every shell request
+on installation. Its executable regression fails with reload mode removed;
+all 274 web tests pass. Repeat the production upgrade check against the same
+profile after redeployment before calling the browser release verified.
 
 Run the `backlog-item` skill's close stage: migrate design.md's
 constraints, vocabulary and reads into the contracts (section 9 lists

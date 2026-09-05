@@ -51,3 +51,7 @@ node tools/measure-open.js --url https://ilovetrains.jeremyvun.com/#/board
 Confirm service-worker-controlled changes in a returning profile as well as a
 cold profile; a healthy origin does not prove that existing clients received
 the new shell.
+
+Check cached module content as well as the worker version: old HTTP-cached
+assets can otherwise enter a newly named shell cache. Installation reloads
+all shell requests; the cached controller must match the deployed source.
