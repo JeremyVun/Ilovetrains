@@ -247,6 +247,31 @@ regression) before phase 4 adds states.
 
 ## Phase 4 — verification wave — DONE marker: `phase 4 done`
 
+Phase 0 and 3 handoff (2026-09-05), binding for this phase:
+
+- Fixture ids to correct from `web/stations.json` (never the reverse), in
+  `web/test/fixture.js` and `tools/shoot-states.js`: Bondi Junction is
+  `202210` (`200080` is Wynyard); Epping `212110` (not `213910`); Tallawong
+  `2155384` and Chatswood `206710` (the fixtures had them shifted); Meadowbank
+  `211430` (not `213810`, Concord West); Strathfield `213510` (not `206020`,
+  Waverton); Mount Victoria `278610` (not `253030`); and there is no "Sydney
+  Olympic Park Station": it is `Olympic Park Station`, `212710` (not
+  `206010`, North Sydney). Another session is concurrently editing
+  `tools/shoot-states.js`'s Tallawong/Chatswood lines to these same values;
+  make the identical edits so the merge is clean.
+- The shooter has no geolocation seam. Add one as a repo feature of
+  `tools/shoot-states.js` (a per-state `geo: {lat, lon, speed?}` that grants
+  the permission and answers `getCurrentPosition`, via CDP
+  `Browser.grantPermissions` + `Emulation.setGeolocationOverride` in
+  `screenshot.js` if that works headless, else a `navigator` stub installed
+  before `route()`), and document its trap: `loadStations()` starts at module
+  load, before the fetch freeze, so the index is usually present.
+- `first-run` now shows the `Use my location` row under headless Chrome
+  (permission `prompt`); that is ruling 8, not a regression.
+- `tools/measure-open.js` needs the live API; if it cannot run without the
+  key, report it as skipped rather than faking it.
+- The real-phone `coords.speed` check is the owner's; report it as open.
+
 Owns: `tools/shoot-states.js`, `assets/comps/latest/`, `tools/README.md`.
 No product code except fixes for defects this wave finds, each named in
 the commit.

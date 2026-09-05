@@ -194,6 +194,10 @@ else → setup with From = here
 
 `leap` drives the receipt (section 8). The location multiplier and floor
 survive only inside today's `predict()`, which is the no-`here` branch.
+The `setup` answers are unreachable from home in practice: the router sends
+a trip-less document to the sheet before home renders, so first-run
+prefilling is the sheet's own silent fix (section 7). The shape stays in the
+contract.
 Trip rows stay ordered by `rankTrips` with the header's trip first.
 
 A fix arriving after the cached paint re-runs `locate` only when the
@@ -224,7 +228,14 @@ each successful refresh), the document's `lastOpen` becomes:
 
 `station` is the tier-1 `here` (within 200 m) at that open, or null. The
 snapshot is what makes entry possible after the service has left the live
-board. No coordinate is stored.
+board. No coordinate is stored. Two consequences found in phase 3
+(2026-09-05): inferred entry reads the record as it stood BEFORE this open
+wrote it (the controller snapshots `lastOpen` on open and on visibility
+return, since the cache-paint write lands before the fix does); and the
+cache-paint write carries no station, because neither the index nor a fix
+exists yet, so the fix's own refresh (write point 2) is what fills it. An
+open whose refresh fails after the fix therefore leaves no platform
+sighting, and the next open cannot infer entry from it.
 
 **Inferred entry** is evaluated when a valid fix arrives on home (open, and
 visibility return) and `lastOpen` exists. With `J = lastOpen.journey`,
@@ -264,6 +275,10 @@ whole header: the status reads `TRIP OVER`, the directions take their done
 treatment (the arrival figure, `AGO`, `You arrived at <Z>.`) and the offer
 shows; a countdown may not stand under a `TRIP OVER` status (orchestrator
 ruling 2026-09-05, phase 2 handoff).
+Open for the owner (phase 3, 2026-09-05): a rider stepping off up to five
+minutes early reads `Now` over `AGO` for those minutes, because
+`countdownFigure(0)` is `Now`; the same pair already showed for the one
+minute at the timetabled arrival. Ships as specified pending a verdict.
 
 **Fixes.** The silent fix is taken on home open and on visibility return to
 home when permission is granted (today: open only). Never persisted, never
@@ -302,7 +317,10 @@ before any query, in the existing result-row grammar:
 First run with permission already granted (a returning user, or a PWA
 installed after the site was granted) takes the silent fix and opens the
 sheet with From filled. First run with `prompt` shows the row. Nothing
-prompts on load.
+prompts on load. Auto-fill applies to first run only (no trips saved);
+add-trip with a fix shows the `NEAREST STATION` group instead, so both
+designed states are reachable and a returning user is not presumed upon
+(phase 3 reading, 2026-09-05).
 
 **The home panel is unchanged (ruling 11).** Trigger, copy and quiet
 rules stay exactly as `playtest-fixes` shipped them: two or more saved
