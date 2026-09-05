@@ -138,7 +138,9 @@ substitutes for going back.
   in 12px italic in place of `SHOWN ABOVE`, with the distance beside it as
   usual; the mark is gone by the next open. Rows carry both stacked
   line-colour rules and coloured line-code badges. The web list is capped by
-  the storage contract's ten-trip LRU.
+  the storage contract's ten-trip LRU. Other-row metadata may ellipsise inside
+  the remaining track; station names and the `Just added` mark with its
+  distance must fit.
 - A receipt explains a prediction only when the app made a meaningful leap.
   It names real evidence. A manually focused trip needs no receipt.
 - A trip chosen because it ends where the phone's days start carries
