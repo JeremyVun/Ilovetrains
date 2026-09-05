@@ -87,7 +87,7 @@ says the list is baked, how it is rebuilt (phase 0's command) and that no
 upstream call is made; the "stale window" paragraph loses its stops
 sentence.
 
-## Phase 2 — pure client logic — DONE marker: `phase 2 done`
+## Phase 2 — pure client logic — DONE marker: `phase 2 done` — DONE e91e069
 
 Owns: `web/js/stations.js` (new), `web/js/predict.js`, `web/js/home.js`,
 `web/js/storage.js`, `web/js/focus.js`, their tests, and
