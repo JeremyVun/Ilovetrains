@@ -36,7 +36,7 @@ of full-journey matching. Contracts and user stories describe these rules.
 Automated gates are green. Phase 4 still owns the physical-phone speed
 observation below; it has not been supplied. The paused handoff explicitly
 assigns that check to the owner and says to report it as open. Production
-deployment proceeds under the repository's standing authorization; complete
+deployment completed under the repository's standing authorization; complete
 closeout awaits the observation or an owner deferral. No `.env` was read
 during this resumption. A local release image was built and smoke-tested.
 
@@ -295,7 +295,13 @@ Verified 2026-09-05:
   Container smoke passed health, new modules, the 386-station rail index
   and baked Rhodes autocomplete, using a harmless placeholder key and no
   upstream requests. This image contains the committed header build;
-  unfinished ferry changes are not in it. Nothing was pushed or deployed.
+  unfinished ferry changes are not in it. The same source was built for
+  linux/amd64 and linux/arm64 and pushed as
+  `registry.jeremyvun.com/ilovetrains:latest`, manifest digest
+  `sha256:667c17e3f5af761ea16c2d192f8f26e532d540cceab3ed70415be8aaee9b8c98`.
+  Deploy job `3889ec2dc1c1df40860942a8ca673040` succeeded on `syd1`.
+  Production health, shell `v18` and the 386-station index were confirmed;
+  returning-worker, offline and real-origin performance checks are running.
 
 Remaining: the owner's real-phone `coords.speed` observation below. Do not
 mark the entire phase done or delete this folder without resolving it.
@@ -342,7 +348,13 @@ moving train. Report the observation; if it is null, remove the speed
 clause from `focus.js`, its test and `client-storage.md` in this phase and
 say so in `design.md`.
 
-## Phase 5 — closeout
+## Phase 5 — closeout — DOCS UPDATED AND DEPLOYED; PHONE CHECK OPEN
+
+Current contracts, PROJECT.md, ROADMAP.md and stories 08/09/21 have been
+updated. Production deployment is complete. The folder and its worktrees
+remain because the physical-phone observation has not been supplied or
+deferred; do not rebuild the completed phases on resumption.
+
 
 Run the `backlog-item` close stage: migrate the surviving rules into the
 contracts (already done per phase; confirm nothing is only in this
