@@ -61,7 +61,7 @@ test('every step states a platform chip in its own line colour', () => {
   assert.match(html, /class="dact-unit board"><b[^>]*>5<\/b><span class="dact-copy"><span>Board T4 · Bondi Junction · Platform 5<\/span>/);
 });
 
-test('ferry detail keeps the side accessible while its chip stays compact', () => {
+test('ferry detail displays the complete location in its green chip', () => {
   const journey = ferryJourneys()[1];
   const model = journeyDetail(journey, FERRY_NOW);
   const html = detailHtml({
@@ -71,7 +71,7 @@ test('ferry detail keeps the side accessible while its chip stays compact', () =
     footer: { dot: 'live', text: 'Live' }
   });
 
-  assert.match(html, /aria-label="Wharf 3, Side A · F1"[^>]*background:var\(--line-fill-FERRY\)[^>]*>3<\/b>/);
+  assert.match(html, /data-ferry-location="Wharf 3, Side A" data-role="origin" data-stop="Circular Quay"[^>]*aria-label="Wharf 3, Side A · F1"[^>]*>Wharf 3, Side A<\/b>/);
   assert.match(html, /<span class="lbl p">Wharf 1<\/span>/);
   assert.match(html, />Take this ferry<\/button>/);
 
@@ -83,7 +83,7 @@ test('ferry detail keeps the side accessible while its chip stays compact', () =
     footer: { dot: 'live', text: 'Live' }
   });
   assert.match(mixedHtml, /class="sy-row change [^"]*ferry-change[^"]*promoted"/);
-  assert.match(mixedHtml, /class="dact-unit board"><b[^>]*>3<\/b><span class="dact-copy"><span>Board F1 · Manly · Wharf 3, <span class="dside">Side A<\/span>/);
+  assert.match(mixedHtml, /class="dact-unit board"><b[^>]*data-ferry-location="Wharf 3, Side A" data-role="board" data-stop="Circular Quay"[^>]*>Wharf 3, Side A<\/b><span class="dact-copy"><span>Board F1 · Manly<\/span>/);
 });
 
 test('a tight change is the only step that carries the warning', () => {

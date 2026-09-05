@@ -141,8 +141,9 @@ substitutes for going back.
   with A3's 214px. Copy and action behavior are identical in both variants.
 - Saved-trip rows are 72px with a `DEPARTURES ›` cue at the right, which the
   sub line reserves 106px for. Names use 19px type; an overflowing paired
-  name fits down in 0.25px steps to a 16px floor, preserving the row height
-  and full names on the verified long-destination frames. The sub line is the status on the focused row,
+  name fits down in 0.25px steps to a 16px floor. If the complete pair still
+  cannot fit, it wraps at that floor and the row expands only as needed;
+  names are never truncated or made smaller. The sub line is the status on the focused row,
   `SHOWN ABOVE` and the distance on the header's own unfocused trip, and the
   distance with the last ride on every other. On the one open where the app
   itself saved the trip it is showing, that row's sub line reads `Just added`
@@ -188,9 +189,13 @@ substitutes for going back.
   side-only values remain verbatim: `Wharf 3, Side A`, `Balmain Wharf`, and
   `Side A`, never `Wharf Balmain Wharf` or `Wharf Side A`. These full values
   remain intact in caps, directions and accessibility text, except for the
-  departure board's exact-origin repetition rule below. A compact colour
-  chip shows the platform or wharf number when the value contains one, and an
-  em dash otherwise.
+  shared journey device's exact-origin repetition rule below. Ferry labels
+  remain visibly complete in the smart header, result rows, promoted rows
+  and detail steps: `Wharf 4, Side A`, never only `4` or `4 · A`. Both
+  alighting and boarding sides of a transfer retain their own labels and
+  stop associations. Rail chips retain their compact platform numerals.
+  Unknown boarding places remain unknown; never infer a numbered wharf
+  from the origin name or use a transfer's wharf as the journey origin.
 - Location permission is requested contextually, never on first load. Missing
   or denied location degrades silently to device history and time.
 - The panel that asks for location appears only once the permission state is
@@ -244,17 +249,21 @@ substitutes for going back.
   whitespace and ignoring case. The full origin stays in the header and
   the raw boarding label stays in accessibility text and journey detail.
   Specific boarding places such as `Wharf 4, Side A` remain full caps.
-  Transfer pins retain their existing numeric grammar. The same rule
-  applies to the promoted board row in detail; the home device is unchanged.
+  The same omission rule applies to the promoted board row and smart
+  header. Ferry transfer labels use the full green cap treatment at 14px,
+  matching initial boarding labels. When labels cannot fit beside each
+  other, give them separate lines without truncating, reducing type, or
+  changing the underlying time-axis proportions. Rail transfer pins retain
+  their numeric grammar.
 - The board is a timeline anchored at now. It opens at the anchor, never in the
   past, and scrolling upward reveals earlier departures. There is no labelled
   scroll affordance (`EARLIER`, `NOW`), and no reverse control anywhere in the
   client: the smart header offers the return direction itself once a focused
   trip is over. The anchor reads `NOW · HH:MM`.
 - Rows rank by effective departure. Past and future rows use the same grammar
-  and equal height; past rows are distinguished through type colour, not
+  and height for a given journey; past rows are distinguished through type colour, not
   container opacity.
-- A row is 96px in a 72px figure column and a body column 14px to its right,
+- A row is at least 96px in a 72px figure column and a body column 14px to its right,
   inside 22px page sides; the sides narrow to 18px at ≤375px, and at ≥900px the
   measure opens to 64px sides, a 120px figure column and a 24px gap. The row's
   1px rule is drawn edge to edge of the row rather than inset. The figure is
@@ -266,7 +275,8 @@ substitutes for going back.
   scheduled time 13px, the arrival 16px in secondary ink at the right. Beneath
   them sit the 22px journey line — boarding cap, time axis, platform pins — and
   the 13px headsign line.
-- Row height is fixed. The board uses the dynamic viewport, its rows scroll
+- Rail row height is fixed; full ferry labels expand their row as needed.
+  The board uses the dynamic viewport, its rows scroll
   when the frame is too short for them, and its footer keeps a separate line
   outside the scroller. A sparse board leaves the space under its last row
   empty rather than distributing rows through it. When six services are
@@ -274,10 +284,11 @@ substitutes for going back.
 - Every change on a journey names the station it happens at beneath the
   platform pin the rider boards from, so where to change and which platform to
   go to are both readable without opening detail. On a two-change row the
-  second station label left-aligns and the second change's alighting pin is
-  hidden.
+  second station label left-aligns and the second change's compact rail
+  alighting pin is hidden. Full ferry alighting labels remain visible.
 - Ferry changes and transfers between different stops give the transfer name
-  its own band above the headsign, within the same 96px row. A platform pin
+  its own band above the headsign. Full ferry place labels stay separate
+  from each other, their station names and the headsign. A platform pin
   clamped against the boarding cap has a 2px ground-colour outline so the two
   labels remain distinct.
 - A tight change paints the dwell segment of the journey axis in the warning
@@ -370,7 +381,9 @@ substitutes for going back.
   boarding place, then `ARRIVE`, which
   becomes `ARRIVE · JOURNEY CANCELLED` when the final leg is cancelled. The
   boarded leg supplies the place, and its full label keeps the wharf and side
-  together.
+  together. Ferry step caps display the full location for both getting off
+  and boarding, with separate lines where needed. A number-only chip with
+  the side in secondary instructions is insufficient.
 - Every service leg names its line code and headsign. A cancelled leg stays in
   place and marks the journey broken; the client does not invent or substitute
   a replacement service absent from the API response. The final arrival is

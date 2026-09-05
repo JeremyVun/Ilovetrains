@@ -229,6 +229,24 @@ test('a ferry board drives the home words and every saved-trip colour device', (
   assert.match(html, />Wharf 2, Side A<\/span>/);
 });
 
+test('home omits an exact repeated ferry origin without inventing a wharf number', () => {
+  const body = ferryBody();
+  body.from.name = 'Pyrmont Bay Wharf';
+  body.journeys = [structuredClone(body.journeys[0])];
+  body.journeys[0].departure.platform = 'Pyrmont Bay Wharf';
+  body.journeys[0].legDetail[0].from.name = 'Pyrmont Bay Wharf';
+  body.journeys[0].legDetail[0].from.platform = 'Pyrmont Bay Wharf';
+  const trip = { id: 'pyrmont', from: body.from, to: body.to, createdAt: new Date(0).toISOString() };
+  const model = homeModel({ ...emptyDoc(), trips: [trip] }, {
+    tripId: trip.id, direction: 'forward'
+  }, body, FERRY_NOW);
+  const html = homeHtml(model);
+
+  assert.doesNotMatch(html, /class="sy-cap"/);
+  assert.doesNotMatch(html, /data-role="origin"/);
+  assert.match(html, /class="hm-stn"[^>]*>Pyrmont Bay Wharf<\/span>/);
+});
+
 test('a saved-trip row opens that trip’s departures and the header is read-only', () => {
   const { html } = screen(transferJourneys(), '09:21');
 
@@ -371,7 +389,7 @@ test('a long saved-trip name shrinks only until it fits', (t) => {
   const prior = globalThis.getComputedStyle;
   t.after(() => { globalThis.getComputedStyle = prior; });
   const node = {
-    style: {}, clientWidth: 318,
+    style: {}, dataset: {}, clientWidth: 318,
     get scrollWidth() {
       return 324 * Number.parseFloat(this.style.fontSize || '19') / 19;
     }
@@ -382,6 +400,28 @@ test('a long saved-trip name shrinks only until it fits', (t) => {
 
   assert.equal(node.scrollWidth <= node.clientWidth + 1, true);
   assert.equal(node.style.fontSize, '18.5px');
+});
+
+test('a long ferry trip keeps both endpoint names at phone width', (t) => {
+  const prior = globalThis.getComputedStyle;
+  t.after(() => { globalThis.getComputedStyle = prior; });
+  const classes = new Set();
+  const row = { classList: { add: (v) => classes.add(v), remove: (v) => classes.delete(v) } };
+  const node = {
+    style: {}, dataset: {}, clientWidth: 318,
+    closest: () => row,
+    get scrollWidth() {
+      return this.dataset.wrap ? 318 : 359 * Number.parseFloat(this.style.fontSize || '16') / 16;
+    }
+  };
+  globalThis.getComputedStyle = () => ({ fontSize: '19px' });
+
+  fitTripNames({ querySelectorAll: () => [node] });
+
+  assert.equal(node.scrollWidth <= node.clientWidth + 1, true);
+  assert.equal(node.style.fontSize, '16px');
+  assert.equal(node.dataset.wrap, 'true');
+  assert.equal(classes.has('wrapped'), true);
 });
 
 /* Focus is written by `Take this train`, by inferred entry and by the redirect

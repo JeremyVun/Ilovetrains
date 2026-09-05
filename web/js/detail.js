@@ -36,9 +36,20 @@ function stepHtml(step) {
 }
 
 function actHtml(step) {
-  if (step.kind !== 'change') return `<span>${chipHtml(step.chip)} ${esc(step.label)}</span>`;
+  if (step.kind !== 'change') {
+    const ferry = step.chip.place === 'Wharf' && step.chip.location;
+    if (ferry) return `<span class="dplace-act">${chipHtml(step.chip)}<span>${esc(step.label)}</span></span>`;
+    return `<span>${chipHtml(step.chip)} ${esc(step.label)}</span>`;
+  }
   const note = step.label === 'Board' ? '' : `<span class="dchange-note">${esc(step.label)}</span>`;
-  const place = step.boardingPlace ? ' · ' + boardingPlaceHtml(step.boardingPlace) : '';
+  const ferry = step.off.place === 'Wharf' || step.on.place === 'Wharf';
+  const place = step.on.place !== 'Wharf' && step.boardingPlace
+    ? ' · ' + boardingPlaceHtml(step.boardingPlace) : '';
+  if (ferry) {
+    return `<span class="dchange-act ferry"><span class="dact-unit">${chipHtml(step.off)}<span>Get off</span></span>`
+      + `<span class="dact-unit board">${chipHtml(step.on)}`
+      + `<span class="dact-copy">${note}<span>${esc(step.serviceLabel)}${place}</span></span></span></span>`;
+  }
   return `<span class="dchange-act"><span class="dact-unit">${chipHtml(step.off)}<span>Get off</span></span>`
     + `<span class="darrow">→</span><span class="dact-unit board">${chipHtml(step.on)}`
     + `<span class="dact-copy">${note}<span>${esc(step.serviceLabel)}${place}</span></span></span></span>`;
@@ -52,8 +63,11 @@ function boardingPlaceHtml(value) {
 
 function chipHtml(chip) {
   const label = chip.location ? ` aria-label="${esc(`${chip.location} · ${chip.code}`)}"` : '';
-  return `<b class="dchip" data-line-code="${esc(chip.code)}"${label} style="background:${
-    lineFill(chip.colourKey)};color:${chipInk(chip.colourKey)}">${esc(chip.platform)}</b>`;
+  const ferry = chip.place === 'Wharf' && chip.location;
+  const attrs = ferry
+    ? ` data-ferry-location="${esc(chip.location)}" data-role="${esc(chip.role)}" data-stop="${esc(chip.stop)}"` : '';
+  return `<b class="dchip${ferry ? ' full-location' : ''}" data-line-code="${esc(chip.code)}"${attrs}${label} style="background:${
+    lineFill(chip.colourKey)};color:${chipInk(chip.colourKey)}">${esc(ferry ? chip.location : chip.platform)}</b>`;
 }
 
 /* The closing rule answers the masthead's, and the line under it states the

@@ -20,6 +20,11 @@ function upstreamPlatforms(name) {
     .filter(Boolean);
 }
 
+function mappedBody(name) {
+  const path = fileURLToPath(new URL(`../../tools/fixtures/${name}`, import.meta.url));
+  return JSON.parse(readFileSync(path, 'utf8'));
+}
+
 test('ferry boarding labels preserve the exceptional values in captured probes', () => {
   const balmainEast = upstreamPlatforms('trip_circularquay_balmaineast.json');
   const balmain = upstreamPlatforms('trip_barangaroo_balmain.json');
@@ -35,7 +40,7 @@ test('ferry boarding labels preserve the exceptional values in captured probes',
   ], ['3', '', '', '2']);
 });
 
-test('side-only and named wharves stay visible while their chips use a dash', () => {
+test('side-only and named wharves stay visible without invented numbers', () => {
   const [, , island] = exceptionalFerryJourneys();
   const model = journeyDetail(island, Date.parse('2026-09-05T16:10:00+10:00'));
   assert.equal(model.steps[1].boardingPlace, 'Side A');
@@ -49,7 +54,8 @@ test('side-only and named wharves stay visible while their chips use a dash', ()
     focused: false,
     footer: { dot: 'live', text: 'Live' }
   });
-  assert.match(html, /Board F8 · Balmain · <span class="dside">Side A<\/span>/);
+  assert.match(html, /data-ferry-location="Side A" data-role="board" data-stop="Cockatoo Island Wharf"[^>]*>Side A<\/b>/);
+  assert.match(html, /Board F8 · Balmain<\/span>/);
   assert.match(html, /<span class="lbl p">Balmain Wharf<\/span>/);
   assert.doesNotMatch(html, /Wharf Side A|Wharf Balmain Wharf/);
 
@@ -57,7 +63,7 @@ test('side-only and named wharves stay visible while their chips use a dash', ()
   sideOrigin.departure.platform = 'Side A';
   sideOrigin.legDetail[0].from.platform = 'Side A';
   assert.match(journeyDeviceHtml(sideOrigin, { caps: true }).html,
-    /class="sy-cap" data-line-code="F3">Side A<\/span>/);
+    /class="sy-cap" data-line-code="F3" data-ferry-location="Side A" data-role="origin"[^>]*>Side A<\/span>/);
 });
 
 test('a walk between hubs names both endpoints and boards at the second', () => {
@@ -84,6 +90,56 @@ test('a walk between hubs names both endpoints and boards at the second', () => 
     focused: false,
     footer: { dot: 'live', text: 'Live' }
   });
-  assert.match(html, /class="sy-row change distinct-stop [^"]*promoted"/);
-  assert.match(html, /Board F4 · Balmain East · Wharf 2, <span class="dside">Side B<\/span>/);
+  assert.match(html, /class="sy-row change full-transfer distinct-stop [^"]*promoted"/);
+  assert.match(html, /data-ferry-location="Wharf 2, Side B" data-role="board" data-stop="Barangaroo Wharf"[^>]*>Wharf 2, Side B<\/b>/);
+  assert.match(html, /Board F4 · Balmain East<\/span>/);
+});
+
+test('captured Pyrmont transfers keep each real side in its own green label', () => {
+  const forward = mappedBody('departures_pyrmont_doublebay.json');
+  const forwardJourney = forward.journeys[1];
+  const forwardDetail = journeyDetail(forwardJourney, Date.parse(forward.generatedAt));
+  const forwardDevice = journeyDeviceHtml(forwardJourney, {
+    caps: true, originName: forward.from.name, changes: forwardDetail.changes, stations: true
+  });
+
+  assert.doesNotMatch(forwardDevice.html, /data-role="origin"/,
+    'the named Pyrmont origin is repeated, not replaced with a numbered wharf');
+  assert.match(forwardDevice.html,
+    /data-ferry-location="Wharf 5, Side B" data-role="alight" data-stop="Circular Quay"[^>]*>Wharf 5, Side B<\/span>/);
+  assert.match(forwardDevice.html,
+    /data-ferry-location="Wharf 4, Side B" data-role="board" data-stop="Circular Quay"[^>]*>Wharf 4, Side B<\/span>/);
+  assert.equal(forwardDevice.spec.total,
+    forwardDevice.spec.legs.reduce((sum, leg) => sum + leg.minutes, 0) + forwardDevice.spec.dwell);
+
+  const reverse = mappedBody('departures_doublebay_pyrmont.json');
+  const reverseJourney = reverse.journeys[0];
+  const reverseDevice = journeyDeviceHtml(reverseJourney, {
+    caps: true, originName: reverse.from.name
+  });
+  assert.match(reverseDevice.html,
+    /data-ferry-location="Wharf 5, Side B" data-role="alight" data-stop="Circular Quay"[^>]*>Wharf 5, Side B<\/span>/);
+  assert.match(reverseDevice.html,
+    /data-ferry-location="Wharf 5, Side A" data-role="board" data-stop="Circular Quay"[^>]*>Wharf 5, Side A<\/span>/);
+
+  const control = mappedBody('departures_circularquay_manly.json');
+  const controlDevice = journeyDeviceHtml(control.journeys[0], {
+    caps: true, originName: control.from.name
+  });
+  assert.match(controlDevice.html,
+    /data-ferry-location="Wharf 4, Side A" data-role="origin" data-stop="Circular Quay"[^>]*>Wharf 4, Side A<\/span>/);
+
+  const model = journeyDetail(forwardJourney, Date.parse(forward.generatedAt));
+  const html = detailHtml({
+    ...model,
+    row: promotedRow(forwardJourney, Date.parse(forward.generatedAt)),
+    focused: false,
+    footer: { dot: 'live', text: 'Live' }
+  });
+  assert.match(html,
+    /data-ferry-location="Pyrmont Bay Wharf" data-role="origin" data-stop="Pyrmont Bay Wharf"[^>]*>Pyrmont Bay Wharf<\/b>/);
+  assert.match(html,
+    /data-ferry-location="Wharf 5, Side B" data-role="alight" data-stop="Circular Quay"[^>]*>Wharf 5, Side B<\/b>/);
+  assert.match(html,
+    /data-ferry-location="Wharf 4, Side B" data-role="board" data-stop="Circular Quay"[^>]*>Wharf 4, Side B<\/b>/);
 });

@@ -113,7 +113,7 @@ function lineCode(leg) {
   return (leg && leg.line && leg.line.name) || '';
 }
 
-function chip(leg, platform) {
+function chip(leg, platform, stop, role) {
   const mode = leg && leg.line && leg.line.mode;
   const words = modeWords(mode);
   return {
@@ -121,7 +121,9 @@ function chip(leg, platform) {
     colourKey: colourKey(leg && leg.line),
     platform: platformChip(platform) || '—',
     location: boardingLabel(platform, mode) || null,
-    place: words.place
+    place: words.place,
+    role,
+    stop: String(stop && stop.name || '')
   };
 }
 
@@ -199,7 +201,7 @@ function stepsOf(legs, changes, cancelled, nowMs) {
     kind: 'board',
     time: depMs === null ? '—' : clock(depMs),
     station: shortName((first.from && first.from.name) || ''),
-    chip: chip(first, first.from && first.from.platform),
+    chip: chip(first, first.from && first.from.platform, first.from, 'origin'),
     label: boardLabel(first),
     tight: false,
     cancelled: cancelled[0] === true,
@@ -213,8 +215,8 @@ function stepsOf(legs, changes, cancelled, nowMs) {
       kind: 'change',
       time: change.minutes === null ? '—' : change.minutes + ' min',
       station: change.station,
-      off: chip(legs[index], change.fromLabel),
-      on: chip(legs[index + 1], change.toLabel),
+      off: chip(legs[index], change.fromLabel, legs[index].to, 'alight'),
+      on: chip(legs[index + 1], change.toLabel, legs[index + 1].from, 'board'),
       // ui.md: a tight change prints its current window and no other.
       label: broken ? 'Cancelled' : tight ? change.minutes + ' min change' : 'Board',
       serviceLabel: boardLabel(legs[index + 1]),
@@ -229,7 +231,7 @@ function stepsOf(legs, changes, cancelled, nowMs) {
     kind: 'arrive',
     time: arrMs === null ? '—' : clock(arrMs),
     station: shortName((last.to && last.to.name) || ''),
-    chip: chip(last, last.to && last.to.platform),
+    chip: chip(last, last.to && last.to.platform, last.to, 'arrival'),
     label: 'Arrive' + (finalCancelled ? ' · Journey cancelled' : ''),
     tight: false,
     cancelled: finalCancelled,

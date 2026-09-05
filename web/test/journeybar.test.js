@@ -95,7 +95,7 @@ test('the station a change happens at hangs off the platform it is boarded from'
   assert.match(header.html, /class="sy-g0 warn"/);
 });
 
-test('ferry devices use mode green and keep the full side outside numeric chips', () => {
+test('ferry devices use mode green and keep full locations in their green devices', () => {
   const direct = journeyDeviceHtml(ferryJourneys()[1], { caps: true });
   assert.equal(direct.vars, '--stem:var(--line-fill-FERRY);--stem2:var(--line-fill-FERRY);'
     + '--chipink:var(--bg);--chipink2:var(--bg);');
@@ -103,11 +103,66 @@ test('ferry devices use mode green and keep the full side outside numeric chips'
   assert.match(direct.html, /data-line-code="F1" data-colour-key="FERRY"[^>]*background:var\(--line-fill-FERRY\)/);
 
   const mixed = journeyDeviceHtml(mixedJourneys()[1], { caps: true });
-  assert.match(mixed.html, /aria-label="Wharf 3, Side A · F1"[^>]*><span class="sy-pv">3<\/span>/);
-  assert.doesNotMatch(mixed.html, />3, Side A<\/span>/, 'the pin stays a compact numeral');
+  assert.match(mixed.html, /data-ferry-location="Wharf 3, Side A" data-role="board" data-stop="Circular Quay"[^>]*>Wharf 3, Side A<\/span>/);
+  assert.doesNotMatch(mixed.html, /<span class="sy-pv">3<\/span>/);
 });
 
-test('the board-only origin rule omits only a normalized exact-repeat cap', () => {
+test('a transfer prints each known location when its counterpart is missing', () => {
+  const missingBoard = structuredClone(mixedJourneys()[1]);
+  missingBoard.legDetail[1].from.platform = null;
+  const alight = journeyDeviceHtml(missingBoard, {
+    caps: true, changes: [{ station: 'Circular Quay' }], stations: true
+  });
+  assert.match(alight.html,
+    /data-pin="a"[^>]*aria-label="Platform 2 · T8"[^>]*>2<span class="sy-pstn"[^>]*>Circular Quay<\/span>/);
+  assert.doesNotMatch(alight.html, /data-pin="b"/);
+
+  const missingAlight = structuredClone(mixedJourneys()[1]);
+  missingAlight.legDetail[0].to.platform = null;
+  const board = journeyDeviceHtml(missingAlight, {
+    caps: true, changes: [{ station: 'Circular Quay' }], stations: true
+  });
+  assert.doesNotMatch(board.html, /data-pin="a"/);
+  assert.match(board.html,
+    /data-pin="b"[\s\S]*data-ferry-location="Wharf 3, Side A" data-role="board" data-stop="Circular Quay"/);
+  assert.match(board.html, /data-transfer-station[^>]*>Circular Quay<\/span>/);
+
+  missingAlight.legDetail[1].from.platform = null;
+  const neither = journeyDeviceHtml(missingAlight, {
+    caps: true, changes: [{ station: 'Circular Quay' }], stations: true
+  });
+  assert.doesNotMatch(neither.html, /data-ferry-location/);
+  assert.match(neither.html,
+    /data-pin="b"[^>]*aria-label="— · F1"[^>]*><span class="sy-pv">—<\/span><span class="sy-pstn"[^>]*>Circular Quay<\/span>/);
+
+  const rail = structuredClone(transferJourneys()[0]);
+  rail.legDetail[1].from.platform = null;
+  const railDevice = journeyDeviceHtml(rail, {
+    caps: true, changes: [{ station: 'Town Hall' }], stations: true
+  });
+  assert.doesNotMatch(railDevice.html, /data-pin=|data-transfer-station/,
+    'a partial rail transfer keeps its established no-marker rendering');
+});
+
+test('a later ferry alighting location remains visible on a three-leg journey', () => {
+  const journey = structuredClone(transferJourneys()[0]);
+  const second = journey.legDetail[1];
+  second.line = { name: 'F4', mode: 'ferry' };
+  second.from = { name: 'Town Hall', platform: 'Wharf 2, Side A' };
+  second.to = { name: 'Central', platform: 'Wharf 5, Side B' };
+  journey.legDetail.push({
+    ...structuredClone(second),
+    line: { name: 'T1', mode: 'train' },
+    from: { name: 'Central Station', platform: 'Platform 13' },
+    departure: { scheduled: '2026-09-05T10:07:00+10:00', estimated: null }
+  });
+  const device = journeyDeviceHtml(journey, { caps: true });
+
+  assert.match(device.html,
+    /class="sy-p a full-location"[^>]*data-transfer-index="1"[^>]*>[\s\S]*data-ferry-location="Wharf 5, Side B" data-role="alight" data-stop="Central"/);
+});
+
+test('the shared-device origin rule omits only a normalized exact-repeat cap', () => {
   const repeated = structuredClone(ferryJourneys()[0]);
   repeated.legDetail[0].from.platform = 'Pyrmont Bay Wharf';
   const originName = '  PYRMONT   bay wharf ';
@@ -120,7 +175,7 @@ test('the board-only origin rule omits only a normalized exact-repeat cap', () =
   assert.match(
     journeyDeviceHtml(repeated, { caps: true }).html,
     /class="sy-cap"[^>]*>Pyrmont Bay Wharf<\/span>/,
-    'home keeps its existing device because it does not opt into the board rule'
+    'a caller without origin context retains the raw boarding label'
   );
 
   const side = journeyDeviceHtml(ferryJourneys()[1], {

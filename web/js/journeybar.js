@@ -33,9 +33,12 @@ export function journeyBarSpec(journey, opts = {}) {
     return {
       code: line.name || '',
       colourKey: colourKey(line),
+      mode: String(line.mode || '').toLowerCase(),
       place: words.place,
       minutes: positiveMinutes(effective(leg.departure), effective(leg.arrival)),
       fromRaw: String(leg.from && leg.from.platform || ''),
+      fromStop: String(leg.from && leg.from.name || ''),
+      toStop: String(leg.to && leg.to.name || ''),
       fromPlatform,
       toPlatform,
       fromLabel: boardingLabel(leg.from && leg.from.platform, line.mode),
@@ -65,6 +68,10 @@ function changeAt(opts, index) {
   return Array.isArray(opts.changes) ? opts.changes[index] || null : null;
 }
 
+function fullLocation(label, role, stop, paint) {
+  return `<span class="sy-pv full-location" data-ferry-location="${esc(label)}" data-role="${role}" data-stop="${esc(stop)}" style="${paint}">${esc(label)}</span>`;
+}
+
 /** Render every segment by cumulative percentages. Supports any leg count;
     the current comps exercise one and two legs, but the seam does not assume it. */
 export function journeyBarHtml(spec, opts = {}) {
@@ -85,13 +92,36 @@ export function journeyBarHtml(spec, opts = {}) {
       const dwellStart = cursor / total * 100;
       const dwellEnd = (cursor + dwell) / total * 100;
       html += `<span class="sy-g0${tight ? ' warn' : ''}" data-seg data-transfer-gap="${index}"${tight ? ' data-tight-gap="true"' : ''} style="left:${dwellStart}%;width:${dwellEnd - dwellStart}%"></span>`;
-      if (opts.caps !== false && leg.toLabel && spec.legs[index + 1].fromLabel) {
-        const next = spec.legs[index + 1];
-        const station = opts.stations && change && change.station
-          ? `<span class="sy-pstn" data-transfer-station data-transfer-index="${index}">${esc(change.station)}</span>` : '';
+      const next = spec.legs[index + 1];
+      const station = opts.stations && change && change.station
+        ? `<span class="sy-pstn" data-transfer-station data-transfer-index="${index}">${esc(change.station)}</span>` : '';
+      const ferryTransfer = leg.mode === 'ferry' || next.mode === 'ferry';
+      const locationsKnown = ferryTransfer
+        ? leg.toLabel || next.fromLabel || station
+        : leg.toLabel && next.fromLabel;
+      if (opts.caps !== false && locationsKnown) {
         const paint = (key) => `background:${lineFill(key || 'T7')};color:${chipInk(key)}`;
-        caps += `<span class="sy-p a" data-pin="a" data-line-code="${esc(leg.code)}" data-transfer-index="${index}" aria-label="${esc(`${leg.toLabel} · ${leg.code}`)}" style="right:${100 - dwellStart}%;${paint(leg.colourKey)}">${esc(leg.toChip)}</span>`
-          + `<span class="sy-p b" data-pin="b" data-next-platform-marker data-transfer-platform data-line-code="${esc(next.code)}" data-transfer-index="${index}" aria-label="${esc(`${next.fromLabel} · ${next.code}`)}" style="left:${dwellEnd}%;${paint(next.colourKey)}"><span class="sy-pv">${esc(next.fromChip)}</span>${station}</span>`;
+        if (!ferryTransfer) {
+          caps += `<span class="sy-p a" data-pin="a" data-line-code="${esc(leg.code)}" data-transfer-index="${index}" aria-label="${esc(`${leg.toLabel} · ${leg.code}`)}" style="right:${100 - dwellStart}%;${paint(leg.colourKey)}">${esc(leg.toChip)}</span>`
+            + `<span class="sy-p b" data-pin="b" data-next-platform-marker data-transfer-platform data-line-code="${esc(next.code)}" data-transfer-index="${index}" aria-label="${esc(`${next.fromLabel} · ${next.code}`)}" style="left:${dwellEnd}%;${paint(next.colourKey)}"><span class="sy-pv">${esc(next.fromChip)}</span>${station}</span>`;
+        } else {
+          const alightFull = leg.mode === 'ferry';
+          const boardFull = next.mode === 'ferry';
+          const alight = alightFull
+            ? fullLocation(leg.toLabel, 'alight', leg.toStop, paint(leg.colourKey))
+            : esc(leg.toChip);
+          const board = boardFull
+            ? fullLocation(next.fromLabel, 'board', next.fromStop, paint(next.colourKey))
+            : `<span class="sy-pv">${esc(next.fromChip)}</span>`;
+          if (leg.toLabel) {
+            caps += `<span class="sy-p a${alightFull ? ' full-location' : ''}" data-pin="a" data-line-code="${esc(leg.code)}" data-transfer-index="${index}" aria-label="${esc(`${leg.toLabel} · ${leg.code}`)}" style="right:${100 - dwellStart}%;${paint(leg.colourKey)}">${alight}${next.fromLabel ? '' : station}</span>`;
+          }
+          if (next.fromLabel) {
+            caps += `<span class="sy-p b${boardFull ? ' full-location' : ''}" data-pin="b" data-next-platform-marker data-transfer-platform data-line-code="${esc(next.code)}" data-transfer-index="${index}" aria-label="${esc(`${next.fromLabel} · ${next.code}`)}" style="left:${dwellEnd}%;${paint(next.colourKey)}">${board}${station}</span>`;
+          } else if (!leg.toLabel && station) {
+            caps += `<span class="sy-p b" data-pin="b" data-next-platform-marker data-transfer-platform data-line-code="${esc(next.code)}" data-transfer-index="${index}" aria-label="— · ${esc(next.code)}" style="left:${dwellEnd}%;${paint(next.colourKey)}"><span class="sy-pv">—</span>${station}</span>`;
+          }
+        }
       }
       cursor += dwell;
     }
@@ -112,12 +142,19 @@ export function journeyDeviceHtml(journey, opts = {}) {
   const first = spec.legs[0] || {};
   const duplicateOrigin = normalized(first.fromRaw) !== ''
     && normalized(first.fromRaw) === normalized(opts.originName);
+  const fullTransfer = opts.caps !== false && spec.legs.some((leg, index) => {
+    const next = spec.legs[index + 1];
+    return next && ((leg.mode === 'ferry' && leg.toLabel) || (next.mode === 'ferry' && next.fromLabel));
+  });
+  const capAttrs = first.mode === 'ferry'
+    ? ` data-ferry-location="${esc(first.fromLabel)}" data-role="origin" data-stop="${esc(first.fromStop)}"` : '';
   const cap = opts.showBoardingPlatform === false || !first.fromLabel || duplicateOrigin
-    ? '' : `<span class="sy-cap" data-line-code="${esc(first.code)}">${esc(first.fromLabel)}</span>`;
+    ? '' : `<span class="sy-cap" data-line-code="${esc(first.code)}"${capAttrs}>${esc(first.fromLabel)}</span>`;
   return {
     spec,
+    fullTransfer,
     vars: journeyVars(spec),
-    html: `<span class="sy-j">${cap}<span class="sy-bar" data-axis="${esc(axisSignature(spec))}">${journeyBarHtml(spec, opts)}</span></span>`
+    html: `<span class="sy-j${fullTransfer ? ' full-transfer' : ''}">${cap}<span class="sy-bar" data-axis="${esc(axisSignature(spec))}">${journeyBarHtml(spec, opts)}</span></span>`
   };
 }
 
@@ -139,6 +176,20 @@ export function clampJourneyBars(root = document) {
   root.querySelectorAll('.sy-bar').forEach((bar) => {
     const bounds = bar.getBoundingClientRect();
     bar.querySelectorAll('.sy-p').forEach((platform) => {
+      const full = platform.querySelector('.sy-pv.full-location');
+      if (full) {
+        full.style.translate = '';
+        delete platform.dataset.clamped;
+        const deviceBounds = (bar.closest('.sy-j') || bar).getBoundingClientRect();
+        const rect = full.getBoundingClientRect();
+        const shift = rect.right > deviceBounds.right + 0.5 ? deviceBounds.right - rect.right
+          : rect.left < deviceBounds.left - 0.5 ? deviceBounds.left - rect.left : 0;
+        if (shift) {
+          full.style.translate = `${shift}px 0`;
+          platform.dataset.clamped = '1';
+        }
+        return;
+      }
       const rect = platform.getBoundingClientRect();
       if (rect.right > bounds.right + 0.5) {
         platform.style.left = 'auto';

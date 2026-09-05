@@ -202,7 +202,8 @@ export function homeHtml(model) {
     caps: true,
     progress: d.progress,
     tight: d.tight,
-    showBoardingPlatform: d.showBoardingPlatform
+    showBoardingPlatform: d.showBoardingPlatform,
+    originName: d.from
   }) : { html: '<span class="sy-j"><span class="sy-bar"></span></span>', vars: '' };
   const status = model.status;
   const late = Boolean(status && status.late);
@@ -280,10 +281,10 @@ function tripRowHtml(entry, model) {
   const lines = entry.lines;
   const spine = `<span class="hm-spine">${lines.map((line) => `<i style="background:${lineFill(line.colourKey)}"></i>`).join('')}</span>`;
   const name = lines.length > 1
-    ? `${badge(lines[0])}${esc(entry.from)} <em>→</em> ${badge(lines[lines.length - 1])}${esc(entry.to)}`
+    ? `<span class="hm-route">${badge(lines[0])}${esc(entry.from)}</span> <span class="hm-route"><em>→</em> ${badge(lines[lines.length - 1])}${esc(entry.to)}</span>`
     : lines.length === 1
-      ? `${badge(lines[0])}${esc(entry.from)} <em>→</em> ${esc(entry.to)}`
-      : `${esc(entry.from)} <em>→</em> ${esc(entry.to)}`;
+      ? `<span class="hm-route">${badge(lines[0])}${esc(entry.from)}</span> <span class="hm-route"><em>→</em> ${esc(entry.to)}</span>`
+      : `<span class="hm-route">${esc(entry.from)}</span> <span class="hm-route"><em>→</em> ${esc(entry.to)}</span>`;
   const state = entry.selected ? model.status ? ' focused' : ' shown' : '';
   return `<button class="tripr${state}" data-svc data-tap data-act="open-trip" data-id="${esc(entry.trip.id)}" data-direction="${esc(entry.direction)}" aria-label="Open ${esc(entry.from)} to ${esc(entry.to)} departures">
     <span class="hm-in">${spine}<span class="hm-bd"><span class="hm-nm" data-fit-trip>${name}</span><span class="hm-sub">${subHtml(entry, model)}</span></span><span class="route-cue">Departures<span class="arrow">›</span></span></span>
@@ -328,10 +329,18 @@ export function finishHomeRender(root) {
 
 export function fitTripNames(root) {
   root.querySelectorAll('[data-fit-trip]').forEach((node) => {
+    const row = node.closest ? node.closest('.tripr') : null;
+    delete node.dataset.wrap;
+    if (row) row.classList.remove('wrapped');
+    node.style.fontSize = '';
     let size = Number.parseFloat(getComputedStyle(node).fontSize);
     while (node.scrollWidth > node.clientWidth + 1 && size > 16) {
       size = Math.max(16, size - 0.25);
       node.style.fontSize = `${size}px`;
+    }
+    if (node.scrollWidth > node.clientWidth + 1) {
+      node.dataset.wrap = 'true';
+      if (row) row.classList.add('wrapped');
     }
   });
 }

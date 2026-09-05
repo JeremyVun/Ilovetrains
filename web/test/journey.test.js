@@ -26,21 +26,25 @@ test('the journey prints as board, change, arrive in travel order', () => {
   const [board, change, arrive] = m.steps;
   assert.deepEqual([board.time, board.station], ['09:24', 'Rhodes']);
   assert.deepEqual(board.chip, {
-    code: 'T9', colourKey: 'T9', platform: '1', location: 'Platform 1', place: 'Platform'
+    code: 'T9', colourKey: 'T9', platform: '1', location: 'Platform 1', place: 'Platform',
+    role: 'origin', stop: 'Rhodes Station'
   });
   assert.equal(board.label, 'Board T9 · Gordon via Lindfield');
   assert.deepEqual([change.time, change.station], ['7 min', 'Town Hall']);
   assert.deepEqual(change.off, {
-    code: 'T9', colourKey: 'T9', platform: '3', location: 'Platform 3', place: 'Platform'
+    code: 'T9', colourKey: 'T9', platform: '3', location: 'Platform 3', place: 'Platform',
+    role: 'alight', stop: 'Town Hall Station'
   });
   assert.deepEqual(change.on, {
-    code: 'T4', colourKey: 'T4', platform: '5', location: 'Platform 5', place: 'Platform'
+    code: 'T4', colourKey: 'T4', platform: '5', location: 'Platform 5', place: 'Platform',
+    role: 'board', stop: 'Town Hall Station'
   });
   assert.equal(change.label, 'Board');
   assert.equal(change.serviceLabel, 'Board T4 · Bondi Junction');
   assert.deepEqual([arrive.time, arrive.station], ['10:08', 'Bondi Junction']);
   assert.deepEqual(arrive.chip, {
-    code: 'T4', colourKey: 'T4', platform: '2', location: 'Platform 2', place: 'Platform'
+    code: 'T4', colourKey: 'T4', platform: '2', location: 'Platform 2', place: 'Platform',
+    role: 'arrival', stop: 'Bondi Junction Station'
   });
   assert.equal(arrive.label, 'Arrive');
   assert.deepEqual(m.arrival, {
@@ -58,7 +62,8 @@ test('mode words and platform parsing preserve a ferry boarding side', () => {
   const ferry = detail(ferryJourneys()[2], FERRY_NOW);
   assert.equal(ferry.vehicle, 'ferry');
   assert.deepEqual(ferry.steps[0].chip, {
-    code: 'F1', colourKey: 'FERRY', platform: '3', location: 'Wharf 3, Side B', place: 'Wharf'
+    code: 'F1', colourKey: 'FERRY', platform: '3', location: 'Wharf 3, Side B', place: 'Wharf',
+    role: 'origin', stop: 'Circular Quay'
   });
   assert.deepEqual(ferry.arrival, {
     time: '16:20', station: 'Manly Wharf', platform: '1', label: 'Wharf 1',
