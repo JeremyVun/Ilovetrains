@@ -188,8 +188,7 @@ substitutes for going back.
   adds that word only when the upstream value needs it. Complete names and
   side-only values remain verbatim: `Wharf 3, Side A`, `Balmain Wharf`, and
   `Side A`, never `Wharf Balmain Wharf` or `Wharf Side A`. These full values
-  remain intact in initial boarding caps, directions and accessibility text,
-  except for the shared journey device's exact-origin repetition rule below.
+  remain intact in initial boarding caps, directions and accessibility text.
   The initial ferry cap uses the full value, such as `Wharf 4, Side A`.
   Transfer chips use the train platform grammar with the side joined to the
   number: `5B` and `2B`. A side-only value uses its side (`B`); a named value
@@ -246,14 +245,12 @@ substitutes for going back.
   is ellipsised. A single word wider than its column wraps within the word
   as a last resort, preserving every character. At widths up to 375px, the type is 24px with a 22px arrow
   and 7px gaps.
-- A row omits its visible boarding cap only when the nonempty raw boarding
-  label exactly equals the journey origin after trimming, collapsing
-  whitespace and ignoring case. The full origin stays in the header and
-  the raw boarding label stays in accessibility text and journey detail.
-  Specific boarding places such as `Wharf 4, Side A` remain full caps.
-  The same omission rule applies to the promoted board row and smart
-  header. Ferry transfer pins use the same compact treatment as rail pins,
-  with the side joined directly to the number.
+- The first boarding cap shows the full available label in the smart header,
+  result rows and promoted detail row, even when it repeats the origin name.
+  `Pyrmont Bay Wharf` remains a named cap; `Wharf 4, Side A` remains a full
+  numbered cap. Unknown boarding locations stay absent. Ferry transfer pins
+  use the same compact treatment as rail pins, with the side joined directly
+  to the number.
 - The board is a timeline anchored at now. It opens at the anchor, never in the
   past, and scrolling upward reveals earlier departures. There is no labelled
   scroll affordance (`EARLIER`, `NOW`), and no reverse control anywhere in the

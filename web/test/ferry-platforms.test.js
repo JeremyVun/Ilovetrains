@@ -107,8 +107,8 @@ test('captured Pyrmont transfers keep each real side in compact green chips', ()
     caps: true, originName: forward.from.name, changes: forwardDetail.changes, stations: true
   });
 
-  assert.doesNotMatch(forwardDevice.html, /data-role="origin"/,
-    'the named Pyrmont origin is repeated, not replaced with a numbered wharf');
+  assert.match(forwardDevice.html, /data-role="origin"[^>]*>Pyrmont Bay Wharf<\/span>/,
+    'the first label uses the named boarding location without inventing a number');
   assert.match(forwardDevice.html,
     /data-ferry-location="Wharf 5, Side B" data-role="alight" data-stop="Circular Quay"[^>]*>5B<\/span>/);
   assert.match(forwardDevice.html,

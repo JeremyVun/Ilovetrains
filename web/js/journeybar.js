@@ -140,21 +140,15 @@ export function journeyBarHtml(spec, opts = {}) {
 export function journeyDeviceHtml(journey, opts = {}) {
   const spec = journeyBarSpec(journey, opts);
   const first = spec.legs[0] || {};
-  const duplicateOrigin = normalized(first.fromRaw) !== ''
-    && normalized(first.fromRaw) === normalized(opts.originName);
   const capAttrs = first.mode === 'ferry'
     ? ` data-ferry-location="${esc(first.fromLabel)}" data-role="origin" data-stop="${esc(first.fromStop)}"` : '';
-  const cap = opts.showBoardingPlatform === false || !first.fromLabel || duplicateOrigin
+  const cap = opts.showBoardingPlatform === false || !first.fromLabel
     ? '' : `<span class="sy-cap" data-line-code="${esc(first.code)}"${capAttrs}>${esc(first.fromLabel)}</span>`;
   return {
     spec,
     vars: journeyVars(spec),
     html: `<span class="sy-j">${cap}<span class="sy-bar" data-axis="${esc(axisSignature(spec))}">${journeyBarHtml(spec, opts)}</span></span>`
   };
-}
-
-function normalized(value) {
-  return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 export function axisSignature(spec) {

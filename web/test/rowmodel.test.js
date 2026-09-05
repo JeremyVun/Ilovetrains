@@ -472,7 +472,7 @@ test('ferry rows derive paint and words from mode without hiding the operator co
   assert.equal(trainReplacement.note, '15:40 cancelled · next train');
 });
 
-test('the board balances complete endpoint names and omits an exact repeated cap', () => {
+test('the board balances complete endpoint names and retains the first boarding cap', () => {
   const repeated = structuredClone(ferryJourneys()[0]);
   repeated.legDetail[0].from.platform = 'Pyrmont Bay Wharf';
   repeated.departure.platform = 'Pyrmont Bay Wharf';
@@ -483,10 +483,10 @@ test('the board balances complete endpoint names and omits an exact repeated cap
   const html = boardHtml({ trip: source, direction: 'forward', model, nowMs: FERRY_NOW });
 
   assert.match(html, /<h1 class="sy-h1"><b class="endpoint from">Pyrmont Bay Wharf<\/b><span class="conn"><\/span><b class="endpoint to">Double Bay Wharf<\/b><\/h1>/);
-  assert.doesNotMatch(html, /class="sy-cap"/);
+  assert.match(html, /class="sy-cap"[^>]*>Pyrmont Bay Wharf<\/span>/);
   assert.match(html, /aria-label="[^\"]*Pyrmont Bay Wharf · MFF[^\"]*"/,
-    'the omitted boarding place stays in the row accessibility text');
-  assert.doesNotMatch(resultRowHtml(model.rows[0], {
+    'the boarding place also stays in the row accessibility text');
+  assert.match(resultRowHtml(model.rows[0], {
     promoted: true, tappable: false, originName: '  PYRMONT   BAY WHARF '
   }), /class="sy-cap"/, 'detail promotes the same composed board row');
 
@@ -496,7 +496,7 @@ test('the board balances complete endpoint names and omits an exact repeated cap
     model: { ...model, stale: true, rows: [], futureRows: [], pastRows: model.rows },
     nowMs: FERRY_NOW
   });
-  assert.doesNotMatch(pastHtml, /class="sy-cap"/, 'past rows use the same board composition');
+  assert.match(pastHtml, /class="sy-cap"/, 'past rows use the same board composition');
 
   const reverseJourney = structuredClone(repeated);
   reverseJourney.legDetail[0].from.platform = 'Double Bay Wharf';
@@ -506,7 +506,7 @@ test('the board balances complete endpoint names and omits an exact repeated cap
     trip: source, direction: 'reverse', model: reverseModel, nowMs: FERRY_NOW
   });
   assert.match(reverseHtml, /class="endpoint from">Double Bay Wharf<\/b>.*class="endpoint to">Pyrmont Bay Wharf<\/b>/);
-  assert.doesNotMatch(reverseHtml, /class="sy-cap"/, 'the reverse board compares against its own origin');
+  assert.match(reverseHtml, /class="sy-cap"[^>]*>Double Bay Wharf<\/span>/, 'the reverse board retains its own boarding label');
 
   const railTrip = {
     from: { name: 'Rhodes Station' },

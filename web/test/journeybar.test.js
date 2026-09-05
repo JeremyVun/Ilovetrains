@@ -143,15 +143,15 @@ test('a transfer prints each known location when its counterpart is missing', ()
     'a partial rail transfer keeps its established no-marker rendering');
 });
 
-test('the shared-device origin rule omits only a normalized exact-repeat cap', () => {
+test('the shared device retains full named and numbered boarding caps', () => {
   const repeated = structuredClone(ferryJourneys()[0]);
   repeated.legDetail[0].from.platform = 'Pyrmont Bay Wharf';
   const originName = '  PYRMONT   bay wharf ';
 
-  assert.doesNotMatch(
+  assert.match(
     journeyDeviceHtml(repeated, { caps: true, originName }).html,
-    /class="sy-cap"/,
-    'case and whitespace do not make a repeated origin useful'
+    /class="sy-cap"[^>]*>Pyrmont Bay Wharf<\/span>/,
+    'the first label stays visible even when it repeats the origin'
   );
   assert.match(
     journeyDeviceHtml(repeated, { caps: true }).html,
