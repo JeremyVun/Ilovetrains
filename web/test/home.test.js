@@ -9,7 +9,7 @@ import { directionsModel } from '../js/focus.js';
 import { fitStationNames } from '../js/dom.js';
 import { homeHtml, homeModel, tripIsOver } from '../js/home.js';
 import { emptyDoc } from '../js/storage.js';
-import { departureMs, journeyKey } from '../js/journey.js';
+import { departureMs, departureKey } from '../js/journey.js';
 import { cancelLeg, delayLeg, transferBody, transferJourneys } from './fixture.js';
 
 const at = (time) => Date.parse(`2026-09-01T${time}:00+10:00`);
@@ -469,7 +469,7 @@ test('the strip is the inferred header\'s receipt, and only its own', () => {
     origin: RHODES,
     destination: BONDI,
     departureMs: departureMs(journey),
-    journeyKey: journeyKey(journey)
+    journeyKey: departureKey(journey)
   });
   assert.match(html, /<div class="hm-rule"><\/div>\s*<div class="hm-strip" data-strip>/,
     'the strip sits under the heavy rule');
