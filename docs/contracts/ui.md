@@ -411,7 +411,7 @@ the same change as this contract, and git keeps the history. Every frame in it
 is a `tools/shoot-states.js` shot of the built client, so a frame no state can
 produce is removed rather than left to rot.
 
-The set is thirty frames:
+The set is thirty-four frames:
 
 - Board: `board-390x844-hero.png` plus its `past`, `delayed`, `cancelled`,
   `long`, `two-change` and `hero-light` variants, and `board-412x732-hero.png`.
@@ -427,6 +427,12 @@ The set is thirty frames:
   unfocused cancelled lead, `focused-cxl` a focused journey cancelled before it
   departs, `late` the `RUNNING LATE` treatment, and `back` the return direction
   with its real transfer platforms after the offer is accepted.
+- Location-first home: `home-390x844-inferred.png` and its `inferred-light`
+  variant are inferred travel mode carrying the `Going somewhere else?` line;
+  `home-390x844-just-added.png` is the open on which the app saved the pair it
+  is showing, marked once in the sub line.
+- Setup: `setup-390x844-origin.png` is the sheet opening with From filled from
+  a fix and the destination field focused.
 
 Measurements these frames carry deliberately, so nothing above reads as drift:
 the two header clocks share a baseline to within 1px, which is the tolerance
@@ -434,6 +440,8 @@ the instrument allows; the header's heavy rule sits 214px from the frame top
 at 390×844 with no receipt, which is what the content-sized block measures;
 a focused journey still shows its boarding cap and pre-departure progress
 marker before it leaves, so `home-390x844-focused-cxl` carries both;
+`home-390x844-inferred` carries the inferred line at 49px with its 48px action,
+and `home-390x844-just-added` the 63px mark inside the sub line's 212px track;
 `detail-*-tight` shoots a change shortened by a late first leg,
 so its promoted row reads `5 MIN LATE`.
 
