@@ -10,6 +10,7 @@ export const TRIPS_CAP = 10;
 export const SEARCH_CAP = 3;
 export const DIRECTIONS = ['forward', 'reverse'];
 export const LOCATION_ASK_QUIET_MS = 30 * 86_400_000;
+export const NEW_OPENS = 3;
 
 export function emptyDoc() {
   return {
@@ -116,6 +117,11 @@ export function parseDoc(raw) {
   if (v.locationAsk && typeof v.locationAsk.declinedAt === 'string') {
     doc.locationAsk = { declinedAt: v.locationAsk.declinedAt };
   }
+  const tel = v.telemetry;
+  if (tel && Number.isInteger(tel.opens) && tel.opens >= 0
+      && Number.isInteger(tel.bucket) && tel.bucket >= 0 && tel.bucket <= 99) {
+    doc.telemetry = { opens: tel.opens, bucket: tel.bucket };
+  }
   if (v.cache && typeof v.cache === 'object') {
     for (const [k, entry] of Object.entries(v.cache)) {
       if (entry && typeof entry.fetchedAt === 'string' && entry.body && typeof entry.body === 'object') {
@@ -139,6 +145,7 @@ export function serializeDoc(doc) {
   };
   if (doc.focus) out.focus = doc.focus;
   if (doc.locationAsk) out.locationAsk = doc.locationAsk;
+  if (doc.telemetry) out.telemetry = doc.telemetry;
   return JSON.stringify(out);
 }
 
@@ -146,6 +153,24 @@ export function serializeDoc(doc) {
     reload is a nag. */
 export function declineLocation(doc, atMs) {
   return { ...doc, locationAsk: { declinedAt: new Date(atMs).toISOString() } };
+}
+
+/** The device's own open counter and experiment bucket. Only the word
+    `userClass` derives from it ever leaves the phone; the counts do not. */
+export function recordOpen(doc, random) {
+  const current = doc.telemetry;
+  return {
+    ...doc,
+    telemetry: {
+      opens: (current ? current.opens : 0) + 1,
+      bucket: current ? current.bucket : Math.floor(random() * 100)
+    }
+  };
+}
+
+export function userClass(doc) {
+  const telemetry = doc && doc.telemetry;
+  return telemetry && telemetry.opens > NEW_OPENS ? 'ret' : 'new';
 }
 
 export function cacheKey(fromId, toId) {

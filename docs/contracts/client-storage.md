@@ -47,6 +47,7 @@ read/write atomic and migration simple):
   },
   "lastViewed": {"tripId": "uuid", "direction": "forward"},
   "locationAsk": {"declinedAt": "2026-09-01T09:21:00+10:00"},
+  "telemetry": {"opens": 12, "bucket": 37},
   "cache": {
     "<from>-<to>": {"fetchedAt": "...", "body": {"…": "last departures response"}}
   }
@@ -72,9 +73,46 @@ read/write atomic and migration simple):
 - `locationAsk` is optional and holds only the time the user last declined the
   location panel. Absence means never declined; a malformed value is dropped,
   not repaired.
+- `telemetry` is optional and holds only how many opens this device has
+  reached an answer on and a bucket 0-99 drawn once at random. It is written
+  only while analytics is enabled (the production origin, no Global Privacy
+  Control, no Do Not Track), only by `web/js/analytics.js` and only through
+  the normal document update. A malformed value is dropped whole and starts
+  again. The counts themselves never leave the device: the only thing derived
+  from them that does is the word `new` (three opens or fewer) or `ret`, and
+  the experiment arm the bucket selects.
 - A station's optional `location` is captured from `/api/v1/stops` at save
   time. Trips without coordinates are backfilled lazily by stop id. Missing
   coordinates disable only the location term.
+
+## Analytics queue
+
+Anonymous counters wait for the network under their own key,
+`trains.analytics.v1`, because they are transport state rather than the
+user's and an event must never rewrite `trains.v1`:
+
+```json
+{"queue": [{"t": "shown_predicted",
+            "d": {"u": "new", "x.strip-placement": "a3"}, "n": 5}]}
+```
+
+- Written only while analytics is enabled; on any other origin nothing is
+  stored, no request is made, and every experiment answers with its control
+  arm. A malformed value is treated as an empty queue.
+- `t` is an event name, `d` its dimensions, `n` how many times it happened.
+  An event whose `t` and `d` match a queued entry increments `n` instead of
+  appending, so a week offline is a few dozen entries however many opens it
+  held.
+- Capped at 200 entries, oldest dropped.
+- A flush posts the queue as one JSON array to the analytics service, each
+  entry gaining `"p": "ilovetrains"`. Entries clear only on a 2xx, and only
+  the counts that were sent: anything recorded during the request survives.
+  These counters are the one thing on the device that is sent anywhere, and
+  they never go to this app's server.
+- `d` carries at most the user class `u`, a running experiment's variant
+  `x.<experiment>` and a source word `f`. Never a station, coordinate, trip,
+  line, clock time, journey or anything typed into a field. A new event name
+  or dimension value is a change to this contract, not a build decision.
 
 ## Trip selection
 

@@ -6,7 +6,8 @@ import assert from 'node:assert/strict';
 import {
   STORAGE_KEY, HISTORY_CAP, TRIPS_CAP, emptyDoc, parseDoc, serializeDoc, cacheKey, leg,
   addTrip, removeTrip, moveTrip, recordView, recordSearch, recordRide, updateStop,
-  putCache, getCache, loadDoc, saveDoc, declineLocation, LOCATION_ASK_QUIET_MS
+  putCache, getCache, loadDoc, saveDoc, declineLocation, LOCATION_ASK_QUIET_MS,
+  recordOpen, userClass, NEW_OPENS
 } from '../js/storage.js';
 
 const CENTRAL = { id: '200060', name: 'Central Station' };
@@ -200,4 +201,50 @@ test('a declined location ask is remembered, and a malformed one is dropped', ()
   assert.equal(parseDoc(JSON.stringify({ locationAsk: { declinedAt: 7 } })).locationAsk, undefined);
   assert.equal(parseDoc(JSON.stringify({ locationAsk: 'nope' })).locationAsk, undefined);
   assert.equal(LOCATION_ASK_QUIET_MS, 30 * 86_400_000);
+});
+
+
+test('telemetry is kept only when both counters are in range', () => {
+  const good = { opens: 12, bucket: 37 };
+  assert.deepEqual(parseDoc(JSON.stringify({ telemetry: good })).telemetry, good);
+  assert.deepEqual(parseDoc(JSON.stringify({ telemetry: { opens: 0, bucket: 0 } })).telemetry,
+    { opens: 0, bucket: 0 });
+  assert.deepEqual(parseDoc(JSON.stringify({ telemetry: { opens: 2, bucket: 99 } })).telemetry,
+    { opens: 2, bucket: 99 });
+
+  for (const bad of [{ opens: '7', bucket: 3 }, { opens: 2, bucket: 100 }, { opens: -1, bucket: 3 },
+    { opens: 1.5, bucket: 3 }, { opens: 2, bucket: -1 }, { opens: 2 }, { bucket: 2 }, 'nope']) {
+    assert.equal(parseDoc(JSON.stringify({ telemetry: bad })).telemetry, undefined,
+      `${JSON.stringify(bad)} should be dropped whole`);
+  }
+  assert.equal(parseDoc(serializeDoc(emptyDoc())).telemetry, undefined);
+});
+
+test('an open increments the counter and draws the bucket exactly once', () => {
+  const first = recordOpen(emptyDoc(), () => 0.37);
+  assert.deepEqual(first.telemetry, { opens: 1, bucket: 37 });
+
+  const second = recordOpen(first, () => 0.9);
+  assert.deepEqual(second.telemetry, { opens: 2, bucket: 37 }, 'the bucket is drawn once, ever');
+  assert.deepEqual(recordOpen(emptyDoc(), () => 0.999).telemetry, { opens: 1, bucket: 99 });
+  assert.deepEqual(recordOpen(emptyDoc(), () => 0).telemetry, { opens: 1, bucket: 0 });
+  assert.equal(emptyDoc().telemetry, undefined, 'recordOpen is pure');
+});
+
+test('a device is new for three opens and returning from the fourth', () => {
+  assert.equal(NEW_OPENS, 3);
+  assert.equal(userClass(emptyDoc()), 'new');
+  let doc = emptyDoc();
+  for (const expected of ['new', 'new', 'new', 'ret', 'ret']) {
+    doc = recordOpen(doc, () => 0.37);
+    assert.equal(userClass(doc), expected, `opens ${doc.telemetry.opens}`);
+  }
+});
+
+test('telemetry round-trips through trains.v1 with the rest of the document', () => {
+  const store = memoryStore();
+  const doc = recordOpen(docWithTrips(), () => 0.37);
+  saveDoc(doc, store);
+  assert.deepEqual(loadDoc(store), doc);
+  assert.deepEqual([...store._map.keys()], [STORAGE_KEY], 'still one key');
 });
