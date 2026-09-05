@@ -69,8 +69,8 @@ behaviour must name what it really measures — app opens are looks, not
 rides.
 
 The signals, scores and storage the header runs on are the binding contract
-in `docs/contracts/client-storage.md` (prediction heuristic, geolocation
-term, home-station inference, completed rides, focus). Change the behaviour
+in `docs/contracts/client-storage.md` (location-first selection, daily
+home votes, the no-location predictor, completed rides and travel mode). Change the behaviour
 there and here in the same change. How the header looks and the states it
 moves through are binding in `docs/contracts/ui.md`.
 
@@ -243,12 +243,18 @@ Browser (localStorage: trips, history, rides, focus, home, searches, cache)
 - **Focusing a trip is consent** (2026-09-01). It settles the honesty
   question for directions: the user's intentional action is warrant enough
   to speak about their trip, and focusing something else is the correction.
-- **Prediction stays simple and documented.** Time-of-day + day-type +
-  recency over view history, multiplied by a one-shot geolocation term and
-  informed by completed rides and inferred home. Deterministic given
-  (storage document, now, fix), and unit tested.
+- **Prediction starts where the user is.** A nearby station sets the origin;
+  relevant view history chooses the destination, then the usual starting
+  station inferred from the last seven daily first-open votes. Three votes
+  establish it; until then, the first saved origin is the fallback. An
+  unsaved pair becomes an ordinary saved trip. Without a nearby station,
+  time, day type, recency and the location term rank saved trips. All
+  personal evidence remains on the device; the station index is shared
+  with the server's offline-built autocomplete.
 - **The progress marker is continuous** (2026-09-02), inferred from the
-  clock rather than observed. The known gap — right trip, wrong service — is
+  clock rather than observed. Travel mode may also begin from a previous
+  platform sighting, the shown service's timetable and a later movement
+  fix; its correction opens the existing sheet to change destination. The known gap — right trip, wrong service — is
   accepted until it bites in real use.
 - **Trains and metro only** for now; station search exists only to set up a
   saved trip; no general trip planner.
