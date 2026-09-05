@@ -12,8 +12,16 @@
    their commute share one. ageInDays is fractional, so decay is continuous. */
 
 import { DIRECTIONS } from './storage.js';
+import { distanceKm, here } from './stations.js';
+
+/* Still part of this module's surface: the geometry moved to stations.js,
+   which the index needs and which cannot import back. */
+export { distanceKm };
 
 const DAY_MS = 86_400_000;
+
+/* Fewer votes than this is not a habit, only a week that happened. */
+export const HOME_VOTES_NEEDED = 3;
 
 export function isWeekend(ms) {
   const d = new Date(ms).getDay();
@@ -52,18 +60,6 @@ export function scoreCandidate(history, tripId, direction, nowMs) {
   return total;
 }
 
-/** All (trip, direction) candidates with their scores, board order preserved. */
-export function distanceKm(a, b) {
-  if (!a || !b || !Number.isFinite(a.lat) || !Number.isFinite(a.lon)
-      || !Number.isFinite(b.lat) || !Number.isFinite(b.lon)) return null;
-  const rad = (degrees) => degrees * Math.PI / 180;
-  const dLat = rad(b.lat - a.lat);
-  const dLon = rad(b.lon - a.lon);
-  const x = Math.sin(dLat / 2) ** 2
-    + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
-  return 6371 * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
-}
-
 export function locationFactor(fix, origin) {
   const distance = distanceKm(fix, origin && origin.location);
   if (distance === null || (distance > 2 && distance <= 10)) return 1;
@@ -75,6 +71,7 @@ export function locationFactor(fix, origin) {
    0.01 × 1.0. Any real history dwarfs it. */
 export const PREDICT_FLOOR = 0.01;
 
+/** All (trip, direction) candidates with their scores, board order preserved. */
 export function scoreAll(doc, nowMs, opts = {}) {
   const out = [];
   for (const trip of doc.trips) {
@@ -129,4 +126,80 @@ export function rankTrips(doc, nowMs, opts = {}) {
     const candidate = directions.find((item) => item.direction === direction) || best;
     return { trip, index, ...candidate, selected: Boolean(selected && selected.tripId === trip.id) };
   }).sort((a, b) => Number(b.selected) - Number(a.selected) || b.score - a.score || a.index - b.index);
+}
+
+/**
+ * Where the phone's days start, derived from the daily first-open votes on
+ * every read so there is no stale copy. Fewer than three votes falls back to
+ * the first saved trip's origin, which claims nothing.
+ * @returns {{station: object, confidence: number}|null}
+ */
+export function homeOf(doc) {
+  const tally = new Map();
+  ((doc && doc.homeVotes) || []).forEach((vote, index) => {
+    const entry = tally.get(vote.station.id) || { count: 0 };
+    tally.set(vote.station.id, { station: vote.station, count: entry.count + 1, latest: index });
+  });
+  const winner = [...tally.values()].sort((a, b) => b.count - a.count || b.latest - a.latest)[0];
+  if (winner && winner.count >= HOME_VOTES_NEEDED) {
+    return { station: winner.station, confidence: winner.count };
+  }
+  const first = (doc && doc.trips && doc.trips[0]) || null;
+  return first ? { station: first.from, confidence: 0 } : null;
+}
+
+function fromHere(doc, station, nowMs) {
+  const out = [];
+  for (const trip of doc.trips || []) {
+    for (const direction of DIRECTIONS) {
+      const ends = direction === 'reverse'
+        ? { from: trip.to, to: trip.from } : { from: trip.from, to: trip.to };
+      if (ends.from.id !== station.id) continue;
+      out.push({
+        tripId: trip.id,
+        direction,
+        to: ends.to,
+        score: scoreCandidate(doc.history, trip.id, direction, nowMs)
+      });
+    }
+  }
+  return out;
+}
+
+const chosen = (candidate, leap) =>
+  ({ kind: 'trip', tripId: candidate.tripId, direction: candidate.direction, leap });
+
+/**
+ * The header's answer outside travel mode (client-storage.md, `locate`).
+ * Origin is where the user is; destination is the usual place from there,
+ * else home. With no fix and no station index this is today's predictor.
+ * @returns {{kind: 'trip'|'pair'|'setup'}} see the contract for each shape.
+ */
+export function locate(doc, nowMs, opts = {}) {
+  const spot = here(doc, opts.stations, opts.fix);
+  const trips = doc.trips || [];
+  const predicted = () => {
+    const answer = predict(doc, nowMs, opts);
+    return { kind: 'trip', tripId: answer.tripId, direction: answer.direction, leap: 'usual' };
+  };
+  if (!spot) return trips.length ? predicted() : { kind: 'setup', from: null };
+
+  const home = homeOf(doc);
+  const away = Boolean(home) && home.station.id !== spot.station.id;
+  const candidates = fromHere(doc, spot.station, nowMs);
+
+  if (candidates.length) {
+    const best = candidates.reduce((top, candidate) => Math.max(top, candidate.score), 0);
+    const leaders = candidates.filter((candidate) => candidate.score === best);
+    if (best > 0 && leaders.length === 1) return chosen(leaders[0], 'usual');
+    const homeward = away && candidates.find((candidate) => candidate.to.id === home.station.id);
+    if (homeward) return chosen(homeward, 'home');
+    const last = doc.lastViewed;
+    const viewed = last && candidates.find((candidate) =>
+      candidate.tripId === last.tripId && candidate.direction === last.direction);
+    return chosen(viewed || candidates[0], 'usual');
+  }
+  if (away) return { kind: 'pair', from: spot.station, to: home.station };
+  if (trips.length) return predicted();
+  return { kind: 'setup', from: spot.station };
 }

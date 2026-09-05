@@ -179,3 +179,27 @@ export function threeLegJourney() {
   j.legs = 3;
   return j;
 }
+
+
+/* A dozen real stations with their real coordinates, standing in for the baked
+   index. Every distance the location tests assert is arithmetic on these. */
+export const STATIONS = {
+  rhodes: { id: '213820', name: 'Rhodes Station', modes: ['train'], location: { lat: -33.8308, lon: 151.0879 } },
+  meadowbank: { id: '213810', name: 'Meadowbank Station', modes: ['train'], location: { lat: -33.8175, lon: 151.0895 } },
+  burwood: { id: '213110', name: 'Burwood Station', modes: ['train'], location: { lat: -33.8772, lon: 151.1040 } },
+  strathfield: { id: '213210', name: 'Strathfield Station', modes: ['train'], location: { lat: -33.8720, lon: 151.0944 } },
+  townhall: { id: '200070', name: 'Town Hall Station', modes: ['train'], location: { lat: -33.8735, lon: 151.2070 } },
+  wynyard: { id: '200080', name: 'Wynyard Station', modes: ['train'], location: { lat: -33.8659, lon: 151.2064 } },
+  central: { id: '200060', name: 'Central Station', modes: ['train'], location: { lat: -33.8832, lon: 151.2069 } },
+  bondi: { id: '202210', name: 'Bondi Junction Station', modes: ['train'], location: { lat: -33.8915, lon: 151.2477 } },
+  parramatta: { id: '215020', name: 'Parramatta Station', modes: ['train'], location: { lat: -33.8173, lon: 151.0053 } },
+  olympicpark: { id: '214710', name: 'Olympic Park Station', modes: ['train'], location: { lat: -33.8471, lon: 151.0637 } },
+  epping: { id: '212510', name: 'Epping Station', modes: ['train', 'metro'], location: { lat: -33.7726, lon: 151.0819 } },
+  chatswood: { id: '206710', name: 'Chatswood Station', modes: ['train', 'metro'], location: { lat: -33.7967, lon: 151.1805 } }
+};
+
+export const INDEX = Object.values(STATIONS);
+
+export function tripBetween(id, fromKey, toKey, createdAt = new Date(0).toISOString()) {
+  return { id, from: STATIONS[fromKey], to: STATIONS[toKey], createdAt };
+}

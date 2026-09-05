@@ -2,7 +2,7 @@
 
 import {
   loadDoc, saveDoc, addTrip, findTrip, leg, cacheKey, putCache, getCache, recordView,
-  recordRide, updateStop, setHome, declineLocation, LOCATION_ASK_QUIET_MS
+  recordRide, updateStop, declineLocation, LOCATION_ASK_QUIET_MS
 } from './storage.js';
 import { distanceKm, predict } from './predict.js';
 import { boardModel, promotedRow } from './rowmodel.js';
@@ -259,10 +259,7 @@ function renderHome() {
     predicted: state.predicted,
     leave: leaveDistance()
   });
-  if (state.offerDismissed) {
-    home.over = false;
-    home.home.moved = null;
-  }
+  if (state.offerDismissed) home.over = false;
   const freshness = home.freshness;
   home.freshness = '';
   const html = Home.homeHtml(home);
@@ -415,13 +412,6 @@ function homeAction(action, element) {
     return;
   }
   if (action === 'use-location') return requestLocation();
-  if (action === 'accept-home') {
-    const station = state.doc.trips.flatMap((trip) => [trip.from, trip.to])
-      .find((stop) => stop.id === element.dataset.id);
-    if (station) ctx.update(setHome(state.doc, station, 3, now()));
-    state.offerDismissed = true;
-    renderHome();
-  }
 }
 
 function requestLocation() {
@@ -557,13 +547,8 @@ function recordCompletedFocus(doc) {
   const trip = findTrip(doc, focus.tripId);
   if (!trip) return doc;
   const ends = leg(trip, focus.direction);
-  let next = recordRide(doc, { tripId: focus.tripId, direction: focus.direction },
+  return recordRide(doc, { tripId: focus.tripId, direction: focus.direction },
     focus.journey, ends.from, ends.to);
-  if (!next.home) {
-    const inferred = Home.inferHome(next, now()).inferred;
-    if (inferred) next = setHome(next, inferred.station, inferred.confidence, now());
-  }
-  return next;
 }
 
 async function fetchPast(initial) {

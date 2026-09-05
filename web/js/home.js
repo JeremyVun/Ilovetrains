@@ -5,47 +5,14 @@ import { esc, figureHtml, shortName, fitStationNames } from './dom.js';
 import {
   focusExpired, focusOf, directionsModel, focusStatus, journeyCancelled
 } from './focus.js';
-import { arrivalMs, departureMs, legsOf } from './journey.js';
+import { arrivalMs, departureMs, journeyKey, legsOf } from './journey.js';
 import { clock } from './time.js';
 import { journeyDeviceHtml, clampJourneyBars } from './journeybar.js';
 import { cacheKey, leg } from './storage.js';
-import { dayTypeMatch, distanceKm, hourProximity, isWeekend, rankTrips } from './predict.js';
+import { AT_STATION_KM, distanceKm } from './stations.js';
+import { dayTypeMatch, homeOf, HOME_VOTES_NEEDED, hourProximity, isWeekend, rankTrips } from './predict.js';
 
-const EVENING_START = 16;
-const MORNING_END = 11;
-const HOME_EVIDENCE = 3;
 const RECEIPT_EVIDENCE = 3;
-/* Inside this radius the top line answers "you are here" rather than "how far". */
-const AT_ORIGIN_KM = 0.2;
-
-export function inferHome(doc, nowMs) {
-  const rides = (doc.rides || []).filter((ride) => Date.parse(ride.arrivedAt) <= nowMs);
-  const scores = new Map();
-  for (const ride of rides) {
-    const departureHour = new Date(ride.departedAt).getHours();
-    const arrivalHour = new Date(ride.arrivedAt).getHours();
-    if (departureHour < MORNING_END) addScore(scores, ride.from, 1);
-    if (arrivalHour >= EVENING_START) addScore(scores, ride.to, 1);
-  }
-  const leaders = [...scores.values()].sort((a, b) => b.count - a.count);
-  const inferred = leaders[0] && leaders[0].count >= HOME_EVIDENCE
-    ? { station: leaders[0].station, confidence: leaders[0].count } : null;
-  const home = doc.home || (inferred
-    ? { ...inferred, inferredAt: new Date(nowMs).toISOString() }
-    : doc.trips[0] ? { station: doc.trips[0].from, confidence: 0, inferredAt: null } : null);
-
-  const evenings = rides.filter((ride) => new Date(ride.arrivedAt).getHours() >= EVENING_START).slice(-3);
-  const moved = home && evenings.length === 3
-    && evenings.every((ride) => ride.to.id === evenings[0].to.id)
-    && evenings[0].to.id !== home.station.id ? evenings[0].to : null;
-  return { home, inferred, moved };
-}
-
-function addScore(scores, station, value) {
-  const current = scores.get(station.id) || { station, count: 0 };
-  current.count += value;
-  scores.set(station.id, current);
-}
 
 export function tripIsOver(focus, nowMs) {
   if (!focus) return false;
@@ -93,6 +60,13 @@ function lineCodes(doc, trip, direction, currentJourney) {
   return codes;
 }
 
+/* The mark is a fact about this open: the trip did not exist when the page
+   loaded, so the app is the one that saved it. */
+function savedThisOpen(trip, loadedAt) {
+  const created = Date.parse(trip.createdAt);
+  return Number.isFinite(loadedAt) && Number.isFinite(created) && created >= loadedAt;
+}
+
 export function homeModel(doc, selection, body, nowMs, opts = {}) {
   const focus = focusOf(doc);
   const activeFocus = focus && !focusExpired(focus, nowMs) ? focus : null;
@@ -117,7 +91,7 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     ? { tripId: activeFocus.tripId, direction: activeFocus.direction } : selection;
   const selectedTrip = doc.trips.find((item) => item.id === selected.tripId) || trip;
   const selectedEnds = leg(selectedTrip, selected.direction);
-  const home = inferHome(doc, nowMs);
+  const home = homeOf(doc);
   let receipt = opts.receipt || '';
   if (!receipt && selected.direction === 'reverse') {
     const outbound = (doc.rides || []).filter((ride) => ride.tripId === selectedTrip.id && ride.direction === 'forward').at(-1);
@@ -131,6 +105,11 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
         && evidence.days >= RECEIPT_EVIDENCE
         ? 'You check this trip most weekday mornings.' : 'You often check this trip around now.';
     }
+  }
+  if (!receipt && opts.predicted && !activeFocus && opts.leap === 'home' && home) {
+    receipt = home.confidence >= HOME_VOTES_NEEDED
+      ? `Your days usually start at ${shortName(home.station.name)}.`
+      : `You usually travel from ${shortName(home.station.name)}.`;
   }
 
   const directions = journey ? directionsModel(journey, nowMs, {
@@ -158,10 +137,12 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
       codes: lineCodes(doc, entry.trip, entry.direction,
         entry.trip.id === selectedTrip.id ? journey : null),
       distance: formatDistance(entry.distanceKm),
-      ridden: lastRidden(doc, entry.trip.id, nowMs)
+      ridden: lastRidden(doc, entry.trip.id, nowMs),
+      justAdded: entry.trip.id === selectedTrip.id && !activeFocus
+        && Boolean(opts.predicted) && savedThisOpen(entry.trip, opts.loadedAt)
     };
   });
-  const over = tripIsOver(activeFocus, nowMs);
+  const over = Boolean(activeFocus) && (tripIsOver(activeFocus, nowMs) || Boolean(opts.arrived));
   // A board still in the post is not offline; the pill rests until it answers.
   const waiting = !body && !opts.offline;
   const status = activeFocus ? focusStatus(activeFocus.journey, {
@@ -175,6 +156,12 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     directions,
     ranked,
     home,
+    strip: activeFocus && activeFocus.by === 'inferred' ? {
+      origin: selectedEnds.from,
+      destination: selectedEnds.to,
+      departureMs: departureMs(activeFocus.journey),
+      journeyKey: journeyKey(activeFocus.journey)
+    } : null,
     focus: activeFocus,
     status,
     top: status ? null : topLine(shortName(selectedEnds.from.name),
@@ -190,7 +177,7 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
    back to a status word when it cannot. */
 function topLine(name, km) {
   if (!Number.isFinite(km)) return { lead: 'Next train', name: '' };
-  if (km <= AT_ORIGIN_KM) return { lead: 'At ', name };
+  if (km <= AT_STATION_KM) return { lead: 'At ', name };
   return { lead: `${formatDistance(km).replace(/ away$/, '')} to `, name };
 }
 
@@ -228,6 +215,7 @@ export function homeHtml(model) {
     </section>
     ${offerHtml(model)}
     <div class="hm-rule"></div>
+    ${model.strip ? stripHtml() : ''}
     <div class="hm-ix tl" data-t="trip-list" data-scroller>
       <div class="hm-anchor"><div class="l">My trips</div></div>
       ${model.ranked.map((entry) => tripRowHtml(entry, model)).join('')}
@@ -269,6 +257,9 @@ function subHtml(entry, model) {
   if (entry.selected && model.status) {
     return `<b class="${statusClass(model.status).trim()}" data-row-status data-late="${model.status.late}">${statusHtml(model.status)}</b>`;
   }
+  if (entry.justAdded) {
+    return `<i class="hm-new">Just added</i>${entry.distance ? ` · ${esc(entry.distance)}` : ''}`;
+  }
   if (entry.selected) {
     return `<b>Shown above</b>${entry.distance ? ` · ${esc(entry.distance)}` : ''}`;
   }
@@ -296,12 +287,14 @@ function offerHtml(model) {
       <p>You’ve arrived. The return trip is ready when you are.</p>
       <div class="hm-acts"><button data-act="way-back">Show the way back</button><button class="q" data-act="dismiss-offer">Not now</button></div></div>`;
   }
-  if (model.home.moved) {
-    return `<div class="hm-offer"><div class="r"></div><span class="k">Home may have moved</span>
-      <p>Your last three evenings ended at ${esc(shortName(model.home.moved.name))}, not ${esc(shortName(model.home.home.station.name))}.</p>
-      <div class="hm-acts"><button data-act="accept-home" data-id="${esc(model.home.moved.id)}">Use ${esc(shortName(model.home.moved.name))}</button><button class="q" data-act="dismiss-offer">Keep current</button></div></div>`;
-  }
   return '';
+}
+
+/* The inferred header's only control, and its receipt: the app guessed this
+   trip, so the correction is one tap (design.md, ruling 7). */
+function stripHtml() {
+  return '<div class="hm-strip" data-strip><span class="q">Going somewhere else?</span>'
+    + '<button data-act="change-destination" data-tap>Change</button></div>';
 }
 
 function locationAskHtml() {

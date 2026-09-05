@@ -5,9 +5,10 @@ import assert from 'node:assert/strict';
 
 import {
   predict, scoreCandidate, scoreAll, dayTypeMatch, hourProximity, recencyDecay,
-  distanceKm, locationFactor, rankTrips, PREDICT_FLOOR
+  distanceKm, locationFactor, rankTrips, homeOf, locate, PREDICT_FLOOR, HOME_VOTES_NEEDED
 } from '../js/predict.js';
 import { emptyDoc, addTrip, recordView } from '../js/storage.js';
+import { INDEX, STATIONS, tripBetween } from './fixture.js';
 
 const CENTRAL = { id: '200060', name: 'Central Station' };
 const PARRA = { id: '215020', name: 'Parramatta Station' };
@@ -209,4 +210,118 @@ test('one real view outweighs the floor even from the wrong end of the line', ()
 
   assert.ok(scores.forward > scores.reverse, 'history dominates the floor');
   assert.deepEqual(predict(d, MON_0800, { fix: AT_PARRA }), { tripId: 'home', direction: 'forward' });
+});
+
+
+/* ---- home from the daily votes (design.md 3) ---------------------------- */
+
+const votes = (keys) => keys.map((key, index) => ({
+  day: `2026-08-${String(24 + index).padStart(2, '0')}`, station: STATIONS[key]
+}));
+
+test('home is the station with the most votes among the last seven days', () => {
+  const doc = { ...emptyDoc(), homeVotes: votes(['rhodes', 'rhodes', 'burwood', 'rhodes', 'burwood', 'burwood', 'burwood']) };
+  assert.deepEqual(homeOf(doc), { station: STATIONS.burwood, confidence: 4 });
+});
+
+test('three votes are the minimum; below it the first saved trip answers at zero', () => {
+  const thin = {
+    ...emptyDoc(),
+    trips: [tripBetween('t1', 'rhodes', 'bondi')],
+    homeVotes: votes(['rhodes', 'rhodes', 'burwood'])
+  };
+  assert.deepEqual(homeOf(thin), { station: STATIONS.rhodes, confidence: 0 });
+
+  const enough = { ...thin, homeVotes: votes(['rhodes', 'rhodes', 'rhodes']) };
+  assert.deepEqual(homeOf(enough), { station: STATIONS.rhodes, confidence: HOME_VOTES_NEEDED });
+
+  assert.equal(homeOf({ ...emptyDoc(), homeVotes: votes(['rhodes', 'burwood']) }), null,
+    'no votes worth counting and no saved trip is no home');
+});
+
+test('a tie goes to the station of the most recent vote among the tied', () => {
+  const doc = { ...emptyDoc(), homeVotes: votes(['rhodes', 'burwood', 'rhodes', 'burwood', 'rhodes', 'burwood']) };
+  assert.deepEqual(homeOf(doc), { station: STATIONS.burwood, confidence: 3 });
+
+  const other = { ...emptyDoc(), homeVotes: votes(['burwood', 'rhodes', 'burwood', 'rhodes', 'burwood', 'rhodes']) };
+  assert.deepEqual(homeOf(other), { station: STATIONS.rhodes, confidence: 3 });
+});
+
+
+/* ---- locate: the answer outside travel mode (design.md 4) --------------- */
+
+const AT = (key) => ({ ...STATIONS[key].location });
+const homeVotes = votes(['rhodes', 'rhodes', 'rhodes']);
+const reverseViews = (times) => times.map((t) => ({ tripId: 't1', direction: 'reverse', t }));
+
+test('away from home with nothing to go on, the header answers with the way home', () => {
+  const doc = { ...emptyDoc(), trips: [tripBetween('t1', 'rhodes', 'bondi')], homeVotes };
+  assert.deepEqual(locate(doc, MON_0800, { fix: AT('bondi'), stations: INDEX }),
+    { kind: 'trip', tripId: 't1', direction: 'reverse', leap: 'home' });
+});
+
+test('real history from where you are outranks the home rule', () => {
+  const doc = {
+    ...emptyDoc(),
+    trips: [tripBetween('t1', 'rhodes', 'bondi')],
+    homeVotes,
+    history: reverseViews([
+      '2026-08-24T08:10:00+10:00', '2026-08-25T08:05:00+10:00', '2026-08-26T07:50:00+10:00'
+    ])
+  };
+  assert.deepEqual(locate(doc, MON_0800, { fix: AT('bondi'), stations: INDEX }),
+    { kind: 'trip', tripId: 't1', direction: 'reverse', leap: 'usual' });
+});
+
+test('a pair no saved trip covers is the answer where the user actually is', () => {
+  const doc = { ...emptyDoc(), trips: [tripBetween('t1', 'rhodes', 'bondi')], homeVotes };
+  const answer = locate(doc, MON_0800, { fix: AT('burwood'), stations: INDEX });
+
+  assert.equal(answer.kind, 'pair');
+  assert.deepEqual([answer.from.id, answer.to.id], [STATIONS.burwood.id, STATIONS.rhodes.id]);
+  assert.ok(answer.from.location && answer.to.location, 'the controller saves this pair as a trip');
+});
+
+test('at home with nothing saved from home, today\'s predictor answers unchanged', () => {
+  const doc = { ...emptyDoc(), trips: [tripBetween('t1', 'central', 'parramatta')], homeVotes };
+  const opts = { fix: AT('rhodes'), stations: INDEX };
+
+  assert.deepEqual(locate(doc, MON_0800, opts),
+    { kind: 'trip', ...predict(doc, MON_0800, opts), leap: 'usual' });
+});
+
+test('with no here at all the predictor answers, and a new user gets the sheet', () => {
+  const nowhere = { fix: { lat: -33.9042, lon: 151.1040 }, stations: INDEX };
+  const doc = { ...emptyDoc(), trips: [tripBetween('t1', 'central', 'parramatta')], homeVotes };
+
+  assert.deepEqual(locate(doc, MON_0800, nowhere),
+    { kind: 'trip', ...predict(doc, MON_0800, nowhere), leap: 'usual' });
+  assert.deepEqual(locate(doc, MON_0800, {}),
+    { kind: 'trip', ...predict(doc, MON_0800, {}), leap: 'usual' });
+  assert.deepEqual(locate(emptyDoc(), MON_0800, nowhere), { kind: 'setup', from: null });
+});
+
+test('a new user with a fix gets the sheet with From already filled', () => {
+  const doc = { ...emptyDoc(), homeVotes };
+  assert.deepEqual(locate(doc, MON_0800, { fix: AT('rhodes'), stations: INDEX }),
+    { kind: 'setup', from: STATIONS.rhodes });
+
+  // Votes know where home is before any trip is saved, so the pair is answerable.
+  const away = locate(doc, MON_0800, { fix: AT('burwood'), stations: INDEX });
+  assert.deepEqual([away.kind, away.from.id, away.to.id],
+    ['pair', STATIONS.burwood.id, STATIONS.rhodes.id]);
+});
+
+test('candidates from here that tie fall back to lastViewed, then to saved order', () => {
+  const doc = {
+    ...emptyDoc(),
+    trips: [tripBetween('t1', 'central', 'parramatta'), tripBetween('t2', 'central', 'townhall')],
+    homeVotes
+  };
+  const opts = { fix: AT('central'), stations: INDEX };
+
+  assert.deepEqual(locate(doc, MON_0800, opts),
+    { kind: 'trip', tripId: 't1', direction: 'forward', leap: 'usual' });
+  assert.deepEqual(locate({ ...doc, lastViewed: { tripId: 't2', direction: 'forward' } }, MON_0800, opts),
+    { kind: 'trip', tripId: 't2', direction: 'forward', leap: 'usual' });
 });

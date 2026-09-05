@@ -5,11 +5,12 @@ import assert from 'node:assert/strict';
 
 import {
   setFocus, clearFocus, isFocused, focusExpired, matchJourney, refreshFocus,
-  directionsModel, focusStatus, FOCUS_CLEAR_MS
+  directionsModel, focusStatus, inferTravel, arrived, FOCUS_CLEAR_MS
 } from '../js/focus.js';
-import { parseDoc, serializeDoc, emptyDoc, removeTrip } from '../js/storage.js';
+import { parseDoc, serializeDoc, emptyDoc, recordLastOpen, removeTrip } from '../js/storage.js';
 import {
-  TRANSFER_NOW, TRANSFER_DEPARTED_NOW, transferBody, transferJourneys, delayLeg, cancelLeg
+  TRANSFER_NOW, TRANSFER_DEPARTED_NOW, transferBody, transferJourneys, delayLeg, cancelLeg,
+  STATIONS, tripBetween
 } from './fixture.js';
 
 const TRIP = {
@@ -28,6 +29,7 @@ test('focusing snapshots the journey verbatim', () => {
   const journey = transferJourneys()[0];
   const doc = docWithFocus(journey);
 
+  assert.equal(doc.focus.by, 'focus', 'a hand focus says so');
   assert.equal(doc.focus.tripId, TRIP.id);
   assert.equal(doc.focus.direction, 'forward');
   assert.equal(doc.focus.focusedAt, '2026-08-31T23:21:00.000Z');
@@ -80,6 +82,17 @@ test('a departed journey keeps its snapshot rather than losing itself', () => {
 
   assert.equal(matchJourney(remaining, doc.focus.journey), null);
   assert.deepEqual(next.focus.journey, doc.focus.journey);
+});
+
+test('the kind of focus survives a refresh that replaces the snapshot', () => {
+  const doc = setFocus({ ...emptyDoc(), trips: [TRIP] }, SELECTION,
+    transferJourneys()[0], TRANSFER_NOW, 'inferred');
+  const journeys = transferJourneys();
+  delayLeg(journeys[0], 0, 6);
+  const next = refreshFocus(doc, SELECTION, transferBody({ journeys }), TRANSFER_NOW);
+
+  assert.equal(next.focus.by, 'inferred');
+  assert.notDeepEqual(next.focus.journey, doc.focus.journey);
 });
 
 test('another trip\'s board never overwrites the snapshot', () => {
@@ -198,4 +211,79 @@ test('a later leg cancelled after departure names that leg, not the one that lef
   assert.equal(directionsModel(journey, at('09:21')).instruction, '09:24 CANCELLED · NEXT TRAIN');
   assert.equal(directionsModel(cancelLeg(transferJourneys()[0], 0), at('09:33')).instruction,
     '09:24 CANCELLED · NEXT TRAIN');
+});
+
+
+/* ---- inferred travel mode (design.md 5) --------------------------------- */
+
+const RIDE = {
+  line: { name: 'T9' },
+  departure: { scheduled: '2026-09-05T09:24:00+10:00', estimated: null },
+  arrival: { scheduled: '2026-09-05T10:03:00+10:00', estimated: null }
+};
+const on = (time) => Date.parse(`2026-09-05T${time}:00+10:00`);
+const AT_STRATHFIELD = { lat: -33.8720, lon: 151.0944 };
+const AT_RHODES = { lat: -33.8308, lon: 151.0879 };
+/* 1.2 km from Rhodes, but away from Bondi Junction rather than toward it. */
+const BACKWARDS = { lat: -33.8254, lon: 151.0765 };
+/* 300 m from Rhodes, still 16.4 km from Bondi Junction. */
+const JUST_LEFT = { lat: -33.8281, lon: 151.0879 };
+
+function seen(at = '09:15', station = STATIONS.rhodes, direction = 'forward') {
+  const doc = { ...emptyDoc(), trips: [tripBetween('t1', 'rhodes', 'bondi')] };
+  return recordLastOpen(doc, { station, tripId: 't1', direction, journey: RIDE }, on(at));
+}
+
+test('seen on the platform and moved toward the destination is travel mode', () => {
+  const focus = inferTravel(seen(), on('09:40'), AT_STRATHFIELD);
+
+  assert.deepEqual(focus, {
+    tripId: 't1',
+    direction: 'forward',
+    focusedAt: new Date(on('09:40')).toISOString(),
+    by: 'inferred',
+    journey: RIDE
+  });
+});
+
+test('movement that is not toward the destination is not a ride', () => {
+  assert.equal(inferTravel(seen(), on('09:40'), BACKWARDS), null);
+  assert.equal(inferTravel(seen(), on('09:40'), AT_RHODES), null, 'still on the platform');
+});
+
+test('a sighting too long before departure, or too long after arrival, is not evidence', () => {
+  assert.equal(inferTravel(seen('09:05'), on('09:40'), AT_STRATHFIELD), null, '19 min before it left');
+  assert.equal(inferTravel(seen('09:09'), on('09:40'), AT_STRATHFIELD).by, 'inferred', '15 min exactly');
+  assert.equal(inferTravel(seen(), on('10:34'), AT_STRATHFIELD), null, 'past arrival plus 30 min');
+  assert.equal(inferTravel(seen(), on('10:33'), AT_STRATHFIELD).by, 'inferred', '30 min exactly');
+  assert.equal(inferTravel(seen(), on('09:23'), AT_STRATHFIELD), null, 'not under way yet');
+});
+
+test('speed can stand in for the geometry, but never without leaving the platform', () => {
+  assert.equal(inferTravel(seen(), on('09:40'), { ...JUST_LEFT, speed: 12 }).by, 'inferred');
+  assert.equal(inferTravel(seen(), on('09:40'), JUST_LEFT), null, 'the same fix with no speed');
+  assert.equal(inferTravel(seen(), on('09:40'), { ...AT_RHODES, speed: 12 }), null,
+    'a fast reading at the platform is noise, not a ride');
+  assert.equal(inferTravel(seen(), on('09:40'), { ...JUST_LEFT, speed: 7 }), null);
+  assert.equal(inferTravel(seen(), on('09:40'), { ...JUST_LEFT, speed: NaN }), null);
+});
+
+test('entry needs a previous open at this journey\'s own origin, and its trip', () => {
+  assert.equal(inferTravel(emptyDoc(), on('09:40'), AT_STRATHFIELD), null);
+  assert.equal(inferTravel(seen('09:15', STATIONS.burwood), on('09:40'), AT_STRATHFIELD), null);
+  assert.equal(inferTravel(seen('09:15', null), on('09:40'), AT_STRATHFIELD), null,
+    'no station at the previous open is no sighting');
+  assert.equal(inferTravel(removeTrip(seen(), 't1'), on('09:40'), AT_STRATHFIELD), null);
+  assert.equal(inferTravel(seen(), on('09:40'), null), null);
+});
+
+test('arrival at the destination ends the trip as the rider steps off', () => {
+  const focus = { tripId: 't1', direction: 'forward', by: 'inferred', journey: RIDE };
+  const platform = { lat: -33.89015, lon: 151.2477 };
+
+  assert.equal(arrived(focus, STATIONS.bondi, platform, on('09:59')), true);
+  assert.equal(arrived(focus, STATIONS.bondi, platform, on('09:57')), false, 'five minutes out is too early');
+  assert.equal(arrived(focus, STATIONS.bondi, AT_STRATHFIELD, on('09:59')), false);
+  assert.equal(arrived(focus, STATIONS.bondi, null, on('09:59')), false);
+  assert.equal(arrived(null, STATIONS.bondi, platform, on('09:59')), false);
 });

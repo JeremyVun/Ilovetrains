@@ -483,6 +483,21 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
 }
 .hm-acts button.q { color: var(--ink-3); }
 .hm-rule { flex: none; height: 2px; background: var(--ink); opacity: .85; }
+/* The second offer grammar: one line below the heavy rule, question left,
+   action right, so the header above it stays read-only (ui.md, Core flow). */
+.hm-strip {
+  flex: none; display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; padding: 0 22px; min-height: 48px; border-bottom: 1px solid var(--rule);
+}
+.hm-strip .q {
+  font-size: 15px; font-weight: 300; color: var(--ink-2); min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hm-strip button {
+  flex: none; min-height: 48px; white-space: nowrap; font-size: 12px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--ink);
+}
+.hm-new { font-size: 12px; font-weight: 400; font-style: italic; letter-spacing: 0; text-transform: none; }
 .hm-ix {
   flex: 1 1 auto; min-height: 0; padding: 0 22px; display: flex; flex-direction: column;
   overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
@@ -601,7 +616,7 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
    at the full idiom (205px of copy in a 210px column, measured). */
 @media (max-width: 375px) {
   body { --sy-pad: 18px; }
-  .sy-mast, .hm-top, .hm-hd, .hm-offer, .hm-ix, .hm-bar, .hm-ask, .hm-mast, .hm-sheet {
+  .sy-mast, .hm-top, .hm-hd, .hm-offer, .hm-strip, .hm-ix, .hm-bar, .hm-ask, .hm-mast, .hm-sheet {
     padding-left: 18px; padding-right: 18px;
   }
   .sy-cap { padding-left: 6px; padding-right: 6px; }
@@ -630,7 +645,7 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
   .sy-fig .sy-n { font-size: 52px; }
   .sy-row.wide .sy-fig .sy-n { font-size: 40px; }
   .hm-c { width: 100%; }
-  .hm-c .hm-top, .hm-c .hm-hd, .hm-c .hm-offer, .hm-c .hm-ix,
+  .hm-c .hm-top, .hm-c .hm-hd, .hm-c .hm-offer, .hm-c .hm-strip, .hm-c .hm-ix,
   .hm-c .hm-bar, .hm-c .hm-ask, .hm-c .hm-mast, .hm-c .hm-sheet {
     padding-left: 64px; padding-right: 64px;
   }

@@ -15,26 +15,91 @@ import {
   journeyDetail, journeyKey, legsOf, arrivalMs, departureMs, effective, platformNumber
 } from './journey.js';
 import { shortName } from './dom.js';
+import { distanceKm } from './stations.js';
+import { findTrip, leg } from './storage.js';
 
 /* Half an hour past arrival the journey is over and directions are clutter
    (client-storage.md). Clearing is automatic so nobody has to remember to. */
 export const FOCUS_CLEAR_MS = 30 * 60_000;
+
+/* Inferred entry (client-storage.md, Travel mode). The journey must be under
+   way, the previous open must have been on its platform shortly before it
+   left, and the phone must have moved the way the train goes. */
+export const TRAVEL_LATE_MS = 30 * 60_000;
+export const TRAVEL_SEEN_MS = 15 * 60_000;
+export const TRAVEL_MOVED_KM = 1;
+export const TRAVEL_SPEED_MS = 8;
+export const TRAVEL_SPEED_MOVED_KM = 0.2;
+/* Exit: at the destination, the trip is over as the rider steps off. */
+export const ARRIVED_KM = 0.2;
+export const ARRIVED_EARLY_MS = 5 * 60_000;
 
 export function focusOf(doc) {
   return (doc && doc.focus) || null;
 }
 
 /** At most one focused journey: focusing another replaces it. */
-export function setFocus(doc, selection, journey, nowMs) {
+export function setFocus(doc, selection, journey, nowMs, by = 'focus') {
   return {
     ...doc,
     focus: {
       tripId: selection.tripId,
       direction: selection.direction,
       focusedAt: new Date(nowMs).toISOString(),
+      by,
       journey
     }
   };
+}
+
+/**
+ * Travel mode entered from the fix alone: the focus object to set, or null.
+ * Condition 3 (moved toward the destination) is what stops a walk back home
+ * for a forgotten laptop from reading as a ride.
+ */
+export function inferTravel(doc, nowMs, fix) {
+  const last = doc && doc.lastOpen;
+  if (!last || !fix) return null;
+  const trip = findTrip(doc, last.tripId);
+  if (!trip) return null;
+  const ends = leg(trip, last.direction);
+  const origin = ends.from.location;
+  const destination = ends.to.location;
+  if (!origin || !destination) return null;
+
+  const departure = departureMs(last.journey);
+  const arrival = arrivalMs(last.journey);
+  const seenAt = Date.parse(last.at);
+  if (departure === null || arrival === null || !Number.isFinite(seenAt)) return null;
+  if (nowMs < departure || nowMs > arrival + TRAVEL_LATE_MS) return null;
+  if (!last.station || last.station.id !== ends.from.id) return null;
+  if (departure - seenAt > TRAVEL_SEEN_MS) return null;
+
+  const left = distanceKm(fix, origin);
+  if (left === null) return null;
+  const toward = left >= TRAVEL_MOVED_KM
+    && distanceKm(fix, destination) <= distanceKm(origin, destination) - TRAVEL_MOVED_KM;
+  const fast = Number.isFinite(fix.speed) && fix.speed >= TRAVEL_SPEED_MS
+    && left >= TRAVEL_SPEED_MOVED_KM;
+  if (!toward && !fast) return null;
+
+  return {
+    tripId: last.tripId,
+    direction: last.direction,
+    focusedAt: new Date(nowMs).toISOString(),
+    by: 'inferred',
+    journey: last.journey
+  };
+}
+
+/** The journey snapshot carries no coordinates, so the destination station
+    comes from the saved trip. */
+export function arrived(focus, destination, fix, nowMs) {
+  if (!focus || !destination || !fix) return false;
+  const arrival = arrivalMs(focus.journey);
+  if (arrival === null || nowMs < arrival - ARRIVED_EARLY_MS) return false;
+  const km = distanceKm(fix, destination.location);
+  return km !== null && km <= ARRIVED_KM;
 }
 
 export function clearFocus(doc) {
