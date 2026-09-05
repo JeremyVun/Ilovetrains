@@ -47,6 +47,16 @@ late in the warning colour. The rules and geometry are binding in
 `docs/contracts/ui.md` and `docs/contracts/client-storage.md`; every exemplar
 in `assets/comps/latest/` is shot from the built client.
 
+### Smart header location and travel mode — shipped 2026-09-05
+The header starts at a nearby station, uses relevant history before the usual
+starting station, and saves an unsaved pair when it becomes the answer. Home
+is inferred silently from daily first-open votes. Movement can enter travel
+mode from the last shown departure, and a destination fix records arrival
+even offline. The inferred header offers `CHANGE` through the existing sheet.
+The shared baked station index now serves client location lookup and server
+autocomplete. Rules are in the client-storage and UI contracts. The optional
+real-phone speed observation remains open in `docs/backlog/smart-header-v2/`.
+
 ## Next
 
 Decide after living with M3 on real commutes. The owner's playtest notes
@@ -54,25 +64,21 @@ are the spec for the next round, verbatim, as they were for board v2.
 Suggested order, each its own backlog folder:
 
 ### M4 — Smart header accuracy
-The number one metric. Today's inputs are view history (time of day, day
-type, recency), a one-shot geolocation term, completed rides from focused
-journeys, and a three-vote home inference. Candidate work, all to be judged
-by whether the header answers the user's real intent more often:
+The number one metric. A nearby station sets the origin, view history sets
+the destination before daily home votes, and movement can infer travel on
+the last shown departure. Without a nearby station, the original history
+score and location term still apply. Candidate work is judged by whether
+the header answers the user's real intent more often:
 - **Measure before tuning.** Record, on the device only, whether the
   header's pick was the trip the user then acted on (tapped, focused) or
   corrected away from. Without a hit rate, tuning is guessing. Opened as
   `docs/backlog/analytics/` (owner, 2026-09-05): analytics and A/B testing
   from the start, first experiment the inferred travel-mode strip.
-- **Better signals over harder guessing**: use the time of the last ride
-  and the trip's own duration to judge "trip over" and "on the way back";
-  weekday/weekend and public-holiday awareness; a walking-distance term that
-  prefers the station the user is nearest to, not just the origin they
-  saved; ride detection once a native client can observe it.
-- **Receipt copy system**: every leap class has a receipt, the receipt names
-  the real evidence, and no receipt appears when none is needed. Copy
-  reviewed with the `user-facing-copy` skill.
-- **Home-may-have-moved** flow iterated from real use (it is built but the
-  experience is untested in the wild).
+- **Better signals over harder guessing**: public-holiday awareness and
+  ride detection once a native client can observe it. Location-first origins,
+  daily home votes and inferred travel are now the baseline to measure.
+- **Receipt copy system**: test the evidence-specific receipts in real use.
+  Daily home votes now re-infer silently; the moved-home offer is removed.
 - **Focused-journey disruption recovery**: when a later leg is cancelled while
   the user may already be travelling, make the smart header switch to the next
   best alternative. Do not rely on a recovery button in the cancelled journey
@@ -106,10 +112,6 @@ geometric. Open owner questions, each an observation waiting on a ruling:
 - Tune the server transfer floor (`MIN_CONNECTION_TIME`) from real
   connections rather than defaults; never show a trip the user would not
   take.
-- Baked station index: build the ~300-entry train/metro station list into
-  the server (from the GTFS stops bundle) so `/api/v1/stops` never touches
-  TfNSW — instant autocomplete, zero upstream calls. Motivated by live use
-  2026-09-01: every distinct search prefix is a cold ~0.5–1.5s upstream call.
 - Disruption/trackwork awareness surfaced on saved trips and in the header.
 - No routing configuration surface. If a case seems to need one, bring it to
   the owner as a routing defect first.
