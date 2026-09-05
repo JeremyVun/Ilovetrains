@@ -23,6 +23,22 @@ The public response `/tmp/ferry-pyrmont-doublebay.json`, captured at
 `Pyrmont Bay Wharf`, equal to the origin. The earlier destination-only
 wrapping rule is superseded by this design review.
 
+Round 1 compares balanced endpoint columns (C1), labelled endpoint rows
+(C2), and stacked route endpoints with compact ferry markers (C3). The
+recommendation is C1: retain full endpoint names under the same wrapping
+rule and omit a boarding cap only when its label exactly repeats the
+origin after case/whitespace normalization. Numeric wharf and side labels
+remain intact. No owner verdict has been recorded.
+
+The workshop's `index.html` and `OPTIONS.md` contain the comparison and
+tradeoffs. All 48 captures cover both phone frames and schemes, the
+Pyrmont–Double Bay route in both directions, numeric wharves and rail.
+They have no reported overflow, text spill or clipping. C2's smaller cap
+type and C3's compact number/side notation require explicit owner rulings.
+The reverse route also exposes the existing numeric-only transfer-pin
+tradeoff: `Wharf 5, Side B` to `Wharf 5, Side A` appears as `5` to `5` on
+the board; full side names remain in detail and accessibility text.
+
 ## The owner's words
 
 - "Currently we only do trains. I want to also do metros. it is common for
