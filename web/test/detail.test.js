@@ -9,7 +9,8 @@ import { detailHtml } from '../js/detail.js';
 import { journeyDetail } from '../js/journey.js';
 import { promotedRow } from '../js/rowmodel.js';
 import {
-  TRANSFER_NOW, TRANSFER_DEPARTED_NOW, transferJourneys, delayLeg, cancelLeg
+  TRANSFER_NOW, TRANSFER_DEPARTED_NOW, transferJourneys, delayLeg, cancelLeg,
+  FERRY_NOW, ferryJourneys, mixedJourneys
 } from './fixture.js';
 
 const ENDS = { fromName: 'Rhodes Station', toName: 'Bondi Junction Station' };
@@ -45,7 +46,7 @@ test('the promoted row is the board’s row, and is not a tap target', () => {
 
 test('every step states a platform chip in its own line colour', () => {
   const html = render(transferJourneys()[0]);
-  const chips = [...html.matchAll(/<b class="dchip" data-line-code="([^"]+)" style="background:([^;]+);color:([^"]+)">([^<]+)<\/b>/g)]
+  const chips = [...html.matchAll(/<b class="dchip" data-line-code="([^"]+)"(?: aria-label="[^"]+")? style="background:([^;]+);color:([^"]+)">([^<]+)<\/b>/g)]
     .map((m) => [m[1], m[2], m[3], m[4]]);
 
   assert.deepEqual(chips, [
@@ -56,6 +57,30 @@ test('every step states a platform chip in its own line colour', () => {
   ]);
   assert.match(html, /Board T9 · Gordon via Lindfield/);
   assert.match(html, / Get off &nbsp;→&nbsp; /);
+});
+
+test('ferry detail keeps the side accessible while its chip stays compact', () => {
+  const journey = ferryJourneys()[1];
+  const model = journeyDetail(journey, FERRY_NOW);
+  const html = detailHtml({
+    ...model,
+    row: promotedRow(journey, FERRY_NOW),
+    focused: false,
+    footer: { dot: 'live', text: 'Live' }
+  });
+
+  assert.match(html, /aria-label="Wharf 3, Side A · F1"[^>]*background:var\(--line-fill-FERRY\)[^>]*>3<\/b>/);
+  assert.match(html, /<span class="lbl p">Wharf 1<\/span>/);
+  assert.match(html, />Take this ferry<\/button>/);
+
+  const mixed = mixedJourneys()[1];
+  const mixedHtml = detailHtml({
+    ...journeyDetail(mixed, FERRY_NOW),
+    row: promotedRow(mixed, FERRY_NOW),
+    focused: false,
+    footer: { dot: 'live', text: 'Live' }
+  });
+  assert.match(mixedHtml, />3<\/b> Board · Wharf 3, <span class="dside">Side A<\/span>/);
 });
 
 test('a tight change is the only step that carries the warning', () => {

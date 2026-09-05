@@ -19,7 +19,7 @@ type journey struct {
 }
 
 type leg struct {
-	Duration             int             `json:"duration"`
+	Duration             *int            `json:"duration"`
 	IsRealtimeControlled bool            `json:"isRealtimeControlled"`
 	RealtimeStatus       []string        `json:"realtimeStatus"`
 	Origin               place           `json:"origin"`

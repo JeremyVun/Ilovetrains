@@ -119,6 +119,30 @@ const TRIP_EPPING = {
   to: { id: '206710', name: 'Chatswood Station', location: { lat: -33.7967, lon: 151.1830 } },
   createdAt: '2026-08-08T08:00:00+10:00'
 };
+const TRIP_FERRY = {
+  id: 'trip-circular-quay-manly',
+  from: { id: '200020', name: 'Circular Quay', location: { lat: -33.861351, lon: 151.210813 } },
+  to: { id: '209573', name: 'Manly Wharf', location: { lat: -33.799541, lon: 151.284282 } },
+  createdAt: '2026-09-05T08:00:00+10:00'
+};
+const TRIP_MIXED = {
+  id: 'trip-wynyard-manly',
+  from: { id: '200080', name: 'Wynyard Station', location: { lat: -33.8659, lon: 151.2057 } },
+  to: { id: '209573', name: 'Manly Wharf', location: { lat: -33.799541, lon: 151.284282 } },
+  createdAt: '2026-09-05T08:01:00+10:00'
+};
+const TRIP_BALMAIN_EAST = {
+  id: 'trip-circular-quay-balmain-east',
+  from: { id: '200020', name: 'Circular Quay' },
+  to: { id: '20414', name: 'Balmain East Wharf' },
+  createdAt: '2026-09-05T08:02:00+10:00'
+};
+const TRIP_COCKATOO_BALMAIN = {
+  id: 'trip-barangaroo-balmain',
+  from: { id: '2000441', name: 'Barangaroo Wharf' },
+  to: { id: '204157', name: 'Balmain Wharf' },
+  createdAt: '2026-09-05T08:03:00+10:00'
+};
 
 /* The coordinates web/stations.json actually carries, so a seeded fix lands
    where the baked index says the station is and `here` names it. */
@@ -192,7 +216,9 @@ async function states() {
   const {
     departuresBody, baseJourneys, journey, delay, cancel,
     transferBody, transferJourneys, delayLeg, cancelLeg, threeLegJourney,
-    TRANSFER_NOW, TRANSFER_DEPARTED_NOW
+    TRANSFER_NOW, TRANSFER_DEPARTED_NOW,
+    FERRY_NOW, ferryBody, ferryJourneys, mixedBody, mixedJourneys,
+    balmainEastBody, cockatooBalmainBody
   } = fx;
 
   const board = (name, body, opts = {}) => ({
@@ -248,6 +274,19 @@ async function states() {
     };
   };
 
+  const ferry = (name, body, opts = {}) => ({
+    name,
+    seed: doc({
+      trips: [opts.trip || TRIP_FERRY], body, hist: opts.hist || [],
+      fetchedAt: body.generatedAt, focus: opts.focus || null
+    }),
+    now: opts.now || FERRY_NOW,
+    body,
+    route: opts.route || '#/board',
+    after: opts.after,
+    expect: opts.expect
+  });
+
   const tighten = (journeys) => { delayLeg(journeys[0], 0, 5); return journeys; };
   const breakLeg = (journeys) => { cancelLeg(journeys[0], 1); return journeys; };
 
@@ -256,6 +295,10 @@ async function states() {
     journeys[0] = threeLegJourney();
     return journeys;
   };
+  const mixedPastBody = (journey) => mixedBody({
+    generatedAt: '2026-09-05T15:36:00+10:00',
+    journeys: journey ? [journey] : []
+  });
 
   /* One displayed minute is the smallest positive delay the floored-minute
      arithmetic can print (r3 OPTIONS.md, S3/S4). */
@@ -855,7 +898,120 @@ async function states() {
     transfer('board-cancelled-tight', breakLeg(tighten(transferJourneys()))),
     transfer('board-two-change', twoChangeBoard()),
 
+    ferry('ferry-home', ferryBody(), {
+      route: '#/',
+      expect: { status: 'Next ferry', ferryCodes: ['MFF'] }
+    }),
+    ferry('ferry-board', ferryBody(), {
+      expect: { copy: ['Wharf 2, Side A', 'Wharf 3, Side A'], ferryCodes: ['MFF', 'F1'] }
+    }),
+    ferry('ferry-detail', ferryBody(), {
+      after: OPEN_ROW(1),
+      expect: { rail: true, copy: ['Take this ferry', 'Wharf 3, Side A'], ferryCodes: ['F1'] }
+    }),
+    ferry('ferry-focus-before', ferryBody({ generatedAt: '2026-09-05T15:43:00+10:00' }), {
+      route: '#/',
+      now: Date.parse('2026-09-05T15:43:00+10:00'),
+      focus: ferryJourneys()[1],
+      after: FIX(-33.861351, 151.210813, Date.parse('2026-09-05T15:43:00+10:00')),
+      expect: { status: 'Running', copy: ['Leave now for Wharf 3, Side A'], ferryCodes: ['F1'] }
+    }),
+    ferry('ferry-distinct-stop-detail', balmainEastBody(), {
+      trip: TRIP_BALMAIN_EAST,
+      after: OPEN_ROW(1),
+      expect: {
+        rail: true,
+        copy: ['Wynyard → Barangaroo', 'Board · Wharf 2, Side B', 'Take this train'],
+        aria: ['Wharf 2, Side B · F4'],
+        ferryCodes: ['F4']
+      }
+    }),
+    ferry('ferry-exception-detail', cockatooBalmainBody(), {
+      trip: TRIP_COCKATOO_BALMAIN,
+      after: OPEN_ROW(0),
+      expect: {
+        rail: true,
+        copy: ['Side A', 'Balmain Wharf', 'Take this ferry'],
+        notCopy: ['Wharf Side A', 'Wharf Balmain Wharf'],
+        detailChips: ['1', '—', '—', '—'],
+        aria: ['Side A · F8', 'Balmain Wharf · F8'],
+        ferryCodes: ['F3', 'F8']
+      }
+    }),
+    ferry('mixed-board', mixedBody(), {
+      trip: TRIP_MIXED,
+      now: Date.parse('2026-09-05T15:25:00+10:00'),
+      expect: { copy: ['Circular Quay'], aria: ['Wharf 2, Side A · MFF'], ferryCodes: ['MFF', 'F1'] }
+    }),
+    ferry('mixed-detail', mixedBody(), {
+      trip: TRIP_MIXED,
+      now: Date.parse('2026-09-05T15:25:00+10:00'),
+      after: OPEN_ROW(1),
+      expect: {
+        rail: true,
+        copy: ['arrives 16:07', 'Board · Wharf 3, Side A', 'Take this train'],
+        aria: ['Wharf 3, Side A · F1'],
+        ferryCodes: ['F1']
+      }
+    }),
+    ferry('mixed-detail-mff', mixedBody(), {
+      trip: TRIP_MIXED,
+      now: Date.parse('2026-09-05T15:25:00+10:00'),
+      after: OPEN_ROW(0),
+      expect: {
+        rail: true,
+        copy: ['arrives 16:00', 'Board · Wharf 2, Side A', 'Take this train'],
+        aria: ['Wharf 2, Side A · MFF'],
+        ferryCodes: ['MFF']
+      }
+    }),
+    ferry('mixed-past-dedupe', mixedPastBody(null), {
+      trip: TRIP_MIXED,
+      after: `
+  t.state.pastBodies = [${JSON.stringify(mixedBody({ journeys: [mixedJourneys()[0]] }))}];
+  t.state.pastExhausted = false;
+  t.state.loadingPast = false;
+  window.fetch = async () => new Response(${JSON.stringify(JSON.stringify(mixedBody({ journeys: [mixedJourneys()[1]] })))}, { headers: { 'Content-Type': 'application/json' } });
+  await t.older();
+  await sleep(80);
+  if (!t.state.pastExhausted) console.error('mixed onward-only duplicate did not exhaust past pagination');
+  if (t.state.pastBodies.length !== 1) console.error('mixed onward-only duplicate appended a past page');`,
+      expect: {}
+    }),
+
     { name: 'first-run', seed: doc({ trips: [], hist: [] }), now: NOW, route: '#/setup' },
+    {
+      name: 'first-run-search-manly',
+      seed: doc({ trips: [], hist: [] }),
+      now: FERRY_NOW,
+      route: '#/setup',
+      type: { role: 'from', text: 'manly' },
+      stops: { stops: [{ id: '209573', name: 'Manly Wharf', modes: ['ferry'] }] },
+      expect: { copy: ['Manly', 'ferry'] }
+    },
+    {
+      name: 'first-run-search-circular',
+      seed: doc({ trips: [], hist: [] }),
+      now: FERRY_NOW,
+      route: '#/setup',
+      type: { role: 'from', text: 'circular' },
+      stops: { stops: [{ id: '200020', name: 'Circular Quay', modes: ['train', 'ferry'] }] },
+      expect: { copy: ['Circular Quay', 'train · ferry'] }
+    },
+    {
+      name: 'first-run-recent-manly-offline',
+      seed: {
+        ...doc({ trips: [], hist: [] }),
+        searches: {
+          from: [{ id: '209573', name: 'Manly Wharf', modes: ['ferry'] }],
+          to: []
+        }
+      },
+      now: FERRY_NOW,
+      route: '#/setup',
+      type: { role: 'from', text: 'Manly Wharf', reject: true },
+      expect: { copy: ['You searched before', 'Manly Wharf'] }
+    },
     {
       name: 'first-run-search',
       seed: doc({ trips: [], hist: [] }),
@@ -946,7 +1102,9 @@ function pageScript(state) {
 
   ${state.type ? `
   // A frozen fetch photographs the WAIT; the mock photographs the answer.
-  ${state.type.freeze ? '' : `window.fetch = async () => new Response(${JSON.stringify(JSON.stringify(STOPS))}, { headers: { 'Content-Type': 'application/json' } });`}
+  ${state.type.freeze ? '' : state.type.reject
+    ? 'window.fetch = async () => { throw new TypeError("offline"); };'
+    : `window.fetch = async () => new Response(${JSON.stringify(JSON.stringify(state.stops || STOPS))}, { headers: { 'Content-Type': 'application/json' } });`}
   const input = document.querySelector('[data-role="${state.type ? state.type.role : ''}"]');
   input.focus();
   input.value = ${JSON.stringify(state.type ? state.type.text : '')};
@@ -955,6 +1113,8 @@ function pageScript(state) {
   ` : ''}
 
   if (t && t.onLiveView()) {
+    t.state.pastBodies = [];
+    t.state.seenLive = new Map();
     t.state.body = ${JSON.stringify(body)};
     t.state.offline = ${state.offline ? 'true' : 'false'};
     t.state.serverStale = false;
@@ -1199,6 +1359,53 @@ function pageScript(state) {
     if (expect.status !== undefined) {
       const said = topStatus ? topStatus.textContent.trim() : null;
       if (said !== expect.status) problems.push('the top line reads "' + said + '", not "' + expect.status + '"');
+    }
+    if (Array.isArray(expect.copy)) {
+      const visible = document.body.textContent;
+      for (const copy of expect.copy) {
+        if (!visible.includes(copy)) problems.push('expected copy is missing: "' + copy + '"');
+      }
+    }
+    if (Array.isArray(expect.notCopy)) {
+      const visible = document.body.textContent;
+      for (const copy of expect.notCopy) {
+        if (visible.includes(copy)) problems.push('unexpected copy is present: "' + copy + '"');
+      }
+    }
+    if (Array.isArray(expect.detailChips)) {
+      const chips = [...document.querySelectorAll('.dchip')].map((node) => node.textContent.trim());
+      if (chips.join('/') !== expect.detailChips.join('/')) {
+        problems.push('detail chips are ' + chips.join('/') + ', not ' + expect.detailChips.join('/'));
+      }
+    }
+    if (Array.isArray(expect.aria)) {
+      const labels = [...document.querySelectorAll('[aria-label]')].map((node) => node.getAttribute('aria-label'));
+      for (const label of expect.aria) {
+        if (!labels.includes(label)) problems.push('expected accessible label is missing: "' + label + '"');
+      }
+    }
+    if (Array.isArray(expect.ferryCodes)) {
+      const root = getComputedStyle(document.documentElement);
+      const ferryFill = root.getPropertyValue('--line-fill-FERRY').trim();
+      const ferryProbe = document.createElement('span');
+      ferryProbe.style.cssText = 'position:absolute;background:' + ferryFill;
+      document.body.appendChild(ferryProbe);
+      const expectedFill = getComputedStyle(ferryProbe).backgroundColor;
+      ferryProbe.remove();
+      for (const code of expect.ferryCodes) {
+        const devices = [...document.querySelectorAll('[data-line-code="' + code + '"]')]
+          .filter((node) => getComputedStyle(node).backgroundColor !== 'rgba(0, 0, 0, 0)');
+        if (!devices.length) {
+          problems.push('no painted ferry device for ' + code);
+          continue;
+        }
+        for (const device of devices) {
+          if (getComputedStyle(device).backgroundColor !== expectedFill) {
+            problems.push(code + ' device is ' + getComputedStyle(device).backgroundColor
+              + ', not ferry green ' + expectedFill);
+          }
+        }
+      }
     }
     /* The smart header's own furniture. The numbers are the comps round's
        measurements (docs/backlog/smart-header-v2, OPTIONS-r1.md section 2). */

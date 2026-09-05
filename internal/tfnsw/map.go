@@ -14,6 +14,7 @@ import (
 const (
 	classTrain = 1
 	classMetro = 2
+	classFerry = 9
 )
 
 // EFA product classes for walking segments: a footpath between platforms
@@ -32,7 +33,7 @@ const (
 // as cancelled rather than silently presenting a train that will not run.
 var cancelPattern = regexp.MustCompile(`(?i)cancel`)
 
-var platformSuffix = regexp.MustCompile(`,\s*Platform\s.*$`)
+var boardingSuffix = regexp.MustCompile(`,\s*(?:Platform|Wharf|Side)\s.*$`)
 
 func modeName(class int) (string, bool) {
 	switch class {
@@ -40,6 +41,8 @@ func modeName(class int) (string, bool) {
 		return "train", true
 	case classMetro:
 		return "metro", true
+	case classFerry:
+		return "ferry", true
 	}
 	return "", false
 }
@@ -72,6 +75,11 @@ type plannedJourney struct {
 	longestChange time.Duration
 }
 
+type servicePath struct {
+	legs  []leg
+	walks [][]leg
+}
+
 func mapTripWithPolicy(body []byte, fromID, toID string, limit int, generatedAt time.Time,
 	loc *time.Location, policy connectionPolicy) (*DeparturesResponse, error) {
 	var raw tripResponse
@@ -89,16 +97,21 @@ func mapTripWithPolicy(body []byte, fromID, toID string, limit int, generatedAt 
 	var rows []plannedJourney
 
 	for _, j := range raw.Journeys {
-		legs, serveable := serviceLegs(j)
+		path, serveable := serviceLegs(j)
 		// Dropped here, before the limit below, so the client still receives up
 		// to `limit` journeys it can actually take.
-		if !serveable || len(legs) == 0 {
+		if !serveable || len(path.legs) == 0 {
 			continue
 		}
-		if !connectionFloorMet(legs, policy.Minimum) {
+		if !connectionFloorMet(path, policy.Minimum) {
 			continue
 		}
-		first, last := legs[0], legs[len(legs)-1]
+		first, last := path.legs[0], path.legs[len(path.legs)-1]
+		// The response cannot describe a walk before boarding or after alighting at another stop.
+		if (walkingLeg(j.Legs[0]) && endpointStation(first.Origin).ID != fromID) ||
+			(walkingLeg(j.Legs[len(j.Legs)-1]) && endpointStation(last.Destination).ID != toID) {
+			continue
+		}
 
 		schedDep, ok := parseTime(first.Origin.DepartureTimePlanned)
 		if !ok {
@@ -128,14 +141,14 @@ func mapTripWithPolicy(body []byte, fromID, toID string, limit int, generatedAt 
 				// stopsAway needs live vehicle position data the Trip Planner
 				// does not carry; the contract allows null.
 				StopsAway: nil,
-				Cancelled: cancelled(legs),
-				Legs:      len(legs),
-				LegDetail: legDetail(legs, loc),
+				Cancelled: cancelled(path.legs),
+				Legs:      len(path.legs),
+				LegDetail: legDetail(path.legs, loc),
 			},
 			effective:     effective(estDep, schedDep),
 			departure:     schedDep,
 			arrival:       schedArr,
-			longestChange: longestConnection(legs),
+			longestChange: longestConnection(path),
 		}
 		rows = append(rows, row)
 
@@ -163,30 +176,80 @@ func mapTripWithPolicy(body []byte, fromID, toID string, limit int, generatedAt 
 // connectionFloorMet uses the printed plan, not a transient realtime delay.
 // The floor decides whether the planner may offer the route; live shrinkage is
 // still shown honestly by the client's tight-change treatment.
-func connectionFloorMet(legs []leg, minimum time.Duration) bool {
-	if len(legs) < 2 || minimum <= 0 {
+func connectionFloorMet(path servicePath, minimum time.Duration) bool {
+	if len(path.legs) < 2 {
 		return true
 	}
-	for i := 1; i < len(legs); i++ {
-		arrival, arrivalOK := parseTime(legs[i-1].Destination.ArrivalTimePlanned)
-		departure, departureOK := parseTime(legs[i].Origin.DepartureTimePlanned)
-		if !arrivalOK || !departureOK || departure.Sub(arrival) < minimum {
+	for i := 1; i < len(path.legs); i++ {
+		connection, ok := plannedConnection(path, i)
+		if !ok || (minimum > 0 && connection < minimum) {
 			return false
 		}
 	}
 	return true
 }
 
-func longestConnection(legs []leg) time.Duration {
+func longestConnection(path servicePath) time.Duration {
 	var longest time.Duration
-	for i := 1; i < len(legs); i++ {
-		arrival, arrivalOK := parseTime(legs[i-1].Destination.ArrivalTimePlanned)
-		departure, departureOK := parseTime(legs[i].Origin.DepartureTimePlanned)
-		if arrivalOK && departureOK && departure.Sub(arrival) > longest {
-			longest = departure.Sub(arrival)
+	for i := 1; i < len(path.legs); i++ {
+		connection, ok := plannedConnection(path, i)
+		if ok && connection > longest {
+			longest = connection
 		}
 	}
 	return longest
+}
+
+func plannedConnection(path servicePath, next int) (time.Duration, bool) {
+	arrival, arrivalOK := parseTime(path.legs[next-1].Destination.ArrivalTimePlanned)
+	departure, departureOK := parseTime(path.legs[next].Origin.DepartureTimePlanned)
+	if !arrivalOK || !departureOK {
+		return 0, false
+	}
+	connection := departure.Sub(arrival)
+	if connection < 0 {
+		return 0, false
+	}
+	var walks []leg
+	if next-1 < len(path.walks) {
+		walks = path.walks[next-1]
+	}
+	for _, walk := range walks {
+		duration, ok := walkingDuration(walk)
+		if !ok {
+			return 0, false
+		}
+		if duration > connection {
+			return 0, false
+		}
+		connection -= duration
+	}
+	return connection, true
+}
+
+func walkingDuration(walk leg) (time.Duration, bool) {
+	if walk.Duration != nil {
+		seconds := int64(*walk.Duration)
+		if seconds < 0 || seconds > int64(1<<63-1)/int64(time.Second) {
+			return 0, false
+		}
+		return time.Duration(seconds) * time.Second, true
+	}
+	departure, departureOK := parseTime(walk.Origin.DepartureTimePlanned)
+	arrival, arrivalOK := parseTime(walk.Destination.ArrivalTimePlanned)
+	if !departureOK || !arrivalOK {
+		return 0, false
+	}
+	duration := arrival.Sub(departure)
+	if duration < 0 {
+		return 0, false
+	}
+	return duration, true
+}
+
+func walkingLeg(l leg) bool {
+	return l.Transportation != nil &&
+		(l.Transportation.Product.Class == classFootpath || l.Transportation.Product.Class == classConnection)
 }
 
 // Upstream never charges for waiting, so after a line closes it offers the
@@ -221,29 +284,37 @@ func laterArrivesWithin(later []plannedJourney, row plannedJourney) bool {
 	return false
 }
 
-// serviceLegs returns the train/metro legs of a journey, dropping walking
-// segments so `legs` counts services and legs > 1 means a real interchange.
+// serviceLegs returns the served legs of a journey, dropping walking segments
+// from the response while retaining them for the connection policy.
 //
 // serveable is false when the journey rides something we neither serve nor
 // walk — On Demand buses (class 10) leak past the exclMOT exclusions, and a
-// journey you cannot take by train is not an answer to this board's question,
+// journey you cannot take by a served mode is not an answer to this board's
+// question,
 // so the caller drops the whole journey rather than pretending the bus leg
 // away and offering a trip that starts at the wrong station.
-func serviceLegs(j journey) (legs []leg, serveable bool) {
+func serviceLegs(j journey) (path servicePath, serveable bool) {
+	var pendingWalks []leg
 	for _, l := range j.Legs {
 		if l.Transportation == nil {
 			continue
 		}
 		switch l.Transportation.Product.Class {
-		case classTrain, classMetro:
-			legs = append(legs, l)
+		case classTrain, classMetro, classFerry:
+			if len(path.legs) > 0 {
+				path.walks = append(path.walks, pendingWalks)
+			}
+			path.legs = append(path.legs, l)
+			pendingWalks = nil
 		case classFootpath, classConnection:
-			// Folded into the gap between the legs either side.
+			if len(path.legs) > 0 {
+				pendingWalks = append(pendingWalks, l)
+			}
 		default:
-			return nil, false
+			return servicePath{}, false
 		}
 	}
-	return legs, true
+	return path, true
 }
 
 // legDetail maps the service legs of one journey in order, so a client can
@@ -364,14 +435,13 @@ func endpointStation(p place) place {
 	return p
 }
 
-// stationName produces a display name: "Central Station, Platform 12" and
-// "Central Station, Sydney" both become "Central Station".
+// stationName keeps a wharf's real name while removing its boarding suffix.
 func stationName(p place) string {
 	name := p.DisassembledName
 	if name == "" {
 		name = p.Name
 	}
-	return strings.TrimSpace(platformSuffix.ReplaceAllString(name, ""))
+	return strings.TrimSpace(boardingSuffix.ReplaceAllString(name, ""))
 }
 
 func effective(estimated, scheduled time.Time) time.Time {

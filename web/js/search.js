@@ -110,8 +110,8 @@ function editDistance(a, b) {
     win, then word prefixes, then small edit distances. Thus “Rhode” ranks
     “Rhodes” first without hiding other stations TfNSW returned. */
 export function fuzzyScore(name, query) {
-  const n = queryKey(String(name).replace(/\bstation\b/gi, ''));
-  const q = queryKey(query);
+  const n = queryKey(String(name).replace(/\b(station|wharf)\b/gi, ''));
+  const q = queryKey(String(query ?? '').replace(/\b(station|wharf)\b/gi, ''));
   if (!q) return 0;
   if (n === q) return 1000;
   if (n.startsWith(q)) return 900 - (n.length - q.length);

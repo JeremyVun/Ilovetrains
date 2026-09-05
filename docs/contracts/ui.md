@@ -163,6 +163,22 @@ substitutes for going back.
   (`You check this trip most weekday mornings.`, `You often check this trip
   around now.`), never that they ride it. Only a persisted ride supports the
   reverse-direction receipt.
+- `Train` is the generic word for any service, metro included (`Next train`,
+  `Take this train`, `Getting the next trains…`). The word `metro` appears only
+  where the distinction changes what the rider does: the setup sheet's mode
+  label under a station, and a change between modes in journey detail. Line
+  colour and headsign carry the rest (owner ruling 2026-09-05).
+- Ferry-first journeys use `ferry` where journey-specific copy uses `train`:
+  `Next ferry`, `Take this ferry`, and `<time> cancelled · next ferry`.
+  Loading and no-journey states remain generic: `Getting the next trains…`.
+  Train and metro legs call their boarding place `Platform`; ferry legs call
+  it `Wharf`. A transfer uses the word for the leg being boarded. The client
+  adds that word only when the upstream value needs it. Complete names and
+  side-only values remain verbatim: `Wharf 3, Side A`, `Balmain Wharf`, and
+  `Side A`, never `Wharf Balmain Wharf` or `Wharf Side A`. These full values
+  remain intact in caps, directions and accessibility text. A compact colour
+  chip shows the platform or wharf number when the value contains one, and an
+  em dash otherwise.
 - Location permission is requested contextually, never on first load. Missing
   or denied location degrades silently to device history and time.
 - The panel that asks for location appears only once the permission state is
@@ -314,8 +330,9 @@ substitutes for going back.
   change, an arrive step. Steps are 72px, change steps 82px with a heavy rule
   above and below. Each states a time, a station and a platform chip in its
   line's colour with a label — `BOARD <code> · <headsign>`, then `GET OFF` and
-  `BOARD` across a change's two chips, then `ARRIVE`, which becomes
-  `ARRIVE · JOURNEY CANCELLED` when the final leg is cancelled.
+  `BOARD · <place> <label>` across a change's two chips, then `ARRIVE`, which
+  becomes `ARRIVE · JOURNEY CANCELLED` when the final leg is cancelled. The
+  boarded leg supplies `<place>`, and the full label includes any side.
 - Every service leg names its line code and headsign. A cancelled leg stays in
   place and marks the journey broken; the client does not invent or substitute
   a replacement service absent from the API response. The final arrival is
@@ -333,8 +350,9 @@ substitutes for going back.
 - The screen closes with a heavy rule and the tail — effective arrival time,
   destination and arrival platform — or `JOURNEY CANCELLED` in the warning
   colour with the time struck. Beneath the tail is the freshness line, and
-  beneath that the 66px action rail `Take this train`, which shares its
-  geometry with home's `New trip` rail.
+  beneath that the 66px action rail `Take this train` or `Take this ferry`,
+  chosen from the first leg, which shares its geometry with home's `New trip`
+  rail.
 - Once the journey has departed, the promoted row's figure and provenance are
   the directions ladder's, `TO CHANGE` or `TO GO`, and the steps the rider is
   past take the quiet done treatment: secondary ink, no strike. There are no
@@ -345,14 +363,19 @@ substitutes for going back.
   measured from effective times. There is no minimum visual transfer width.
 - A transfer gap is bracketed by the alighting platform numeral in the first
   leg's colour and the boarding platform numeral in the next leg's colour.
-  Platform markers overlay the axis and do not consume its width.
+  Platform markers overlay the axis and do not consume its width. When the
+  service legs meet at different stop IDs because a walk lies between them,
+  the change label names both supplied endpoints as `<alighting stop> →
+  <boarding stop>`. Focused riding directions name the alighting stop; focused
+  change directions name the boarding stop. Same-stop changes keep one name.
 - Directions count to the next required action and use `TO CHANGE` or `TO GO`.
-  The instruction line names the station and platform of that action: while
-  riding, `Get off at <station> · Platform <n>`; while dwelling at a change,
-  `Change at <station> · Platform <n>`; and, with a tight change still ahead,
-  `Tight change · <n> min · Platform <n>` in place of either. The platform
-  clause is omitted when upstream gives none. The boarding-platform cap
-  disappears after boarding.
+  The instruction line names the station and boarding place of that action:
+  while riding, `Get off at <station> · <place> <label>`; while dwelling at a
+  change, `Change at <station> · <place> <label>`; and, with a tight change
+  still ahead, `Tight change · <n> min · <place> <label>` in place of either.
+  `<place>` is `Platform` for train and metro, and `Wharf` for ferry. The clause
+  is omitted when upstream gives none. The boarding-place cap disappears after
+  boarding.
 - The progress marker moves continuously from timetable and live estimates. It
   is an inference from time, never a claim of continuous location tracking.
 
@@ -381,16 +404,20 @@ hierarchy, not a colour inversion.
 | live | `#4ADE80` | `#0F7A4A` |
 
 Line colour belongs to the service and appears as a first-class device once per
-service. Multi-leg bars split by leg and transfer duration. Implementations use
-the line palette defined in `web/app.css` (the reference; native ports
-generate theirs from the same values); new line codes must update every
-client's mapping and its tests in the same change.
+service. Multi-leg bars split by leg and transfer duration. Rail services use
+the palette key matching their visible line code. Every ferry uses the `FERRY`
+mode key regardless of its visible code, including private operators: official
+green `#5AB031` in dark and `#428024` in light, where it measures 4.59:1 on
+paper. Implementations use the palette defined in `web/app.css` (the reference;
+native ports generate theirs from the same values); new rail line codes and new
+mode keys must update every client's mapping and its tests in the same change.
 
 Line colour has two roles. Every filled device — the boarding cap, the platform
 pins, the saved-trip badges and spine bars, the journey-detail chips and the
-axis ride segments — paints `--line-fill-<code>`; every bare use of line colour
-as text paints `--line-<code>`. In the dark scheme the two are equal. In light
-only T1 and BMT differ: the fill is the official `#F99D1C` under paper `#FAF9F5`
+axis ride segments — paints `--line-fill-<key>`; every bare use of line colour
+as text paints `--line-<key>`. The key is the line code for rail and `FERRY` for
+ferries. In the dark scheme the two are equal. In light only T1 and BMT differ:
+the fill is the official `#F99D1C` under paper `#FAF9F5`
 type, while the same codes as bare text keep the readable `#A46204`. Paper on
 that yellow measures 2.02:1 against the binding 3:1 rule for filled devices.
 The owner's verdict of 2026-09-03 accepts that exception for TfNSW line
@@ -398,11 +425,12 @@ identity: the yellow may only ever be darkened by an imperceptible amount and
 never returned to a brown fill, and the regression test asserts the exact pair
 rather than a ratio. Text on any other fill is at least 14px/700 and meets 3:1.
 
-Platform numerals on a line-colour chip are paper in the light scheme, on every
-line: paper reads better than ink on all fourteen light-scheme line colours and
-is the only value that clears 3:1 on T4 and HUN. The dark scheme knocks them
-out per line colour, where ink is the readable value on T4, T5, T9, CCN and HUN
-and paper is on the rest.
+Platform and wharf numerals on a service-colour chip are paper in the light
+scheme, on every service: paper reads better than ink on all fifteen
+light-scheme palette colours and
+is the only value that clears 3:1 on T4 and HUN. In the dark scheme, T4, T5,
+T9, CCN and HUN use light ink; the remaining fills use the dark ground,
+including ferry green at 7.21:1.
 
 ## Calibration and verification
 

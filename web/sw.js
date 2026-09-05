@@ -23,7 +23,7 @@
  * Bump VERSION on every deploy that changes any file in SHELL.
  */
 
-const VERSION = 'v18';
+const VERSION = 'v19';
 const SHELL_CACHE = 'shell-' + VERSION;
 const DATA_CACHE = 'data-' + VERSION;
 
@@ -35,8 +35,8 @@ const SHELL = [
   '/index.html',
   '/app.css',
   '/manifest.webmanifest',
-  '/js/analytics.js',
   '/stations.json',
+  '/js/analytics.js',
   '/js/api.js',
   '/js/board.js',
   '/js/detail.js',

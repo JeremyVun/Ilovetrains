@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { journeyBarSpec, journeyBarHtml, journeyDeviceHtml, journeyVars, axisSignature } from '../js/journeybar.js';
-import { transferJourneys } from './fixture.js';
+import { ferryJourneys, mixedJourneys, transferJourneys } from './fixture.js';
 
 test('the journey bar is one exact percentage time axis', () => {
   const spec = journeyBarSpec(transferJourneys()[0]);
@@ -93,4 +93,16 @@ test('the station a change happens at hangs off the platform it is boarded from'
   });
   assert.doesNotMatch(header.html, /sy-pstn/);
   assert.match(header.html, /class="sy-g0 warn"/);
+});
+
+test('ferry devices use mode green and keep the full side outside numeric chips', () => {
+  const direct = journeyDeviceHtml(ferryJourneys()[1], { caps: true });
+  assert.equal(direct.vars, '--stem:var(--line-fill-FERRY);--stem2:var(--line-fill-FERRY);'
+    + '--chipink:var(--bg);--chipink2:var(--bg);');
+  assert.match(direct.html, />Wharf 3, Side A<\/span>/);
+  assert.match(direct.html, /data-line-code="F1" data-colour-key="FERRY"[^>]*background:var\(--line-fill-FERRY\)/);
+
+  const mixed = journeyDeviceHtml(mixedJourneys()[1], { caps: true });
+  assert.match(mixed.html, /aria-label="Wharf 3, Side A · F1"[^>]*><span class="sy-pv">3<\/span>/);
+  assert.doesNotMatch(mixed.html, />3, Side A<\/span>/, 'the pin stays a compact numeral');
 });

@@ -3,6 +3,7 @@
 import { esc, figureHtml, shortName } from './dom.js';
 import { clock } from './time.js';
 import { journeyDeviceHtml, clampJourneyBars } from './journeybar.js';
+import { rowLines } from './rowmodel.js';
 
 export function boardHtml({ trip, direction, model, nowMs = Date.now(), freshness }) {
   const from = direction === 'reverse' ? trip.to.name : trip.from.name;
@@ -74,7 +75,11 @@ export function resultRowHtml(row, opts = {}) {
     opts.promoted ? 'promoted' : ''].filter(Boolean).join(' ');
   const tap = opts.tappable === false ? ''
     : ' data-act="detail" role="button" tabindex="0"';
-  return `<div class="${classes}" style="${device.vars}" data-t="row" data-svc data-key="${esc(row.key)}" data-match="${esc(row.matchKey)}"${tap}>
+  const access = [...rowLines(row), ...changes.flatMap((change) => [
+    change.fromLabel || '—',
+    change.toLabel || '—'
+  ])].join('. ');
+  return `<div class="${classes}" style="${device.vars}" data-t="row" data-svc data-key="${esc(row.key)}" data-match="${esc(row.matchKey)}" aria-label="${esc(access)}"${tap}>
     <div class="sy-fig" data-figure-column><span class="sy-n">${figureHtml(row.figure, 'sy-u')}</span><span class="sy-st${row.provenanceWarn ? ' warn' : ''}">${esc(row.provenance || '')}</span></div>
     <div class="sy-b">
       <div class="sy-t"><span class="sy-dp">${esc(row.depTime)}</span>${row.schedTime ? `<del class="sy-was">${esc(row.schedTime)}</del>` : ''}${arrivalHtml(row, opts)}</div>

@@ -24,7 +24,8 @@ type Arrival struct {
 	Estimated *string `json:"estimated"`
 }
 
-// Line describes the service operating a journey. Mode is "train" or "metro".
+// Line describes the service operating a journey. Mode is "train", "metro" or
+// "ferry".
 type Line struct {
 	Name string `json:"name"`
 	Mode string `json:"mode"`
@@ -45,9 +46,9 @@ type LegTime struct {
 	Estimated *string `json:"estimated"`
 }
 
-// Leg is one train or metro service inside a journey. Walking between legs is
-// not a leg; it lives in the gap between one leg's arrival and the next leg's
-// departure.
+// Leg is one train, metro or ferry service inside a journey. Walking between
+// legs is not a leg; it lives in the gap between one leg's arrival and the
+// next leg's departure.
 type Leg struct {
 	Line      Line     `json:"line"`
 	Headsign  string   `json:"headsign"`

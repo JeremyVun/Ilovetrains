@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Probe TfNSW Trip Planner API and save raw responses to tools/fixtures/.
-# Usage: tools/probe-tfnsw.sh
-# Reads TFNSW_API_KEY from env, falling back to .env at the repo root.
+# Usage: tools/probe-tfnsw.sh [--ferries]
+# Reads TFNSW_API_KEY from the process environment; never sources .env.
 # Makes ~6 requests per run (quota-cheap). Never prints the key.
 set -euo pipefail
 
@@ -9,9 +9,6 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 FIXDIR="$ROOT/tools/fixtures"
 mkdir -p "$FIXDIR"
 
-if [[ -z "${TFNSW_API_KEY:-}" && -f "$ROOT/.env" ]]; then
-  set -a; source "$ROOT/.env"; set +a
-fi
 [[ -n "${TFNSW_API_KEY:-}" ]] || { echo "TFNSW_API_KEY not set" >&2; exit 1; }
 
 BASE="https://api.transport.nsw.gov.au/v1/tp"
@@ -21,7 +18,27 @@ req() { # req <fixture-name> <url>
   code=$(curl -sS -o "$FIXDIR/$name.json" -w '%{http_code}' \
     -H "Authorization: apikey $TFNSW_API_KEY" "$url")
   echo "$name: HTTP $code ($(wc -c < "$FIXDIR/$name.json" | tr -d ' ') bytes)"
+  [[ "$code" == 200 ]] || return 1
 }
+
+# Keep train, metro and ferry; exclude light rail, bus, coach, On Demand and school bus.
+EXCL="excludedMeans=checkbox&exclMOT_4=1&exclMOT_5=1&exclMOT_7=1&exclMOT_10=1&exclMOT_11=1"
+
+if [[ "${1:-}" == --ferries ]]; then
+  for entry in 'manly_wharf:Manly%20Wharf' 'circularquay_wharf:Circular%20Quay' 'circularquay_wharf3:Circular%20Quay%20Wharf%203' 'parramatta_wharf:Parramatta%20Wharf'; do
+    req "stop_finder_${entry%%:*}" \
+      "$BASE/stop_finder?outputFormat=rapidJSON&type_sf=any&name_sf=${entry#*:}&coordOutputFormat=EPSG%3A4326&TfNSWSF=true"
+  done
+  # Trip Planner groups the wharves and railway at 200020; GTFS 20004 fails.
+  FERRY_DATE=$(TZ=Australia/Sydney date +%Y%m%d)
+  FERRY_TIME=$(TZ=Australia/Sydney date +%H%M)
+  for entry in 'circularquay_manly:200020:209573' 'wynyard_manly:200080:209573' 'manly_circularquay:209573:200020' 'circularquay_balmaineast:200020:20414' 'barangaroo_balmain:2000441:204157'; do
+    route=${entry#*:}
+    req "trip_${entry%%:*}" \
+      "$BASE/trip?outputFormat=rapidJSON&coordOutputFormat=EPSG%3A4326&depArrMacro=dep&itdDate=$FERRY_DATE&itdTime=$FERRY_TIME&type_origin=any&name_origin=${route%%:*}&type_destination=any&name_destination=${route#*:}&calcNumberOfTrips=10&$EXCL&TfNSWTR=true"
+  done
+  exit 0
+fi
 
 # type_sf=stop returns "stop invalid" on the current platform (verified
 # 2026-08-31); use type_sf=any and filter results to type=="stop".
@@ -37,13 +54,8 @@ echo "resolved stop ids: central=$CENTRAL parramatta=$PARRA"
 
 NOW_DATE=$(date +%Y%m%d) NOW_TIME=$(date +%H%M)
 
-# Trains/metro only: EFA product classes — exclude light rail(4), bus(5),
-# coach(7), ferry(9), On Demand(10), school bus(11). Probe verifies these class
-# numbers. Keep this list identical to internal/tfnsw/client.go, or the
-# fixtures stop describing what the server actually asks for.
-# (trip_rhodes_bondijunction.json is deliberately NOT from this script: it was
-# captured without exclMOT_10 so the golden tests keep a real On Demand leak.)
-EXCL="excludedMeans=checkbox&exclMOT_4=1&exclMOT_5=1&exclMOT_7=1&exclMOT_9=1&exclMOT_10=1&exclMOT_11=1"
+# trip_rhodes_bondijunction.json was captured without exclMOT_10 so the
+# golden tests keep a real On Demand leak. Do not overwrite that fixture.
 
 req trip_central_parramatta \
   "$BASE/trip?outputFormat=rapidJSON&coordOutputFormat=EPSG%3A4326&depArrMacro=dep&itdDate=$NOW_DATE&itdTime=$NOW_TIME&type_origin=any&name_origin=$CENTRAL&type_destination=any&name_destination=$PARRA&calcNumberOfTrips=6&$EXCL&TfNSWTR=true"

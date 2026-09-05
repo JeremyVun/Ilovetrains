@@ -5,9 +5,10 @@ import { esc, figureHtml, shortName, fitStationNames } from './dom.js';
 import {
   focusExpired, focusOf, directionsModel, focusStatus, journeyCancelled
 } from './focus.js';
-import { arrivalMs, departureMs, departureKey, legsOf } from './journey.js';
+import { arrivalMs, departureMs, departureKey, legsOf, modeWords } from './journey.js';
+import { colourKey, lineFill } from './lines.js';
 import { clock } from './time.js';
-import { journeyDeviceHtml, clampJourneyBars } from './journeybar.js';
+import { journeyDeviceHtml, clampJourneyBars, chipInk } from './journeybar.js';
 import { cacheKey, leg } from './storage.js';
 import { AT_STATION_KM, distanceKm } from './stations.js';
 import { dayTypeMatch, homeOf, HOME_VOTES_NEEDED, hourProximity, isWeekend, rankTrips } from './predict.js';
@@ -53,11 +54,13 @@ function cachedJourney(doc, trip, direction) {
   return entry && entry.body && Array.isArray(entry.body.journeys) ? entry.body.journeys[0] : null;
 }
 
-function lineCodes(doc, trip, direction, currentJourney) {
+function journeyLines(doc, trip, direction, currentJourney) {
   const journey = currentJourney || cachedJourney(doc, trip, direction)
     || cachedJourney(doc, trip, direction === 'forward' ? 'reverse' : 'forward');
-  const codes = legsOf(journey).map((item) => (item.line && item.line.name) || '').filter(Boolean);
-  return codes;
+  return legsOf(journey).map((item) => ({
+    code: (item.line && item.line.name) || '',
+    colourKey: colourKey(item.line)
+  })).filter((item) => item.code);
 }
 
 /* The mark is a fact about this open: the trip did not exist when the page
@@ -87,6 +90,7 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
       && departureMs(liveLead) !== null ? clock(departureMs(liveLead)) : '';
   const journey = activeFocus ? replacement || activeFocus.journey
     : nextRunning || liveLead || cachedJourney(doc, trip, selection.direction);
+  const firstJourneyLeg = legsOf(journey)[0] || {};
   const selected = activeFocus
     ? { tripId: activeFocus.tripId, direction: activeFocus.direction } : selection;
   const selectedTrip = doc.trips.find((item) => item.id === selected.tripId) || trip;
@@ -136,7 +140,7 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
       ...entry,
       from: shortName(entryEnds.from.name),
       to: shortName(entryEnds.to.name),
-      codes: lineCodes(doc, entry.trip, entry.direction,
+      lines: journeyLines(doc, entry.trip, entry.direction,
         entry.trip.id === selectedTrip.id ? journey : null),
       distance: formatDistance(entry.distanceKm),
       ridden: lastRidden(doc, entry.trip.id, nowMs),
@@ -166,7 +170,8 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     focus: activeFocus,
     status,
     top: status ? null : topLine(shortName(selectedEnds.from.name),
-      distanceKm(opts.fix, selectedEnds.from.location)),
+      distanceKm(opts.fix, selectedEnds.from.location),
+      modeWords(firstJourneyLeg.line && firstJourneyLeg.line.mode).vehicle),
     over,
     freshness: waiting ? '' : opts.stale ? 'Offline' : 'Live',
     dot: waiting ? 'idle' : opts.stale ? 'stale' : 'live',
@@ -176,8 +181,8 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
 
 /* The line above the header answers how far the station is, and only falls
    back to a status word when it cannot. */
-function topLine(name, km) {
-  if (!Number.isFinite(km)) return { lead: 'Next train', name: '' };
+function topLine(name, km, vehicle = 'train') {
+  if (!Number.isFinite(km)) return { lead: `Next ${vehicle}`, name: '' };
   if (km <= AT_STATION_KM) return { lead: 'At ', name };
   return { lead: `${formatDistance(km).replace(/ away$/, '')} to `, name };
 }
@@ -249,9 +254,8 @@ function topHtml(model) {
   return `<span class="answer-kind" data-focus-status data-late="false"><span class="answer-line" data-fit-box>${esc(top.lead)}${name}</span></span>`;
 }
 
-function badge(code) {
-  const lightInk = ['T4', 'T5', 'T9', 'CCN', 'HUN'].includes(code);
-  return `<b class="hm-bdg" style="background:var(--line-fill-${esc(code)}, var(--line-${esc(code)}));color:var(--${lightInk ? 'ink' : 'bg'});">${esc(code)}</b>`;
+function badge(line) {
+  return `<b class="hm-bdg" data-line-code="${esc(line.code)}" style="background:${lineFill(line.colourKey)};color:${chipInk(line.colourKey)};">${esc(line.code)}</b>`;
 }
 
 function subHtml(entry, model) {
@@ -269,12 +273,12 @@ function subHtml(entry, model) {
 }
 
 function tripRowHtml(entry, model) {
-  const codes = entry.codes;
-  const spine = `<span class="hm-spine">${codes.map((code) => `<i style="background:var(--line-fill-${esc(code)}, var(--line-${esc(code)}))"></i>`).join('')}</span>`;
-  const name = codes.length > 1
-    ? `${badge(codes[0])}${esc(entry.from)} <em>→</em> ${badge(codes[codes.length - 1])}${esc(entry.to)}`
-    : codes.length === 1
-      ? `${badge(codes[0])}${esc(entry.from)} <em>→</em> ${esc(entry.to)}`
+  const lines = entry.lines;
+  const spine = `<span class="hm-spine">${lines.map((line) => `<i style="background:${lineFill(line.colourKey)}"></i>`).join('')}</span>`;
+  const name = lines.length > 1
+    ? `${badge(lines[0])}${esc(entry.from)} <em>→</em> ${badge(lines[lines.length - 1])}${esc(entry.to)}`
+    : lines.length === 1
+      ? `${badge(lines[0])}${esc(entry.from)} <em>→</em> ${esc(entry.to)}`
       : `${esc(entry.from)} <em>→</em> ${esc(entry.to)}`;
   const state = entry.selected ? model.status ? ' focused' : ' shown' : '';
   return `<button class="tripr${state}" data-svc data-tap data-act="open-trip" data-id="${esc(entry.trip.id)}" data-direction="${esc(entry.direction)}" aria-label="Open ${esc(entry.from)} to ${esc(entry.to)} departures">

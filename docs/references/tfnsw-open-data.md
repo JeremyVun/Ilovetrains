@@ -203,6 +203,84 @@ Albury, Brisbane, Perth, Broken Hill, Casino, Kyogle and the stops between).
 They are real rail stations on `route_type` 106 services and `stop_finder`
 returns them today, so the index keeps them.
 
+## Ferries
+
+Verified 2026-09-05 with `tools/probe-tfnsw.sh --ferries`. The Sydney
+Ferries bundle at `/v1/gtfs/schedule/ferries/sydneyferries` returned HTTP
+200, 893,137 bytes, `feed_version 05092026-010132`, and only `route_type 4`.
+`ferries_gtfs_summary.json` captures the feed metadata and all 75 stops:
+13 parents, 26 parented children and 36 standalone `location_type = 0`
+stops. The rail index's parent-only keep rule does not work for ferries.
+
+GTFS and Trip Planner do **not** share ferry parent IDs:
+
+| Place | GTFS | Trip Planner stop | Observed shape |
+| --- | --- | --- | --- |
+| Circular Quay | `20004` (Wharf 3 parent), `2000216` / `2000217` (sides) | `200020` | Shared with Circular Quay railway; modes `[1,4,5,9]` |
+| Manly | `20951`, `209525`, `209593` (standalone wharves 1–3) | `209573` | `Manly Wharf`, modes `[9]` |
+| Parramatta | `21501` (standalone `Parramatta Wharf`) | `2150112` | `Parramatta Wharf`, modes `[9]` |
+
+Stop-finder fixtures: `stop_finder_manly_wharf.json`,
+`stop_finder_circularquay_wharf.json`, `stop_finder_circularquay_wharf3.json`
+and `stop_finder_parramatta_wharf.json`. Searching `Circular Quay` names
+`200020` as Station; searching `Circular Quay Wharf 3` names the same ID
+as Wharf. GTFS `20004` used as an endpoint gives no journeys in either
+direction (`trip_gtfs_circularquay_manly.json` and
+`trip_manly_gtfs_circularquay.json`). These findings invalidate the ferry
+design's separate-parent and ID-equality premises; the replacement index
+policy was revised by the owner to use verified Trip Planner hubs.
+
+`tools/probe-ferry-stops.py` subsequently queried every boarding stop served
+by ferry routes (54 IDs) using `name_sf=<GTFS boarding ID>`. Every query
+returned one best class-9 stop. `ferry_stop_mapping.json` retains these raw
+responses and feed provenance: 38 distinct Trip Planner hubs. Circular Quay
+is the only ID shared with the rail index, producing 423 total entries
+(386 rail/metro plus 37 ferry-only). Barangaroo Wharf is `2000441`, separate
+from Barangaroo metro `200046`. Only GTFS-served boarding IDs seed the
+index, so Manly Fast Ferry does not expand the searchable wharf network.
+
+With Trip Planner IDs and exclusions 4, 5, 7, 10 and 11:
+
+- `trip_circularquay_manly.json`: 16 journeys, 11 F1 and 5 MFF legs.
+- `trip_wynyard_manly.json`: 15 journeys, each T8 then F1 or MFF.
+  All 15 station-to-wharf changes omit walking legs. No class-99/100 leg
+  occurs in any of these three fixtures, so their walk duration and time
+  fields cannot be observed here.
+- `trip_manly_circularquay.json`: 15 journeys, 9 F1 and 6 MFF legs.
+
+Both ferry operators use class 9: `Sydney Ferries Network` has code `F1`,
+number `F1 Manly`; `Private ferry and fast ferry services` has code `MFF`,
+number `MFF Manly Fast Ferry`. Headsigns are `Manly` outbound and
+`Circular Quay` inbound. F1 includes monitored and schedule-only legs;
+MFF is schedule-only in this capture. Monitored legs carry
+`isRealtimeControlled: true` and `realtimeStatus: ["MONITORED"]`.
+
+Every captured ferry origin has `platformName`. Circular Quay returns
+`Wharf 2, Side A`, `Wharf 3, Side A` or `Wharf 3, Side B`; Manly returns
+`Wharf 1` or `Wharf 2`. Leg parent names also carry the wharf/side suffix,
+so the rail-only platform suffix stripping is insufficient. Side labels
+must be included in the browser verification; `Wharf 3` alone understates
+the actual content width.
+
+Additional live coverage, 2026-09-05:
+
+- `trip_circularquay_balmaineast.json` includes T2 from Circular Quay to
+  Wynyard, a class-99 walk from Wynyard to Barangaroo Wharf (`duration 600`
+  seconds; planned `06:05:18Z` → `06:15:18Z`), then F4 to Balmain East.
+  The service endpoints on either side
+  of the walk are different stops and must both be named in a change.
+- Balmain East and Cockatoo Island publish `platformName: "Side A"`;
+  their parent names append `, Side A` to the wharf name. Balmain publishes
+  `platformName: "Balmain Wharf"`. These are real boarding labels without a
+  number, not missing data. The client preserves the complete supplied
+  label and leaves the compact numeric chip as an em dash.
+- `trip_barangaroo_balmain.json` also offers a leading nine-minute walk
+  from Barangaroo to Wynyard before boarding a train (planned `06:30:30Z`
+  → `06:39:30Z`, `duration 540`). The current response
+  has no outer-walk leg, so that route is excluded instead of presenting
+  the Wynyard train as a departure from Barangaroo. Walks between services
+  remain supported; walks within the selected endpoint hub are retained.
+
 ## GTFS / GTFS-realtime — not used in v1
 
 Static GTFS bundles + GTFS-R v2 protobuf feeds (Trip Updates, Vehicle

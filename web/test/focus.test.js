@@ -10,6 +10,7 @@ import {
 import { parseDoc, serializeDoc, emptyDoc, recordLastOpen, removeTrip } from '../js/storage.js';
 import {
   TRANSFER_NOW, TRANSFER_DEPARTED_NOW, transferBody, transferJourneys, delayLeg, cancelLeg,
+  ferryJourneys, mixedJourneys,
   STATIONS, tripBetween
 } from './fixture.js';
 
@@ -211,6 +212,23 @@ test('a later leg cancelled after departure names that leg, not the one that lef
   assert.equal(directionsModel(journey, at('09:21')).instruction, '09:24 CANCELLED · NEXT TRAIN');
   assert.equal(directionsModel(cancelLeg(transferJourneys()[0], 0), at('09:33')).instruction,
     '09:24 CANCELLED · NEXT TRAIN');
+});
+
+test('ferry directions name a wharf and keep its boarding side', () => {
+  const journey = ferryJourneys()[1];
+  const before = directionsModel(journey, Date.parse('2026-09-05T15:36:00+10:00'), {
+    leave: '4 min'
+  });
+  assert.equal(before.instruction, 'Leave now for Wharf 3, Side A');
+  assert.equal(before.vehicle, 'ferry');
+
+  journey.cancelled = true;
+  journey.legDetail[0].cancelled = true;
+  assert.equal(directionsModel(journey, Date.parse('2026-09-05T15:36:00+10:00')).instruction,
+    '15:45 CANCELLED · NEXT FERRY');
+
+  const change = directionsModel(mixedJourneys()[1], Date.parse('2026-09-05T15:35:00+10:00'));
+  assert.equal(change.instruction, 'Change at Circular Quay · Wharf 3, Side A');
 });
 
 

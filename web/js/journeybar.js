@@ -3,8 +3,8 @@
    share of the journey at every viewport width. */
 
 import { esc } from './dom.js';
-import { effective, legsOf, platformNumber } from './journey.js';
-import { lineFill } from './lines.js';
+import { boardingLabel, effective, legsOf, modeWords, platformChip, platformNumber } from './journey.js';
+import { colourKey, lineFill } from './lines.js';
 
 const KNOCKOUT = new Set(['T4', 'T5', 'T9', 'CCN', 'HUN']);
 
@@ -25,12 +25,24 @@ export function journeyBarSpec(journey, opts = {}) {
   const legs = legsOf(journey, opts);
   if (!legs.length) return { legs: [{ minutes: 1, code: '' }], dwell: 0, total: 1 };
 
-  const parts = legs.map((leg) => ({
-    code: (leg.line && leg.line.name) || '',
-    minutes: positiveMinutes(effective(leg.departure), effective(leg.arrival)),
-    fromPlatform: platformNumber(leg.from && leg.from.platform),
-    toPlatform: platformNumber(leg.to && leg.to.platform)
-  }));
+  const parts = legs.map((leg) => {
+    const line = leg.line || {};
+    const words = modeWords(line.mode);
+    const fromPlatform = platformNumber(leg.from && leg.from.platform);
+    const toPlatform = platformNumber(leg.to && leg.to.platform);
+    return {
+      code: line.name || '',
+      colourKey: colourKey(line),
+      place: words.place,
+      minutes: positiveMinutes(effective(leg.departure), effective(leg.arrival)),
+      fromPlatform,
+      toPlatform,
+      fromLabel: boardingLabel(leg.from && leg.from.platform, line.mode),
+      toLabel: boardingLabel(leg.to && leg.to.platform, line.mode),
+      fromChip: platformChip(leg.from && leg.from.platform) || '—',
+      toChip: platformChip(leg.to && leg.to.platform) || '—'
+    };
+  });
   const dwells = [];
   for (let i = 1; i < legs.length; i++) {
     dwells.push(positiveMinutes(effective(legs[i - 1].arrival), effective(legs[i].departure)));
@@ -43,9 +55,9 @@ export function journeyBarSpec(journey, opts = {}) {
 export function journeyVars(spec) {
   const first = spec.legs[0] || {};
   const second = spec.legs[1] || first;
-  return `--stem:${lineFill(first.code || 'T7')};`
-    + `--stem2:${lineFill(second.code || first.code || 'T7')};`
-    + `--chipink:${chipInk(first.code)};--chipink2:${chipInk(second.code)};`;
+  return `--stem:${lineFill(first.colourKey || 'T7')};`
+    + `--stem2:${lineFill(second.colourKey || first.colourKey || 'T7')};`
+    + `--chipink:${chipInk(first.colourKey)};--chipink2:${chipInk(second.colourKey)};`;
 }
 
 function changeAt(opts, index) {
@@ -63,7 +75,7 @@ export function journeyBarHtml(spec, opts = {}) {
   spec.legs.forEach((leg, index) => {
     const start = cursor / total * 100;
     const end = (cursor + leg.minutes) / total * 100;
-    html += `<span class="sy-r${index === 0 ? ' a' : index === 1 ? ' b' : ''} leg-${index}" data-seg data-line-code="${esc(leg.code)}" style="left:${start}%;width:${end - start}%;background:${lineFill(leg.code || 'T7')}"></span>`;
+    html += `<span class="sy-r${index === 0 ? ' a' : index === 1 ? ' b' : ''} leg-${index}" data-seg data-line-code="${esc(leg.code)}" data-colour-key="${esc(leg.colourKey)}" style="left:${start}%;width:${end - start}%;background:${lineFill(leg.colourKey || 'T7')}"></span>`;
     cursor += leg.minutes;
     if (index < spec.legs.length - 1) {
       const change = changeAt(opts, index);
@@ -72,13 +84,13 @@ export function journeyBarHtml(spec, opts = {}) {
       const dwellStart = cursor / total * 100;
       const dwellEnd = (cursor + dwell) / total * 100;
       html += `<span class="sy-g0${tight ? ' warn' : ''}" data-seg data-transfer-gap="${index}"${tight ? ' data-tight-gap="true"' : ''} style="left:${dwellStart}%;width:${dwellEnd - dwellStart}%"></span>`;
-      if (opts.caps !== false && leg.toPlatform && spec.legs[index + 1].fromPlatform) {
+      if (opts.caps !== false && leg.toLabel && spec.legs[index + 1].fromLabel) {
         const next = spec.legs[index + 1];
         const station = opts.stations && change && change.station
           ? `<span class="sy-pstn" data-transfer-station data-transfer-index="${index}">${esc(change.station)}</span>` : '';
-        const paint = (code) => `background:${lineFill(code || 'T7')};color:${chipInk(code)}`;
-        caps += `<span class="sy-p a" data-pin="a" data-line-code="${esc(leg.code)}" data-transfer-index="${index}" style="right:${100 - dwellStart}%;${paint(leg.code)}">${esc(leg.toPlatform)}</span>`
-          + `<span class="sy-p b" data-pin="b" data-next-platform-marker data-transfer-platform data-line-code="${esc(next.code)}" data-transfer-index="${index}" style="left:${dwellEnd}%;${paint(next.code)}"><span class="sy-pv">${esc(next.fromPlatform)}</span>${station}</span>`;
+        const paint = (key) => `background:${lineFill(key || 'T7')};color:${chipInk(key)}`;
+        caps += `<span class="sy-p a" data-pin="a" data-line-code="${esc(leg.code)}" data-transfer-index="${index}" aria-label="${esc(`${leg.toLabel} · ${leg.code}`)}" style="right:${100 - dwellStart}%;${paint(leg.colourKey)}">${esc(leg.toChip)}</span>`
+          + `<span class="sy-p b" data-pin="b" data-next-platform-marker data-transfer-platform data-line-code="${esc(next.code)}" data-transfer-index="${index}" aria-label="${esc(`${next.fromLabel} · ${next.code}`)}" style="left:${dwellEnd}%;${paint(next.colourKey)}"><span class="sy-pv">${esc(next.fromChip)}</span>${station}</span>`;
       }
       cursor += dwell;
     }
@@ -97,8 +109,8 @@ export function journeyBarHtml(spec, opts = {}) {
 export function journeyDeviceHtml(journey, opts = {}) {
   const spec = journeyBarSpec(journey, opts);
   const first = spec.legs[0] || {};
-  const cap = opts.showBoardingPlatform === false || !first.fromPlatform
-    ? '' : `<span class="sy-cap" data-line-code="${esc(first.code)}">Platform ${esc(first.fromPlatform)}</span>`;
+  const cap = opts.showBoardingPlatform === false || !first.fromLabel
+    ? '' : `<span class="sy-cap" data-line-code="${esc(first.code)}">${esc(first.fromLabel)}</span>`;
   return {
     spec,
     vars: journeyVars(spec),

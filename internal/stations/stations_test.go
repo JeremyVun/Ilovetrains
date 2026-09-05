@@ -15,9 +15,13 @@ func TestFuzzyScoreMatchesTheClient(t *testing.T) {
 		want  int
 	}{
 		{"Central Station", "central", 1000},
-		// n is "central" once "station" is stripped, so the full name is not
-		// an exact match and is too far for the edit-distance floor.
-		{"Central Station", "Central Station", 0},
+		{"Manly Wharf", "manly", 1000},
+		{"Circular Quay Wharf", "circular", 895},
+		{"Parramatta Wharf", "parra", 895},
+		{"Parramatta Station", "parra", 895},
+		{"Central Station", "Central Station", 1000},
+		{"Manly Wharf", "Manly Wharf", 1000},
+		{"Parramatta Wharf", "parramatta wharf", 1000},
 		{"Central Station", "  CENTRAL  ", 1000},
 		{"Central Coast", "central", 894},
 		{"Central Coast", "centra", 893},
@@ -62,11 +66,40 @@ func TestSearchRanksTheStationTheQueryNames(t *testing.T) {
 		{"bondi", "Bondi Junction Station"},
 		{"tallawong", "Tallawong Station"},
 		{"olympic park", "Olympic Park Station"},
+		{"manly", "Manly Wharf"},
+		{"manly wharf", "Manly Wharf"},
+		{"circular", "Circular Quay"},
 	} {
 		got := Search(tc.query, 10)
 		if len(got) == 0 || got[0].Name != tc.want {
 			t.Errorf("Search(%q)[0] = %+v, want %s", tc.query, got, tc.want)
 		}
+	}
+}
+
+func TestFerryHubsUsePlannerIDsAndMergeSharedModes(t *testing.T) {
+	manly := Search("manly", 1)
+	if len(manly) != 1 || manly[0].ID != "209573" || len(manly[0].Modes) != 1 || manly[0].Modes[0] != "ferry" {
+		t.Fatalf("Manly = %+v", manly)
+	}
+	circular := Search("circular", 10)
+	if len(circular) != 1 || circular[0].ID != "200020" || len(circular[0].Modes) != 2 || circular[0].Modes[0] != "train" || circular[0].Modes[1] != "ferry" {
+		t.Fatalf("Circular Quay = %+v", circular)
+	}
+	ferries := 0
+	for _, stop := range All() {
+		for _, mode := range stop.Modes {
+			if mode != "ferry" {
+				continue
+			}
+			ferries++
+			if stop.Location == nil || stop.Location.Lat < -34.2 || stop.Location.Lat > -33.6 || stop.Location.Lon < 150.9 || stop.Location.Lon > 151.4 {
+				t.Errorf("ferry outside harbour: %+v", stop)
+			}
+		}
+	}
+	if ferries < 30 || ferries > 45 {
+		t.Errorf("ferry hubs = %d", ferries)
 	}
 }
 

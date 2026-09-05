@@ -172,6 +172,31 @@ func TestDeparturesContract(t *testing.T) {
 	}
 }
 
+func TestDeparturesContractCarriesFerryFields(t *testing.T) {
+	departures := sampleDepartures()
+	ferryPlatform := "Wharf 3, Side A"
+	departures.From = tfnsw.Place{ID: "200020", Name: "Circular Quay"}
+	departures.To = tfnsw.Place{ID: "209573", Name: "Manly Wharf"}
+	departures.Journeys[0].Departure.Platform = &ferryPlatform
+	departures.Journeys[0].Line = tfnsw.Line{Name: "MFF", Mode: "ferry"}
+
+	got := get(t, newTestServer(t, &fakeUpstream{departures: departures}),
+		"/api/v1/departures?from=200020&to=209573")
+	if got.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", got.Code, got.Body)
+	}
+	var body tfnsw.DeparturesResponse
+	if err := json.Unmarshal(got.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decoding body: %v", err)
+	}
+	journey := body.Journeys[0]
+	if body.From.Name != "Circular Quay" || body.To.Name != "Manly Wharf" ||
+		journey.Line.Mode != "ferry" || journey.Departure.Platform == nil ||
+		*journey.Departure.Platform != ferryPlatform {
+		t.Errorf("ferry response = %+v / %+v / %+v", body.From, body.To, journey)
+	}
+}
+
 func TestDeparturesRepeatQueryHitsCache(t *testing.T) {
 	upstream := &fakeUpstream{departures: sampleDepartures()}
 	handler := newTestServer(t, upstream)

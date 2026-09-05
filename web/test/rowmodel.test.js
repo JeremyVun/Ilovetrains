@@ -8,8 +8,12 @@ import { fileURLToPath } from 'node:url';
 
 import { boardModel, rowLines, STALE_MS } from '../js/rowmodel.js';
 import { emptyCopy, resultRowHtml } from '../js/board.js';
+import { departureKey, journeyKey } from '../js/journey.js';
 import { NOW, departuresBody, baseJourneys, journey, delay, cancel } from './fixture.js';
-import { TRANSFER_NOW, transferBody, transferJourneys, cancelLeg, delayLeg, threeLegJourney } from './fixture.js';
+import {
+  TRANSFER_NOW, transferBody, transferJourneys, cancelLeg, delayLeg, threeLegJourney,
+  FERRY_NOW, ferryBody, mixedBody, mixedJourneys
+} from './fixture.js';
 
 const body = (journeys, generatedAt) => departuresBody({ journeys, generatedAt });
 
@@ -423,6 +427,51 @@ test('a service the live answer still lists but has already run is a past row', 
   assert.equal(running.pastRows.length, 0);
 });
 
+test('live and past alternatives deduplicate by their shared first departure', () => {
+  const [live, oldAlternative] = mixedJourneys();
+  delayLeg(live, 0, 7);
+  const now = Date.parse('2026-09-05T15:30:00+10:00');
+  const model = boardModel({
+    generatedAt: new Date(now).toISOString(), journeys: [live]
+  }, now, { pastBodies: [{ journeys: [oldAlternative] }] });
+
+  assert.equal(model.futureRows.length, 1);
+  assert.equal(model.pastRows.length, 0);
+  assert.equal(model.futureRows[0].departureKey, departureKey(oldAlternative));
+  assert.notEqual(model.futureRows[0].matchKey, journeyKey(oldAlternative),
+    'the itinerary key remains independent of first-departure dedupe');
+});
+
+test('ferry rows derive paint and words from mode without hiding the operator code', () => {
+  const model = boardModel(ferryBody(), FERRY_NOW);
+  assert.deepEqual(model.rows.slice(0, 2).map((row) => [row.lineCode, row.colourKey]), [
+    ['MFF', 'FERRY'], ['F1', 'FERRY']
+  ]);
+  assert.equal(model.rows[0].lineFill, 'var(--line-fill-FERRY)');
+  assert.equal(rowLines(model.rows[0])[1], 'Wharf 2, Side A · MFF');
+  assert.match(resultRowHtml(model.rows[0]), /aria-label="15:40 arrives 16:00\. Wharf 2, Side A · MFF\. Manly"/);
+  const mixedRows = boardModel(mixedBody(), Date.parse('2026-09-05T15:25:00+10:00')).rows;
+  assert.equal(new Set(mixedRows.map((row) => row.matchKey)).size, 2);
+  assert.equal(new Set(mixedRows.map((row) => row.key)).size, 2);
+  assert.match(resultRowHtml(mixedRows[0]), /aria-label="[^"]*Wharf 2, Side A[^"]*"/);
+
+  const cancelled = ferryBody();
+  cancelled.journeys[0].cancelled = true;
+  cancelled.journeys[0].legDetail[0].cancelled = true;
+  const replacement = boardModel(cancelled, FERRY_NOW).rows[1];
+  assert.equal(replacement.note, '15:40 cancelled · next ferry');
+
+  const crossMode = ferryBody();
+  crossMode.journeys[0].cancelled = true;
+  crossMode.journeys[0].legDetail[0].cancelled = true;
+  crossMode.journeys[1].line = { name: 'T8', mode: 'train' };
+  crossMode.journeys[1].legDetail[0].line = crossMode.journeys[1].line;
+  crossMode.journeys[1].departure.platform = 'Platform 4';
+  crossMode.journeys[1].legDetail[0].from.platform = 'Platform 4';
+  const trainReplacement = boardModel(crossMode, FERRY_NOW).rows[1];
+  assert.equal(trainReplacement.note, '15:40 cancelled · next train');
+});
+
 /* --- the line that stands in for the whole board -------------------------- */
 
 /* When there are no rows there is one sentence on the screen, and on a cold
@@ -458,7 +507,9 @@ test('a row carries each change: the station, both platforms and the window', ()
   const m = boardModel(transferBody(), TRANSFER_NOW);
 
   assert.deepEqual(m.rows[0].changes, [{
-    station: 'Town Hall', fromPlatform: '3', toPlatform: '5',
+    station: 'Town Hall', fromStation: 'Town Hall', toStation: 'Town Hall',
+    fromPlatform: '3', toPlatform: '5', fromLabel: 'Platform 3', toLabel: 'Platform 5',
+    fromPlace: 'Platform', toPlace: 'Platform',
     minutes: 7, printed: 7, tight: false, broken: false
   }]);
   assert.equal(m.rows[0].changes[0].station, 'Town Hall', 'the station a browsing user needs, without opening detail');

@@ -1,7 +1,9 @@
 # tools
 
 - `probe-tfnsw.sh` — probe TfNSW Trip Planner endpoints, save raw responses
-  to `fixtures/` (needs `TFNSW_API_KEY` in env or root `.env`; ~5 requests).
+  to `fixtures/` (needs `TFNSW_API_KEY` already in the environment; never
+  sources `.env`; ~5 requests). `--ferries` captures four stop searches
+  and five ferry/mixed journey responses using verified Trip Planner IDs.
 - `fixtures/` — raw TfNSW responses from probes; golden inputs for backend
   mapping tests. Re-run the probe to refresh; note refresh date in commits.
 - `screenshot.js` — screenshot any URL at a real device viewport over CDP.
@@ -337,9 +339,9 @@ node tools/build-stations.js --from-dir /path/to/zips # no key, no network
 
 It reads `TFNSW_API_KEY` from the process environment and only to download;
 it never opens `.env`. `--from-dir` expects `sydneytrains.zip`,
-`nswtrains.zip` and `metro.zip` already in that directory; without the flag
-the bundles land in `.gtfs/` off the repository root. The zips are 12 MB, 40
-MB and 1 MB and are never committed. It shells out to `unzip -p`, so it is
+`nswtrains.zip`, `metro.zip` and `ferries.zip` already in that directory; without the flag
+the bundles land in `.gtfs/` off the repository root. The zips are about 12 MB, 40
+MB, 1 MB and 0.9 MB and are never committed. It shells out to `unzip -p`, so it is
 dependency-free but not portable to a machine without it.
 
 Bundle URLs, and why metro is v2:
@@ -350,6 +352,21 @@ Bundle URLs, and why metro is v2:
   bundle answers 200 but is frozen at September 2024 and has none of the
   Metro City section. See `docs/references/tfnsw-open-data.md`, "Station
   index".
+
+Ferries use `https://api.transport.nsw.gov.au/v1/gtfs/schedule/ferries/sydneyferries`.
+The generator joins ferry routes (4, 1000–1099 or 1200) to served boarding
+stops, then uses `fixtures/ferry_stop_mapping.json` to resolve Trip Planner
+hubs. Regeneration stays offline with `--from-dir` and fails on an unmapped
+boarding stop. To refresh the mapping, first download the ferries ZIP and
+run `python3 tools/probe-ferry-stops.py` with the key already exported. The
+probe queries every served boarding ID, validates one best ferry result,
+and captures full responses without recording the key. It never opens `.env`.
+The current mapping resolves 54 boarding stops to 38 hubs; Circular Quay
+merges with the railway, giving 423 index entries. Names lacking either
+`Station` or `Wharf` are printed, including intentional shared hubs.
+
+`node --test tools/test/build-stations.test.js` verifies the mapping's ID,
+ambiguity and coordinate guards against captured responses.
 
 A parent station is kept only when a rail `route_type` actually serves it,
 joining `stop_times.txt` → `trips.txt` → `routes.txt`. Without that join NSW

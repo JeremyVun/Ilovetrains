@@ -14,7 +14,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { COLOURS, lineColour, lineFill } from '../js/lines.js';
+import { COLOURS, colourKey, lineColour, lineFill } from '../js/lines.js';
+import { chipInk } from '../js/journeybar.js';
 
 const css = readFileSync(fileURLToPath(new URL('../app.css', import.meta.url)), 'utf8')
   .replace(/\/\*[\s\S]*?\*\//g, ' ');
@@ -38,6 +39,13 @@ function schemes() {
 }
 
 const [dark, light] = schemes();
+
+test('ferry colour follows mode while the visible operator code stays independent', () => {
+  assert.equal(colourKey({ name: 'F1', mode: 'ferry' }), 'FERRY');
+  assert.equal(colourKey({ name: 'MFF', mode: 'ferry' }), 'FERRY');
+  assert.equal(colourKey({ name: 'T1', mode: 'train' }), 'T1');
+  assert.equal(lineFill(colourKey({ name: 'MFF', mode: 'ferry' })), 'var(--line-fill-FERRY)');
+});
 
 /* --- colour maths (WCAG 2.x) --------------------------------------------- */
 
@@ -122,6 +130,15 @@ function fillValue(scheme, code) {
   const reference = /^var\(\s*(--[\w-]+)\s*\)$/.exec(raw);
   return reference ? scheme[reference[1]] : raw;
 }
+
+test('dark ferry devices use dark ink with measured readable contrast', () => {
+  assert.equal(chipInk('FERRY'), 'var(--bg)');
+  const ground = rgb(dark['--bg'], [0, 0, 0]);
+  const [hi, lo] = [luminance(rgb(fillValue(dark, 'FERRY'), ground)), luminance(ground)]
+    .sort((a, b) => b - a);
+  const measured = (hi + 0.05) / (lo + 0.05);
+  assert.ok(measured >= 7, `dark ink on ferry green is ${measured.toFixed(2)}:1, wanted >= 7`);
+});
 
 /* The exception the owner accepted with its measurement, not with a waiver. */
 const YELLOW_EXCEPTION = { codes: ['T1', 'BMT'], fill: '#F99D1C', ink: '#FAF9F5', ratio: 2.02 };

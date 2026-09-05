@@ -3,10 +3,12 @@ process.env.TZ = 'Australia/Sydney'; // every clock string the page prints is de
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { journeyDetail, journeyKey, departureKey, legsOf, TIGHT_CHANGE_MIN } from '../js/journey.js';
+import {
+  journeyDetail, journeyKey, departureKey, legsOf, modeWords, platformChip, platformNumber, TIGHT_CHANGE_MIN
+} from '../js/journey.js';
 import {
   TRANSFER_NOW, TRANSFER_DEPARTED_NOW, transferJourneys, delayLeg, cancelLeg,
-  NOW, baseJourneys
+  NOW, baseJourneys, FERRY_NOW, ferryJourneys, mixedJourneys
 } from './fixture.js';
 
 const detail = (journey, now = TRANSFER_NOW, opts) => journeyDetail(journey, now, opts);
@@ -23,18 +25,48 @@ test('the journey prints as board, change, arrive in travel order', () => {
 
   const [board, change, arrive] = m.steps;
   assert.deepEqual([board.time, board.station], ['09:24', 'Rhodes']);
-  assert.deepEqual(board.chip, { code: 'T9', platform: '1' });
+  assert.deepEqual(board.chip, {
+    code: 'T9', colourKey: 'T9', platform: '1', location: 'Platform 1', place: 'Platform'
+  });
   assert.equal(board.label, 'Board T9 · Gordon via Lindfield');
   assert.deepEqual([change.time, change.station], ['7 min', 'Town Hall']);
-  assert.deepEqual(change.off, { code: 'T9', platform: '3' });
-  assert.deepEqual(change.on, { code: 'T4', platform: '5' });
+  assert.deepEqual(change.off, {
+    code: 'T9', colourKey: 'T9', platform: '3', location: 'Platform 3', place: 'Platform'
+  });
+  assert.deepEqual(change.on, {
+    code: 'T4', colourKey: 'T4', platform: '5', location: 'Platform 5', place: 'Platform'
+  });
   assert.equal(change.label, 'Board');
   assert.deepEqual([arrive.time, arrive.station], ['10:08', 'Bondi Junction']);
-  assert.deepEqual(arrive.chip, { code: 'T4', platform: '2' });
+  assert.deepEqual(arrive.chip, {
+    code: 'T4', colourKey: 'T4', platform: '2', location: 'Platform 2', place: 'Platform'
+  });
   assert.equal(arrive.label, 'Arrive');
   assert.deepEqual(m.arrival, {
-    time: '10:08', station: 'Bondi Junction', platform: '2', cancelled: false
+    time: '10:08', station: 'Bondi Junction', platform: '2', label: 'Platform 2',
+    place: 'Platform', cancelled: false
   });
+});
+
+test('mode words and platform parsing preserve a ferry boarding side', () => {
+  assert.deepEqual(modeWords('ferry'), { vehicle: 'ferry', place: 'Wharf' });
+  assert.deepEqual(modeWords('metro'), { vehicle: 'train', place: 'Platform' });
+  assert.equal(platformNumber('Wharf 3, Side B'), '3, Side B');
+  assert.equal(platformChip('Wharf 3, Side B'), '3');
+
+  const ferry = detail(ferryJourneys()[2], FERRY_NOW);
+  assert.equal(ferry.vehicle, 'ferry');
+  assert.deepEqual(ferry.steps[0].chip, {
+    code: 'F1', colourKey: 'FERRY', platform: '3', location: 'Wharf 3, Side B', place: 'Wharf'
+  });
+  assert.deepEqual(ferry.arrival, {
+    time: '16:20', station: 'Manly Wharf', platform: '1', label: 'Wharf 1',
+    place: 'Wharf', cancelled: false
+  });
+
+  const change = detail(mixedJourneys()[1], FERRY_NOW).changes[0];
+  assert.deepEqual([change.fromPlace, change.fromPlatform], ['Platform', '2']);
+  assert.deepEqual([change.toPlace, change.toPlatform], ['Wharf', '3, Side A']);
 });
 
 /* The rule the whole change step rests on. 09:51:36 into Town Hall and
@@ -208,13 +240,17 @@ test('a step states a time, not a countdown, so old data cannot age it', () => {
   assert.deepEqual(m.steps.map((s) => s.time), ['09:24', '7 min', '10:08']);
 });
 
-test('the journey key is the pair a delay cannot move', () => {
+test('the journey key uses every service leg and no delay can move it', () => {
   const journey = transferJourneys()[0];
   const before = journeyKey(journey);
   delayLeg(journey, 0, 9);
 
   assert.equal(journeyKey(journey), before);
-  assert.equal(before, 'T9|2026-09-01T09:24:18+10:00');
+  assert.equal(before, '[["T9","2026-09-01T09:24:18+10:00"],["T4","2026-09-01T09:58:00+10:00"]]');
+
+  const [mff, f1] = mixedJourneys();
+  assert.equal(mff.legDetail[0].departure.scheduled, f1.legDetail[0].departure.scheduled);
+  assert.notEqual(journeyKey(mff), journeyKey(f1), 'different ferry connections remain selectable');
 });
 
 test('a destination redirect matches the first departure across changed connections', () => {

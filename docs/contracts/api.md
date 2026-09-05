@@ -108,17 +108,24 @@ Semantics:
   estimated fields with (near-)copies of the planned times for schedule-only
   services too, and serving those would fake a live estimate.
 - `estimated` reflects realtime even when it equals `scheduled` (on time).
-- `platform` is `null` when unknown. `mode` is `"train"` or `"metro"`.
-- `name` on `from`/`to` is the station name without its platform or suburb
-  suffix ("Central Station"), matching the names `/api/v1/stops` returns. It
-  is `""` when no journey was found to take it from.
+- `platform` is `null` when unknown. `mode` is `"train"`, `"metro"` or
+  `"ferry"`.
+- `name` on `from`/`to` is the station or wharf name without its boarding
+  platform, wharf or side suffix ("Central Station", "Circular Quay" or
+  "Manly Wharf"), matching the names `/api/v1/stops` returns. It is `""` when
+  no journey was found to take it from.
 - `stopsAway` is always `null` in v1: the Trip Planner carries no live vehicle
   position. Reserved for a later data source.
+- Journeys with a leading walk to board at a different stop, or a trailing
+  walk from a different alighting stop to the requested destination, are
+  omitted. The response has no outer-walk instruction and must not imply
+  that a service boards at the requested stop when it boards elsewhere.
+  Walks within an endpoint hub and walks between services remain supported.
 - `legs > 1` means a transfer is required; v1 clients may show a transfer
   badge but journeys are still ordered by departure time. `legs` counts
   services only — a walking transfer between platforms is not a leg.
-- `legDetail` lists the service legs in order, one entry per train/metro
-  service; same length as `legs`. Walking legs (upstream
+- `legDetail` lists the service legs in order, one entry per train, metro or
+  ferry service; same length as `legs`. Walking legs (upstream
   product class 99/100) are folded into the gap between service legs, never
   listed. Each leg:
 
@@ -145,14 +152,12 @@ Semantics:
   own fields. Leg detail comes from the same upstream `trip` call with no
   extra upstream request, so the response remains a pure cached function of
   the query string.
-- Journeys containing any non-train/metro SERVICE leg, such as a product
-  class 10 "On Demand" bus, are EXCLUDED entirely — v1 plans trains and metro
-  only, and a journey you cannot take by train is not an answer to this
-  board's question. They are
-  dropped before `limit` is applied, so a board still fills with up to
-  `limit` takeable journeys. The upstream request also sends `exclMOT_10=1`;
-  the server-side drop guards against any excluded class that upstream still
-  returns.
+- Journeys containing any non-train/metro/ferry SERVICE leg, such as a product
+  class 10 "On Demand" bus, are EXCLUDED entirely — v1 plans trains, metro and
+  ferries only. They are dropped before `limit` is applied, so a board still
+  fills with up to `limit` takeable journeys. The upstream request excludes
+  classes 4, 5, 7, 10 and 11; the server-side drop guards against any excluded
+  class that upstream still returns.
 - Cancelled services are included with `cancelled: true` (clients render
   struck-through), never silently dropped. Detection is deliberately loose
   (any upstream realtime status containing "cancel"): the exact upstream shape
@@ -162,13 +167,15 @@ Semantics:
 - Multi-service journeys must meet the server's planned connection floor at
   every transfer. The default is 3 minutes and deployment may tune it with
   `MIN_CONNECTION_TIME` (a non-negative Go duration such as `4m`). The floor
-  uses scheduled arrival→departure times: a journey that was sane when planned
-  may still shrink in realtime, which the client shows with its tight-change
-  treatment. The proxy asks upstream for spare candidates, drops unsafe
-  journeys before applying the public `limit`, and never rewrites times.
+  measures slack: scheduled arrival→departure minus the summed duration of any
+  intervening class-99/100 walking legs. An explicit upstream `duration` is
+  used when present; otherwise its planned arrival minus departure is used.
+  The proxy asks upstream for spare candidates, drops unsafe journeys before
+  applying the public `limit`, and never rewrites response times.
 - Multi-service journeys also meet a planned connection ceiling, default 60
   minutes and tunable with `MAX_CONNECTION_TIME` (same duration format; `0`
-  disables it). A journey whose longest planned change exceeds the ceiling is
+  disables it). The ceiling measures the same planned slack. A journey whose
+  longest planned change exceeds the ceiling is
   dropped when a later-departing journey that is itself served arrives
   before that wait would have ended. The rule exists because upstream
   answers "next departures" one train at a time and never charges for
@@ -191,7 +198,8 @@ Station autocomplete for trip setup, answered from a station list baked into
 the binary. No upstream call is made and no request can fail on TfNSW.
 
 - The list is generated by `node tools/build-stations.js` from the TfNSW
-  static GTFS bundles (see `tools/README.md` for the bundle URLs and
+  four static GTFS bundles (Sydney Trains, NSW TrainLink, Metro and Sydney
+  Ferries; see `tools/README.md` for the bundle URLs and
   `docs/references/tfnsw-open-data.md` for how a station is selected). It is
   committed to the repository in two byte-identical copies,
   `internal/stations/stations.json` for this endpoint and `web/stations.json`
@@ -209,8 +217,17 @@ the binary. No upstream call is made and no request can fail on TfNSW.
   then prefix, then word prefix, then substring, then a small edit distance),
   ported into `internal/stations` and pinned to the same case table so the
   two sides cannot drift.
-- `modes` lists only `"train"` and/or `"metro"`; a station's other modes
-  (bus, light rail, ferry) are not reported because v1 cannot plan them.
+- `modes` lists served modes in `train, metro, ferry` order. Bus and light
+  rail are not reported. Sydney Ferries GTFS determines which boarding
+  stops are included; the committed `tools/fixtures/ferry_stop_mapping.json`
+  resolves them to verified Trip Planner hubs. Unmapped served boarding
+  stops fail regeneration. Private-only wharves are not indexed.
+- Stops sharing a Trip Planner ID merge modes, so Circular Quay is one
+  `Circular Quay` entry (`200020`, `train · ferry`), while Manly is
+  `Manly Wharf` (`209573`, `ferry`). Boarding wharves and sides belong to
+  journey legs. Ferry-only names end in `Wharf`; shared rail/ferry hubs
+  lose the rail-only `Station` suffix. Search strips `station` and `wharf`
+  for ranking and accepts either suffix on the query.
 
 ```json
 {
@@ -222,7 +239,9 @@ the binary. No upstream call is made and no request can fail on TfNSW.
 ```
 
 `location` is the station's WGS84 coordinates, from the GTFS bundle's
-`stop_lat`/`stop_lon` for the parent station. Every station in the baked
+`stop_lat`/`stop_lon` for rail parents and from the verified Trip Planner
+stop for ferry-only hubs. Shared hubs retain the rail coordinates. Every
+station in the baked
 index carries one, so `null` is a guard rather than an expected case; it is
 never `{"lat": 0, "lon": 0}`, which is a point in the Atlantic that would win
 any nearest-station comparison outright. It powers the client-side

@@ -147,6 +147,16 @@ test('fuzzy ranking puts Rhodes first for the partial Rhode', () => {
     'upstream station answers are ranked, not hidden');
 });
 
+test('wharves use the same fuzzy ranking as stations', () => {
+  assert.equal(fuzzyScore('Manly Wharf', 'manly'), 1000);
+  assert.equal(fuzzyScore('Manly Wharf', 'manly wharf'), 1000);
+  assert.equal(fuzzyScore('Parramatta Wharf', 'parramatta wharf'), 1000);
+  assert.equal(fuzzyScore('Central Station', 'central station'), 1000);
+  assert.equal(fuzzyScore('Circular Quay Wharf', 'circular'), 895);
+  assert.equal(fuzzyScore('Parramatta Wharf', 'parra'), fuzzyScore('Parramatta Station', 'parra'));
+  assert.equal(rankStops([{ name: 'Manly Vale' }, { name: 'Manly Wharf' }], 'manly')[0].name, 'Manly Wharf');
+});
+
 /* --- what Enter commits to ----------------------------------------------- */
 
 test('Enter takes the top match, which is the one the ranking put first', () => {

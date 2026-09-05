@@ -8,8 +8,10 @@
    past the fold. `rowLines()` is that invariant, written down. */
 
 import { parseIso, clock, minutesUntil, ageLabel, countdownFigure } from './time.js';
-import { lineColour, lineFill } from './lines.js';
-import { journeyDetail, journeyKey, platformNumber } from './journey.js';
+import { colourKey, lineColour, lineFill } from './lines.js';
+import {
+  boardingLabel, departureKey, journeyDetail, journeyKey, modeWords, platformNumber
+} from './journey.js';
 
 /* 30s refresh cadence plus margin: past this, a countdown is a claim the data
    cannot support. */
@@ -17,7 +19,7 @@ export const STALE_MS = 90_000;
 const LIVE_DOT_MS = 45_000;
 
 /* The contract copy fits the full label idiom at every supported width. */
-export const CANCELLED_LEAD_NOTE = (time) => time + ' cancelled · next train';
+export const CANCELLED_LEAD_NOTE = (time, vehicle = 'train') => time + ' cancelled · next ' + vehicle;
 
 export function boardModel(body, nowMs, opts = {}) {
   const staleMs = opts.staleMs ?? STALE_MS;
@@ -33,17 +35,17 @@ export function boardModel(body, nowMs, opts = {}) {
   // Only a service the live answer still shows can outrank a past copy of it.
   // A service it lists but has already dropped below now has no live row left,
   // so its last live estimate is the only copy there is (ui.md, departed).
-  const liveKeys = new Set(futureRows.map((row) => row.matchKey));
+  const liveKeys = new Set(futureRows.map((row) => row.departureKey));
 
   const pastRows = (Array.isArray(opts.pastBodies) ? opts.pastBodies : [])
     .flatMap((page) => Array.isArray(page && page.journeys) ? page.journeys : [])
     // A live answer is newer than a settled past page. It wins even when the
     // past cache still carries an older estimate for the same service.
-    .filter((journey) => !liveKeys.has(journeyKey(journey)))
+    .filter((journey) => !liveKeys.has(departureKey(journey)))
     .map((j) => journeyRow(j, nowMs, false, { ...opts, pastSource: true }))
     .filter((r) => r !== null && r.past);
 
-  const uniquePast = [...new Map(pastRows.map((row) => [row.matchKey, row])).values()]
+  const uniquePast = [...new Map(pastRows.map((row) => [row.departureKey, row])).values()]
     .sort((a, b) => a.effectiveMs - b.effectiveMs);
 
   markLeadAndCancelledLead(futureRows);
@@ -137,13 +139,19 @@ function journeyRow(journey, nowMs, stale, opts) {
     : figureFor(cancelled, stale, mins);
 
   const lineCode = (journey.line && journey.line.name) || '';
+  const firstLine = (firstLeg && firstLeg.line) || journey.line || {};
+  const paintKey = colourKey(firstLine);
+  const words = modeWords(firstLine.mode);
+  const matchKey = journeyKey(journey);
+  const firstDepartureKey = departureKey(journey);
 
   return {
-    key: (dep.scheduled || dep.estimated) + '|' + lineCode + '|' + (dep.platform || ''),
+    key: JSON.stringify([matchKey, dep.platform || '']),
     // The identity the detail view and the focus snapshot re-match on
     // (client-storage.md). The row key above also carries the platform, which
-    // upstream can revise; this one is the pair that cannot move.
-    matchKey: journeyKey(journey),
+    // upstream can revise; this one uses fields that cannot move.
+    matchKey,
+    departureKey: firstDepartureKey,
     effectiveMs: effective,
     journey,
     first: false,
@@ -166,9 +174,13 @@ function journeyRow(journey, nowMs, stale, opts) {
     // A cancelled row keeps its arrival: it is what the next train is judged against.
     arrTime: arrivalMs === null ? null : clock(arrivalMs),
     platform: platformNumber(dep.platform) || null,
+    platformLabel: boardingLabel(dep.platform, firstLine.mode) || null,
     lineCode,
-    lineColour: lineColour(lineCode),
-    lineFill: lineFill(lineCode),
+    colourKey: paintKey,
+    lineColour: lineColour(paintKey),
+    lineFill: lineFill(paintKey),
+    vehicle: words.vehicle,
+    place: words.place,
     headsign: journey.destinationHeadsign || opts.fallbackHeadsign || '',
     transfers: typeof journey.legs === 'number' && journey.legs > 1,
     changes: changesOf(journey, nowMs, cancelled),
@@ -189,8 +201,14 @@ export function promotedRow(journey, nowMs, opts = {}) {
 function changesOf(journey, nowMs, cancelled) {
   return journeyDetail(journey, nowMs).changes.map((change) => ({
     station: change.station,
+    fromStation: change.fromStation,
+    toStation: change.toStation,
     fromPlatform: change.fromPlatform,
     toPlatform: change.toPlatform,
+    fromLabel: change.fromLabel,
+    toLabel: change.toLabel,
+    fromPlace: change.fromPlace,
+    toPlace: change.toPlace,
     minutes: change.minutes,
     printed: change.printedMin,
     tight: change.tight && !cancelled,
@@ -206,7 +224,7 @@ function markLeadAndCancelledLead(rows) {
   rows[0].first = true;
   if (!rows[0].cancelled) return;
   const next = rows.find((r) => !r.cancelled);
-  if (next) next.note = CANCELLED_LEAD_NOTE(rows[0].depTime);
+  if (next) next.note = CANCELLED_LEAD_NOTE(rows[0].depTime, next.vehicle);
 }
 
 /**
@@ -220,7 +238,8 @@ export function rowLines(row) {
     row.arrTime ? 'arrives ' + row.arrTime : ''
   ].filter(Boolean).join(' ');
 
-  const line2 = ['Platform ' + (row.platform || '—'), row.lineCode || '—'].join(' · ');
+  const location = row.platformLabel || (row.place === 'Platform' ? 'Platform —' : '—');
+  const line2 = [location, row.lineCode || '—'].join(' · ');
 
   const line3 = row.note || row.headsign || '—';
 

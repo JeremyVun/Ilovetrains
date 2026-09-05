@@ -1,0 +1,2969 @@
+{
+  "capturedAt": "2026-09-05T05:37:55.482647+00:00",
+  "feedInfo": [
+    {
+      "feed_publisher_name": "Sydney Ferries",
+      "feed_publisher_url": "http://transportnsw.info",
+      "feed_lang": "EN",
+      "feed_version": "05092026-010132"
+    }
+  ],
+  "queries": {
+    "2000212": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "200020",
+          "isGlobalId": true,
+          "name": "Circular Quay, Sydney",
+          "disassembledName": "Circular Quay",
+          "coord": [
+            -33.861351,
+            151.210813
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95301001:1",
+            "name": "Sydney",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "200020",
+              "isGlobalId": true,
+              "name": "Circular Quay, Sydney",
+              "disassembledName": "Circular Quay",
+              "type": "stop",
+              "coord": [
+                -33.861351,
+                151.210813
+              ],
+              "parent": {
+                "name": "Sydney",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10101103"
+              },
+              "modes": [
+                1,
+                4,
+                5,
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10101103"
+          },
+          "modes": [
+            1,
+            4,
+            5,
+            9
+          ]
+        }
+      ]
+    },
+    "2000215": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "200020",
+          "isGlobalId": true,
+          "name": "Circular Quay, Sydney",
+          "disassembledName": "Circular Quay",
+          "coord": [
+            -33.861351,
+            151.210813
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95301001:1",
+            "name": "Sydney",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "200020",
+              "isGlobalId": true,
+              "name": "Circular Quay, Sydney",
+              "disassembledName": "Circular Quay",
+              "type": "stop",
+              "coord": [
+                -33.861351,
+                151.210813
+              ],
+              "parent": {
+                "name": "Sydney",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10101103"
+              },
+              "modes": [
+                1,
+                4,
+                5,
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10101103"
+          },
+          "modes": [
+            1,
+            4,
+            5,
+            9
+          ]
+        }
+      ]
+    },
+    "2000216": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "200020",
+          "isGlobalId": true,
+          "name": "Circular Quay, Sydney",
+          "disassembledName": "Circular Quay",
+          "coord": [
+            -33.861351,
+            151.210813
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95301001:1",
+            "name": "Sydney",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "200020",
+              "isGlobalId": true,
+              "name": "Circular Quay, Sydney",
+              "disassembledName": "Circular Quay",
+              "type": "stop",
+              "coord": [
+                -33.861351,
+                151.210813
+              ],
+              "parent": {
+                "name": "Sydney",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10101103"
+              },
+              "modes": [
+                1,
+                4,
+                5,
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10101103"
+          },
+          "modes": [
+            1,
+            4,
+            5,
+            9
+          ]
+        }
+      ]
+    },
+    "2000217": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "200020",
+          "isGlobalId": true,
+          "name": "Circular Quay, Sydney",
+          "disassembledName": "Circular Quay",
+          "coord": [
+            -33.861351,
+            151.210813
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95301001:1",
+            "name": "Sydney",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "200020",
+              "isGlobalId": true,
+              "name": "Circular Quay, Sydney",
+              "disassembledName": "Circular Quay",
+              "type": "stop",
+              "coord": [
+                -33.861351,
+                151.210813
+              ],
+              "parent": {
+                "name": "Sydney",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10101103"
+              },
+              "modes": [
+                1,
+                4,
+                5,
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10101103"
+          },
+          "modes": [
+            1,
+            4,
+            5,
+            9
+          ]
+        }
+      ]
+    },
+    "2000223": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "200020",
+          "isGlobalId": true,
+          "name": "Circular Quay, Sydney",
+          "disassembledName": "Circular Quay",
+          "coord": [
+            -33.861351,
+            151.210813
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95301001:1",
+            "name": "Sydney",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "200020",
+              "isGlobalId": true,
+              "name": "Circular Quay, Sydney",
+              "disassembledName": "Circular Quay",
+              "type": "stop",
+              "coord": [
+                -33.861351,
+                151.210813
+              ],
+              "parent": {
+                "name": "Sydney",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10101103"
+              },
+              "modes": [
+                1,
+                4,
+                5,
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10101103"
+          },
+          "modes": [
+            1,
+            4,
+            5,
+            9
+          ]
+        }
+      ]
+    },
+    "2000225": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "200020",
+          "isGlobalId": true,
+          "name": "Circular Quay, Sydney",
+          "disassembledName": "Circular Quay",
+          "coord": [
+            -33.861351,
+            151.210813
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95301001:1",
+            "name": "Sydney",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "200020",
+              "isGlobalId": true,
+              "name": "Circular Quay, Sydney",
+              "disassembledName": "Circular Quay",
+              "type": "stop",
+              "coord": [
+                -33.861351,
+                151.210813
+              ],
+              "parent": {
+                "name": "Sydney",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10101103"
+              },
+              "modes": [
+                1,
+                4,
+                5,
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10101103"
+          },
+          "modes": [
+            1,
+            4,
+            5,
+            9
+          ]
+        }
+      ]
+    },
+    "2000227": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "200020",
+          "isGlobalId": true,
+          "name": "Circular Quay, Sydney",
+          "disassembledName": "Circular Quay",
+          "coord": [
+            -33.861351,
+            151.210813
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95301001:1",
+            "name": "Sydney",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "200020",
+              "isGlobalId": true,
+              "name": "Circular Quay, Sydney",
+              "disassembledName": "Circular Quay",
+              "type": "stop",
+              "coord": [
+                -33.861351,
+                151.210813
+              ],
+              "parent": {
+                "name": "Sydney",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10101103"
+              },
+              "modes": [
+                1,
+                4,
+                5,
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10101103"
+          },
+          "modes": [
+            1,
+            4,
+            5,
+            9
+          ]
+        }
+      ]
+    },
+    "2000229": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "200020",
+          "isGlobalId": true,
+          "name": "Circular Quay, Sydney",
+          "disassembledName": "Circular Quay",
+          "coord": [
+            -33.861351,
+            151.210813
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95301001:1",
+            "name": "Sydney",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "200020",
+              "isGlobalId": true,
+              "name": "Circular Quay, Sydney",
+              "disassembledName": "Circular Quay",
+              "type": "stop",
+              "coord": [
+                -33.861351,
+                151.210813
+              ],
+              "parent": {
+                "name": "Sydney",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10101103"
+              },
+              "modes": [
+                1,
+                4,
+                5,
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10101103"
+          },
+          "modes": [
+            1,
+            4,
+            5,
+            9
+          ]
+        }
+      ]
+    },
+    "2000236": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "2000441",
+          "isGlobalId": true,
+          "name": "Barangaroo Wharf, Barangaroo",
+          "disassembledName": "Barangaroo Wharf",
+          "coord": [
+            -33.864784,
+            151.201056
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95301004:1",
+            "name": "Barangaroo",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "2000441",
+              "isGlobalId": true,
+              "name": "Barangaroo Wharf, Barangaroo",
+              "disassembledName": "Barangaroo Wharf",
+              "type": "stop",
+              "coord": [
+                -33.864784,
+                151.201056
+              ],
+              "parent": {
+                "name": "Barangaroo",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102039"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102039"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "2000237": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "2000441",
+          "isGlobalId": true,
+          "name": "Barangaroo Wharf, Barangaroo",
+          "disassembledName": "Barangaroo Wharf",
+          "coord": [
+            -33.864784,
+            151.201056
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95301004:1",
+            "name": "Barangaroo",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "2000441",
+              "isGlobalId": true,
+              "name": "Barangaroo Wharf, Barangaroo",
+              "disassembledName": "Barangaroo Wharf",
+              "type": "stop",
+              "coord": [
+                -33.864784,
+                151.201056
+              ],
+              "parent": {
+                "name": "Barangaroo",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102039"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102039"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "2000238": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "2000441",
+          "isGlobalId": true,
+          "name": "Barangaroo Wharf, Barangaroo",
+          "disassembledName": "Barangaroo Wharf",
+          "coord": [
+            -33.864784,
+            151.201056
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95301004:1",
+            "name": "Barangaroo",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "2000441",
+              "isGlobalId": true,
+              "name": "Barangaroo Wharf, Barangaroo",
+              "disassembledName": "Barangaroo Wharf",
+              "type": "stop",
+              "coord": [
+                -33.864784,
+                151.201056
+              ],
+              "parent": {
+                "name": "Barangaroo",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102039"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102039"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "2000239": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "2000441",
+          "isGlobalId": true,
+          "name": "Barangaroo Wharf, Barangaroo",
+          "disassembledName": "Barangaroo Wharf",
+          "coord": [
+            -33.864784,
+            151.201056
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95301004:1",
+            "name": "Barangaroo",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "2000441",
+              "isGlobalId": true,
+              "name": "Barangaroo Wharf, Barangaroo",
+              "disassembledName": "Barangaroo Wharf",
+              "type": "stop",
+              "coord": [
+                -33.864784,
+                151.201056
+              ],
+              "parent": {
+                "name": "Barangaroo",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102039"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102039"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "200910": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "2000260",
+          "isGlobalId": true,
+          "name": "Pyrmont Bay Wharf, Pyrmont",
+          "disassembledName": "Pyrmont Bay Wharf",
+          "coord": [
+            -33.868482,
+            151.198818
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95301023:1",
+            "name": "Pyrmont",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "2000260",
+              "isGlobalId": true,
+              "name": "Pyrmont Bay Wharf, Pyrmont",
+              "disassembledName": "Pyrmont Bay Wharf",
+              "type": "stop",
+              "coord": [
+                -33.868482,
+                151.198818
+              ],
+              "parent": {
+                "name": "Pyrmont",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102033"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102033"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "200954": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "200956",
+          "isGlobalId": true,
+          "name": "Pirrama Park Wharf, Pyrmont",
+          "disassembledName": "Pirrama Park Wharf",
+          "coord": [
+            -33.86453,
+            151.191064
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95301023:1",
+            "name": "Pyrmont",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "200956",
+              "isGlobalId": true,
+              "name": "Pirrama Park Wharf, Pyrmont",
+              "disassembledName": "Pirrama Park Wharf",
+              "type": "stop",
+              "coord": [
+                -33.86453,
+                151.191064
+              ],
+              "parent": {
+                "name": "Pyrmont",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102056"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102056"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "20271": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "202727",
+          "isGlobalId": true,
+          "name": "Darling Point Wharf, Darling Point",
+          "disassembledName": "Darling Point Wharf",
+          "coord": [
+            -33.866652,
+            151.239587
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95365002:1",
+            "name": "Darling Point",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "202727",
+              "isGlobalId": true,
+              "name": "Darling Point Wharf, Darling Point",
+              "disassembledName": "Darling Point Wharf",
+              "type": "stop",
+              "coord": [
+                -33.866652,
+                151.239587
+              ],
+              "parent": {
+                "name": "Darling Point",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102034"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102034"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "20281": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "202823",
+          "isGlobalId": true,
+          "name": "Double Bay Wharf, Double Bay",
+          "disassembledName": "Double Bay Wharf",
+          "coord": [
+            -33.873707,
+            151.242443
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95365003:1",
+            "name": "Double Bay",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "202823",
+              "isGlobalId": true,
+              "name": "Double Bay Wharf, Double Bay",
+              "disassembledName": "Double Bay Wharf",
+              "type": "stop",
+              "coord": [
+                -33.873707,
+                151.242443
+              ],
+              "parent": {
+                "name": "Double Bay",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102003"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102003"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "20291": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "202972",
+          "isGlobalId": true,
+          "name": "Rose Bay Wharf, Rose Bay",
+          "disassembledName": "Rose Bay Wharf",
+          "coord": [
+            -33.870802,
+            151.262345
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95365006:1",
+            "name": "Rose Bay",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "202972",
+              "isGlobalId": true,
+              "name": "Rose Bay Wharf, Rose Bay",
+              "disassembledName": "Rose Bay Wharf",
+              "type": "stop",
+              "coord": [
+                -33.870802,
+                151.262345
+              ],
+              "parent": {
+                "name": "Rose Bay",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102004"
+              },
+              "modes": [
+                5,
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102004"
+          },
+          "modes": [
+            5,
+            9
+          ]
+        }
+      ]
+    },
+    "202973": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "202972",
+          "isGlobalId": true,
+          "name": "Rose Bay Wharf, Rose Bay",
+          "disassembledName": "Rose Bay Wharf",
+          "coord": [
+            -33.870802,
+            151.262345
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95365006:1",
+            "name": "Rose Bay",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "202972",
+              "isGlobalId": true,
+              "name": "Rose Bay Wharf, Rose Bay",
+              "disassembledName": "Rose Bay Wharf",
+              "type": "stop",
+              "coord": [
+                -33.870802,
+                151.262345
+              ],
+              "parent": {
+                "name": "Rose Bay",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102004"
+              },
+              "modes": [
+                5,
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102004"
+          },
+          "modes": [
+            5,
+            9
+          ]
+        }
+      ]
+    },
+    "20301": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "2030164",
+          "isGlobalId": true,
+          "name": "Watsons Bay Wharf, Watsons Bay",
+          "disassembledName": "Watsons Bay Wharf",
+          "coord": [
+            -33.8433,
+            151.281686
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95365008:1",
+            "name": "Watsons Bay",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "2030164",
+              "isGlobalId": true,
+              "name": "Watsons Bay Wharf, Watsons Bay",
+              "disassembledName": "Watsons Bay Wharf",
+              "type": "stop",
+              "coord": [
+                -33.8433,
+                151.281686
+              ],
+              "parent": {
+                "name": "Watsons Bay",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102005"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102005"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "203771": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "203783",
+          "isGlobalId": true,
+          "name": "Blackwattle Bay Wharf, Glebe",
+          "disassembledName": "Blackwattle Bay Wharf",
+          "coord": [
+            -33.871329,
+            151.185078
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95301016:1",
+            "name": "Glebe",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "203783",
+              "isGlobalId": true,
+              "name": "Blackwattle Bay Wharf, Glebe",
+              "disassembledName": "Blackwattle Bay Wharf",
+              "type": "stop",
+              "coord": [
+                -33.871329,
+                151.185078
+              ],
+              "parent": {
+                "name": "Glebe",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102058"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102058"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "20411": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "204155",
+          "isGlobalId": true,
+          "name": "Balmain West Wharf, Balmain",
+          "disassembledName": "Balmain West Wharf",
+          "coord": [
+            -33.855124,
+            151.168768
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95333002:1",
+            "name": "Balmain",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "204155",
+              "isGlobalId": true,
+              "name": "Balmain West Wharf, Balmain",
+              "disassembledName": "Balmain West Wharf",
+              "type": "stop",
+              "coord": [
+                -33.855124,
+                151.168768
+              ],
+              "parent": {
+                "name": "Balmain",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102006"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102006"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "20412": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "204156",
+          "isGlobalId": true,
+          "name": "Birchgrove Wharf, Birchgrove",
+          "disassembledName": "Birchgrove Wharf",
+          "coord": [
+            -33.846598,
+            151.186105
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95333004:1",
+            "name": "Birchgrove",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "204156",
+              "isGlobalId": true,
+              "name": "Birchgrove Wharf, Birchgrove",
+              "disassembledName": "Birchgrove Wharf",
+              "type": "stop",
+              "coord": [
+                -33.846598,
+                151.186105
+              ],
+              "parent": {
+                "name": "Birchgrove",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102007"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102007"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "20413": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "204157",
+          "isGlobalId": true,
+          "name": "Balmain Wharf, Balmain",
+          "disassembledName": "Balmain Wharf",
+          "coord": [
+            -33.854752,
+            151.186115
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95333002:1",
+            "name": "Balmain",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "204157",
+              "isGlobalId": true,
+              "name": "Balmain Wharf, Balmain",
+              "disassembledName": "Balmain Wharf",
+              "type": "stop",
+              "coord": [
+                -33.854752,
+                151.186115
+              ],
+              "parent": {
+                "name": "Balmain",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102008"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102008"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "204153": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "20414",
+          "isGlobalId": true,
+          "name": "Balmain East Wharf, Balmain East",
+          "disassembledName": "Balmain East Wharf",
+          "coord": [
+            -33.857068,
+            151.195861
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95333003:1",
+            "name": "Balmain East",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "20414",
+              "isGlobalId": true,
+              "name": "Balmain East Wharf, Balmain East",
+              "disassembledName": "Balmain East Wharf",
+              "type": "stop",
+              "coord": [
+                -33.857068,
+                151.195861
+              ],
+              "parent": {
+                "name": "Balmain East",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102010"
+              },
+              "modes": [
+                5,
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102010"
+          },
+          "modes": [
+            5,
+            9
+          ]
+        }
+      ]
+    },
+    "204154": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "20414",
+          "isGlobalId": true,
+          "name": "Balmain East Wharf, Balmain East",
+          "disassembledName": "Balmain East Wharf",
+          "coord": [
+            -33.857068,
+            151.195861
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95333003:1",
+            "name": "Balmain East",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "20414",
+              "isGlobalId": true,
+              "name": "Balmain East Wharf, Balmain East",
+              "disassembledName": "Balmain East Wharf",
+              "type": "stop",
+              "coord": [
+                -33.857068,
+                151.195861
+              ],
+              "parent": {
+                "name": "Balmain East",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102010"
+              },
+              "modes": [
+                5,
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102010"
+          },
+          "modes": [
+            5,
+            9
+          ]
+        }
+      ]
+    },
+    "20461": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "2046158",
+          "isGlobalId": true,
+          "name": "Abbotsford Wharf, Abbotsford",
+          "disassembledName": "Abbotsford Wharf",
+          "coord": [
+            -33.843876,
+            151.128257
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95314001:1",
+            "name": "Abbotsford",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "2046158",
+              "isGlobalId": true,
+              "name": "Abbotsford Wharf, Abbotsford",
+              "disassembledName": "Abbotsford Wharf",
+              "type": "stop",
+              "coord": [
+                -33.843876,
+                151.128257
+              ],
+              "parent": {
+                "name": "Abbotsford",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102011"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102011"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "20462": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "2046159",
+          "isGlobalId": true,
+          "name": "Chiswick Wharf, Chiswick",
+          "disassembledName": "Chiswick Wharf",
+          "coord": [
+            -33.845683,
+            151.141777
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95314005:1",
+            "name": "Chiswick",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "2046159",
+              "isGlobalId": true,
+              "name": "Chiswick Wharf, Chiswick",
+              "disassembledName": "Chiswick Wharf",
+              "type": "stop",
+              "coord": [
+                -33.845683,
+                151.141777
+              ],
+              "parent": {
+                "name": "Chiswick",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102012"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102012"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "20471": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "204761",
+          "isGlobalId": true,
+          "name": "Drummoyne Wharf, Drummoyne",
+          "disassembledName": "Drummoyne Wharf",
+          "coord": [
+            -33.845622,
+            151.156956
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95314008:1",
+            "name": "Drummoyne",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "204761",
+              "isGlobalId": true,
+              "name": "Drummoyne Wharf, Drummoyne",
+              "disassembledName": "Drummoyne Wharf",
+              "type": "stop",
+              "coord": [
+                -33.845622,
+                151.156956
+              ],
+              "parent": {
+                "name": "Drummoyne",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102013"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102013"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "20603": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "206099",
+          "isGlobalId": true,
+          "name": "North Sydney Wharf, North Sydney",
+          "disassembledName": "North Sydney Wharf",
+          "coord": [
+            -33.844596,
+            151.218595
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95343010:1",
+            "name": "North Sydney",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "206099",
+              "isGlobalId": true,
+              "name": "North Sydney Wharf, North Sydney",
+              "disassembledName": "North Sydney Wharf",
+              "type": "stop",
+              "coord": [
+                -33.844596,
+                151.218595
+              ],
+              "parent": {
+                "name": "North Sydney",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102016"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102016"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "206076": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "20601",
+          "isGlobalId": true,
+          "name": "McMahons Point Wharf, McMahons Point",
+          "disassembledName": "McMahons Point Wharf",
+          "coord": [
+            -33.848658,
+            151.20628
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95343007:1",
+            "name": "McMahons Point",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "20601",
+              "isGlobalId": true,
+              "name": "McMahons Point Wharf, McMahons Point",
+              "disassembledName": "McMahons Point Wharf",
+              "type": "stop",
+              "coord": [
+                -33.848658,
+                151.20628
+              ],
+              "parent": {
+                "name": "McMahons Point",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102015"
+              },
+              "modes": [
+                5,
+                9,
+                11
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102015"
+          },
+          "modes": [
+            5,
+            9,
+            11
+          ]
+        }
+      ]
+    },
+    "206080": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "20601",
+          "isGlobalId": true,
+          "name": "McMahons Point Wharf, McMahons Point",
+          "disassembledName": "McMahons Point Wharf",
+          "coord": [
+            -33.848658,
+            151.20628
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95343007:1",
+            "name": "McMahons Point",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "20601",
+              "isGlobalId": true,
+              "name": "McMahons Point Wharf, McMahons Point",
+              "disassembledName": "McMahons Point Wharf",
+              "type": "stop",
+              "coord": [
+                -33.848658,
+                151.20628
+              ],
+              "parent": {
+                "name": "McMahons Point",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102015"
+              },
+              "modes": [
+                5,
+                9,
+                11
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102015"
+          },
+          "modes": [
+            5,
+            9,
+            11
+          ]
+        }
+      ]
+    },
+    "206122": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "20611",
+          "isGlobalId": true,
+          "name": "Milsons Point Wharf, Milsons Point",
+          "disassembledName": "Milsons Point Wharf",
+          "coord": [
+            -33.84961,
+            151.210851
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95343008:1",
+            "name": "Milsons Point",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "20611",
+              "isGlobalId": true,
+              "name": "Milsons Point Wharf, Milsons Point",
+              "disassembledName": "Milsons Point Wharf",
+              "type": "stop",
+              "coord": [
+                -33.84961,
+                151.210851
+              ],
+              "parent": {
+                "name": "Milsons Point",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102017"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102017"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "206126": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "20611",
+          "isGlobalId": true,
+          "name": "Milsons Point Wharf, Milsons Point",
+          "disassembledName": "Milsons Point Wharf",
+          "coord": [
+            -33.84961,
+            151.210851
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95343008:1",
+            "name": "Milsons Point",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "20611",
+              "isGlobalId": true,
+              "name": "Milsons Point Wharf, Milsons Point",
+              "disassembledName": "Milsons Point Wharf",
+              "type": "stop",
+              "coord": [
+                -33.84961,
+                151.210851
+              ],
+              "parent": {
+                "name": "Milsons Point",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102017"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102017"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "20614": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "206132",
+          "isGlobalId": true,
+          "name": "Kirribilli Wharf, Kirribilli",
+          "disassembledName": "Kirribilli Wharf",
+          "coord": [
+            -33.849461,
+            151.219656
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95343005:1",
+            "name": "Kirribilli",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "206132",
+              "isGlobalId": true,
+              "name": "Kirribilli Wharf, Kirribilli",
+              "disassembledName": "Kirribilli Wharf",
+              "type": "stop",
+              "coord": [
+                -33.849461,
+                151.219656
+              ],
+              "parent": {
+                "name": "Kirribilli",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102018"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102018"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "20651": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "206518",
+          "isGlobalId": true,
+          "name": "Greenwich Point Wharf, Greenwich",
+          "disassembledName": "Greenwich Point Wharf",
+          "coord": [
+            -33.841978,
+            151.180751
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95332001:1",
+            "name": "Greenwich",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "206518",
+              "isGlobalId": true,
+              "name": "Greenwich Point Wharf, Greenwich",
+              "disassembledName": "Greenwich Point Wharf",
+              "type": "stop",
+              "coord": [
+                -33.841978,
+                151.180751
+              ],
+              "parent": {
+                "name": "Greenwich",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102019"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102019"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "20881": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "208877",
+          "isGlobalId": true,
+          "name": "Mosman Bay Wharf, Mosman",
+          "disassembledName": "Mosman Bay Wharf",
+          "coord": [
+            -33.838399,
+            151.232715
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95340002:1",
+            "name": "Mosman",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "208877",
+              "isGlobalId": true,
+              "name": "Mosman Bay Wharf, Mosman",
+              "disassembledName": "Mosman Bay Wharf",
+              "type": "stop",
+              "coord": [
+                -33.838399,
+                151.232715
+              ],
+              "parent": {
+                "name": "Mosman",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102020"
+              },
+              "modes": [
+                5,
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102020"
+          },
+          "modes": [
+            5,
+            9
+          ]
+        }
+      ]
+    },
+    "20882": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "208878",
+          "isGlobalId": true,
+          "name": "South Mosman Wharf, Mosman",
+          "disassembledName": "South Mosman Wharf",
+          "coord": [
+            -33.843099,
+            151.232807
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95340002:1",
+            "name": "Mosman",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "208878",
+              "isGlobalId": true,
+              "name": "South Mosman Wharf, Mosman",
+              "disassembledName": "South Mosman Wharf",
+              "type": "stop",
+              "coord": [
+                -33.843099,
+                151.232807
+              ],
+              "parent": {
+                "name": "Mosman",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102021"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102021"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "20883": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "208899",
+          "isGlobalId": true,
+          "name": "Taronga Zoo Wharf, Mosman",
+          "disassembledName": "Taronga Zoo Wharf",
+          "coord": [
+            -33.845888,
+            151.239747
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95340002:1",
+            "name": "Mosman",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "208899",
+              "isGlobalId": true,
+              "name": "Taronga Zoo Wharf, Mosman",
+              "disassembledName": "Taronga Zoo Wharf",
+              "type": "stop",
+              "coord": [
+                -33.845888,
+                151.239747
+              ],
+              "parent": {
+                "name": "Mosman",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102022"
+              },
+              "modes": [
+                5,
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102022"
+          },
+          "modes": [
+            5,
+            9
+          ]
+        }
+      ]
+    },
+    "20891": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "208943",
+          "isGlobalId": true,
+          "name": "Neutral Bay Wharf, Neutral Bay",
+          "disassembledName": "Neutral Bay Wharf",
+          "coord": [
+            -33.841979,
+            151.218996
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95343009:1",
+            "name": "Neutral Bay",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "208943",
+              "isGlobalId": true,
+              "name": "Neutral Bay Wharf, Neutral Bay",
+              "disassembledName": "Neutral Bay Wharf",
+              "type": "stop",
+              "coord": [
+                -33.841979,
+                151.218996
+              ],
+              "parent": {
+                "name": "Neutral Bay",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102023"
+              },
+              "modes": [
+                5,
+                9,
+                11
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102023"
+          },
+          "modes": [
+            5,
+            9,
+            11
+          ]
+        }
+      ]
+    },
+    "20892": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "208946",
+          "isGlobalId": true,
+          "name": "Kurraba Point Wharf, Kurraba Point",
+          "disassembledName": "Kurraba Point Wharf",
+          "coord": [
+            -33.843314,
+            151.222095
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95343021:1",
+            "name": "Kurraba Point",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "208946",
+              "isGlobalId": true,
+              "name": "Kurraba Point Wharf, Kurraba Point",
+              "disassembledName": "Kurraba Point Wharf",
+              "type": "stop",
+              "coord": [
+                -33.843314,
+                151.222095
+              ],
+              "parent": {
+                "name": "Kurraba Point",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102024"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102024"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "20901": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "209037",
+          "isGlobalId": true,
+          "name": "Cremorne Point Wharf, Cremorne Point",
+          "disassembledName": "Cremorne Point Wharf",
+          "coord": [
+            -33.84769,
+            151.23109
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95343003:1",
+            "name": "Cremorne Point",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "209037",
+              "isGlobalId": true,
+              "name": "Cremorne Point Wharf, Cremorne Point",
+              "disassembledName": "Cremorne Point Wharf",
+              "type": "stop",
+              "coord": [
+                -33.84769,
+                151.23109
+              ],
+              "parent": {
+                "name": "Cremorne Point",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102025"
+              },
+              "modes": [
+                5,
+                9,
+                11
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102025"
+          },
+          "modes": [
+            5,
+            9,
+            11
+          ]
+        }
+      ]
+    },
+    "20902": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "209038",
+          "isGlobalId": true,
+          "name": "Old Cremorne Wharf, Cremorne Point",
+          "disassembledName": "Old Cremorne Wharf",
+          "coord": [
+            -33.840939,
+            151.230379
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95343003:1",
+            "name": "Cremorne Point",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "209038",
+              "isGlobalId": true,
+              "name": "Old Cremorne Wharf, Cremorne Point",
+              "disassembledName": "Old Cremorne Wharf",
+              "type": "stop",
+              "coord": [
+                -33.840939,
+                151.230379
+              ],
+              "parent": {
+                "name": "Cremorne Point",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102026"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102026"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "20951": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "209573",
+          "isGlobalId": true,
+          "name": "Manly Wharf, Manly",
+          "disassembledName": "Manly Wharf",
+          "coord": [
+            -33.799541,
+            151.284282
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95337005:1",
+            "name": "Manly",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "209573",
+              "isGlobalId": true,
+              "name": "Manly Wharf, Manly",
+              "disassembledName": "Manly Wharf",
+              "type": "stop",
+              "coord": [
+                -33.799541,
+                151.284282
+              ],
+              "parent": {
+                "name": "Manly",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102027"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102027"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "21101": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "211099",
+          "isGlobalId": true,
+          "name": "Woolwich Wharf, Woolwich",
+          "disassembledName": "Woolwich Wharf",
+          "coord": [
+            -33.838596,
+            151.176051
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95326005:1",
+            "name": "Woolwich",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "211099",
+              "isGlobalId": true,
+              "name": "Woolwich Wharf, Woolwich",
+              "disassembledName": "Woolwich Wharf",
+              "type": "stop",
+              "coord": [
+                -33.838596,
+                151.176051
+              ],
+              "parent": {
+                "name": "Woolwich",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102035"
+              },
+              "modes": [
+                5,
+                9,
+                11
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102035"
+          },
+          "modes": [
+            5,
+            9,
+            11
+          ]
+        }
+      ]
+    },
+    "211033": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "20009",
+          "isGlobalId": true,
+          "name": "Cockatoo Island Wharf, Woolwich",
+          "disassembledName": "Cockatoo Island Wharf",
+          "coord": [
+            -33.845584,
+            151.17299
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95326005:1",
+            "name": "Woolwich",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "20009",
+              "isGlobalId": true,
+              "name": "Cockatoo Island Wharf, Woolwich",
+              "disassembledName": "Cockatoo Island Wharf",
+              "type": "stop",
+              "coord": [
+                -33.845584,
+                151.17299
+              ],
+              "parent": {
+                "name": "Woolwich",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102002"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102002"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "211158": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "211131",
+          "isGlobalId": true,
+          "name": "Huntleys Point Wharf, Huntleys Point",
+          "disassembledName": "Huntleys Point Wharf",
+          "coord": [
+            -33.841905,
+            151.142134
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95326004:1",
+            "name": "Huntleys Point",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "211131",
+              "isGlobalId": true,
+              "name": "Huntleys Point Wharf, Huntleys Point",
+              "disassembledName": "Huntleys Point Wharf",
+              "type": "stop",
+              "coord": [
+                -33.841905,
+                151.142134
+              ],
+              "parent": {
+                "name": "Huntleys Point",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102036"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102036"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "21122": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "211217",
+          "isGlobalId": true,
+          "name": "Kissing Point Wharf, Putney",
+          "disassembledName": "Kissing Point Wharf",
+          "coord": [
+            -33.831652,
+            151.102004
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95352011:1",
+            "name": "Putney",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "211217",
+              "isGlobalId": true,
+              "name": "Kissing Point Wharf, Putney",
+              "disassembledName": "Kissing Point Wharf",
+              "type": "stop",
+              "coord": [
+                -33.831652,
+                151.102004
+              ],
+              "parent": {
+                "name": "Putney",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102037"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102037"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "21141": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "211497",
+          "isGlobalId": true,
+          "name": "Meadowbank Wharf, Meadowbank",
+          "disassembledName": "Meadowbank Wharf",
+          "coord": [
+            -33.821035,
+            151.089902
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95352009:1",
+            "name": "Meadowbank",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "211497",
+              "isGlobalId": true,
+              "name": "Meadowbank Wharf, Meadowbank",
+              "disassembledName": "Meadowbank Wharf",
+              "type": "stop",
+              "coord": [
+                -33.821035,
+                151.089902
+              ],
+              "parent": {
+                "name": "Meadowbank",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102028"
+              },
+              "modes": [
+                5,
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102028"
+          },
+          "modes": [
+            5,
+            9
+          ]
+        }
+      ]
+    },
+    "21151": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "211655",
+          "isGlobalId": true,
+          "name": "Rydalmere Wharf, Rydalmere",
+          "disassembledName": "Rydalmere Wharf",
+          "coord": [
+            -33.81778,
+            151.043867
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95346016:1",
+            "name": "Rydalmere",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "211655",
+              "isGlobalId": true,
+              "name": "Rydalmere Wharf, Rydalmere",
+              "disassembledName": "Rydalmere Wharf",
+              "type": "stop",
+              "coord": [
+                -33.81778,
+                151.043867
+              ],
+              "parent": {
+                "name": "Rydalmere",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102029"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102029"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    },
+    "212751": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "21271",
+          "isGlobalId": true,
+          "name": "Sydney Olympic Park Wharf, Sydney Olympic Park",
+          "disassembledName": "Sydney Olympic Park Wharf",
+          "coord": [
+            -33.822115,
+            151.079093
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95304009:1",
+            "name": "Sydney Olympic Park",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "21271",
+              "isGlobalId": true,
+              "name": "Sydney Olympic Park Wharf, Sydney Olympic Park",
+              "disassembledName": "Sydney Olympic Park Wharf",
+              "type": "stop",
+              "coord": [
+                -33.822115,
+                151.079093
+              ],
+              "parent": {
+                "name": "Sydney Olympic Park",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102030"
+              },
+              "modes": [
+                5,
+                9,
+                11
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102030"
+          },
+          "modes": [
+            5,
+            9,
+            11
+          ]
+        }
+      ]
+    },
+    "212753": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "21271",
+          "isGlobalId": true,
+          "name": "Sydney Olympic Park Wharf, Sydney Olympic Park",
+          "disassembledName": "Sydney Olympic Park Wharf",
+          "coord": [
+            -33.822115,
+            151.079093
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95304009:1",
+            "name": "Sydney Olympic Park",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "21271",
+              "isGlobalId": true,
+              "name": "Sydney Olympic Park Wharf, Sydney Olympic Park",
+              "disassembledName": "Sydney Olympic Park Wharf",
+              "type": "stop",
+              "coord": [
+                -33.822115,
+                151.079093
+              ],
+              "parent": {
+                "name": "Sydney Olympic Park",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102030"
+              },
+              "modes": [
+                5,
+                9,
+                11
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102030"
+          },
+          "modes": [
+            5,
+            9,
+            11
+          ]
+        }
+      ]
+    },
+    "2137185": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "21371",
+          "isGlobalId": true,
+          "name": "Cabarita Wharf, Cabarita",
+          "disassembledName": "Cabarita Wharf",
+          "coord": [
+            -33.840971,
+            151.116509
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95314003:1",
+            "name": "Cabarita",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "21371",
+              "isGlobalId": true,
+              "name": "Cabarita Wharf, Cabarita",
+              "disassembledName": "Cabarita Wharf",
+              "type": "stop",
+              "coord": [
+                -33.840971,
+                151.116509
+              ],
+              "parent": {
+                "name": "Cabarita",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102031"
+              },
+              "modes": [
+                5,
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102031"
+          },
+          "modes": [
+            5,
+            9
+          ]
+        }
+      ]
+    },
+    "2137186": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "21371",
+          "isGlobalId": true,
+          "name": "Cabarita Wharf, Cabarita",
+          "disassembledName": "Cabarita Wharf",
+          "coord": [
+            -33.840971,
+            151.116509
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95314003:1",
+            "name": "Cabarita",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "21371",
+              "isGlobalId": true,
+              "name": "Cabarita Wharf, Cabarita",
+              "disassembledName": "Cabarita Wharf",
+              "type": "stop",
+              "coord": [
+                -33.840971,
+                151.116509
+              ],
+              "parent": {
+                "name": "Cabarita",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102031"
+              },
+              "modes": [
+                5,
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102031"
+          },
+          "modes": [
+            5,
+            9
+          ]
+        }
+      ]
+    },
+    "21501": {
+      "version": "10.6.21.17",
+      "locations": [
+        {
+          "id": "2150112",
+          "isGlobalId": true,
+          "name": "Parramatta Wharf, Parramatta",
+          "disassembledName": "Parramatta Wharf",
+          "coord": [
+            -33.813952,
+            151.010482
+          ],
+          "type": "stop",
+          "matchQuality": 100000,
+          "isBest": true,
+          "parent": {
+            "id": "placeID:95346013:1",
+            "name": "Parramatta",
+            "type": "locality"
+          },
+          "assignedStops": [
+            {
+              "id": "2150112",
+              "isGlobalId": true,
+              "name": "Parramatta Wharf, Parramatta",
+              "disassembledName": "Parramatta Wharf",
+              "type": "stop",
+              "coord": [
+                -33.813952,
+                151.010482
+              ],
+              "parent": {
+                "name": "Parramatta",
+                "type": "locality"
+              },
+              "connectingMode": 100,
+              "properties": {
+                "stopId": "10102032"
+              },
+              "modes": [
+                9
+              ]
+            }
+          ],
+          "properties": {
+            "stopId": "10102032"
+          },
+          "modes": [
+            9
+          ]
+        }
+      ]
+    }
+  }
+}

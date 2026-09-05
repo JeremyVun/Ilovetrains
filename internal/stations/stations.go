@@ -70,7 +70,7 @@ func Search(query string, limit int) []Stop {
 	return stops
 }
 
-var stationWord = regexp.MustCompile(`(?i)\bstation\b`)
+var stationWord = regexp.MustCompile(`(?i)\b(station|wharf)\b`)
 
 func normalise(s string) string {
 	return strings.ToLower(strings.Join(strings.Fields(s), " "))
@@ -80,7 +80,7 @@ func normalise(s string) string {
 // change there.
 func fuzzyScore(name, query string) int {
 	n := normalise(stationWord.ReplaceAllString(name, ""))
-	q := normalise(query)
+	q := normalise(stationWord.ReplaceAllString(query, ""))
 	switch {
 	case q == "":
 		return 0

@@ -6,13 +6,13 @@
    after the board has dropped it: rowmodel.js removes departed services and is
    right to, so once you are on the train the durable copy is the one
    in localStorage. On every refresh the client re-matches it in fresh data by
-   (first leg's line, timetabled departure) and replaces the snapshot when it
+   each leg's line and timetabled departure and replaces the snapshot when it
    matches, so live delays keep flowing; when it no longer matches — it has
    departed, or the network is gone — the last snapshot stands. */
 
 import { clock, minutesUntil, countdownFigure } from './time.js';
 import {
-  journeyDetail, journeyKey, legsOf, arrivalMs, departureMs, effective, platformNumber
+  boardingLabel, journeyDetail, journeyKey, legsOf, arrivalMs, departureMs, effective, modeWords
 } from './journey.js';
 import { shortName } from './dom.js';
 import { distanceKm } from './stations.js';
@@ -179,6 +179,7 @@ export function directionsModel(value, nowMs, opts = {}) {
   const legs = legsOf(journey, opts);
   const first = legs[0] || {};
   const last = legs[legs.length - 1] || {};
+  const firstWords = modeWords(first.line && first.line.mode);
   const depMs = departureMs(journey);
   const arrMs = arrivalMs(journey);
   const scheduledDep = Date.parse((first.departure || {}).scheduled || '');
@@ -210,6 +211,7 @@ export function directionsModel(value, nowMs, opts = {}) {
 
   const model = {
     journey,
+    vehicle: firstWords.vehicle,
     from: shortName((first.from && first.from.name) || opts.fromName || ''),
     to: shortName((last.to && last.to.name) || opts.toName || ''),
     depTime: depMs === null ? '—' : clock(depMs),
@@ -235,7 +237,7 @@ export function directionsModel(value, nowMs, opts = {}) {
     model.tight = false;
     model.figure = depMs === null || stale ? '' : countdownFigure(minutesUntil(depMs, nowMs));
     model.provenance = '';
-    model.instruction = `${opts.cancelledTime || model.depTime} CANCELLED · NEXT TRAIN`;
+    model.instruction = `${opts.cancelledTime || model.depTime} CANCELLED · NEXT ${firstWords.vehicle.toUpperCase()}`;
     return model;
   }
   if (depMs === null || arrMs === null) {
@@ -262,7 +264,7 @@ export function directionsModel(value, nowMs, opts = {}) {
       : first.departure && first.departure.estimated ? '' : 'SCHEDULED';
     model.provenanceWarn = departureDelay > 0;
     if (opts.leave) {
-      model.instruction = `Leave now for Platform ${platformNumber(first.from && first.from.platform) || '—'}`;
+      model.instruction = `Leave now for ${boardingLabel(first.from && first.from.platform, first.line && first.line.mode) || '—'}`;
       model.receipt = opts.receipt || `You’re ${opts.leave} from ${model.from}.`;
       model.act = true;
     }
@@ -279,9 +281,10 @@ export function directionsModel(value, nowMs, opts = {}) {
       const hasChange = Boolean(next);
       model.figure = stale ? '' : countdownFigure(minutesUntil(legArrival, nowMs));
       model.provenance = hasChange ? 'TO CHANGE' : 'TO GO';
-      model.instruction = `Get off at ${hasChange ? next.station : model.to}`
-        + (platformNumber(legs[i].to && legs[i].to.platform)
-          ? ` · Platform ${platformNumber(legs[i].to.platform)}` : '');
+      const destination = boardingLabel(legs[i].to && legs[i].to.platform,
+        legs[i].line && legs[i].line.mode);
+      model.instruction = `Get off at ${hasChange ? next.fromStation : model.to}`
+        + (destination ? ` · ${destination}` : '');
       model.activeLeg = i;
       phase = i === 0 ? 'ride' : 'ride2';
       break;
@@ -289,8 +292,8 @@ export function directionsModel(value, nowMs, opts = {}) {
     if (next && next.departureMs !== null && nowMs < next.departureMs) {
       model.figure = stale ? '' : countdownFigure(minutesUntil(next.departureMs, nowMs));
       model.provenance = 'TO CHANGE';
-      model.instruction = `Change at ${next.station}`
-        + (next.toPlatform ? ` · Platform ${next.toPlatform}` : '');
+      model.instruction = `Change at ${next.toStation}`
+        + (next.toLabel ? ` · ${next.toLabel}` : '');
       model.activeLeg = next.index;
       phase = 'dwell';
       break;
@@ -301,7 +304,7 @@ export function directionsModel(value, nowMs, opts = {}) {
   if (risk) {
     model.warn = true;
     model.instruction = `Tight change · ${risk.minutes} min`
-      + (risk.toPlatform ? ` · Platform ${risk.toPlatform}` : '');
+      + (risk.toLabel ? ` · ${risk.toLabel}` : '');
     if (risk.printedMin !== null && risk.minutes < risk.printedMin) {
       model.receipt = `Printed change was ${risk.printedMin} min.`;
     }

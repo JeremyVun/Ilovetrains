@@ -37,12 +37,20 @@ function stepHtml(step) {
 
 function actHtml(step) {
   if (step.kind !== 'change') return chipHtml(step.chip) + ' ' + esc(step.label);
-  return chipHtml(step.off) + ' Get off &nbsp;→&nbsp; ' + chipHtml(step.on) + ' ' + esc(step.label);
+  const place = step.boardingPlace ? ' · ' + boardingPlaceHtml(step.boardingPlace) : '';
+  return chipHtml(step.off) + ' Get off &nbsp;→&nbsp; ' + chipHtml(step.on) + ' ' + esc(step.label) + place;
+}
+
+function boardingPlaceHtml(value) {
+  const match = String(value).match(/^(.*?)(Side\s+\S+)$/i);
+  if (!match) return esc(value);
+  return esc(match[1]) + `<span class="dside">${esc(match[2])}</span>`;
 }
 
 function chipHtml(chip) {
-  return `<b class="dchip" data-line-code="${esc(chip.code)}" style="background:${
-    lineFill(chip.code)};color:${chipInk(chip.code)}">${esc(chip.platform)}</b>`;
+  const label = chip.location ? ` aria-label="${esc(`${chip.location} · ${chip.code}`)}"` : '';
+  return `<b class="dchip" data-line-code="${esc(chip.code)}"${label} style="background:${
+    lineFill(chip.colourKey)};color:${chipInk(chip.colourKey)}">${esc(chip.platform)}</b>`;
 }
 
 /* The closing rule answers the masthead's, and the line under it states the
@@ -50,7 +58,7 @@ function chipHtml(chip) {
 function tailHtml(arrival) {
   const platform = arrival.cancelled
     ? '<span class="lbl p warn">Journey cancelled</span>'
-    : `<span class="lbl p">Platform ${esc(arrival.platform || '—')}</span>`;
+    : `<span class="lbl p">${esc(arrival.label || '—')}</span>`;
   return `<div class="detail-tail${arrival.cancelled ? ' cx' : ''}"><div class="rule"></div>
   <div class="line"><span class="t">${esc(arrival.time || '—')}</span><span class="n">${
     esc(arrival.station || '—')}</span>${platform}</div>
@@ -62,5 +70,5 @@ function tailHtml(arrival) {
    unfocus; the back control is the way out. */
 function railHtml(model) {
   if (model.cancelled || model.focused) return '';
-  return '<div class="hm-bar detail-rail" data-footer-rail><button data-act="focus">Take this train</button></div>';
+  return `<div class="hm-bar detail-rail" data-footer-rail><button data-act="focus">Take this ${esc(model.vehicle)}</button></div>`;
 }

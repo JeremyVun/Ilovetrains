@@ -1,6 +1,6 @@
 # ilovetrains
 
-A Sydney train and metro app that answers one question the moment you open
+A Sydney train, metro and ferry app that answers one question the moment you open
 it: **"What train should I take right now?"** — with zero taps, zero search,
 zero ads. Live at https://ilovetrains.jeremyvun.com.
 
@@ -256,7 +256,7 @@ Browser (localStorage: trips, history, rides, focus, home, searches, cache)
   platform sighting, the shown service's timetable and a later movement
   fix; its correction opens the existing sheet to change destination. The known gap — right trip, wrong service — is
   accepted until it bites in real use.
-- **Trains and metro only** for now; station search exists only to set up a
+- **Trains, metro and ferries** for now; station search exists only to set up a
   saved trip; no general trip planner.
 
 ## Core user flows

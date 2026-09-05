@@ -42,6 +42,8 @@ func mustParse(t *testing.T, value string) time.Time {
 
 func ptr(value string) *string { return &value }
 
+func intPtr(value int) *int { return &value }
+
 // legDiff compares two legs by their wire form, so a pointer field that should
 // be null is judged the way a client sees it.
 func legDiff(want, got Leg) string {
@@ -264,6 +266,119 @@ func TestMapTripMetro(t *testing.T) {
 	}
 }
 
+func TestMapTripFerryFixtures(t *testing.T) {
+	cases := []struct {
+		fixture      string
+		fromID, toID string
+		fromName     string
+		toName       string
+		platform     string
+	}{
+		{"trip_circularquay_manly.json", "200020", "209573", "Circular Quay", "Manly Wharf", "Wharf 2, Side A"},
+		{"trip_manly_circularquay.json", "209573", "200020", "Manly Wharf", "Circular Quay", "Wharf 2"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.fixture, func(t *testing.T) {
+			got, err := mapTrip(fixture(t, tc.fixture), tc.fromID, tc.toID, 16,
+				mustParse(t, "2026-09-05T05:20:00Z"), sydney(t))
+			if err != nil {
+				t.Fatalf("mapTrip: %v", err)
+			}
+			if got.From.Name != tc.fromName || got.To.Name != tc.toName {
+				t.Errorf("from/to = %+v / %+v, want %q / %q", got.From, got.To, tc.fromName, tc.toName)
+			}
+			if len(got.Journeys) == 0 {
+				t.Fatal("journeys = 0, want ferry departures")
+			}
+			first := got.Journeys[0]
+			if first.Line != (Line{Name: "MFF", Mode: "ferry"}) {
+				t.Errorf("line = %+v, want private MFF ferry", first.Line)
+			}
+			if first.Departure.Platform == nil || *first.Departure.Platform != tc.platform {
+				t.Errorf("platform = %v, want %q", first.Departure.Platform, tc.platform)
+			}
+			if tc.fixture == "trip_circularquay_manly.json" {
+				for _, journey := range got.Journeys {
+					if journey.Line.Name == "F1" {
+						if journey.Departure.Platform == nil || *journey.Departure.Platform != "Wharf 3, Side A" {
+							t.Errorf("F1 platform = %v, want Wharf 3, Side A", journey.Departure.Platform)
+						}
+						return
+					}
+				}
+				t.Error("F1 journey missing from ferry fixture")
+			}
+		})
+	}
+}
+
+func TestMapTripFerryPreservesWharfSideAndMixedLegTimes(t *testing.T) {
+	got, err := mapTrip(fixture(t, "trip_wynyard_manly.json"), "200080", "209573", 15,
+		mustParse(t, "2026-09-05T05:20:00Z"), sydney(t))
+	if err != nil {
+		t.Fatalf("mapTrip: %v", err)
+	}
+	if got.From.Name != "Wynyard Station" || got.To.Name != "Manly Wharf" {
+		t.Errorf("from/to = %+v / %+v, want Wynyard Station / Manly Wharf", got.From, got.To)
+	}
+	if len(got.Journeys) == 0 {
+		t.Fatal("journeys = 0, want train-to-ferry departures")
+	}
+	first := got.Journeys[0]
+	if first.Legs != 2 || len(first.LegDetail) != 2 {
+		t.Fatalf("legs = %d, legDetail = %d, want 2", first.Legs, len(first.LegDetail))
+	}
+	if first.LegDetail[0].Line != (Line{Name: "T8", Mode: "train"}) ||
+		first.LegDetail[1].Line != (Line{Name: "MFF", Mode: "ferry"}) {
+		t.Errorf("leg lines = %+v / %+v, want T8 train / MFF ferry", first.LegDetail[0].Line, first.LegDetail[1].Line)
+	}
+	ferry := first.LegDetail[1]
+	if ferry.From.Name != "Circular Quay" || ferry.To.Name != "Manly Wharf" {
+		t.Errorf("ferry places = %+v / %+v, want Circular Quay / Manly Wharf", ferry.From, ferry.To)
+	}
+	if ferry.From.Platform == nil || *ferry.From.Platform != "Wharf 2, Side A" {
+		t.Errorf("ferry platform = %v, want Wharf 2, Side A", ferry.From.Platform)
+	}
+	if first.LegDetail[0].Arrival.Scheduled != "2026-09-05T15:31:00+10:00" ||
+		ferry.Departure.Scheduled != "2026-09-05T15:40:00+10:00" {
+		t.Errorf("response transfer times = %q → %q, want upstream times unchanged",
+			first.LegDetail[0].Arrival.Scheduled, ferry.Departure.Scheduled)
+	}
+}
+
+func TestFerrySideNamesAndWalkEndpointsFromLiveFixtures(t *testing.T) {
+	got, err := mapTrip(fixture(t, "trip_circularquay_balmaineast.json"), "200020", "20414", 10,
+		mustParse(t, "2026-09-05T06:00:00Z"), sydney(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.To.Name != "Balmain East Wharf" {
+		t.Fatalf("destination = %q", got.To.Name)
+	}
+	for _, j := range got.Journeys {
+		last := j.LegDetail[len(j.LegDetail)-1]
+		if last.To.Name != "Balmain East Wharf" || last.To.Platform == nil || *last.To.Platform != "Side A" {
+			t.Errorf("wharf and side must stay separate: %+v", last.To)
+		}
+	}
+	got, err = mapTrip(fixture(t, "trip_barangaroo_balmain.json"), "2000441", "204157", 10,
+		mustParse(t, "2026-09-05T06:00:00Z"), sydney(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Journeys) != 2 {
+		t.Fatalf("journeys = %d, want two starting at Barangaroo", len(got.Journeys))
+	}
+	for _, j := range got.Journeys {
+		if j.LegDetail[0].From.ID != "2000441" {
+			t.Errorf("journey boards at another stop: %+v", j.LegDetail[0].From)
+		}
+		if j.LegDetail[0].To.Name != "Cockatoo Island Wharf" {
+			t.Errorf("side leaked into stop name: %+v", j.LegDetail[0].To)
+		}
+	}
+}
+
 func TestFixturesCarryExpectedUpstreamFields(t *testing.T) {
 	// Guards the assumptions the mapping is built on: if a refreshed fixture
 	// loses these, the mapping tests above are no longer testing reality.
@@ -276,6 +391,7 @@ func TestFixturesCarryExpectedUpstreamFields(t *testing.T) {
 	}{
 		{"trip_central_parramatta.json", "T1 North Shore & Western Line", classTrain, "Platform 12", true},
 		{"trip_tallawong_chatswood.json", "M1 Metro North West & Bankstown Line", classMetro, "Platform 2", true},
+		{"trip_circularquay_manly.json", "MFF Manly Fast Ferry", classFerry, "Wharf 2, Side A", false},
 		// The past window must stay MONITORED, or the golden above stops
 		// testing that a departed service still carries its actuals.
 		{"trip_central_parramatta_past.json", "T1 North Shore & Western Line", classTrain, "Platform 18", true},
@@ -511,8 +627,9 @@ func TestMapTripLegDetailFoldsWalkingLegsIntoTheGap(t *testing.T) {
 	// The real class-99 footpath from the fixture, moved into the Town Hall
 	// transfer of the T9 → T4 journey: it must not be listed, and the gap
 	// between the two services must still be the whole change window.
-	got, err := mapTrip(withFootpathAtTransfer(t, fixture(t, "trip_rhodes_bondijunction.json")),
-		"213820", "202210", 6, mustParse(t, "2026-08-31T23:20:00Z"), sydney(t))
+	got, err := mapTripWithPolicy(withFootpathAtTransfer(t, fixture(t, "trip_rhodes_bondijunction.json")),
+		"213820", "202210", 6, mustParse(t, "2026-08-31T23:20:00Z"), sydney(t),
+		connectionPolicy{Maximum: DefaultMaximumConnectionTime})
 	if err != nil {
 		t.Fatalf("mapTrip: %v", err)
 	}
@@ -533,19 +650,83 @@ func TestMapTripLegDetailFoldsWalkingLegsIntoTheGap(t *testing.T) {
 }
 
 func TestConnectionFloorRejectsUnreasonablyTightPlans(t *testing.T) {
-	legs := []leg{
+	path := servicePath{legs: []leg{
 		{Destination: place{ArrivalTimePlanned: "2026-09-01T09:51:00Z"}},
 		{Origin: place{DepartureTimePlanned: "2026-09-01T09:53:00Z"}},
-	}
-	if connectionFloorMet(legs, 3*time.Minute) {
+	}}
+	if connectionFloorMet(path, 3*time.Minute) {
 		t.Error("2-minute planned connection passed a 3-minute floor")
 	}
-	legs[1].Origin.DepartureTimePlanned = "2026-09-01T09:54:00Z"
-	if !connectionFloorMet(legs, 3*time.Minute) {
+	path.legs[1].Origin.DepartureTimePlanned = "2026-09-01T09:54:00Z"
+	if !connectionFloorMet(path, 3*time.Minute) {
 		t.Error("3-minute planned connection did not meet the floor")
 	}
-	if !connectionFloorMet(legs, 0) {
+	if !connectionFloorMet(path, 0) {
 		t.Error("zero disables the tuneable floor")
+	}
+}
+
+func TestConnectionSlackSubtractsWalksForFloorAndCeiling(t *testing.T) {
+	service := func(class int) *transportation {
+		return &transportation{Product: product{Class: class}}
+	}
+	path, serveable := serviceLegs(journey{Legs: []leg{
+		{Destination: place{ArrivalTimePlanned: "2026-09-01T09:00:00Z"}, Transportation: service(classTrain)},
+		{Duration: intPtr(300), Transportation: service(classFootpath)},
+		{Duration: intPtr(300), Transportation: service(classConnection)},
+		{Origin: place{DepartureTimePlanned: "2026-09-01T10:05:00Z"}, Transportation: service(classMetro)},
+	}})
+	if !serveable || len(path.walks) != 1 || len(path.walks[0]) != 2 {
+		t.Fatalf("service path = %+v, want class-99 and class-100 walks in one gap", path)
+	}
+	if got := longestConnection(path); got != 55*time.Minute {
+		t.Errorf("longest connection = %s, want 55m after both walks", got)
+	}
+
+	path.legs[1].Origin.DepartureTimePlanned = "2026-09-01T09:05:00Z"
+	path.walks[0] = []leg{{Duration: intPtr(240)}}
+	if connectionFloorMet(path, 3*time.Minute) {
+		t.Error("5-minute gap with a 4-minute walk passed a 3-minute floor")
+	}
+	path.walks[0] = nil
+	if !connectionFloorMet(path, 3*time.Minute) {
+		t.Error("5-minute rail-only gap did not meet a 3-minute floor")
+	}
+}
+
+func TestWalkingDurationFallsBackOnlyWhenDurationIsAbsent(t *testing.T) {
+	walk := leg{
+		Duration:    intPtr(0),
+		Origin:      place{DepartureTimePlanned: "2026-09-01T09:00:00Z"},
+		Destination: place{ArrivalTimePlanned: "2026-09-01T09:04:00Z"},
+	}
+	if got, ok := walkingDuration(walk); !ok || got != 0 {
+		t.Errorf("explicit duration = %s, %v; want 0s, true", got, ok)
+	}
+	walk.Duration = nil
+	if got, ok := walkingDuration(walk); !ok || got != 4*time.Minute {
+		t.Errorf("fallback duration = %s, %v; want 4m, true", got, ok)
+	}
+}
+
+func TestNegativeWalkCannotCreateConnectionSlack(t *testing.T) {
+	path := servicePath{
+		legs: []leg{
+			{Destination: place{ArrivalTimePlanned: "2026-09-01T09:00:00Z"}},
+			{Origin: place{DepartureTimePlanned: "2026-09-01T09:02:00Z"}},
+		},
+		walks: [][]leg{{{Duration: intPtr(-300)}}},
+	}
+	if connectionFloorMet(path, 3*time.Minute) {
+		t.Error("negative walk made a 2-minute transfer meet a 3-minute floor")
+	}
+
+	path.walks[0][0] = leg{
+		Origin:      place{DepartureTimePlanned: "2026-09-01T09:04:00Z"},
+		Destination: place{ArrivalTimePlanned: "2026-09-01T09:00:00Z"},
+	}
+	if connectionFloorMet(path, 3*time.Minute) {
+		t.Error("backwards planned walk made a 2-minute transfer meet a 3-minute floor")
 	}
 }
 

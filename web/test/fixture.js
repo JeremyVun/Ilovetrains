@@ -180,6 +180,167 @@ export function threeLegJourney() {
   return j;
 }
 
+/* ---- ferries ----------------------------------------------------------- */
+
+export const FERRY_NOW = Date.parse('2026-09-05T15:36:00+10:00');
+
+const ferryTime = (hhmmss) => `2026-09-05T${hhmmss}+10:00`;
+const ferryTimes = (scheduled, realtime = true) => ({
+  scheduled: ferryTime(scheduled),
+  estimated: realtime ? ferryTime(scheduled) : null
+});
+
+const CIRCULAR_QUAY = { id: '200020', name: 'Circular Quay' };
+const MANLY_WHARF = { id: '209573', name: 'Manly Wharf' };
+
+function ferryLeg({
+  code, dep, arr, fromPlatform, toPlatform, realtime = true,
+  from = CIRCULAR_QUAY, to = MANLY_WHARF, headsign = 'Manly'
+}) {
+  return {
+    line: { name: code, mode: 'ferry' },
+    headsign,
+    from: { ...from, platform: fromPlatform },
+    to: { ...to, platform: toPlatform },
+    departure: ferryTimes(dep, realtime),
+    arrival: ferryTimes(arr, realtime),
+    cancelled: false
+  };
+}
+
+function apiJourney(legDetail) {
+  const first = legDetail[0];
+  const last = legDetail[legDetail.length - 1];
+  return {
+    departure: { ...first.departure, platform: first.from.platform },
+    arrival: { ...last.arrival },
+    line: { ...first.line },
+    destinationHeadsign: first.headsign,
+    stopsAway: null,
+    cancelled: false,
+    legs: legDetail.length,
+    legDetail
+  };
+}
+
+export function privateFerryJourney() {
+  return apiJourney([ferryLeg({
+    code: 'MFF', dep: '15:40:00', arr: '16:00:00',
+    fromPlatform: 'Wharf 2, Side A', toPlatform: 'Wharf 2', realtime: false
+  })]);
+}
+
+export function ferryJourneys() {
+  return [
+    privateFerryJourney(),
+    apiJourney([ferryLeg({
+      code: 'F1', dep: '15:45:00', arr: '16:07:00',
+      fromPlatform: 'Wharf 3, Side A', toPlatform: 'Wharf 1'
+    })]),
+    apiJourney([ferryLeg({
+      code: 'F1', dep: '15:50:00', arr: '16:20:00',
+      fromPlatform: 'Wharf 3, Side B', toPlatform: 'Wharf 1'
+    })])
+  ];
+}
+
+export function ferryBody(overrides = {}) {
+  return {
+    from: { ...CIRCULAR_QUAY, modes: ['train', 'ferry'], location: { lat: -33.861351, lon: 151.210813 } },
+    to: { ...MANLY_WHARF, modes: ['ferry'], location: { lat: -33.799541, lon: 151.284282 } },
+    generatedAt: overrides.generatedAt || ferryTime('15:36:00'),
+    journeys: overrides.journeys || ferryJourneys()
+  };
+}
+
+function wynyardLeg() {
+  return {
+    line: { name: 'T8', mode: 'train' },
+    headsign: 'Revesby via Airport',
+    from: { id: '200080', name: 'Wynyard Station', platform: 'Platform 6' },
+    to: { ...CIRCULAR_QUAY, platform: 'Platform 2' },
+    departure: ferryTimes('15:28:30'),
+    arrival: ferryTimes('15:31:00'),
+    cancelled: false
+  };
+}
+
+export function mixedJourneys() {
+  return [
+    apiJourney([wynyardLeg(), ferryLeg({
+      code: 'MFF', dep: '15:40:00', arr: '16:00:00',
+      fromPlatform: 'Wharf 2, Side A', toPlatform: 'Wharf 2', realtime: false
+    })]),
+    apiJourney([wynyardLeg(), ferryLeg({
+      code: 'F1', dep: '15:45:00', arr: '16:07:00',
+      fromPlatform: 'Wharf 3, Side A', toPlatform: 'Wharf 1'
+    })])
+  ];
+}
+
+export function mixedBody(overrides = {}) {
+  return {
+    from: { id: '200080', name: 'Wynyard Station', modes: ['train'], location: { lat: -33.8659, lon: 151.2057 } },
+    to: { ...MANLY_WHARF, modes: ['ferry'], location: { lat: -33.799541, lon: 151.284282 } },
+    generatedAt: overrides.generatedAt || ferryTime('15:25:00'),
+    journeys: overrides.journeys || mixedJourneys()
+  };
+}
+
+export function exceptionalFerryJourneys() {
+  const balmainEast = { id: '20414', name: 'Balmain East Wharf' };
+  const barangaroo = { id: '2000441', name: 'Barangaroo Wharf' };
+  const cockatoo = { id: '20009', name: 'Cockatoo Island Wharf' };
+  const balmain = { id: '204157', name: 'Balmain Wharf' };
+  const direct = apiJourney([ferryLeg({
+    code: 'F4', dep: '15:57:00', arr: '16:12:00', headsign: 'Balmain East',
+    fromPlatform: 'Wharf 5, Side B', toPlatform: 'Side A', to: balmainEast
+  })]);
+  const train = {
+    line: { name: 'T2', mode: 'train' }, headsign: 'Leppington',
+    from: { ...CIRCULAR_QUAY, platform: 'Platform 1' },
+    to: { id: '200080', name: 'Wynyard Station', platform: 'Platform 5' },
+    departure: ferryTimes('16:03:30'), arrival: ferryTimes('16:05:18'), cancelled: false
+  };
+  const walkChange = apiJourney([train, ferryLeg({
+    code: 'F4', dep: '16:16:00', arr: '16:21:00', headsign: 'Balmain East',
+    fromPlatform: 'Wharf 2, Side B', toPlatform: 'Side A',
+    from: barangaroo, to: balmainEast
+  })]);
+  const islandChange = apiJourney([
+    ferryLeg({
+      code: 'F3', dep: '15:58:00', arr: '16:07:00', headsign: 'Cockatoo Island',
+      fromPlatform: 'Wharf 1, Side B', toPlatform: 'Side A',
+      from: barangaroo, to: cockatoo
+    }),
+    ferryLeg({
+      code: 'F8', dep: '16:19:00', arr: '16:35:00', headsign: 'Balmain',
+      fromPlatform: 'Side A', toPlatform: 'Balmain Wharf',
+      from: cockatoo, to: balmain
+    })
+  ]);
+  return [direct, walkChange, islandChange];
+}
+
+export function balmainEastBody(overrides = {}) {
+  const journeys = exceptionalFerryJourneys();
+  return {
+    from: { ...CIRCULAR_QUAY, modes: ['train', 'ferry'] },
+    to: { id: '20414', name: 'Balmain East Wharf', modes: ['ferry'] },
+    generatedAt: overrides.generatedAt || ferryTime('15:55:00'),
+    journeys: overrides.journeys || journeys.slice(0, 2)
+  };
+}
+
+export function cockatooBalmainBody(overrides = {}) {
+  return {
+    from: { id: '2000441', name: 'Barangaroo Wharf', modes: ['ferry'] },
+    to: { id: '204157', name: 'Balmain Wharf', modes: ['ferry'] },
+    generatedAt: overrides.generatedAt || ferryTime('15:55:00'),
+    journeys: overrides.journeys || [exceptionalFerryJourneys()[2]]
+  };
+}
+
 
 /* A dozen real stations with their real coordinates, standing in for the baked
    index. Every distance the location tests assert is arithmetic on these. */

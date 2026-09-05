@@ -10,7 +10,9 @@ import { fitStationNames } from '../js/dom.js';
 import { homeHtml, homeModel, tripIsOver } from '../js/home.js';
 import { emptyDoc } from '../js/storage.js';
 import { departureMs, departureKey } from '../js/journey.js';
-import { cancelLeg, delayLeg, transferBody, transferJourneys } from './fixture.js';
+import {
+  cancelLeg, delayLeg, transferBody, transferJourneys, FERRY_NOW, ferryBody
+} from './fixture.js';
 
 const at = (time) => Date.parse(`2026-09-01T${time}:00+10:00`);
 
@@ -209,6 +211,22 @@ test('the top line answers how far the station is, or names the next train', () 
   const { html } = screen(journeys, '09:21', { fix: { lat: RHODES.location.lat, lon: RHODES.location.lon } });
   assert.ok(html.includes('At <span data-fit-name="Rhodes">Rhodes</span>'));
   assert.ok(html.includes('data-focus-status data-late="false"'));
+});
+
+test('a ferry board drives the home words and every saved-trip colour device', () => {
+  const body = ferryBody();
+  const trip = {
+    id: 'ferry', from: body.from, to: body.to, createdAt: new Date(0).toISOString()
+  };
+  const doc = { ...emptyDoc(), trips: [trip] };
+  const model = homeModel(doc, { tripId: 'ferry', direction: 'forward' }, body, FERRY_NOW);
+  const html = homeHtml(model);
+
+  assert.deepEqual(model.top, { lead: 'Next ferry', name: '' });
+  assert.deepEqual(model.ranked[0].lines, [{ code: 'MFF', colourKey: 'FERRY' }]);
+  assert.match(html, /data-line-code="MFF"[^>]*background:var\(--line-fill-FERRY\);color:var\(--bg\)/);
+  assert.match(html, /class="hm-spine"><i style="background:var\(--line-fill-FERRY\)/);
+  assert.match(html, />Wharf 2, Side A<\/span>/);
 });
 
 test('a saved-trip row opens that trip’s departures and the header is read-only', () => {

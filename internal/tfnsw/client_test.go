@@ -58,14 +58,13 @@ func TestClientSendsAuthAndRequiredTripParams(t *testing.T) {
 		// routes without under-filling the four-service public answer.
 		"calcNumberOfTrips": "10",
 		"TfNSWTR":           "true",
-		// Exclusions that leave train (1) and metro (2) only. exclMOT_10 keeps
-		// On Demand buses out; without it upstream routes them (verified live
-		// 2026-09-01, Rhodes → Bondi Junction).
+		// Exclusions that leave train (1), metro (2) and ferry (9). exclMOT_10
+		// keeps On Demand buses out; without it upstream routes them (verified
+		// live 2026-09-01, Rhodes → Bondi Junction).
 		"excludedMeans": "checkbox",
 		"exclMOT_4":     "1",
 		"exclMOT_5":     "1",
 		"exclMOT_7":     "1",
-		"exclMOT_9":     "1",
 		"exclMOT_10":    "1",
 		"exclMOT_11":    "1",
 	}
@@ -73,6 +72,9 @@ func TestClientSendsAuthAndRequiredTripParams(t *testing.T) {
 		if got.Get(key) != value {
 			t.Errorf("param %s = %q, want %q", key, got.Get(key), value)
 		}
+	}
+	if got.Get("exclMOT_9") != "" {
+		t.Errorf("exclMOT_9 = %q, want ferry served", got.Get("exclMOT_9"))
 	}
 	if len(got.Get("itdDate")) != 8 || len(got.Get("itdTime")) != 4 {
 		t.Errorf("itdDate/itdTime = %q/%q, want YYYYMMDD/HHMM", got.Get("itdDate"), got.Get("itdTime"))

@@ -14,14 +14,15 @@
   --warn:     #FF7A5C;                 /* delay / cancellation. 7.4:1 */
   --live:     #4ADE80;
 
-  /* TfNSW line colours, as badge accents. The board paints var(--line-XX);
-     web/js/lines.js maps the API's badge code to the variable and
+  /* TfNSW service colours, as badge accents. The board paints var(--line-XX);
+     web/js/lines.js maps rail codes and the ferry mode to a variable, and
      web/test/theme.test.js fails if the two lists ever disagree. */
   --line-T1: #F99D1C; --line-T2: #0098CD; --line-T3: #F37021; --line-T4: #005AA3;
   --line-T5: #C4258F; --line-T7: #6F818E; --line-T8: #00954C; --line-T9: #D11F2F;
   --line-M1: #168388;
   --line-BMT: #F99D1C; --line-CCN: #D11F2F; --line-SCO: #0098CD;
   --line-SHL: #00954C; --line-HUN: #833134;
+  --line-FERRY: #5AB031;
 
   /* The second colour role: what a FILLED device is painted, as against the
      same line used as bare text. Only the light scheme splits them. */
@@ -33,6 +34,7 @@
   --line-fill-BMT: var(--line-BMT); --line-fill-CCN: var(--line-CCN);
   --line-fill-SCO: var(--line-SCO); --line-fill-SHL: var(--line-SHL);
   --line-fill-HUN: var(--line-HUN);
+  --line-fill-FERRY: var(--line-FERRY);
 
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
@@ -61,8 +63,8 @@
                                           11°), which is 2.3:1 here and unusable */
     --live:   #0F7A4A;                 /* 5.11:1 */
 
-    /* Darkened per line, hue and saturation held, lightness dropped only until
-       the badge clears 4.5:1 as text. Four lines were already dark enough to
+    /* Darkened per palette key, hue and saturation held, lightness dropped only
+       until the badge clears 4.5:1 as text. Four lines were already dark enough to
        print unchanged. Ratios are guarded by web/test/theme.test.js. */
     --line-T1: #A46204; /* 4.61 */  --line-T2: #0079A3; /* 4.68 */
     --line-T3: #BD4D0A; /* 4.71 */  --line-T4: #005AA3; /* 6.66, unchanged */
@@ -72,6 +74,8 @@
     --line-M1: #157B7F; /* 4.78 */
     --line-BMT: #A46204; --line-CCN: #D11F2F; --line-SCO: #0079A3;
     --line-SHL: #008041; --line-HUN: #833134; /* 8.12, unchanged */
+    --line-FERRY: #428024; /* 4.59 */
+    --line-fill-FERRY: var(--line-FERRY);
 
     /* Paper on this yellow is 2.02:1, the exception ui.md's visual language
        accepts: the darkened token above makes T1 look brown and lose its identity. */
@@ -172,6 +176,7 @@ button { cursor: pointer; }
   font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
   color: var(--ink-3);
 }
+.dwhat span.dside { display: inline; margin-top: 0; white-space: nowrap; }
 .dchip {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 21px; height: 21px; padding: 0 5px; border-radius: 3px;

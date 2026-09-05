@@ -3,7 +3,7 @@
 
 import { spawn } from 'node:child_process';
 import { createWriteStream } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { get } from 'node:https';
 import { dirname, join } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -16,16 +16,22 @@ const BUNDLES = [
   { name: 'nswtrains', mode: 'train', url: 'https://api.transport.nsw.gov.au/v1/gtfs/schedule/nswtrains' },
   // v2, not v1: the v1 metro bundle is frozen at the 2024 North West line and
   // has none of the City section stations.
-  { name: 'metro', mode: 'metro', url: 'https://api.transport.nsw.gov.au/v2/gtfs/schedule/metro' }
+  { name: 'metro', mode: 'metro', url: 'https://api.transport.nsw.gov.au/v2/gtfs/schedule/metro' },
+  { name: 'ferries', mode: 'ferry', url: 'https://api.transport.nsw.gov.au/v1/gtfs/schedule/ferries/sydneyferries' }
 ];
 
-const MODE_ORDER = ['train', 'metro'];
+const MODE_ORDER = ['train', 'metro', 'ferry'];
 
 /* GTFS route_type: 1/2 basic rail, 100–117 extended rail, 400–405 urban rail.
    NSW TrainLink's coaches are 204/205 and are what this keeps out. */
 function isRail(routeType) {
   const t = Number(routeType);
   return t === 1 || t === 2 || (t >= 100 && t <= 117) || (t >= 400 && t <= 405);
+}
+
+function isFerry(routeType) {
+  const t = Number(routeType);
+  return t === 4 || t === 1200 || (t >= 1000 && t <= 1099);
 }
 
 function splitCsvLine(line) {
@@ -53,6 +59,10 @@ function splitCsvLine(line) {
 
 async function* readRows(zip, member) {
   const child = spawn('unzip', ['-p', zip, member], { stdio: ['ignore', 'pipe', 'inherit'] });
+  const completion = new Promise((resolve, reject) => {
+    child.on('close', resolve);
+    child.on('error', reject);
+  });
   const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
   let header = null;
   for await (const raw of lines) {
@@ -67,7 +77,7 @@ async function* readRows(zip, member) {
     for (let i = 0; i < header.length; i++) row[header[i]] = fields[i] ?? '';
     yield row;
   }
-  const code = await new Promise((resolve) => child.on('close', resolve));
+  const code = await completion;
   if (code !== 0) throw new Error(`unzip -p ${zip} ${member} exited ${code}`);
 }
 
@@ -77,9 +87,9 @@ async function collect(zip, member, fn) {
   return out;
 }
 
-async function railStations(zip) {
+async function servedStations(zip, mode, mapping) {
   const routes = await collect(zip, 'routes.txt', (r, out) => {
-    if (isRail(r.route_type)) out.add(r.route_id);
+    if ((mode === 'ferry' ? isFerry : isRail)(r.route_type)) out.add(r.route_id);
   });
   const trips = await collect(zip, 'trips.txt', (r, out) => {
     if (routes.has(r.route_id)) out.add(r.trip_id);
@@ -99,13 +109,40 @@ async function railStations(zip) {
   }
 
   const served = new Map();
+  const resolved = new Set();
   for await (const time of readRows(zip, 'stop_times.txt')) {
     if (!trips.has(time.trip_id)) continue;
+    if (mode === 'ferry') {
+      if (resolved.has(time.stop_id)) continue;
+      const stop = ferryHub(mapping, time.stop_id);
+      served.set(stop.id, stop);
+      resolved.add(time.stop_id);
+      continue;
+    }
     const parent = parentOf.get(time.stop_id) ?? time.stop_id;
     const station = stations.get(parent);
     if (station) served.set(parent, station);
   }
   return served;
+}
+
+export function ferryHub(mapping, boardingID) {
+  const matches = (mapping.queries?.[boardingID]?.locations || [])
+    .filter((s) => s.type === 'stop' && s.isBest && s.modes?.includes(9));
+  if (matches.length !== 1) throw new Error(`No verified ferry hub for ${boardingID}; run tools/probe-ferry-stops.py`);
+  const stop = matches[0];
+  const [lat, lon] = stop.coord || [];
+  if (!/^\d+$/.test(stop.id) || !stop.disassembledName
+      || !Number.isFinite(lat) || !Number.isFinite(lon)
+      || lat < -34.2 || lat > -33.6 || lon < 150.9 || lon > 151.4) {
+    throw new Error(`Invalid ferry hub for ${boardingID}`);
+  }
+  const name = stop.disassembledName.replace(/(?:,\s*)?\s+Wharf\s+\d.*$/i, '').trim();
+  return {
+    id: stop.id,
+    name: /\bWharf$/i.test(name) ? name : name + ' Wharf',
+    location: { lat: round6(lat), lon: round6(lon) }
+  };
 }
 
 function round6(value) {
@@ -139,17 +176,20 @@ async function main() {
   const fromDirFlag = process.argv.indexOf('--from-dir');
   const dir = fromDirFlag >= 0 ? process.argv[fromDirFlag + 1] : join(ROOT, '.gtfs');
   await mkdir(dir, { recursive: true });
+  const mapping = JSON.parse(await readFile(join(ROOT, 'tools/fixtures/ferry_stop_mapping.json'), 'utf8'));
 
   const merged = new Map();
   for (const bundle of BUNDLES) {
     const zip = join(dir, `${bundle.name}.zip`);
     if (fromDirFlag < 0) await download(bundle.url, zip);
-    const stations = await railStations(zip);
-    process.stderr.write(`${bundle.name}: ${stations.size} rail stations\n`);
+    const stations = await servedStations(zip, bundle.mode, mapping);
+    process.stderr.write(`${bundle.name}: ${stations.size} ${bundle.mode} stops\n`);
     for (const [id, station] of stations) {
       const existing = merged.get(id);
-      if (existing) existing.modes.add(bundle.mode);
-      else merged.set(id, { ...station, modes: new Set([bundle.mode]) });
+      if (existing) {
+        existing.modes.add(bundle.mode);
+        if (bundle.mode === 'ferry') existing.name = existing.name.replace(/\s+Station$/i, '');
+      } else merged.set(id, { ...station, modes: new Set([bundle.mode]) });
     }
   }
 
@@ -168,9 +208,9 @@ async function main() {
     await writeFile(target, json);
   }
 
-  const odd = stations.filter((s) => !s.name.endsWith('Station'));
+  const odd = stations.filter((s) => !/(Station|Wharf)$/.test(s.name));
   process.stderr.write(`${stations.length} stations written\n`);
-  for (const s of odd) process.stderr.write(`  name does not end in Station: ${s.id} ${s.name}\n`);
+  for (const s of odd) process.stderr.write(`  name does not end in Station or Wharf: ${s.id} ${s.name}\n`);
 }
 
-await main();
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) await main();

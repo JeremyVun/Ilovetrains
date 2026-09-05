@@ -165,14 +165,16 @@ The document may contain an optional `focus` field — "I'm on this train":
 - `by` is `"focus"` when the user tapped `Take this train` and `"inferred"`
   when the app entered travel mode from a fix. A focus written before `by`
   shipped reads as `"focus"`; any other value drops the focus.
-- Written by `Take this train` on journey detail and by inferred entry below;
+- Written by `Take this train` (`Take this ferry` for a ferry-first journey) on journey detail and by inferred entry below;
   nothing else writes it. There is no unfocus control: it clears itself once
   now > the journey's effective arrival + 30 min, and accepting the return
   offer that a finished focus produces clears it too.
 - `journey` is a full snapshot so directions and detail stay viewable after
   departure and offline. On each refresh the client re-matches it in fresh
-  data by (first leg's line.name, departure.scheduled) and updates the
-  snapshot when matched (live delays keep flowing); unmatched (departed)
+  data by the ordered list of every service leg’s `(line.name,
+  departure.scheduled)` pair and updates the snapshot when matched (live
+  delays keep flowing). This distinguishes routes sharing the same first
+  train but connecting to different ferries. Unmatched (departed)
   keeps the last snapshot.
 - At most one focused journey. Focusing another replaces it.
 - Deleting the trip deletes its focus, like its history and its cache: nothing
@@ -257,6 +259,11 @@ Saved endpoints use the index coordinates when available, falling back to
 the saved snapshot. The saved end outranks a nearer stranger so a
 user whose own origin is a kilometre away is not handed a station they have
 never used. Without the index, or without a fix, there is no `here`.
+Wharves and railway stations follow the same rules. `stations.js` exposes
+`loadStations()` (one fetch per page, null on failure),
+`nearest(stations, fix, withinKm)` (`{station, km}` or null), and
+`here(doc, stations, fix)` (`{station, tier}` or null). The index is
+precached for offline use.
 
 ```
 here = above, or none

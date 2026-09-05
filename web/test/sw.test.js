@@ -17,6 +17,11 @@ function shellList() {
   return [...block[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
 }
 
+test('precache requests are unique so cache.addAll can install atomically', () => {
+  const shell = shellList();
+  assert.equal(new Set(shell).size, shell.length);
+});
+
 test('every shell path the worker precaches exists on disk', () => {
   for (const entry of shellList()) {
     if (entry === '/') continue; // the navigation URL, served as index.html
@@ -31,6 +36,10 @@ test('every ES module the app ships is precached', () => {
     if (!name.endsWith('.js')) continue;
     assert.ok(shell.has('/js/' + name), `web/js/${name} is not in the sw.js SHELL list`);
   }
+});
+
+test('the station lookup index is available offline', () => {
+  assert.ok(shellList().includes('/stations.json'));
 });
 
 test('every icon the manifest promises is precached and on disk', () => {

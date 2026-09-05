@@ -15,6 +15,7 @@
 
 import { parseIso, clock, minutesUntil } from './time.js';
 import { shortName } from './dom.js';
+import { colourKey } from './lines.js';
 
 /* A change this short is worth colouring even when realtime did not shrink
    it; short scheduled connections are normal. */
@@ -47,21 +48,23 @@ export function legsOf(journey, opts = {}) {
   }];
 }
 
-/** The identity a focused journey is re-matched by across refreshes
-    (docs/contracts/client-storage.md): the first leg's line and its
-    TIMETABLED departure — the one field a delay cannot move. */
+/** The identity a focused journey is re-matched by across refreshes: each
+    service leg's line and timetabled departure, which delays cannot move. */
 export function journeyKey(journey) {
-  return departureKey(journey);
+  return JSON.stringify(legsOf(journey).map((leg) => {
+    const line = (leg.line && leg.line.name) || '';
+    const scheduled = (leg.departure && leg.departure.scheduled) || '';
+    return [line, scheduled];
+  }));
 }
 
 // Redirects keep the first service even when their later legs change.
 export function departureKey(journey) {
   const first = legsOf(journey)[0] || {};
-  const line = (first.line && first.line.name)
-    || (journey && journey.line && journey.line.name) || '';
-  const scheduled = (first.departure && first.departure.scheduled)
-    || (journey && journey.departure && journey.departure.scheduled) || '';
-  return line + '|' + scheduled;
+  return JSON.stringify([
+    (first.line && first.line.name) || '',
+    (first.departure && first.departure.scheduled) || ''
+  ]);
 }
 
 export function arrivalMs(journey) {
@@ -81,11 +84,45 @@ export function departureMs(journey) {
 
 export function platformNumber(value) {
   if (!value) return '';
-  return String(value).replace(/^platform\s+/i, '');
+  return String(value).replace(/^(?:platform|wharf)\s+/i, '');
+}
+
+export function platformChip(value) {
+  const raw = String(value || '').trim();
+  const match = raw.match(/\b(?:platform|wharf)\s+(\d+[a-z]?)(?=\b|,|$)/i)
+    || raw.match(/^(\d+[a-z]?)(?=\b|,|$)/i);
+  return match ? match[1] : '';
+}
+
+export function modeWords(mode) {
+  return String(mode || '').toLowerCase() === 'ferry'
+    ? { vehicle: 'ferry', place: 'Wharf' }
+    : { vehicle: 'train', place: 'Platform' };
+}
+
+export function boardingLabel(value, mode) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const place = modeWords(mode).place;
+  if (new RegExp(`\\b${place}\\b`, 'i').test(raw)) return raw;
+  if (place === 'Wharf' && /^side\b/i.test(raw)) return raw;
+  return `${place} ${raw}`;
 }
 
 function lineCode(leg) {
   return (leg && leg.line && leg.line.name) || '';
+}
+
+function chip(leg, platform) {
+  const mode = leg && leg.line && leg.line.mode;
+  const words = modeWords(mode);
+  return {
+    code: lineCode(leg),
+    colourKey: colourKey(leg && leg.line),
+    platform: platformChip(platform) || '—',
+    location: boardingLabel(platform, mode) || null,
+    place: words.place
+  };
 }
 
 function behind(ms, nowMs) {
@@ -108,12 +145,27 @@ function changeBetween(prev, next, index, nowMs) {
   // telling the same bad news twice in two different words.
   const broken = prev.cancelled === true || next.cancelled === true;
   const shrunk = minutes !== null && printedMin !== null && minutes < printedMin;
+  const fromMode = prev.line && prev.line.mode;
+  const toMode = next.line && next.line.mode;
+  const fromStation = shortName((prev.to && prev.to.name) || '');
+  const toStation = shortName((next.from && next.from.name) || '');
+  const fromID = prev.to && prev.to.id;
+  const toID = next.from && next.from.id;
+  const station = fromID && toID && fromID !== toID
+    ? [fromStation, toStation].filter(Boolean).join(' → ')
+    : fromStation || toStation;
 
   return {
     index,
-    station: shortName((prev.to && prev.to.name) || (next.from && next.from.name) || ''),
+    station,
+    fromStation,
+    toStation,
     fromPlatform: platformNumber(prev.to && prev.to.platform) || null,
     toPlatform: platformNumber(next.from && next.from.platform) || null,
+    fromLabel: boardingLabel(prev.to && prev.to.platform, fromMode) || null,
+    toLabel: boardingLabel(next.from && next.from.platform, toMode) || null,
+    fromPlace: modeWords(fromMode).place,
+    toPlace: modeWords(toMode).place,
     minutes,
     printedMin,
     tight: !broken && minutes !== null && (minutes < TIGHT_CHANGE_MIN || shrunk),
@@ -124,10 +176,6 @@ function changeBetween(prev, next, index, nowMs) {
     arrTime: arrMs === null ? null : clock(arrMs),
     depTime: depMs === null ? null : clock(depMs)
   };
-}
-
-function chip(code, platform) {
-  return { code, platform: platform || '—' };
 }
 
 function boardLabel(leg) {
@@ -151,7 +199,7 @@ function stepsOf(legs, changes, cancelled, nowMs) {
     kind: 'board',
     time: depMs === null ? '—' : clock(depMs),
     station: shortName((first.from && first.from.name) || ''),
-    chip: chip(lineCode(first), platformNumber(first.from && first.from.platform) || null),
+    chip: chip(first, first.from && first.from.platform),
     label: boardLabel(first),
     tight: false,
     cancelled: cancelled[0] === true,
@@ -165,10 +213,11 @@ function stepsOf(legs, changes, cancelled, nowMs) {
       kind: 'change',
       time: change.minutes === null ? '—' : change.minutes + ' min',
       station: change.station,
-      off: chip(lineCode(legs[index]), change.fromPlatform),
-      on: chip(lineCode(legs[index + 1]), change.toPlatform),
+      off: chip(legs[index], change.fromLabel),
+      on: chip(legs[index + 1], change.toLabel),
       // ui.md: a tight change prints its current window and no other.
       label: broken ? 'Cancelled' : tight ? change.minutes + ' min change' : 'Board',
+      boardingPlace: broken ? '' : change.toLabel || '',
       tight,
       cancelled: broken,
       done: change.done
@@ -179,7 +228,7 @@ function stepsOf(legs, changes, cancelled, nowMs) {
     kind: 'arrive',
     time: arrMs === null ? '—' : clock(arrMs),
     station: shortName((last.to && last.to.name) || ''),
-    chip: chip(lineCode(last), platformNumber(last.to && last.to.platform) || null),
+    chip: chip(last, last.to && last.to.platform),
     label: 'Arrive' + (finalCancelled ? ' · Journey cancelled' : ''),
     tight: false,
     cancelled: finalCancelled,
@@ -223,11 +272,14 @@ export function journeyDetail(journey, nowMs, opts = {}) {
 
   const first = legs[0] || {};
   const last = legs[legs.length - 1] || {};
+  const firstWords = modeWords(first.line && first.line.mode);
+  const lastWords = modeWords(last.line && last.line.mode);
   const arrMs = arrivalMs(journey);
   const arrTime = arrMs === null ? null : clock(arrMs);
 
   return {
     key: journeyKey(journey),
+    vehicle: firstWords.vehicle,
     stale: Boolean(opts.stale),
     from: shortName((first.from && first.from.name) || opts.fromName || ''),
     to: shortName((last.to && last.to.name) || opts.toName || ''),
@@ -245,6 +297,8 @@ export function journeyDetail(journey, nowMs, opts = {}) {
       time: arrTime,
       station: shortName((last.to && last.to.name) || opts.toName || ''),
       platform: platformNumber(last.to && last.to.platform) || null,
+      label: boardingLabel(last.to && last.to.platform, last.line && last.line.mode) || null,
+      place: lastWords.place,
       cancelled: cancelled[legs.length - 1] === true
     }
   };

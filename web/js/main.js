@@ -716,7 +716,7 @@ async function fetchLive() {
     });
     if (!onLiveView() || key !== currentKey()) return;
     if (state.seenKey !== key) { state.seenLive = new Map(); state.seenKey = key; }
-    for (const journey of body.journeys || []) state.seenLive.set(journeyKey(journey), journey);
+    for (const journey of body.journeys || []) state.seenLive.set(departureKey(journey), journey);
     state.body = body;
     state.serverStale = serverStale;
     state.offline = false;
@@ -777,8 +777,8 @@ async function fetchPast(initial) {
       signal: pastInflight.signal
     });
     if (state.view !== 'board' || key !== currentKey()) return;
-    const before = new Set(state.pastBodies.flatMap((page) => page.journeys || []).map(journeyKey));
-    const gained = (body.journeys || []).some((journey) => !before.has(journeyKey(journey)));
+    const before = new Set(state.pastBodies.flatMap((page) => page.journeys || []).map(departureKey));
+    const gained = (body.journeys || []).some((journey) => !before.has(departureKey(journey)));
     if (!gained) state.pastExhausted = true;
     else state.pastBodies.unshift(body);
     if (initial) state.initialBoardLanding = true;
