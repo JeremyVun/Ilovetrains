@@ -81,24 +81,3 @@ type DeparturesResponse struct {
 	At          *string   `json:"at"`
 	Journeys    []Journey `json:"journeys"`
 }
-
-// Location is a station's WGS84 position, for the client's geolocation term.
-// The server never learns where the user is; it only says where stations are.
-type Location struct {
-	Lat float64 `json:"lat"`
-	Lon float64 `json:"lon"`
-}
-
-// Stop is one station in a stop search result. Location is null when upstream
-// omits the station's coordinates.
-type Stop struct {
-	ID       string    `json:"id"`
-	Name     string    `json:"name"`
-	Modes    []string  `json:"modes"`
-	Location *Location `json:"location"`
-}
-
-// StopsResponse is the body of GET /api/v1/stops.
-type StopsResponse struct {
-	Stops []Stop `json:"stops"`
-}

@@ -34,17 +34,6 @@ var cancelPattern = regexp.MustCompile(`(?i)cancel`)
 
 var platformSuffix = regexp.MustCompile(`,\s*Platform\s.*$`)
 
-// Axis order of upstream's EPSG:4326 `coord` pair, verified 2026-09-01 against
-// real stop_finder responses rather than assumed from the CRS: Central Station
-// is [-33.884024, 151.206203] and the Adelaide coach stop G50001 is
-// [-34.927477, 138.595501]. Read the other way round those are a point in
-// Lebanon and one in the Southern Ocean, so latitude is first.
-const (
-	coordLat = 0
-	coordLon = 1
-	coordLen = 2
-)
-
 func modeName(class int) (string, bool) {
 	switch class {
 	case classTrain:
@@ -53,83 +42,6 @@ func modeName(class int) (string, bool) {
 		return "metro", true
 	}
 	return "", false
-}
-
-// mapStops turns a stop_finder payload into our stops response: stations only,
-// train/metro only, best match first.
-func mapStops(body []byte) (*StopsResponse, error) {
-	var raw stopFinderResponse
-	if err := json.Unmarshal(body, &raw); err != nil {
-		return nil, fmt.Errorf("%w: decoding stop_finder: %v", ErrUpstream, err)
-	}
-
-	type scored struct {
-		stop    Stop
-		isBest  bool
-		quality int
-	}
-	var candidates []scored
-	seen := make(map[string]bool)
-
-	for _, loc := range raw.Locations {
-		if loc.Type != "stop" || loc.ID == "" || seen[loc.ID] {
-			continue
-		}
-		modes := serveableModes(loc.Modes)
-		if len(modes) == 0 {
-			continue
-		}
-		seen[loc.ID] = true
-		candidates = append(candidates, scored{
-			stop: Stop{
-				ID:       loc.ID,
-				Name:     stationName(loc),
-				Modes:    modes,
-				Location: stopLocation(loc),
-			},
-			isBest:  loc.IsBest,
-			quality: loc.MatchQuality,
-		})
-	}
-
-	sort.SliceStable(candidates, func(i, j int) bool {
-		if candidates[i].isBest != candidates[j].isBest {
-			return candidates[i].isBest
-		}
-		return candidates[i].quality > candidates[j].quality
-	})
-
-	stops := make([]Stop, 0, len(candidates))
-	for _, c := range candidates {
-		stops = append(stops, c.stop)
-	}
-	return &StopsResponse{Stops: stops}, nil
-}
-
-// stopLocation reads a station's coordinates. Upstream is not obliged to carry
-// them, and a fabricated position would send the client's nearest-station
-// prediction to the wrong platform, so a missing pair maps to null.
-func stopLocation(p place) *Location {
-	if len(p.Coord) < coordLen {
-		return nil
-	}
-	return &Location{Lat: p.Coord[coordLat], Lon: p.Coord[coordLon]}
-}
-
-// serveableModes maps EFA product classes to our mode names, keeping only
-// train and metro and preserving that order.
-func serveableModes(classes []int) []string {
-	var modes []string
-	for _, class := range []int{classTrain, classMetro} {
-		for _, c := range classes {
-			if c == class {
-				name, _ := modeName(class)
-				modes = append(modes, name)
-				break
-			}
-		}
-	}
-	return modes
 }
 
 // mapTrip turns a trip payload into our departures response. fromID/toID are

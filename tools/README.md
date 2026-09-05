@@ -14,6 +14,7 @@
   concepts × scenarios × frames × schemes with measured probes, build the
   contact sheet. Read `comps/README.md`.
 - `icon.html` + `make-icons.sh` — regenerate the PWA icons through the browser.
+- `build-stations.js` — rebuild the baked station index both clients search.
 
 ## comps/
 
@@ -264,3 +265,43 @@ paint and live data, in ms — from a cold open and then a warm, worker-served o
 non-zero if the bar is missed. `make-icons.sh` regenerates `web/icons/*` from
 `tools/icon.html` (a canvas drawing whose proportions are query-tunable) at the
 exact sizes the manifest promises.
+
+## build-stations.js
+
+Writes the baked station index to `web/stations.json` and
+`internal/stations/stations.json`, byte-identical, sorted by id. The Go
+server answers `/api/v1/stops` from its copy and makes no upstream call; the
+client loads its copy for nearest-station work. A Go test keeps the two
+copies equal.
+
+```sh
+node tools/build-stations.js                          # downloads, needs the key
+node tools/build-stations.js --from-dir /path/to/zips # no key, no network
+```
+
+It reads `TFNSW_API_KEY` from the process environment and only to download;
+it never opens `.env`. `--from-dir` expects `sydneytrains.zip`,
+`nswtrains.zip` and `metro.zip` already in that directory; without the flag
+the bundles land in `.gtfs/` off the repository root. The zips are 12 MB, 40
+MB and 1 MB and are never committed. It shells out to `unzip -p`, so it is
+dependency-free but not portable to a machine without it.
+
+Bundle URLs, and why metro is v2:
+
+- `https://api.transport.nsw.gov.au/v1/gtfs/schedule/sydneytrains`
+- `https://api.transport.nsw.gov.au/v1/gtfs/schedule/nswtrains`
+- `https://api.transport.nsw.gov.au/v2/gtfs/schedule/metro` — the v1 metro
+  bundle answers 200 but is frozen at September 2024 and has none of the
+  Metro City section. See `docs/references/tfnsw-open-data.md`, "Station
+  index".
+
+A parent station is kept only when a rail `route_type` actually serves it,
+joining `stop_times.txt` → `trips.txt` → `routes.txt`. Without that join NSW
+TrainLink's coach network arrives too, Adelaide included. It prints the
+entry count, each bundle's contribution and any station whose name does not
+end in "Station" — currently Southern Cross (Melbourne) and four rail
+replacement stops.
+
+Regenerating is a deliberate act: the output is committed, so run it when
+the network changes, check the diff, and say in the commit message that the
+index was rebuilt and from bundles of what date.

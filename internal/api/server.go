@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"trains/internal/cache"
+	"trains/internal/stations"
 	"trains/internal/tfnsw"
 )
 
@@ -19,7 +20,6 @@ import (
 // substitute a fake so no test touches the network.
 type Upstream interface {
 	Departures(ctx context.Context, from, to string, limit int, at time.Time) (*tfnsw.DeparturesResponse, error)
-	Stops(ctx context.Context, query string) (*tfnsw.StopsResponse, error)
 }
 
 // Cache lifetimes. The in-memory TTLs mirror the s-maxage the contract
@@ -27,7 +27,6 @@ type Upstream interface {
 // upstream call per key per TTL.
 const (
 	departuresTTL = 30 * time.Second
-	stopsTTL      = 24 * time.Hour
 
 	// A settled past window does not change, so it is cached for an hour and
 	// the CDN is told it may keep it for one. Caching it is not only cheap but
@@ -36,14 +35,10 @@ const (
 	// the more truthful answer.
 	departuresPastTTL = time.Hour
 
-	// The contract's stale-on-upstream-failure windows differ because
-	// departures data ages badly while the near-static station list
-	// does not, so a week-old search index beats a 502 during a long outage.
 	// A past window has already happened, so a day-old copy of it is exactly as
 	// true as a fresh fetch — matching the stale-while-revalidate we advertise.
 	departuresStaleWindow     = 10 * time.Minute
 	departuresPastStaleWindow = 24 * time.Hour
-	stopsStaleWindow          = 7 * 24 * time.Hour
 
 	// fetchBudget bounds one upstream fetch including its retry.
 	fetchBudget = 12 * time.Second
@@ -83,6 +78,10 @@ const (
 
 const minQueryLength = 2
 
+// stopsLimit caps a station search. The index is small and the setup sheet
+// shows a short list.
+const stopsLimit = 10
+
 // Server holds the caches and upstream client shared by all requests. It holds
 // no per-user state: every response is a pure function of the query string.
 type Server struct {
@@ -91,7 +90,6 @@ type Server struct {
 	// settled past window is worth an hour, and cache.Cache holds one TTL.
 	departures     *cache.Cache[*tfnsw.DeparturesResponse]
 	departuresPast *cache.Cache[*tfnsw.DeparturesResponse]
-	stops          *cache.Cache[*tfnsw.StopsResponse]
 	webDir         string
 	now            func() time.Time
 }
@@ -103,7 +101,6 @@ func New(upstream Upstream, webDir string) *Server {
 		upstream:       upstream,
 		departures:     cache.New[*tfnsw.DeparturesResponse](departuresTTL, departuresStaleWindow),
 		departuresPast: cache.New[*tfnsw.DeparturesResponse](departuresPastTTL, departuresPastStaleWindow),
-		stops:          cache.New[*tfnsw.StopsResponse](stopsTTL, stopsStaleWindow),
 		webDir:         webDir,
 		now:            time.Now,
 	}
@@ -217,17 +214,12 @@ func (s *Server) handleStops(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
+	writeData(w, stopsCacheControl, false, StopsResponse{Stops: stations.Search(query, stopsLimit)})
+}
 
-	result, err := s.stops.Do(r.Context(), query, func(ctx context.Context) (*tfnsw.StopsResponse, error) {
-		ctx, cancel := fetchContext(ctx)
-		defer cancel()
-		return s.upstream.Stops(ctx, query)
-	})
-	if err != nil {
-		writeError(w, err)
-		return
-	}
-	writeData(w, stopsCacheControl, result.Stale, result.Value)
+// StopsResponse is the body of GET /api/v1/stops.
+type StopsResponse struct {
+	Stops []stations.Stop `json:"stops"`
 }
 
 func handleHealthz(w http.ResponseWriter, _ *http.Request) {

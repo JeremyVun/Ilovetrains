@@ -82,23 +82,6 @@ func NewClient(apiKey string) (*Client, error) {
 // Location is the timezone all served timestamps use.
 func (c *Client) Location() *time.Location { return c.loc }
 
-// Stops searches stations by name. Note type_sf=any: type_sf=stop is broken
-// upstream ("stop invalid", code -2000), so we filter to stations ourselves.
-func (c *Client) Stops(ctx context.Context, query string) (*StopsResponse, error) {
-	q := url.Values{}
-	q.Set("outputFormat", "rapidJSON")
-	q.Set("coordOutputFormat", "EPSG:4326")
-	q.Set("type_sf", "any")
-	q.Set("name_sf", query)
-	q.Set("TfNSWSF", "true")
-
-	body, err := c.get(ctx, "/stop_finder", q)
-	if err != nil {
-		return nil, err
-	}
-	return mapStops(body)
-}
-
 // Departures returns the journeys from one station to another departing at or
 // after `at`. A zero `at` means now.
 //
@@ -216,8 +199,8 @@ func (c *Client) attempt(ctx context.Context, endpoint string) (body []byte, ret
 	if err != nil {
 		return nil, true, classify(err)
 	}
-	// Judge success by status and payload only: successful stop_finder
-	// responses carry systemMessages entries of type "error".
+	// Judge success by status and payload only: successful responses carry
+	// systemMessages entries of type "error".
 	if resp.StatusCode != http.StatusOK {
 		return nil, retryableStatus(resp.StatusCode),
 			fmt.Errorf("%w: HTTP %d", ErrUpstream, resp.StatusCode)

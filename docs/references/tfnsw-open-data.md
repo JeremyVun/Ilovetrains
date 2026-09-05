@@ -144,6 +144,65 @@ destination.
 ### add_info
 Service alerts. Not probed yet **[verify when alerts UI is scheduled]**.
 
+## Station index
+
+Verified 2026-09-05, building `web/stations.json` and
+`internal/stations/stations.json` (`tools/build-stations.js`).
+
+Bundles, downloaded with `Authorization: apikey <key>`:
+
+- `https://api.transport.nsw.gov.au/v1/gtfs/schedule/sydneytrains`
+- `https://api.transport.nsw.gov.au/v1/gtfs/schedule/nswtrains`
+- `https://api.transport.nsw.gov.au/v2/gtfs/schedule/metro`
+
+Metro is **v2**. The v1 metro bundle answers 200 but is frozen at
+`feed_version 17092024`: one route, "Metro North West Line", 13 stations,
+none of the City section. v2 is current (2026-09-03) and carries all 21 M1
+stations including Barangaroo, Gadigal, Waterloo, Victoria Cross and Crows
+Nest, which appear in no v1 bundle. `v2/sydneytrains` and `v2/nswtrains` are
+404; those two stay on v1.
+
+Row filter: `stops.txt` rows with `location_type = 1`, kept only when
+`stop_times.txt` → `trips.txt` → `routes.txt` shows a rail `route_type`
+serving them (1, 2, 100–117 or 400–405). Sydney Trains is all `route_type`
+2; NSW TrainLink is 100 and 106 for rail and 204/205 for its coaches; Metro
+is 401. Without the join, NSW TrainLink alone contributes 274 coach stops
+including Adelaide Central Bus Station.
+
+`location_type = 1` on its own is only a station filter in these three
+bundles. In the complete Greater Sydney bundle
+(`/v1/publictransport/timetables/complete/gtfs`, 302 MB) every bus stop is
+`location_type = 1`: 78,031 of them.
+
+GTFS parent-station ids are the Trip Planner stop ids. Each name below was
+put through `stop_finder` (`type_sf=any&name_sf=<name>`) and the first
+`type == "stop"` result compared with the GTFS parent id:
+
+| Station | GTFS | stop_finder | Match |
+| --- | --- | --- | --- |
+| Central Station | 200060 | 200060 | yes |
+| Rhodes Station | 213820 | 213820 | yes |
+| Bondi Junction Station | 202210 | 202210 | yes |
+| Parramatta Station | 215020 | 215020 | yes |
+| Tallawong Station | 2155384 | 2155384 | yes |
+
+`200080` is **Wynyard Station** in every bundle and upstream. The client
+fixtures that label it Bondi Junction are wrong; Bondi Junction is `202210`.
+
+The dropped Bankstown-line stations (Belmore, Campsie, Canterbury, Dulwich
+Hill, Hurlstone Park, Lakemba, Marrickville, Punchbowl, Wiley Park) are
+correctly dropped: `stop_finder` reports their modes as `[5, 11]`, bus and
+school bus only, while the line is converted to Metro.
+
+Olympic Park's name is `Olympic Park Station`, not "Sydney Olympic Park
+Station" — the same `disassembledName` the Trip Planner gives.
+
+23 of the 386 entries sit outside NSW: the NSW TrainLink long-distance
+terminals (Southern Cross, Broadmeadows, Seymour, Benalla, Wangaratta,
+Albury, Brisbane, Perth, Broken Hill, Casino, Kyogle and the stops between).
+They are real rail stations on `route_type` 106 services and `stop_finder`
+returns them today, so the index keeps them.
+
 ## GTFS / GTFS-realtime — not used in v1
 
 Static GTFS bundles + GTFS-R v2 protobuf feeds (Trip Updates, Vehicle

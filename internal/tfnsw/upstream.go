@@ -4,14 +4,9 @@ package tfnsw
 // consume are declared; see docs/references/tfnsw-open-data.md for verified
 // behavior and tools/fixtures/*.json for real captured responses.
 //
-// Note: `systemMessages` is deliberately not consumed. Successful stop_finder
-// responses carry entries with type "error" (code -8011, empty text), so
-// success is judged by HTTP status and payload content only.
-
-type stopFinderResponse struct {
-	Version   string  `json:"version"`
-	Locations []place `json:"locations"`
-}
+// Note: `systemMessages` is deliberately not consumed. Successful responses
+// carry entries with type "error" (code -8011, empty text), so success is
+// judged by HTTP status and payload content only.
 
 type tripResponse struct {
 	Version  string    `json:"version"`
@@ -32,22 +27,15 @@ type leg struct {
 	Transportation       *transportation `json:"transportation"`
 }
 
-// place covers both stop_finder locations and trip leg endpoints; the upstream
+// place covers trip leg endpoints; the upstream
 // uses one shape for both.
 type place struct {
 	ID               string      `json:"id"`
 	Name             string      `json:"name"`
 	DisassembledName string      `json:"disassembledName"`
 	Type             string      `json:"type"`
-	MatchQuality     int         `json:"matchQuality"`
-	IsBest           bool        `json:"isBest"`
-	Modes            []int       `json:"modes"`
 	Parent           *place      `json:"parent"`
 	Properties       *properties `json:"properties"`
-
-	// Coord is [latitude, longitude] under coordOutputFormat=EPSG:4326 — see
-	// coordLat/coordLon in map.go for the evidence that fixes the axis order.
-	Coord []float64 `json:"coord"`
 
 	DepartureTimePlanned   string `json:"departureTimePlanned"`
 	DepartureTimeEstimated string `json:"departureTimeEstimated"`
