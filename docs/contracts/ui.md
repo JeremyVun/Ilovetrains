@@ -187,7 +187,8 @@ substitutes for going back.
   adds that word only when the upstream value needs it. Complete names and
   side-only values remain verbatim: `Wharf 3, Side A`, `Balmain Wharf`, and
   `Side A`, never `Wharf Balmain Wharf` or `Wharf Side A`. These full values
-  remain intact in caps, directions and accessibility text. A compact colour
+  remain intact in caps, directions and accessibility text, except for the
+  departure board's exact-origin repetition rule below. A compact colour
   chip shows the platform or wharf number when the value contains one, and an
   em dash otherwise.
 - Location permission is requested contextually, never on first load. Missing
@@ -230,6 +231,20 @@ substitutes for going back.
 
 ## Departure board
 
+- The header gives both endpoints equal-width columns around a 26px arrow,
+  with 9px gaps. Both names wrap by the same rule at 25px/300 with a 1.03
+  line height, inside a minimum 62px name band. The origin aligns left and
+  destination right. Keep `Wharf`, `Junction` and compass words in full;
+  only the existing terminal `Station` suffix is dropped. Neither endpoint
+  is ellipsised. At widths up to 375px, the type is 24px with a 22px arrow
+  and 7px gaps.
+- A row omits its visible boarding cap only when the nonempty raw boarding
+  label exactly equals the journey origin after trimming, collapsing
+  whitespace and ignoring case. The full origin stays in the header and
+  the raw boarding label stays in accessibility text and journey detail.
+  Specific boarding places such as `Wharf 4, Side A` remain full caps.
+  Transfer pins retain their existing numeric grammar. The same rule
+  applies to the promoted board row in detail; the home device is unchanged.
 - The board is a timeline anchored at now. It opens at the anchor, never in the
   past, and scrolling upward reveals earlier departures. There is no labelled
   scroll affordance (`EARLIER`, `NOW`), and no reverse control anywhere in the

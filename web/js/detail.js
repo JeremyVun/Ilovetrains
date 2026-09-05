@@ -19,7 +19,7 @@ export function detailHtml(model) {
   <div class="sy-hr"></div>
 </div>
 <div class="detail-scroll" data-scroller>
-  ${resultRowHtml(model.row, { promoted: true, tappable: false })}
+  ${resultRowHtml(model.row, { promoted: true, tappable: false, originName: model.from })}
   <div class="detail-steps">${model.steps.map(stepHtml).join('')}</div>
 </div>
 ${tailHtml(model.arrival)}

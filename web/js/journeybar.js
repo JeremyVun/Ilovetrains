@@ -35,6 +35,7 @@ export function journeyBarSpec(journey, opts = {}) {
       colourKey: colourKey(line),
       place: words.place,
       minutes: positiveMinutes(effective(leg.departure), effective(leg.arrival)),
+      fromRaw: String(leg.from && leg.from.platform || ''),
       fromPlatform,
       toPlatform,
       fromLabel: boardingLabel(leg.from && leg.from.platform, line.mode),
@@ -109,13 +110,19 @@ export function journeyBarHtml(spec, opts = {}) {
 export function journeyDeviceHtml(journey, opts = {}) {
   const spec = journeyBarSpec(journey, opts);
   const first = spec.legs[0] || {};
-  const cap = opts.showBoardingPlatform === false || !first.fromLabel
+  const duplicateOrigin = normalized(first.fromRaw) !== ''
+    && normalized(first.fromRaw) === normalized(opts.originName);
+  const cap = opts.showBoardingPlatform === false || !first.fromLabel || duplicateOrigin
     ? '' : `<span class="sy-cap" data-line-code="${esc(first.code)}">${esc(first.fromLabel)}</span>`;
   return {
     spec,
     vars: journeyVars(spec),
     html: `<span class="sy-j">${cap}<span class="sy-bar" data-axis="${esc(axisSignature(spec))}">${journeyBarHtml(spec, opts)}</span></span>`
   };
+}
+
+function normalized(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 export function axisSignature(spec) {

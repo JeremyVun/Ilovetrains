@@ -106,3 +106,45 @@ test('ferry devices use mode green and keep the full side outside numeric chips'
   assert.match(mixed.html, /aria-label="Wharf 3, Side A · F1"[^>]*><span class="sy-pv">3<\/span>/);
   assert.doesNotMatch(mixed.html, />3, Side A<\/span>/, 'the pin stays a compact numeral');
 });
+
+test('the board-only origin rule omits only a normalized exact-repeat cap', () => {
+  const repeated = structuredClone(ferryJourneys()[0]);
+  repeated.legDetail[0].from.platform = 'Pyrmont Bay Wharf';
+  const originName = '  PYRMONT   bay wharf ';
+
+  assert.doesNotMatch(
+    journeyDeviceHtml(repeated, { caps: true, originName }).html,
+    /class="sy-cap"/,
+    'case and whitespace do not make a repeated origin useful'
+  );
+  assert.match(
+    journeyDeviceHtml(repeated, { caps: true }).html,
+    /class="sy-cap"[^>]*>Pyrmont Bay Wharf<\/span>/,
+    'home keeps its existing device because it does not opt into the board rule'
+  );
+
+  const side = journeyDeviceHtml(ferryJourneys()[1], {
+    caps: true, originName: 'Circular Quay'
+  });
+  assert.match(side.html, /class="sy-cap"[^>]*>Wharf 3, Side A<\/span>/);
+
+  const named = structuredClone(ferryJourneys()[0]);
+  named.legDetail[0].from.platform = 'Balmain Wharf';
+  assert.match(
+    journeyDeviceHtml(named, { caps: true, originName: 'Barangaroo Wharf' }).html,
+    /class="sy-cap"[^>]*>Balmain Wharf<\/span>/
+  );
+
+  const missing = structuredClone(ferryJourneys()[0]);
+  missing.legDetail[0].from.platform = null;
+  assert.doesNotMatch(
+    journeyDeviceHtml(missing, { caps: true, originName: 'Circular Quay' }).html,
+    /class="sy-cap"/
+  );
+
+  assert.match(
+    journeyDeviceHtml(transferJourneys()[0], { caps: true, originName: 'Rhodes Station' }).html,
+    /class="sy-cap"[^>]*>Platform 1<\/span>/,
+    'ordinary rail keeps a specific platform'
+  );
+});

@@ -259,13 +259,13 @@ button { cursor: pointer; }
 .sy-home .g { font-size: 16px; font-weight: 300; letter-spacing: 0; color: var(--ink-3); }
 .sy-fresh { display: flex; align-items: center; gap: 8px; flex: none; }
 .sy-h1 {
-  display: flex; align-items: center; gap: 13px; margin: 2px 0 9px;
-  font-size: 29px; font-weight: 300; letter-spacing: -.025em; line-height: 1.06;
+  display: grid; grid-template-columns: minmax(0, 1fr) 26px minmax(0, 1fr);
+  gap: 9px; align-items: center; min-height: 62px; margin: 2px 0 9px;
+  font-size: 25px; font-weight: 300; letter-spacing: -.025em; line-height: 1.03;
 }
-.sy-h1 b { font-weight: 300; }
-.sy-h1 b:first-child { flex: none; white-space: nowrap; }
-.sy-h1 b:last-child { min-width: 0; text-align: right; }
-.sy-h1 .conn { flex: 1; min-width: 14px; height: 1px; background: var(--rule-2); position: relative; }
+.sy-h1 b { min-width: 0; font-weight: 300; }
+.sy-h1 b:last-child { text-align: right; }
+.sy-h1 .conn { height: 1px; background: var(--rule-2); position: relative; }
 .sy-h1 .conn::after {
   content: ''; position: absolute; right: 0; top: -3px;
   border-left: 6px solid var(--rule-2); border-top: 3.5px solid transparent; border-bottom: 3.5px solid transparent;
@@ -649,6 +649,10 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
    at the full idiom (205px of copy in a 210px column, measured). */
 @media (max-width: 375px) {
   body { --sy-pad: 18px; }
+  .sy-h1 {
+    grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1fr);
+    gap: 7px; font-size: 24px;
+  }
   .sy-mast, .hm-top, .hm-hd, .hm-offer, .hm-strip, .hm-ix, .hm-bar, .hm-ask, .hm-mast, .hm-sheet {
     padding-left: 18px; padding-right: 18px;
   }

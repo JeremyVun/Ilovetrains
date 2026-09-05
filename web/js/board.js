@@ -15,27 +15,27 @@ export function boardHtml({ trip, direction, model, nowMs = Date.now(), freshnes
       <button class="sy-home" data-act="home"><span class="g">←</span>Home</button>
       <span class="sy-fresh"><span class="pulse ${esc(dot)}"></span><span class="lbl">${esc(label)}</span></span>
     </div>
-    <h1 class="sy-h1"><b>${esc(shortName(from))}</b><span class="conn"></span><b>${esc(shortName(to))}</b></h1>
+    <h1 class="sy-h1"><b class="endpoint from">${esc(shortName(from))}</b><span class="conn"></span><b class="endpoint to">${esc(shortName(to))}</b></h1>
     <div class="sy-hr"></div>
   </div>
-  ${timelineHtml(model, nowMs)}`;
+  ${timelineHtml(model, nowMs, from)}`;
 }
 
 export function freshnessText(model) {
   return model.stale ? model.footer.text || 'Offline' : 'Live';
 }
 
-export function timelineHtml(model, nowMs) {
+export function timelineHtml(model, nowMs, originName = '') {
   const future = model.futureRows || model.rows || [];
   const past = model.pastRows || [];
   const nowClass = past.length ? '' : ' top';
   const futureClass = future.length ? '' : ' void';
   const empty = model.empty && !past.length;
   return `<div class="sy-tl tl${empty ? ' empty' : ''}" data-t="timeline" data-scroller>
-    ${past.map((row) => resultRowHtml(row)).join('')}
+    ${past.map((row) => resultRowHtml(row, { originName })).join('')}
     <div class="sy-fwd${futureClass}">
       <div class="sy-now${nowClass}" id="board-now" data-t="now"><div class="r"></div><div class="l">Now · ${esc(clock(nowMs))}</div></div>
-      ${future.map((row) => resultRowHtml(row)).join('')}
+      ${future.map((row) => resultRowHtml(row, { originName })).join('')}
       ${future.length ? endMark(future) : emptyState(model)}
     </div>
   </div>`;
@@ -66,6 +66,7 @@ export function resultRowHtml(row, opts = {}) {
   const device = journeyDeviceHtml(row.journey, {
     caps: true,
     showBoardingPlatform: true,
+    originName: opts.originName,
     changes,
     stations: true
   });

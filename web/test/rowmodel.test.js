@@ -7,12 +7,12 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { boardModel, rowLines, STALE_MS } from '../js/rowmodel.js';
-import { emptyCopy, resultRowHtml } from '../js/board.js';
+import { boardHtml, emptyCopy, resultRowHtml } from '../js/board.js';
 import { departureKey, journeyKey } from '../js/journey.js';
 import { NOW, departuresBody, baseJourneys, journey, delay, cancel } from './fixture.js';
 import {
   TRANSFER_NOW, transferBody, transferJourneys, cancelLeg, delayLeg, threeLegJourney,
-  FERRY_NOW, ferryBody, mixedBody, mixedJourneys
+  FERRY_NOW, ferryBody, ferryJourneys, mixedBody, mixedJourneys
 } from './fixture.js';
 
 const body = (journeys, generatedAt) => departuresBody({ journeys, generatedAt });
@@ -470,6 +470,50 @@ test('ferry rows derive paint and words from mode without hiding the operator co
   crossMode.journeys[1].legDetail[0].from.platform = 'Platform 4';
   const trainReplacement = boardModel(crossMode, FERRY_NOW).rows[1];
   assert.equal(trainReplacement.note, '15:40 cancelled · next train');
+});
+
+test('the board balances complete endpoint names and omits an exact repeated cap', () => {
+  const repeated = structuredClone(ferryJourneys()[0]);
+  repeated.legDetail[0].from.platform = 'Pyrmont Bay Wharf';
+  repeated.departure.platform = 'Pyrmont Bay Wharf';
+  const source = ferryBody({ journeys: [repeated] });
+  source.from.name = 'Pyrmont Bay Wharf';
+  source.to.name = 'Double Bay Wharf';
+  const model = boardModel(source, FERRY_NOW);
+  const html = boardHtml({ trip: source, direction: 'forward', model, nowMs: FERRY_NOW });
+
+  assert.match(html, /<h1 class="sy-h1"><b class="endpoint from">Pyrmont Bay Wharf<\/b><span class="conn"><\/span><b class="endpoint to">Double Bay Wharf<\/b><\/h1>/);
+  assert.doesNotMatch(html, /class="sy-cap"/);
+  assert.match(html, /aria-label="[^\"]*Pyrmont Bay Wharf · MFF[^\"]*"/,
+    'the omitted boarding place stays in the row accessibility text');
+  assert.doesNotMatch(resultRowHtml(model.rows[0], {
+    promoted: true, tappable: false, originName: '  PYRMONT   BAY WHARF '
+  }), /class="sy-cap"/, 'detail promotes the same composed board row');
+
+  const pastHtml = boardHtml({
+    trip: source,
+    direction: 'forward',
+    model: { ...model, stale: true, rows: [], futureRows: [], pastRows: model.rows },
+    nowMs: FERRY_NOW
+  });
+  assert.doesNotMatch(pastHtml, /class="sy-cap"/, 'past rows use the same board composition');
+
+  const reverseJourney = structuredClone(repeated);
+  reverseJourney.legDetail[0].from.platform = 'Double Bay Wharf';
+  reverseJourney.departure.platform = 'Double Bay Wharf';
+  const reverseModel = boardModel(ferryBody({ journeys: [reverseJourney] }), FERRY_NOW);
+  const reverseHtml = boardHtml({
+    trip: source, direction: 'reverse', model: reverseModel, nowMs: FERRY_NOW
+  });
+  assert.match(reverseHtml, /class="endpoint from">Double Bay Wharf<\/b>.*class="endpoint to">Pyrmont Bay Wharf<\/b>/);
+  assert.doesNotMatch(reverseHtml, /class="sy-cap"/, 'the reverse board compares against its own origin');
+
+  const railTrip = {
+    from: { name: 'Rhodes Station' },
+    to: { name: 'Bondi Junction Station' }
+  };
+  const railHeader = boardHtml({ trip: railTrip, direction: 'forward', model, nowMs: FERRY_NOW });
+  assert.match(railHeader, /class="endpoint from">Rhodes<\/b>.*class="endpoint to">Bondi Junction<\/b>/);
 });
 
 /* --- the line that stands in for the whole board -------------------------- */
