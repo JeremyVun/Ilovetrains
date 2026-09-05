@@ -161,6 +161,8 @@ What is checked, with the comp probes the numbers come from:
   different sizes and a shared box top is not the shared baseline ui.md binds),
   one status string in both the top line and the focused saved-trip row, and a
   `LIVE` dot that stays the live colour however late the journey is;
+- home station names, the inferred strip and the complete `Just added` sub line
+  never ellipsise; ordinary saved-row metadata may use its designed ellipsis;
 - in the light scheme, T1 and BMT fill `#F99D1C` with paper numerals while the
   same codes as bare text stay `#A46204`;
 - tap targets 44px, time-axis segments on scale, no part of a scrolling region
@@ -313,8 +315,10 @@ matter.
 ## measure-open.js and make-icons.sh
 
 `measure-open.js` reports the `docs/contracts/ui.md` experience bar — cached
-paint and live data, in ms — from a cold open and then a warm, worker-served one, and exits
-non-zero if the bar is missed. `make-icons.sh` regenerates `web/icons/*` from
+paint and live data, in ms — from a cold open and then a warm, worker-served
+one. It also requires a successful API response and fresh, non-offline data, so
+cached rows plus a failed request cannot pass the bar. It exits non-zero if the
+bar is missed. `make-icons.sh` regenerates `web/icons/*` from
 `tools/icon.html` (a canvas drawing whose proportions are query-tunable) at the
 exact sizes the manifest promises.
 

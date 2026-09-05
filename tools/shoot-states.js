@@ -1279,8 +1279,11 @@ function pageScript(state) {
       if (said !== expect.sub) problems.push('the shown row’s sub line reads ' + JSON.stringify(said) + ', not ' + JSON.stringify(expect.sub));
     }
 
-    // A station name the app itself printed is never abbreviated by the layout.
-    for (const name of document.querySelectorAll('.hm-stn,.hm-nm,.hm-sub,.hm-strip .q,.hm-strip button')) {
+    // Metadata may ellipsise, but station names, the strip and its new-row mark may not.
+    const markedSub = document.querySelector('.hm-new')?.closest('.hm-sub');
+    const ownCopy = [...document.querySelectorAll('.hm-stn,.hm-nm,.hm-strip .q,.hm-strip button')];
+    if (markedSub) ownCopy.push(markedSub);
+    for (const name of ownCopy) {
       if (name.scrollWidth > name.clientWidth + 0.5) {
         problems.push('"' + name.textContent.trim() + '" is truncated: ' + name.scrollWidth + ' > ' + name.clientWidth);
       }
