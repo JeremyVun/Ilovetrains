@@ -287,7 +287,7 @@ change the produced filename, not the state, so rename by an explicit table and
 then **read every frame**: a stale `OFFLINE` board or a withheld figure is a
 convincing shot of the wrong screen, and so is the wrong route.
 
-The table, all forty-three frames. `default` means no flags: the state carries its
+The table, all forty-four frames. `default` means no flags: the state carries its
 own size and the dark scheme is unsuffixed.
 
 | Exemplar | State | Invocation |
@@ -327,6 +327,7 @@ own size and the dark scheme is unsuffixed.
 | `home-390x844-back.png` | `reverse-real-platforms` | default |
 | `home-390x844-ferry-pyrmont-focused.png` | `ferry-pyrmont-home-focused` | default |
 | `home-390x844-ferry-numeric-focused.png` | `ferry-numeric-home-focused` | default |
+| `home-925x844-ferry-pyrmont-focused.png` | `ferry-pyrmont-home-focused` | `--size 925x844` |
 | `home-390x844-before-light.png` | `home-before` | `--media prefers-color-scheme:light` |
 | `home-412x732-change.png` | `home-change` | `--size 412x732` |
 | `home-390x844-inferred.png` | `home-inferred` | default |
@@ -337,7 +338,8 @@ own size and the dark scheme is unsuffixed.
 | `setup-390x844-origin.png` | `setup-origin` | default |
 
 The focused Pyrmont state selects its captured 22:11 journey, whose Circular
-Quay transfer is `5B` to `4B`; the reverse focused state uses `5B` to `5A`.
+Quay transfer is `5B` to `4B`; it keeps the full `Pyrmont Bay Wharf` origin
+cap. The reverse focused state keeps `Double Bay Wharf` and uses `5B` to `5A`.
 `ferry-numeric-home-focused` and `ferry-numeric-detail` select the captured
 Circular Quay departure from `Wharf 4, Side B` so the full initial label is
 calibrated separately from compact transfer markers.

@@ -1064,8 +1064,10 @@ async function states() {
       expect: {
         boardHeader: ['Pyrmont Bay Wharf', 'Double Bay Wharf'],
         equalHeaderLines: true,
-        caps: [],
-        ferryLocations: pyrmontRows.flat(),
+        caps: Array(4).fill('Pyrmont Bay Wharf'),
+        ferryLocations: pyrmontRows.flatMap((row) => [
+          loc('origin', 'Pyrmont Bay Wharf', 'Pyrmont Bay Wharf'), ...row
+        ]),
         copy: ['Circular Quay'],
         accessibleCopy: ['Pyrmont Bay Wharf'],
         ferryCodes: ['F4', 'F7']
@@ -1077,8 +1079,10 @@ async function states() {
       expect: {
         boardHeader: ['Double Bay Wharf', 'Pyrmont Bay Wharf'],
         equalHeaderLines: true,
-        caps: [],
-        ferryLocations: doubleBayRows.flat(),
+        caps: Array(4).fill('Double Bay Wharf'),
+        ferryLocations: doubleBayRows.flatMap((row) => [
+          loc('origin', 'Double Bay Wharf', 'Double Bay Wharf'), ...row
+        ]),
         copy: ['Circular Quay'],
         accessibleCopy: ['Double Bay Wharf'],
         ferryCodes: ['F7', 'F4']
@@ -1100,8 +1104,10 @@ async function states() {
       now: Date.parse(pyrmontDoubleBayBody.generatedAt),
       expect: {
         status: 'Next ferry',
-        caps: [],
-        ferryLocations: pyrmontRows[0],
+        caps: ['Pyrmont Bay Wharf'],
+        ferryLocations: [
+          loc('origin', 'Pyrmont Bay Wharf', 'Pyrmont Bay Wharf'), ...pyrmontRows[0]
+        ],
         ferryCodes: ['F4', 'F7']
       }
     }),
@@ -1112,8 +1118,10 @@ async function states() {
       focus: pyrmontDoubleBayBody.journeys[1],
       expect: {
         status: 'Running',
-        caps: [],
-        ferryLocations: pyrmontRows[1],
+        caps: ['Pyrmont Bay Wharf'],
+        ferryLocations: [
+          loc('origin', 'Pyrmont Bay Wharf', 'Pyrmont Bay Wharf'), ...pyrmontRows[1]
+        ],
         ferryCodes: ['F4', 'F7']
       }
     }),
@@ -1146,8 +1154,10 @@ async function states() {
       now: Date.parse(doubleBayPyrmontBody.generatedAt),
       expect: {
         status: 'Next ferry',
-        caps: [],
-        ferryLocations: doubleBayRows[0],
+        caps: ['Double Bay Wharf'],
+        ferryLocations: [
+          loc('origin', 'Double Bay Wharf', 'Double Bay Wharf'), ...doubleBayRows[0]
+        ],
         ferryCodes: ['F7', 'F4']
       }
     }),
@@ -1158,8 +1168,10 @@ async function states() {
       focus: doubleBayPyrmontBody.journeys[0],
       expect: {
         status: 'Running',
-        caps: [],
-        ferryLocations: doubleBayRows[0],
+        caps: ['Double Bay Wharf'],
+        ferryLocations: [
+          loc('origin', 'Double Bay Wharf', 'Double Bay Wharf'), ...doubleBayRows[0]
+        ],
         ferryCodes: ['F7', 'F4']
       }
     }),
@@ -1170,8 +1182,9 @@ async function states() {
       expect: {
         rail: true,
         compactPromoted: true,
-        caps: [],
+        caps: ['Pyrmont Bay Wharf'],
         ferryLocations: [
+          loc('origin', 'Pyrmont Bay Wharf', 'Pyrmont Bay Wharf'),
           ...pyrmontRows[1],
           loc('origin', 'Pyrmont Bay Wharf', 'Pyrmont Bay Wharf'),
           ...pyrmontRows[1],
@@ -1190,8 +1203,9 @@ async function states() {
       expect: {
         rail: true,
         compactPromoted: true,
-        caps: [],
+        caps: ['Double Bay Wharf'],
         ferryLocations: [
+          loc('origin', 'Double Bay Wharf', 'Double Bay Wharf'),
           ...doubleBayRows[0],
           loc('origin', 'Double Bay Wharf', 'Double Bay Wharf'),
           ...doubleBayRows[0],
