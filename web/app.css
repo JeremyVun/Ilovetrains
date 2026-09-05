@@ -475,6 +475,17 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
   display: block; grid-column: 1 / -1; grid-row: 4; margin-top: var(--hdgap);
   font-size: 15px; font-weight: 300; line-height: 1.4; color: var(--ink-2);
 }
+.hm-rec-strip {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  height: 32px; min-width: 0;
+}
+.hm-rec-strip .q {
+  min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hm-rec-strip button {
+  flex: none; min-height: 44px; white-space: nowrap; font-size: 12px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--ink);
+}
 .hm-offer { flex: none; padding: 0 22px; }
 .hm-offer .r { height: 1px; background: var(--rule-2); margin: 12px 0; }
 .hm-offer .k, .hm-ask .k {

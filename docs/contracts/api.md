@@ -5,6 +5,9 @@ never receives, stores, or varies on user identity. Every response is a pure
 function of the query string (plus time), so it is CDN-cacheable and shared
 across all users.
 
+Analytics uses a separate browser-to-analytics-origin request; this API is
+never its transport. See [analytics.md](analytics.md).
+
 Invariants:
 - No cookies, no auth, no `Vary` beyond `Accept-Encoding`.
 - CORS: `Access-Control-Allow-Origin: *`.

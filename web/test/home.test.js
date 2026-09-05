@@ -7,7 +7,7 @@ import { join } from 'node:path';
 
 import { directionsModel } from '../js/focus.js';
 import { fitStationNames } from '../js/dom.js';
-import { homeHtml, homeModel, tripIsOver } from '../js/home.js';
+import { fitTripNames, homeHtml, homeModel, tripIsOver } from '../js/home.js';
 import { emptyDoc } from '../js/storage.js';
 import { departureMs, departureKey } from '../js/journey.js';
 import {
@@ -367,6 +367,23 @@ test('a station name is shortened by rule rather than ellipsised', () => {
   assert.equal(fit('North Sydney Junction Station', 11), 'N Sydney Jn');
 });
 
+test('a long saved-trip name shrinks only until it fits', (t) => {
+  const prior = globalThis.getComputedStyle;
+  t.after(() => { globalThis.getComputedStyle = prior; });
+  const node = {
+    style: {}, clientWidth: 318,
+    get scrollWidth() {
+      return 324 * Number.parseFloat(this.style.fontSize || '19') / 19;
+    }
+  };
+  globalThis.getComputedStyle = () => ({ fontSize: '19px' });
+
+  fitTripNames({ querySelectorAll: () => [node] });
+
+  assert.equal(node.scrollWidth <= node.clientWidth + 1, true);
+  assert.equal(node.style.fontSize, '18.5px');
+});
+
 /* Focus is written by `Take this train`, by inferred entry and by the redirect
    that keeps a rider on the same departure — and by nothing else: browsing
    another trip must not move the journey the rider is following
@@ -487,7 +504,8 @@ test('the strip is the inferred header\'s receipt, and only its own', () => {
     origin: RHODES,
     destination: BONDI,
     departureMs: departureMs(journey),
-    journeyKey: departureKey(journey)
+    journeyKey: departureKey(journey),
+    slot: 'below'
   });
   assert.match(html, /<div class="hm-rule"><\/div>\s*<div class="hm-strip" data-strip>/,
     'the strip sits under the heavy rule');
@@ -500,6 +518,28 @@ test('the strip is the inferred header\'s receipt, and only its own', () => {
     .includes('hm-strip'));
   assert.equal(homeModel({ ...emptyDoc(), trips: [HOME_TRIP] }, HOME_SELECTION,
     transferBody(), at('09:33'), {}).strip, null);
+});
+
+test('A2 moves the inferred correction into the receipt slot', () => {
+  const journey = transferJourneys()[0];
+  const doc = {
+    ...emptyDoc(),
+    trips: [HOME_TRIP],
+    focus: {
+      tripId: 't1', direction: 'forward', focusedAt: '2026-09-01T09:21:00+10:00',
+      by: 'inferred', journey
+    }
+  };
+  const a2 = homeModel(doc, HOME_SELECTION, transferBody(), at('09:33'), { stripVariant: 'a2' });
+  const html = homeHtml(a2);
+
+  assert.equal(a2.strip.slot, 'receipt');
+  assert.ok(html.includes('<span class="hm-rec hm-rec-strip" data-strip>'
+    + '<span class="q">Going somewhere else?</span>'
+    + '<button data-act="change-destination" data-tap>Change</button></span>'));
+  assert.doesNotMatch(html, /<div class="hm-rule"><\/div>\s*<div class="hm-strip"/,
+    'A2 leaves nothing below the heavy rule');
+  assert.ok(html.indexOf('hm-rec-strip') < html.indexOf('hm-rule'));
 });
 
 test('a fix at the destination ends the trip before its timetable does', () => {

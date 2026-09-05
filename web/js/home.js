@@ -155,18 +155,20 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     stale: Boolean(opts.stale),
     over
   }) : null;
+  const strip = activeFocus && activeFocus.by === 'inferred' ? {
+    origin: selectedEnds.from,
+    destination: selectedEnds.to,
+    departureMs: departureMs(activeFocus.journey),
+    journeyKey: departureKey(activeFocus.journey),
+    slot: opts.stripVariant === 'a2' ? 'receipt' : 'below'
+  } : null;
   return {
     selected,
     trip: selectedTrip,
     directions,
     ranked,
     home,
-    strip: activeFocus && activeFocus.by === 'inferred' ? {
-      origin: selectedEnds.from,
-      destination: selectedEnds.to,
-      departureMs: departureMs(activeFocus.journey),
-      journeyKey: departureKey(activeFocus.journey)
-    } : null,
+    strip,
     focus: activeFocus,
     status,
     top: status ? null : topLine(shortName(selectedEnds.from.name),
@@ -217,11 +219,13 @@ export function homeHtml(model) {
       </span>
       ${device.html}
       <span class="hm-sign${d.warn ? ' note' : d.act ? ' hm-act' : ''}">${esc(d.instruction || '—')}</span>
-      ${d.receipt ? `<span class="hm-rec">${esc(d.receipt)}</span>` : ''}
+      ${model.strip && model.strip.slot === 'receipt'
+        ? stripHtml('receipt')
+        : d.receipt ? `<span class="hm-rec">${esc(d.receipt)}</span>` : ''}
     </section>
     ${offerHtml(model)}
     <div class="hm-rule"></div>
-    ${model.strip ? stripHtml() : ''}
+    ${model.strip && model.strip.slot === 'below' ? stripHtml('below') : ''}
     <div class="hm-ix tl" data-t="trip-list" data-scroller>
       <div class="hm-anchor"><div class="l">My trips</div></div>
       ${model.ranked.map((entry) => tripRowHtml(entry, model)).join('')}
@@ -282,7 +286,7 @@ function tripRowHtml(entry, model) {
       : `${esc(entry.from)} <em>→</em> ${esc(entry.to)}`;
   const state = entry.selected ? model.status ? ' focused' : ' shown' : '';
   return `<button class="tripr${state}" data-svc data-tap data-act="open-trip" data-id="${esc(entry.trip.id)}" data-direction="${esc(entry.direction)}" aria-label="Open ${esc(entry.from)} to ${esc(entry.to)} departures">
-    <span class="hm-in">${spine}<span class="hm-bd"><span class="hm-nm">${name}</span><span class="hm-sub">${subHtml(entry, model)}</span></span><span class="route-cue">Departures<span class="arrow">›</span></span></span>
+    <span class="hm-in">${spine}<span class="hm-bd"><span class="hm-nm" data-fit-trip>${name}</span><span class="hm-sub">${subHtml(entry, model)}</span></span><span class="route-cue">Departures<span class="arrow">›</span></span></span>
   </button>`;
 }
 
@@ -297,9 +301,11 @@ function offerHtml(model) {
 
 /* The inferred header's only control, and its receipt: the app guessed this
    trip, so the correction is one tap (design.md, ruling 7). */
-function stripHtml() {
-  return '<div class="hm-strip" data-strip><span class="q">Going somewhere else?</span>'
-    + '<button data-act="change-destination" data-tap>Change</button></div>';
+function stripHtml(slot) {
+  const tag = slot === 'receipt' ? 'span' : 'div';
+  const klass = slot === 'receipt' ? 'hm-rec hm-rec-strip' : 'hm-strip';
+  return `<${tag} class="${klass}" data-strip><span class="q">Going somewhere else?</span>`
+    + `<button data-act="change-destination" data-tap>Change</button></${tag}>`;
 }
 
 function locationAskHtml() {
@@ -312,9 +318,20 @@ function locationAskHtml() {
 export function finishHomeRender(root) {
   clampJourneyBars(root);
   fitStationNames(root);
+  fitTripNames(root);
   // Republish journeybar.js's own axis arithmetic where the probes read it.
   root.querySelectorAll('.hm-hd .sy-bar').forEach((bar) => {
     const spec = bar.querySelector('.sy-spec');
     if (spec) bar.dataset.axis = spec.dataset.mins;
+  });
+}
+
+export function fitTripNames(root) {
+  root.querySelectorAll('[data-fit-trip]').forEach((node) => {
+    let size = Number.parseFloat(getComputedStyle(node).fontSize);
+    while (node.scrollWidth > node.clientWidth + 1 && size > 16) {
+      size = Math.max(16, size - 0.25);
+      node.style.fontSize = `${size}px`;
+    }
   });
 }

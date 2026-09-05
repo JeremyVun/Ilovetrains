@@ -18,6 +18,12 @@ function memoryStore() {
 }
 
 const bucketed = (bucket, opens = 1) => ({ ...emptyDoc(), telemetry: { opens, bucket } });
+const bandOpens = [1, 2, 6, 11, 16, 21, 26, 31, 36, 41, 46, 51];
+const dimensionlessEvents = [
+  'shown_predicted', 'hit_predicted', 'miss_predicted',
+  'shown_focus', 'hit_focus', 'miss_focus',
+  'change_inferred', 'asked_panel', 'asked_setup'
+];
 
 /* A document with no bucket still rides in the control arm, so every enabled
    event carries the experiment dimension. */
@@ -71,7 +77,11 @@ test('the bucket picks the variant, and the control answers when it cannot', () 
   assert.equal(variant(bucketed(38), 'strip-placement', true), 'a3');
   assert.equal(variant(emptyDoc(), 'strip-placement', true), 'a3');
   assert.equal(variant(bucketed(37), 'strip-placement', false), 'a3');
+  assert.equal(variant(bucketed(-1), 'strip-placement', true), 'a3');
+  assert.equal(variant(bucketed(100), 'strip-placement', true), 'a3');
   assert.equal(variant(null, 'strip-placement', true), 'a3');
+  assert.equal(variant(bucketed(37), 'toString', true), null);
+  assert.equal(variant(bucketed(37), '__proto__', true), null);
 });
 
 test('every running experiment dimensions every event, and none does when disabled', () => {
@@ -86,6 +96,74 @@ test('an event carries its usage band, its own dims and the experiment, and noth
   analytics.track('saved_setup', { f: 'search' });
   assert.deepEqual(analytics.events, [
     { t: 'saved_setup', d: { u: '2-5', f: 'search', 'x.strip-placement': 'a2' } }
+  ]);
+});
+
+test('only the fixed event and caller-dimension vocabulary reaches the ledger', () => {
+  const milestones = ['1', '5', '10', '15', '20', '25', '30', '40', '50', '75',
+    '100', '150', '200', '250'];
+  const eventCases = [
+    ...['predicted', 'focus', 'usual', 'home', 'pair', 'inferred']
+      .flatMap((kind) => ['shown_' + kind, 'hit_' + kind, 'miss_' + kind])
+      .map((name) => [name, {}]),
+    ['change_inferred', {}], ['entered_inferred', {}],
+    ['back_focus', {}], ['back_inferred', {}],
+    ['asked_panel', {}], ['granted_panel', {}], ['denied_panel', {}], ['later_panel', {}],
+    ['asked_setup', {}], ['granted_setup', {}], ['denied_setup', {}],
+    ...milestones.map((m) => ['opened', { m }]),
+    ...['location', 'empty'].map((f) => ['shown_setup', { f }]),
+    ...['location', 'nearby', 'search', 'redirect', 'redirect_lost']
+      .map((f) => ['saved_setup', { f }])
+  ];
+  const { analytics } = make({ enabled: false });
+  for (const [name, dims] of eventCases) analytics.track(name, dims);
+  assert.deepEqual(analytics.events.map(({ t }) => t), eventCases.map(([name]) => name));
+});
+
+test('personal, arbitrary and reserved caller dimensions are rejected', () => {
+  let docReads = 0;
+  const { analytics } = make({ getDoc: () => { docReads++; return bucketed(37, 4); } });
+  analytics.track('shown_predicted');
+  analytics.track('station_viewed', { station: 'Central' });
+  analytics.track('shown_predicted', { station: 'Central' });
+  analytics.track('shown_predicted', { u: '51+' });
+  analytics.track('shown_predicted', { 'x.strip-placement': 'a2' });
+  analytics.track('opened', { m: '12' });
+  analytics.track('opened', { m: 10 });
+  analytics.track('opened');
+  analytics.track('shown_setup', { f: 'search' });
+  analytics.track('shown_setup');
+  analytics.track('saved_setup', { f: 'empty' });
+  analytics.track('saved_setup', { f: 'search', journey: 'secret' });
+  analytics.track('saved_setup', null);
+
+  assert.equal(docReads, 1, 'rejected calls do not inspect the document');
+  assert.deepEqual(analytics.events, [
+    { t: 'shown_predicted', d: { u: '2-5', 'x.strip-placement': 'a2' } }
+  ]);
+  assert.deepEqual(analytics.queue(), [
+    { t: 'shown_predicted', d: { u: '2-5', 'x.strip-placement': 'a2' }, n: 1 }
+  ]);
+});
+
+test('accepted caller dimensions are copied before document access', () => {
+  let reads = 0;
+  const dims = {
+    get f() {
+      reads++;
+      return reads === 1 ? 'search' : 'Central';
+    }
+  };
+  const { analytics } = make({
+    getDoc: () => {
+      dims.station = '200060';
+      return bucketed(37, 4);
+    }
+  });
+  analytics.track('saved_setup', dims);
+  assert.equal(reads, 1);
+  assert.deepEqual(analytics.events, [
+    { t: 'saved_setup', d: { u: '2-5', 'x.strip-placement': 'a2', f: 'search' } }
   ]);
 });
 
@@ -106,14 +184,25 @@ test('repeats compact to a count, a changed dimension starts a new entry', () =>
 });
 
 test('the queue is capped at 200 entries, oldest dropped', () => {
-  const { analytics } = make();
-  for (let i = 0; i < QUEUE_CAP; i++) analytics.track('e' + i);
+  let doc = emptyDoc();
+  const { analytics } = make({ getDoc: () => doc });
+  const combinations = dimensionlessEvents.flatMap((name) =>
+    bandOpens.flatMap((opens) => [0, 1].map((bucket) => ({ name, doc: bucketed(bucket, opens) }))));
+  for (const combination of combinations.slice(0, QUEUE_CAP)) {
+    doc = combination.doc;
+    analytics.track(combination.name);
+  }
   assert.equal(analytics.queue().length, QUEUE_CAP);
-  analytics.track('e' + QUEUE_CAP);
+  doc = combinations[QUEUE_CAP].doc;
+  analytics.track(combinations[QUEUE_CAP].name);
   const queue = analytics.queue();
   assert.equal(queue.length, QUEUE_CAP);
-  assert.equal(queue[0].t, 'e1');
-  assert.equal(queue.at(-1).t, 'e200');
+  assert.deepEqual(queue[0], {
+    t: combinations[1].name,
+    d: { u: '1', 'x.strip-placement': 'a2' },
+    n: 1
+  });
+  assert.equal(queue.at(-1).t, combinations[QUEUE_CAP].name);
 });
 
 test('a malformed queue is treated as empty rather than losing the app', () => {
@@ -153,6 +242,46 @@ test('malformed queue entries cannot prevent subsequent recording or sending', a
     assert.equal(fetchFn.calls.length, 1);
     assert.deepEqual(analytics.queue(), []);
   }
+});
+
+test('obsolete or privacy-invalid persisted entries are dropped before sending', async () => {
+  const invalidEntries = [
+    { t: 'shown_predicted', d: { u: 'new', 'x.strip-placement': 'a3' }, n: 1 },
+    { t: 'shown_predicted', d: { u: 'ret', 'x.strip-placement': 'a3' }, n: 1 },
+    { t: 'station_viewed', d: d(), n: 1 },
+    { t: 'shown_predicted', d: { ...d(), station: 'Central' }, n: 1 },
+    { t: 'shown_predicted', d: { u: '1', 'x.strip-placement': 'personal-id' }, n: 1 },
+    { t: 'shown_predicted', d: d(), n: 1_000_001 },
+    { t: 'shown_predicted', d: d(), n: 1, sid: 'page-load-1' }
+  ];
+  for (const entry of invalidEntries) {
+    const storage = memoryStore();
+    storage.setItem(QUEUE_KEY, JSON.stringify({ queue: [entry] }));
+    const fetchFn = fakeFetch({ ok: true });
+    const { analytics } = make({ storage, fetchFn });
+    await analytics.flush();
+    assert.equal(fetchFn.calls.length, 0);
+    assert.deepEqual(analytics.queue(), []);
+  }
+});
+
+test('the largest valid queue stays within the service body cap', async () => {
+  let doc = emptyDoc();
+  const fetchFn = fakeFetch({ ok: true });
+  const { analytics, storage } = make({ getDoc: () => doc, fetchFn });
+  const combinations = dimensionlessEvents.flatMap((name) =>
+    bandOpens.flatMap((opens) => [0, 1].map((bucket) => ({ name, doc: bucketed(bucket, opens) }))));
+  for (const combination of combinations.slice(0, QUEUE_CAP)) {
+    doc = combination.doc;
+    analytics.track(combination.name);
+  }
+  const stored = JSON.parse(storage.getItem(QUEUE_KEY));
+  for (const entry of stored.queue) entry.n = 1_000_000;
+  storage.setItem(QUEUE_KEY, JSON.stringify(stored));
+
+  await analytics.flush();
+  assert.equal(fetchFn.calls.length, 1);
+  assert.ok(fetchFn.calls[0].init.body.length <= 64 * 1024);
 });
 
 test('offline flushes keep counts without calling fetch or beacon, then send online', async () => {

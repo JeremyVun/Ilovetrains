@@ -17,6 +17,8 @@ location and focused journeys stay on the device.
   prediction, focus and home inference.
 - `docs/contracts/ui.md` — binding client behavior, visual language and
   calibration rules.
+- `docs/contracts/analytics.md` — anonymous event vocabulary, experiment
+  assignment, privacy controls and aggregate interpretation.
 - `assets/comps/latest/` — the authoritative comps: the current calibration
   exemplar frames every screen is judged against. Replaced, never
   accumulated, when an owner verdict changes a design.

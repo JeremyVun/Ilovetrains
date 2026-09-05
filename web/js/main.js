@@ -3,7 +3,7 @@
 import {
   loadDoc, saveDoc, addTrip, findTrip, leg, cacheKey, putCache, getCache, recordView,
   recordRide, recordHomeVote, recordLastOpen, updateStop, declineLocation, newTripId,
-  LOCATION_ASK_QUIET_MS
+  recordOpen, milestone, LOCATION_ASK_QUIET_MS
 } from './storage.js';
 import { distanceKm, locate, predict } from './predict.js';
 import { here, loadStations } from './stations.js';
@@ -20,6 +20,9 @@ import * as Home from './home.js';
 import { renderSetup } from './setup.js';
 import { getDepartures, getStops } from './api.js';
 import { onAction } from './dom.js';
+import {
+  createAnalytics, install as installAnalytics, isEnabled, variant, EXPERIMENTS
+} from './analytics.js';
 
 const REFRESH_MS = 30_000;
 const TICK_MS = 1_000;
@@ -33,8 +36,15 @@ const DISSOLVE_HOLD_MS = 260;
 let nowFn = () => Date.now();
 const now = () => nowFn();
 
+function localStore() {
+  try { return window.localStorage; } catch (_) { return null; }
+}
+
+const storage = localStore();
+const documentStore = storage || { getItem: () => null, setItem: () => {} };
+
 const state = {
-  doc: loadDoc(),
+  doc: loadDoc(documentStore),
   selection: null,
   body: null,
   pastBodies: [],
@@ -59,8 +69,55 @@ const state = {
   geoPermission: null,
   locationDismissed: false,
   offerDismissed: false,
-  coordsBackfillStarted: false
+  coordsBackfillStarted: false,
+  headerKind: null,
+  headerTripId: null,
+  headerDirection: null,
+  lastShown: null,
+  lastShownKind: null,
+  tapped: false,
+  opened: false,
+  askedPanel: false,
+  setupSaved: false
 };
+
+const analyticsEnabled = isEnabled({
+  hostname: location.hostname,
+  gpc: navigator.globalPrivacyControl,
+  dnt: navigator.doNotTrack,
+  storage
+}) && Boolean(globalThis.crypto && crypto.getRandomValues);
+const forcedVariants = new Map();
+const analytics = createAnalytics({
+  enabled: analyticsEnabled,
+  storage,
+  fetchFn: (...args) => fetch(...args),
+  schedule: (flush) => setTimeout(() => {
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(flush);
+    else flush();
+  }, 10_000),
+  getDoc: () => state.doc
+});
+installAnalytics(analytics);
+
+function activeVariant(id) {
+  return forcedVariants.get(id) || variant(state.doc, id, analyticsEnabled);
+}
+
+function randomBucket() {
+  const word = new Uint32Array(1);
+  crypto.getRandomValues(word);
+  return word[0] / 0x100000000;
+}
+
+function openForAnalytics() {
+  if (state.opened) return;
+  state.opened = true;
+  if (!analyticsEnabled) return;
+  ctx.update(recordOpen(state.doc, randomBucket));
+  const mark = milestone(state.doc);
+  if (mark) analytics.track('opened', { m: mark });
+}
 
 function onLiveView() {
   return ['home', 'board', 'detail'].includes(state.view);
@@ -70,6 +127,7 @@ const timers = { tick: null, refresh: null, view: null };
 let inflight = null;
 let pastInflight = null;
 let geoGeneration = 0;
+let routeGeneration = 0;
 /* A tick may not rewrite a view whose markup is unchanged: the write would
    discard the element a wheel is scrolling and cancel a smooth scroll. */
 const painted = { home: null, board: null, detail: null };
@@ -100,13 +158,27 @@ const ctx = {
   get doc() { return state.doc; },
   get selection() { return state.selection; },
   go(hash) { if (location.hash === hash) route(); else location.hash = hash; },
-  update(doc) { state.doc = doc; saveDoc(doc); },
+  update(doc) { state.doc = doc; saveDoc(doc, documentStore); },
   permission: geoPermissionState,
   fix: takeContextFix,
-  async saveTrip(trip, redirect) {
+  track: (name, dims) => analytics.track(name, dims),
+  shownSetup(source) {
+    openForAnalytics();
+    state.headerKind = 'setup';
+    analytics.track('shown_setup', { f: source });
+  },
+  async saveTrip(trip, redirect, source) {
+    if (state.setupSaved) return;
+    const generation = routeGeneration;
+    state.setupSaved = true;
     state.selection = savePair(trip);
-    if (!redirect) return ctx.go('#/');
+    if (!redirect) {
+      analytics.track('saved_setup', { f: source });
+      return ctx.go('#/');
+    }
     const match = await redirectJourney(trip, redirect);
+    if (generation !== routeGeneration || state.view !== 'setup') return;
+    analytics.track('saved_setup', { f: match ? 'redirect' : 'redirect_lost' });
     if (!match) return ctx.go('#/board');
     ctx.update(setFocus(state.doc, state.selection, match, now(), 'inferred'));
     ctx.go('#/');
@@ -137,6 +209,7 @@ async function redirectJourney(trip, redirect) {
 }
 
 function route() {
+  routeGeneration += 1;
   geoGeneration += 1;
   stopTimers();
   if (inflight) inflight.abort();
@@ -161,6 +234,8 @@ function route() {
 }
 
 function openSetup(root) {
+  state.view = 'setup';
+  state.setupSaved = false;
   const prefill = state.prefill || {};
   state.prefill = null;
   return renderSetup(root, ctx, prefill);
@@ -201,8 +276,9 @@ function chooseSelection() {
 /* `locate` may answer with a pair no saved trip covers, which is saved on the
    spot, or with nothing saved at all, which leaves home for the sheet. */
 function locateSelection() {
+  const hasHere = Boolean(here(state.doc, state.stations, validFix()));
   const answer = locate(state.doc, now(), { fix: validFix(), stations: state.stations });
-  state.leap = answer.leap || null;
+  state.leap = answer.kind === 'pair' ? 'pair' : hasHere ? answer.leap || null : null;
   if (answer.kind === 'trip') return { tripId: answer.tripId, direction: answer.direction };
   if (answer.kind === 'pair') {
     return savePair({
@@ -371,8 +447,7 @@ function useFix() {
     const voted = recordHomeVote(state.doc, spot.station, now());
     if (voted !== state.doc) ctx.update(voted);
   }
-  // Against the record as it stood when this open began: the cache paint has
-  // already overwritten lastOpen with this open's own header.
+  // Compare with the opening record before the cache paint replaced it.
   const entered = focusSelection() || rideRecorded(state.doc, state.previousOpen) ? null
     : inferTravel({ ...state.doc, lastOpen: state.previousOpen }, now(), fix);
   if (entered) {
@@ -380,6 +455,8 @@ function useFix() {
     state.predicted = false;
     state.leap = null;
     state.selection = { tripId: entered.tripId, direction: entered.direction };
+    openForAnalytics();
+    analytics.track('entered_inferred');
   } else if (state.predicted) {
     const answer = locateSelection();
     if (!answer) return;
@@ -413,6 +490,9 @@ function renderHome() {
   if (state.view !== 'home') return;
   const model = currentModel();
   const askLocation = shouldAskLocation();
+  const kind = homeAnswerKind();
+  if (!kind) restoreHomeAttribution();
+  if (kind) openForAnalytics();
   const home = Home.homeModel(state.doc, state.selection, state.body, now(), {
     fix: validFix(),
     stale: model.stale,
@@ -422,9 +502,15 @@ function renderHome() {
     leap: state.leap,
     loadedAt: state.loadedAt,
     arrived: arrivedNow(),
-    leave: leaveDistance()
+    leave: leaveDistance(),
+    stripVariant: activeVariant('strip-placement')
   });
   lastHome = home;
+  if (kind) trackShown(kind, home.selected);
+  if (askLocation && !state.askedPanel) {
+    state.askedPanel = true;
+    analytics.track('asked_panel');
+  }
   if (state.offerDismissed) home.over = false;
   const freshness = home.freshness;
   home.freshness = '';
@@ -439,6 +525,31 @@ function renderHome() {
     Home.finishHomeRender(state.root);
   }
   patchFresh(state.root.querySelector('.hm-fresh .lbl'), freshness);
+}
+
+function homeAnswerKind() {
+  const focus = focusOf(state.doc);
+  if (focus && !focusExpired(focus, now())) return focus.by === 'inferred' ? 'inferred' : 'focus';
+  if (!state.predicted) return null;
+  return state.leap || 'predicted';
+}
+
+function trackShown(kind, selection) {
+  const key = `${kind}:${selection.tripId}:${selection.direction}`;
+  state.headerKind = kind;
+  state.headerTripId = selection.tripId;
+  state.headerDirection = selection.direction;
+  if (key === state.lastShown) return;
+  state.lastShown = key;
+  state.lastShownKind = kind;
+  analytics.track('shown_' + kind);
+}
+
+function restoreHomeAttribution() {
+  if (state.headerKind !== 'setup' || state.setupSaved || !state.lastShownKind) return;
+  if (state.selection.tripId !== state.headerTripId
+    || state.selection.direction !== state.headerDirection) return;
+  state.headerKind = state.lastShownKind;
 }
 
 /* The rider stepping off the train ends the trip before the timetable does
@@ -560,10 +671,23 @@ function homeAction(action, element) {
   if (action === 'new-trip') return ctx.go('#/trips/new');
   if (action === 'open-trip') {
     state.selection = { tripId: element.dataset.id, direction: element.dataset.direction || 'forward' };
+    if (!state.tapped) {
+      state.tapped = true;
+      // Setup led to an explicit choice, so no home answer exists to judge.
+      if (state.headerKind && state.headerKind !== 'setup') {
+        const result = state.selection.tripId === state.headerTripId
+          && state.selection.direction === state.headerDirection ? 'hit_' : 'miss_';
+        analytics.track(result + state.headerKind);
+      }
+    }
     state.offerDismissed = false;
     return ctx.go('#/board');
   }
   if (action === 'way-back') {
+    if (state.headerKind === 'focus' || state.headerKind === 'inferred') {
+      analytics.track('back_' + state.headerKind);
+    }
+    state.headerKind = null;
     state.doc = clearFocus(recordCompletedFocus(state.doc));
     state.selection = {
       tripId: state.selection.tripId,
@@ -584,6 +708,8 @@ function homeAction(action, element) {
   if (action === 'change-destination') {
     const strip = lastHome && lastHome.strip;
     if (!strip) return;
+    lastHome.strip = null;
+    analytics.track('change_inferred');
     state.prefill = {
       origin: strip.origin,
       redirect: {
@@ -596,6 +722,7 @@ function homeAction(action, element) {
     return ctx.go('#/trips/new');
   }
   if (action === 'skip-location') {
+    analytics.track('later_panel');
     state.locationDismissed = true;
     ctx.update(declineLocation(state.doc, now()));
     renderHome();
@@ -610,9 +737,13 @@ async function requestLocation() {
   const fix = await takeFix({ maximumAge: 0 });
   if (generation !== geoGeneration || state.view !== 'home') return;
   if (fix) {
+    analytics.track('granted_panel');
     state.fix = fix;
     useFix();
-  } else renderHome();
+  } else {
+    analytics.track('denied_panel');
+    renderHome();
+  }
 }
 
 function boardAction(action, element) {
@@ -698,6 +829,12 @@ function renderDetail() {
 function detailAction(action) {
   if (action === 'board') return ctx.go('#/board');
   if (action === 'focus') {
+    if (state.headerKind && state.headerKind !== 'setup'
+      && state.selection.tripId === state.headerTripId
+      && state.selection.direction === state.headerDirection) {
+      analytics.track('hit_' + state.headerKind);
+    }
+    state.headerKind = null;
     ctx.update(setFocus(state.doc, state.selection, state.journey, now()));
     return ctx.go('#/');
   }
@@ -855,6 +992,7 @@ window.addEventListener('hashchange', route);
 window.__trains = {
   get state() { return state; },
   get model() { return selectedTrip() ? currentModel() : null; },
+  analytics: { ...analytics, variant: activeVariant },
   set now(fn) { nowFn = fn; },
   get now() { return nowFn; },
   refresh: fetchLive,
@@ -865,5 +1003,28 @@ window.__trains = {
   indexReady,
   route
 };
+
+if (location.hostname === 'localhost') {
+  window.__trains.forceVariant = (id, value) => {
+    if (!Object.hasOwn(EXPERIMENTS, id)) return false;
+    const experiment = EXPERIMENTS[id];
+    if (!experiment || !experiment.variants.includes(value)) return false;
+    forcedVariants.set(id, value);
+    renderCurrent();
+    return true;
+  };
+  window.__trains.resetAnalyticsForTest = () => {
+    analytics.events.length = 0;
+    state.headerKind = null;
+    state.headerTripId = null;
+    state.headerDirection = null;
+    state.lastShown = null;
+    state.lastShownKind = null;
+    state.tapped = false;
+    state.opened = false;
+    state.askedPanel = false;
+    state.setupSaved = false;
+  };
+}
 
 route();

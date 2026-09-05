@@ -27,6 +27,7 @@ export async function renderSetup(root, ctx, { origin, redirect } = {}) {
       if (spot) origin = spot.station;
     }
   }
+  let fromSource = origin ? 'location' : 'search';
   const picked = { from: null, to: null };
   let active = 'from';
   let results = [];
@@ -38,6 +39,8 @@ export async function renderSetup(root, ctx, { origin, redirect } = {}) {
   let fix = initialFix;
   let askable = initialPermission === 'prompt';
   let nearby = null;
+  let askedLocation = false;
+  let locationGeneration = 0;
 
   mount(root, `<div class="hm-c home-screen">
     <div class="hm-top">${ctx.doc.trips.length
@@ -50,6 +53,7 @@ export async function renderSetup(root, ctx, { origin, redirect } = {}) {
     </div>
     <div class="hm-bar save"><button data-act="save" data-t="save" disabled>Choose where you start</button></div>
   </div>`);
+  ctx.shownSetup(origin ? 'location' : 'empty');
 
   const inputs = {
     from: root.querySelector('[data-role="from"]'),
@@ -88,6 +92,10 @@ export async function renderSetup(root, ctx, { origin, redirect } = {}) {
     if (active !== 'from' || inputs.from.value.trim()) return '';
     if (nearby) return `<div class="hm-grp">Nearest station</div>${rowsHtml([nearby], 'pick-near')}`;
     if (!askable || fix) return '';
+    if (!askedLocation) {
+      askedLocation = true;
+      ctx.track('asked_setup');
+    }
     return `<div class="hm-res"><button data-act="use-location">
       <span class="n">Use my location</span></button></div>`;
   }
@@ -150,9 +158,10 @@ export async function renderSetup(root, ctx, { origin, redirect } = {}) {
     paintResults();
   }
 
-  function pick(stop) {
+  function pick(stop, source = 'search') {
     if (!stop) return;
     picked[active] = stop;
+    if (active === 'from') fromSource = source;
     ctx.update(recordSearch(ctx.doc, active, stop));
     inputs[active].value = shortName(stop.name);
     results = [];
@@ -177,6 +186,10 @@ export async function renderSetup(root, ctx, { origin, redirect } = {}) {
     input.addEventListener('input', () => {
       active = role;
       picked[role] = null;
+      if (role === 'from') {
+        fromSource = 'search';
+        redirect = null;
+      }
       paintSave();
       clearTimeout(debounce);
       const query = input.value.trim();
@@ -208,10 +221,12 @@ export async function renderSetup(root, ctx, { origin, redirect } = {}) {
   });
 
   async function useLocation() {
+    const generation = ++locationGeneration;
     fix = await ctx.fix();
-    if (!isCurrent()) return;
+    if (!isCurrent() || generation !== locationGeneration) return;
+    ctx.track(fix ? 'granted_setup' : 'denied_setup');
     if (!stations) stations = await loadStations();
-    if (!isCurrent()) return;
+    if (!isCurrent() || generation !== locationGeneration) return;
     const spot = fix && stations ? here(ctx.doc, stations, fix) : null;
     if (!spot) {
       askable = false;
@@ -219,7 +234,7 @@ export async function renderSetup(root, ctx, { origin, redirect } = {}) {
       return;
     }
     active = 'from';
-    pick(spot.station);
+    pick(spot.station, 'location');
   }
 
   /* A returning user whose permission is already granted starts the sheet where
@@ -229,7 +244,7 @@ export async function renderSetup(root, ctx, { origin, redirect } = {}) {
     const spot = fix && stations ? here(ctx.doc, stations, fix) : null;
     if (spot && !ctx.doc.trips.length) {
       active = 'from';
-      pick(spot.station);
+      pick(spot.station, 'location');
       return;
     }
     const near = fix && stations ? nearest(stations, fix, NEAR_STATION_KM) : null;
@@ -248,7 +263,7 @@ export async function renderSetup(root, ctx, { origin, redirect } = {}) {
     }
     if (action === 'pick-near') {
       active = 'from';
-      pick(nearby);
+      pick(nearby, 'nearby');
       return;
     }
     if (action === 'use-location') {
@@ -261,13 +276,13 @@ export async function renderSetup(root, ctx, { origin, redirect } = {}) {
         from: picked.from,
         to: picked.to,
         createdAt: new Date().toISOString()
-      }, redirect);
+      }, redirect, fromSource);
     }
   });
 
   if (origin) {
     active = 'from';
-    pick(origin);
+    pick(origin, 'location');
   } else {
     inputs.from.focus();
   }

@@ -10,6 +10,8 @@
   No npm dependencies; kills Chrome in a `finally`.
 - `shoot-states.js` — drive the real client into every board state and shoot
   it, checking the board's invariants in the browser as it goes.
+- `check-analytics-browser.js` — verify analytics enablement and privacy in a
+  real browser on the production hostname while serving and capturing locally.
 - `measure-open.js` — the experience bar in milliseconds, from the page's own
   Performance API.
 - `comps/` — the design-comps harness: scaffold a round, shoot the matrix of
@@ -137,6 +139,15 @@ probe long enough to drive a flow) runs awaited JS in the page and prints what
 it returns, so a state can be *measured* — or driven end to end — in the same
 drive that shoots it.
 
+Each state also declares its exact ordered analytics event names. After the
+real-clock boot, the driver resets the per-load ledger and attribution guards,
+restores the seed, and reruns the route before measuring. It fails if the
+ledger differs, if `trains.analytics.v1` exists, or if fetch/sendBeacon touches
+the analytics origin. This proves local drives record the intended semantics
+while transport stays disabled. On localhost only,
+`__trains.forceVariant('strip-placement', 'a2')` changes rendering for a state;
+it does not enable transport.
+
 Invariants are checked on every state and reported at `console.error` under the
 shot; a state that means something particular declares it in its own `expect`
 block (the status string its top line must read, whether journey detail may
@@ -260,7 +271,7 @@ change the produced filename, not the state, so rename by an explicit table and
 then **read every frame**: a stale `OFFLINE` board or a withheld figure is a
 convincing shot of the wrong screen, and so is the wrong route.
 
-The table, all thirty-four frames. `default` means no flags: the state carries its
+The table, all thirty-six frames. `default` means no flags: the state carries its
 own size and the dark scheme is unsuffixed.
 
 | Exemplar | State | Invocation |
@@ -297,6 +308,8 @@ own size and the dark scheme is unsuffixed.
 | `home-412x732-change.png` | `home-change` | `--size 412x732` |
 | `home-390x844-inferred.png` | `home-inferred` | default |
 | `home-390x844-inferred-light.png` | `home-inferred` | `--media prefers-color-scheme:light` |
+| `home-390x844-inferred-a2.png` | `home-inferred-a2` | default |
+| `home-390x844-inferred-a2-light.png` | `home-inferred-a2` | `--media prefers-color-scheme:light` |
 | `home-390x844-just-added.png` | `home-here-pair` | default |
 | `setup-390x844-origin.png` | `setup-origin` | default |
 
@@ -378,3 +391,32 @@ replacement stops.
 Regenerating is a deliberate act: the output is committed, so run it when
 the network changes, check the diff, and say in the commit message that the
 index was rebuilt and from bundles of what date.
+
+## Analytics browser and production checks
+
+Run the isolated browser probe with its private ports:
+
+```sh
+CDP_PORT=9453 HTTP_PORT=8193 node tools/check-analytics-browser.js
+```
+
+It maps `ilovetrains.jeremyvun.com` to the local static server inside Chrome,
+maps the analytics host to loopback as a backstop, and captures attempted
+analytics fetches in the page. It proves a first enabled open assigns a bucket,
+emits `opened` before `shown_predicted`, and builds only the approved payload.
+Separate fresh targets prove GPC, DNT and denied storage force A3 without a
+telemetry write, queue or request. No synthetic event leaves the machine.
+
+After deployment, open the real production app once in an ordinary browser,
+then read the collector with the operator-held key in the header:
+
+```sh
+curl -sS -H "X-Analytics-Key: ${ANALYTICS_READ_KEY}" \
+  "https://analytics.jeremyvun.com/stats?project=ilovetrains"
+```
+
+The response's `window.counters` should contain the open's `shown_*` counter
+and any milestone due for that profile. Compute new-user hit rate, returning
+answer acceptance, milestone reach and A2/A3 strip correction with the exact
+ratios and caveats in [the analytics contract](../docs/contracts/analytics.md#reading-the-counters).
+Never put the read key in a URL.

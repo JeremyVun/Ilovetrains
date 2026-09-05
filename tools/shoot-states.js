@@ -188,7 +188,8 @@ function history(tripId = TRIP.id) {
   ];
 }
 
-function doc({ trips = [TRIP], body = null, fetchedAt = NOW_ISO, hist = history(), focus = null } = {}) {
+function doc({ trips = [TRIP], body = null, fetchedAt = NOW_ISO, hist = history(), focus = null,
+  telemetry = null } = {}) {
   const d = {
     schemaVersion: 1,
     trips,
@@ -206,6 +207,7 @@ function doc({ trips = [TRIP], body = null, fetchedAt = NOW_ISO, hist = history(
       focusedAt: fetchedAt, journey: focus
     };
   }
+  if (telemetry) d.telemetry = telemetry;
   return d;
 }
 
@@ -227,6 +229,7 @@ async function states() {
     now: opts.now || NOW,
     body,
     route: '#/board',
+    events: [],
     ...opts
   });
 
@@ -244,6 +247,7 @@ async function states() {
       now: opts.now || TRANSFER_NOW,
       body,
       route: '#/board',
+      events: opts.events || [],
       after: opts.after,
       expect: opts.expect
     };
@@ -269,6 +273,9 @@ async function states() {
       now: opts.now || TRANSFER_NOW,
       body,
       route: '#/',
+      geo: opts.geo || null,
+      permission: opts.permission,
+      events: opts.events || [opts.focus ? 'shown_focus' : 'shown_predicted'],
       after: opts.after,
       expect: opts.expect
     };
@@ -283,6 +290,8 @@ async function states() {
     now: opts.now || FERRY_NOW,
     body,
     route: opts.route || '#/board',
+    events: opts.events || (opts.route === '#/'
+      ? [opts.focus ? 'shown_focus' : 'shown_predicted'] : []),
     after: opts.after,
     expect: opts.expect
   });
@@ -504,6 +513,7 @@ async function states() {
         journey: opts.focus, by: opts.focusBy || 'focus'
       };
     }
+    if (opts.telemetry) seed.telemetry = opts.telemetry;
     return {
       name,
       seed,
@@ -513,6 +523,8 @@ async function states() {
       route: opts.route || '#/',
       geo: opts.geo || null,
       permission: opts.permission,
+      variant: opts.variant,
+      events: opts.events || [],
       after: opts.after,
       expect: opts.expect
     };
@@ -534,7 +546,85 @@ async function states() {
     expect: { status: 'Running', strip: true, receipt: null, ruleTop: 214.3 }
   });
 
+  const inferredLong = () => {
+    const value = inferred();
+    value.trips = structuredClone(value.trips);
+    value.trips[0].to.name = 'International Airport Station';
+    value.lastOpen = structuredClone(value.lastOpen);
+    value.lastOpen.journey.legDetail.at(-1).to.name = 'International Airport Station';
+    value.journeys = structuredClone(value.journeys);
+    value.journeys[0].legDetail.at(-1).to.name = 'International Airport Station';
+    return value;
+  };
+
   return [
+    home('analytics-predicted-hit', transferJourneys(), {
+      after: `document.querySelectorAll('[data-act="open-trip"]')[0].click(); await sleep(120);`,
+      events: ['shown_predicted', 'hit_predicted']
+    }),
+    home('analytics-predicted-miss', transferJourneys(), {
+      trips: [TRIP_TRANSFER, TRIP],
+      cache: { '200060-215020': departuresBody() },
+      after: `document.querySelectorAll('[data-act="open-trip"]')[1].click(); await sleep(120);`,
+      events: ['shown_predicted', 'miss_predicted']
+    }),
+    home('home-location-panel-later', transferJourneys(), {
+      trips: [TRIP_TRANSFER, TRIP],
+      cache: { '200060-215020': departuresBody() },
+      permission: 'prompt',
+      after: `document.querySelector('[data-act="skip-location"]').click(); await sleep(80);`,
+      events: ['shown_predicted', 'asked_panel', 'later_panel']
+    }),
+    home('analytics-focus', transferJourneys(), {
+      focus: transferJourneys()[0], events: ['shown_focus']
+    }),
+    home('analytics-rapid-focus', transferJourneys(), {
+      after: `document.querySelectorAll('[data-act="open-trip"]')[0].click();
+  await sleep(120);
+  document.querySelectorAll('[data-t="row"]')[0].click();
+  await sleep(120);
+  {
+    const focus = document.querySelector('[data-act="focus"]');
+    focus.click();
+    focus.click();
+    await sleep(160);
+  }`,
+      events: ['shown_predicted', 'hit_predicted', 'hit_predicted', 'shown_focus']
+    }),
+    home('analytics-setup-cancel-hit', transferJourneys(), {
+      after: `document.querySelector('[data-act="new-trip"]').click();
+  await sleep(180);
+  document.querySelector('[data-act="home"]').click();
+  await sleep(180);
+  document.querySelectorAll('[data-act="open-trip"]')[0].click();
+  await sleep(120);`,
+      events: ['shown_predicted', 'shown_setup', 'hit_predicted']
+    }),
+    {
+      name: 'analytics-rapid-save',
+      seed: doc({ trips: [TRIP_TRANSFER], hist: [] }),
+      now: TRANSFER_NOW,
+      route: '#/trips/new',
+      permission: 'denied',
+      events: ['shown_setup', 'saved_setup'],
+      after: `
+  const choose = async (role, text, stop) => {
+    window.fetch = async () => new Response(JSON.stringify({stops: [stop]}), {headers: {'Content-Type': 'application/json'}});
+    const input = document.querySelector('[data-role="' + role + '"]');
+    input.focus();
+    input.value = text;
+    input.dispatchEvent(new Event('input', {bubbles: true}));
+    await sleep(700);
+    document.querySelector('[data-act="pick"]').click();
+    await sleep(40);
+  };
+  await choose('from', 'central', {id: '200060', name: 'Central Station', modes: ['train']});
+  await choose('to', 'parramatta', {id: '215020', name: 'Parramatta Station', modes: ['train']});
+  const save = document.querySelector('[data-act="save"]');
+  save.click();
+  save.click();
+  await sleep(160);`
+    },
     home('home-before', transferJourneys(), { expect: { status: 'Next train' } }),
     home('home-delayed', tighten(transferJourneys()), { expect: { status: 'Next train' } }),
     home('home-cancelled', (() => {
@@ -654,6 +744,7 @@ async function states() {
       now: REVERSE_AT,
       body: reverseBody,
       geo: IX.bondi.location,
+      events: ['shown_predicted', 'shown_home'],
       expect: {
         status: 'At Bondi Junction', strip: false,
         receipt: 'Your days usually start at Rhodes.'
@@ -667,6 +758,7 @@ async function states() {
       now: REVERSE_AT,
       body: reverseBody,
       geo: IX.bondi.location,
+      events: ['shown_predicted', 'shown_home'],
       expect: {
         status: 'At Bondi Junction', strip: false,
         receipt: 'You usually travel from Rhodes.'
@@ -680,6 +772,7 @@ async function states() {
       now: TRANSFER_NOW,
       body: burwoodBody,
       geo: { lat: -33.876235, lon: 151.104762 },
+      events: ['shown_predicted', 'shown_pair'],
       expect: {
         status: 'At Burwood', strip: false, receipt: null,
         sub: 'Just added · 120 m away'
@@ -687,11 +780,24 @@ async function states() {
     }),
     // Seen at Rhodes at 09:15 for the 09:24, and now four kilometres down the
     // line: the app puts the rider back on the train it last showed them.
-    smart('home-inferred', inferred()),
+    smart('home-inferred', {
+      ...inferred(), events: ['shown_predicted', 'entered_inferred', 'shown_inferred']
+    }),
+    smart('home-inferred-a2', {
+      ...inferred(), telemetry: { opens: 5, bucket: 37 }, variant: 'a2',
+      events: ['shown_predicted', 'entered_inferred', 'shown_inferred'],
+      expect: { status: 'Running', strip: true, stripSlot: 'receipt', ruleTop: 258.3 }
+    }),
+    smart('home-inferred-a2-long', {
+      ...inferredLong(), telemetry: { opens: 5, bucket: 37 }, variant: 'a2',
+      events: ['shown_predicted', 'entered_inferred', 'shown_inferred'],
+      expect: { status: 'Running', strip: true, stripSlot: 'receipt', ruleTop: 258.3 }
+    }),
     // ...and the one control that mode has, which opens the familiar sheet on
     // the departure station it already knows.
     smart('setup-redirect', {
       ...inferred(),
+      events: ['shown_predicted', 'entered_inferred', 'shown_inferred', 'change_inferred', 'shown_setup'],
       expect: {},
       after: `
   document.querySelector('[data-act="change-destination"]').click();
@@ -704,6 +810,18 @@ async function states() {
   }
 `
     }),
+    smart('analytics-rapid-change', {
+      ...inferred(),
+      events: ['shown_predicted', 'entered_inferred', 'shown_inferred', 'change_inferred', 'shown_setup'],
+      expect: {},
+      after: `
+  {
+    const change = document.querySelector('[data-act="change-destination"]');
+    change.click();
+    change.click();
+    await sleep(450);
+  }`
+    }),
     // Stepping off four minutes before the timetable says so: the fix ends the
     // trip, and the way back is the only thing left to offer.
     smart('home-arrived', {
@@ -714,6 +832,7 @@ async function states() {
       generatedAt: '2026-09-01T10:04:00+10:00',
       journeys: transferJourneys(),
       geo: IX.bondi.location,
+      events: ['shown_inferred'],
       expect: { status: 'Trip over', strip: true }
     }),
 
@@ -723,6 +842,7 @@ async function states() {
     // phone is and asks only for the other end.
     smart('setup-origin', {
       trips: [], route: '#/setup', geo: IX.rhodes.location,
+      events: ['shown_setup'],
       after: `
   {
     const from = document.querySelector('[data-role="from"]');
@@ -735,6 +855,7 @@ async function states() {
     // prompt on load.
     smart('setup-location-row', {
       trips: [], route: '#/setup', permission: 'prompt',
+      events: ['shown_setup', 'asked_setup'],
       after: `
   {
     const row = [...document.querySelectorAll('[data-act="use-location"]')].find((el) => el.closest('.hm-res'));
@@ -747,6 +868,7 @@ async function states() {
     smart('setup-nearest', {
       trips: [TRIP_TRANSFER_LOCATED, TRIP_CENTRAL_LOCATED],
       route: '#/trips/new', geo: IX.rhodes.location,
+      events: ['shown_setup'],
       after: `
   {
     const group = [...document.querySelectorAll('.hm-grp')].map((el) => el.textContent.trim());
@@ -798,10 +920,16 @@ async function states() {
     board('two-trips', departuresBody(), { trips: [TRIP, TRIP_2] }),
 
     // No cache, no network: the honest nothing-to-show state.
-    { name: 'cold-offline', seed: doc({ trips: [TRIP] }), now: NOW, body: null, offline: true },
+    {
+      name: 'cold-offline', seed: doc({ trips: [TRIP] }), now: NOW, body: null,
+      offline: true, events: ['shown_predicted']
+    },
     // No cache and the first call still in the post: a cold station pair is one
     // to two seconds of TfNSW, and this line is the whole screen for all of it.
-    { name: 'cold-loading', seed: doc({ trips: [TRIP] }), now: NOW, body: null },
+    {
+      name: 'cold-loading', seed: doc({ trips: [TRIP] }), now: NOW, body: null,
+      events: ['shown_predicted']
+    },
 
     /* The short frame, where the board does not fit. Shot before and after a
        scroll: the sixth service has to be reachable, and the footer has to keep
@@ -864,6 +992,7 @@ async function states() {
 
     transfer('focus-returns-home', transferJourneys(), {
       after: `${OPEN_ROW(0)} document.querySelector('[data-act="focus"]').click(); await sleep(160);`,
+      events: ['shown_focus'],
       expect: { status: 'Running' }
     }),
 
@@ -872,6 +1001,7 @@ async function states() {
       generatedAt: '2026-09-01T10:11:00+10:00',
       focus: transferJourneys()[0],
       after: `window.fetch = async () => new Response(${JSON.stringify(JSON.stringify(reverseBody))}, { headers: { 'Content-Type': 'application/json' } }); document.querySelector('[data-act="way-back"]').click(); await sleep(220);`,
+      events: ['shown_focus', 'back_focus'],
       expect: { status: 'Next train' }
     }),
 
@@ -979,12 +1109,16 @@ async function states() {
       expect: {}
     }),
 
-    { name: 'first-run', seed: doc({ trips: [], hist: [] }), now: NOW, route: '#/setup' },
+    {
+      name: 'first-run', seed: doc({ trips: [], hist: [] }), now: NOW, route: '#/setup',
+      events: ['shown_setup', 'asked_setup']
+    },
     {
       name: 'first-run-search-manly',
       seed: doc({ trips: [], hist: [] }),
       now: FERRY_NOW,
       route: '#/setup',
+      events: ['shown_setup', 'asked_setup'],
       type: { role: 'from', text: 'manly' },
       stops: { stops: [{ id: '209573', name: 'Manly Wharf', modes: ['ferry'] }] },
       expect: { copy: ['Manly', 'ferry'] }
@@ -994,6 +1128,7 @@ async function states() {
       seed: doc({ trips: [], hist: [] }),
       now: FERRY_NOW,
       route: '#/setup',
+      events: ['shown_setup', 'asked_setup'],
       type: { role: 'from', text: 'circular' },
       stops: { stops: [{ id: '200020', name: 'Circular Quay', modes: ['train', 'ferry'] }] },
       expect: { copy: ['Circular Quay', 'train · ferry'] }
@@ -1009,6 +1144,7 @@ async function states() {
       },
       now: FERRY_NOW,
       route: '#/setup',
+      events: ['shown_setup', 'asked_setup'],
       type: { role: 'from', text: 'Manly Wharf', reject: true },
       expect: { copy: ['You searched before', 'Manly Wharf'] }
     },
@@ -1017,6 +1153,7 @@ async function states() {
       seed: doc({ trips: [], hist: [] }),
       now: NOW,
       route: '#/setup',
+      events: ['shown_setup', 'asked_setup'],
       type: { role: 'from', text: 'central' }
     },
     // Two characters: too short to ask TfNSW anything worth waiting for, so the
@@ -1026,6 +1163,7 @@ async function states() {
       seed: doc({ trips: [], hist: [] }),
       now: NOW,
       route: '#/setup',
+      events: ['shown_setup', 'asked_setup'],
       type: { role: 'from', text: 'ce', freeze: true }
     },
     // The call is away and nothing has come back yet — up to a second and a
@@ -1035,23 +1173,33 @@ async function states() {
       seed: doc({ trips: [], hist: [] }),
       now: NOW,
       route: '#/setup',
+      events: ['shown_setup', 'asked_setup'],
       type: { role: 'from', text: 'cen', freeze: true }
     },
-    { name: 'desktop', seed: doc({ body: departuresBody() }), now: NOW, body: departuresBody(), size: '1280x800', desktop: true },
+    {
+      name: 'desktop', seed: doc({ body: departuresBody() }), now: NOW,
+      body: departuresBody(), size: '1280x800', desktop: true,
+      events: ['shown_predicted']
+    },
     {
       name: 'desktop-delayed',
       seed: doc({ body: departuresBody({ journeys: delayed }) }),
       now: NOW,
       body: departuresBody({ journeys: delayed }),
       size: '1280x800',
-      desktop: true
+      desktop: true,
+      events: ['shown_predicted']
     },
     {
       ...transfer('desktop-detail', transferJourneys(), { after: OPEN_ROW(0) }),
       size: '1280x800',
       desktop: true
     }
-  ];
+  ].map((state) => ({
+    events: [],
+    ...state,
+    permission: state.permission || (!state.geo && state.seed.trips.length === 0 ? 'prompt' : undefined)
+  }));
 }
 
 /* --- the page script each state runs ------------------------------------- */
@@ -1071,31 +1219,60 @@ function pageScript(state) {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // TRAP 1: freeze the network and abort whatever main.js already asked for.
-  const frozen = () => new Promise(() => {});
-  window.fetch = frozen;
+  const analyticsRequests = [];
+  const analyticsBeacons = [];
+  let fetchImpl = () => new Promise(() => {});
+  const guardedFetch = (input, init) => {
+    const url = String(input && input.url || input || '');
+    if (url.startsWith('https://analytics.jeremyvun.com/')) {
+      analyticsRequests.push({ url, init });
+      return Promise.reject(new TypeError('analytics is disabled in the shooter'));
+    }
+    return fetchImpl(input, init);
+  };
+  Object.defineProperty(window, 'fetch', {
+    configurable: true,
+    get: () => guardedFetch,
+    set: (next) => { fetchImpl = next; }
+  });
+  Object.defineProperty(navigator, 'sendBeacon', {
+    configurable: true,
+    value: (url, body) => {
+      if (String(url).startsWith('https://analytics.jeremyvun.com/')) analyticsBeacons.push({ url, body });
+      return true;
+    }
+  });
   if (t) t.refresh();
   await sleep(40);
 
   if (t) t.now = () => ${state.now};
 
-  ${state.route ? `if (location.hash !== ${JSON.stringify(state.route)}) { location.hash = ${JSON.stringify(state.route)}; await sleep(60); }` : ''}
+  if (location.hash !== ${JSON.stringify(state.route || '#/')}) {
+    location.hash = ${JSON.stringify(state.route || '#/')};
+    await sleep(100);
+  }
+  ${state.variant ? `if (!t.forceVariant('strip-placement', ${JSON.stringify(state.variant)})) throw new Error('could not force strip-placement');` : ''}
+  if (!t || typeof t.resetAnalyticsForTest !== 'function') {
+    throw new Error('the local analytics reset seam is missing');
+  }
+  t.resetAnalyticsForTest();
+  t.state.doc = ${JSON.stringify(state.seed)};
+  localStorage.setItem('trains.v1', JSON.stringify(t.state.doc));
+  t.state.selection = null;
+  t.state.previousOpen = t.state.doc.lastOpen || null;
+  t.state.fix = null;
+  t.state.geoPermission = null;
+  t.state.body = null;
+  t.state.journey = null;
+  t.state.offline = false;
+  t.route();
+  await sleep(${state.geo || state.permission ? state.geoSettleMs || 500 : 180});
 
   ${state.geo || state.permission ? `
-  // The permission and the fix arrived after the load (screenshot.js trap 7),
-  // so nothing has consulted them yet. route() re-runs the controller's whole
-  // location path — permission query, silent fix, useFix — as a fresh open,
-  // which is the only way to reach the answers only that path can produce.
   // Only home holds the index in controller state; the sheet loads its own copy.
   if (${JSON.stringify(state.route || '#/')} === '#/' && !t.state.stations) {
     throw new Error('the station index never loaded: nothing can name where the fix is');
   }
-  // The load already wrote its own lastOpen over the seeded one, and left a
-  // selection behind that would make this open an explicit one.
-  t.state.doc.lastOpen = ${JSON.stringify(state.seed.lastOpen || null)};
-  t.state.selection = null;
-  t.state.fix = null;
-  t.route();
-  await sleep(${state.geoSettleMs || 500});
   ${state.geo && (state.permission || 'granted') === 'granted'
     ? `if (!t.state.fix) throw new Error('the controller took no fix, so no answer on this screen came from one');` : ''}
   ` : ''}
@@ -1434,7 +1611,7 @@ function pageScript(state) {
       return (bright + 0.05) / (dim + 0.05);
     };
     for (const [selector, ratios] of [
-      ['.hm-new', [4.3, 4.83]], ['.hm-strip .q', [8, 8.13]], ['.hm-strip button', [17.6, 17.8]]
+      ['.hm-new', [4.3, 4.83]], ['[data-strip] .q', [8, 8.13]], ['[data-strip] button', [17.6, 17.8]]
     ]) {
       const el = document.querySelector(selector);
       if (!el) continue;
@@ -1447,20 +1624,44 @@ function pageScript(state) {
       }
     }
 
-    /* A3: one 49px line under the heavy rule and above MY TRIPS. */
+    /* A3 is below the rule; A2 uses the receipt slot. */
     const strip = document.querySelector('[data-strip]');
     if (expect.strip === true && !strip) problems.push('the inferred strip is missing');
     if (expect.strip === false && strip) problems.push('the inferred strip is shown on a header that did not guess');
     if (strip) {
       const stripBox = strip.getBoundingClientRect();
-      if (!near(stripBox.height, 49)) problems.push('the strip is ' + round(stripBox.height) + 'px, not 49');
+      const slot = strip.classList.contains('hm-rec-strip') ? 'receipt' : 'below';
+      if (expect.stripSlot && slot !== expect.stripSlot) {
+        problems.push('the inferred control is in the ' + slot + ' slot, not ' + expect.stripSlot);
+      }
       const heavyRule = document.querySelector('.hm-rule');
       const trips = document.querySelector('[data-t="trip-list"]');
-      if (heavyRule && stripBox.top < heavyRule.getBoundingClientRect().bottom - 0.5) {
-        problems.push('the strip is not under the heavy rule');
-      }
-      if (trips && stripBox.bottom > trips.getBoundingClientRect().top + 0.5) {
-        problems.push('the strip is not above the trip list');
+      if (slot === 'below') {
+        if (!near(stripBox.height, 49)) problems.push('the strip is ' + round(stripBox.height) + 'px, not 49');
+        if (heavyRule && stripBox.top < heavyRule.getBoundingClientRect().bottom - 0.5) {
+          problems.push('the strip is not under the heavy rule');
+        }
+        if (trips && stripBox.bottom > trips.getBoundingClientRect().top + 0.5) {
+          problems.push('the strip is not above the trip list');
+        }
+      } else {
+        const question = strip.querySelector('.q');
+        const action = strip.querySelector('button');
+        if (!strip.closest('.hm-hd')) problems.push('the A2 control is outside the receipt slot');
+        if (!question || question.textContent.trim() !== 'Going somewhere else?') {
+          problems.push('the A2 question copy changed');
+        }
+        if (!action || action.textContent.trim() !== 'Change') problems.push('the A2 action copy changed');
+        if (question && getComputedStyle(question).whiteSpace !== 'nowrap') {
+          problems.push('the A2 question can wrap');
+        }
+        if (heavyRule && stripBox.bottom > heavyRule.getBoundingClientRect().top + 0.5) {
+          problems.push('the A2 control crosses the heavy rule');
+        }
+        if (question && action
+          && Math.abs(question.getBoundingClientRect().top - action.getBoundingClientRect().top) > 14) {
+          problems.push('the A2 question and action do not share one line');
+        }
       }
     }
 
@@ -1488,7 +1689,7 @@ function pageScript(state) {
 
     // Metadata may ellipsise, but station names, the strip and its new-row mark may not.
     const markedSub = document.querySelector('.hm-new')?.closest('.hm-sub');
-    const ownCopy = [...document.querySelectorAll('.hm-stn,.hm-nm,.hm-strip .q,.hm-strip button')];
+    const ownCopy = [...document.querySelectorAll('.hm-stn,.hm-nm,[data-strip] button')];
     if (markedSub) ownCopy.push(markedSub);
     for (const name of ownCopy) {
       if (name.scrollWidth > name.clientWidth + 0.5) {
@@ -1581,6 +1782,20 @@ function pageScript(state) {
     if (problems.length) console.error('INVARIANT ' + ${JSON.stringify(state.name)} + ': ' + problems.join('; '));
   } catch (e) { console.error('invariant check failed: ' + e.message); }
 
+  const expectedEvents = ${JSON.stringify(state.events)};
+  const actualEvents = t.analytics.events.map((event) => event.t);
+  if (JSON.stringify(actualEvents) !== JSON.stringify(expectedEvents)) {
+    throw new Error('analytics ledger for ' + ${JSON.stringify(state.name)} + ' is '
+      + JSON.stringify(actualEvents) + ', not ' + JSON.stringify(expectedEvents));
+  }
+  if (localStorage.getItem('trains.analytics.v1') !== null) {
+    throw new Error('analytics queue exists on the local origin');
+  }
+  if (analyticsRequests.length || analyticsBeacons.length) {
+    throw new Error('analytics transport ran on the local origin: fetch=' + analyticsRequests.length
+      + ' beacon=' + analyticsBeacons.length);
+  }
+
   ${state.probe ? `try {
     // Awaited, so a probe that drives the UI can wait for a route change.
     console.warn('PROBE ' + ${JSON.stringify(state.name)} + ' ' + JSON.stringify(await (async () => { ${state.probe} })()));
@@ -1659,7 +1874,7 @@ async function main() {
         args.push('--geo', [state.geo.lat, state.geo.lon, state.geo.speed]
           .filter(Number.isFinite).join(','));
       }
-      const permission = state.permission || (state.geo ? 'granted' : null);
+      const permission = state.permission || (state.geo ? 'granted' : 'denied');
       if (permission) args.push('--geo-permission', permission);
       for (const feature of media) args.push('--media', feature);
       await run(process.execPath, args, env);

@@ -108,10 +108,13 @@ moves through are binding in `docs/contracts/ui.md`.
    are visually distinct and never buried. The past register is decided by
    the data, never by row age: a punctuality claim appears only where there
    are actuals. No "on time" verb — only exceptions are named.
-5. **No ads, no accounts, no tracking.** All personal data (saved trips,
-   history, rides, location fixes) lives on the device. The server never
-   sees who you are. This is a product guarantee, not an implementation
-   detail.
+5. **No ads, no accounts, no tracking.** Saved trips, history, rides and
+   location fixes stay on the device. The app sends anonymous counters to
+   our self-hosted analytics service: which kind of answer the header gave,
+   whether it was acted on, a usage band and an experiment variant. Events
+   contain no device or session identifier, station, trip, coordinate or
+   clock time. Global Privacy Control and Do Not Track disable analytics.
+   The exact vocabulary is in `docs/contracts/analytics.md`.
 6. **Subtraction is the default.** Under "every affordance earns its place",
    iterate by deletion. The round that produced the current design deleted
    REVERSE, EARLIER/NOW, EDIT, the "on time" verb and the focus strip.
@@ -214,12 +217,19 @@ Open Data. Precise interfaces in `docs/contracts/`.
 ```
 Browser (localStorage: trips, history, rides, focus, home, searches, cache)
   ├─ static shell ─────────── service worker, cache-first, VERSION-bumped
+  ├─ anonymous counters ───── shared analytics service, direct cross-origin POST
   └─ fetch /api/v1/... ────── JSON, CDN s-maxage ~30s (shared across users)
                 └─ Go backend (stateless cache/proxy, in-memory TTL cache,
                    single-flight, stale-on-error) ── TfNSW Trip Planner API
 ```
 
 ## Key decisions
+
+- **Anonymous counters, no device profiles** (2026-09-05). Header answer
+  quality is measured by aggregate exposures and actions. Usage bands and
+  occasional open milestones replace identifiers; experiment assignment
+  stays on the device. The first experiment compares inferred correction
+  below the header with the same action in its receipt slot.
 
 - **Thin-client PWA, not htmx** (2026-08-31). Static shell, ES modules, JSON
   API. Chosen because it is the fastest place to iterate a design, for

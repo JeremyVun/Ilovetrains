@@ -11,8 +11,8 @@ verification, not code.
 
 Build audit (2026-09-05): analytics phases 0 and 1 are complete. The
 smart-header dependency is now on main, including storage and controller
-integration. Analytics controller instrumentation and A2 remain unbuilt;
-do not mark phase 2 done on the strength of the ruling-5 module amendment.
+integration. Analytics controller instrumentation and A2 are built and unit-tested.
+The browser verification matrix and production readback remain in progress.
 The header's physical-phone speed observation remains in its own backlog.
 
 The same audit fixed three transport defects: overlapping flushes now share
@@ -23,9 +23,10 @@ accepts an optional `isOnline` function for tests; its browser default checks
 The controller still owns the closed event vocabulary: never pass arbitrary
 data or caller-supplied `u` into `track`.
 
-Verification: all 201 web tests and `go test ./...` pass. Each transport
-regression fails when its corresponding guard is removed. Browser and
-production analytics verification still belong to phases 4 and 5.
+Verification: all 273 web tests and `go test ./...` pass. The first real-client
+flows verify exact event order, setup cancellation, repeated actions and
+zero local analytics requests. Phase 4 owns the remaining size/scheme and
+enabled-host checks; phase 5 owns deployment and authenticated readback.
 
 Global rules for every phase:
 
@@ -137,7 +138,7 @@ and a fake beacon returning `true` then `false`. `sw.test.js` passes with
 `/js/analytics.js` in `SHELL` and `VERSION` bumped. `client-storage.md`
 records the queue key, shape, cap and compaction.
 
-## Phase 2 — instrumenting today's client — DONE marker: `analytics phase 2 done`
+## Phase 2 — instrumenting today's client — DONE: `analytics phase 2 done`
 
 Owns: `web/js/main.js`, `web/js/setup.js`, `web/js/home.js` (the
 `data-t` hooks only if any are needed), `docs/contracts/ui.md` (the
@@ -225,7 +226,7 @@ Gate: `npm test` green; a local drive at `http://localhost:8092` (the
 staying absent (disabled off production). `ui.md` gains the events table
 for home, board, detail and setup as they exist today.
 
-## Phase 3 — smart-header-v2 kinds, the strip and A2 — DONE marker: `analytics phase 3 done`
+## Phase 3 — smart-header-v2 kinds, the strip and A2 — DONE: `analytics phase 3 done`
 
 Starts only after `smart-header-v2` phase 3 is marked done on main;
 verify with the landmark `web/stations.json` and `by:` in

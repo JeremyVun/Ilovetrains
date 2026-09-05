@@ -16,8 +16,9 @@ and API semantics live in `client-storage.md` and `api.md`.
 - The smart header is read-only. It is a section, not a tap target: the
   saved-trip row is the affordance, and the header's own trip carries the same
   `DEPARTURES ›` cue as every other row. A journey the app inferred rather than
-  the user chose carries one control, and it sits below the heavy rule instead
-  of inside the header, so the header stays read-only there too.
+  the user chose carries one control below the heavy rule. While the
+  `strip-placement` experiment runs, variant A2 places that same control in
+  the receipt slot; this is the header's only interactive exception.
 - Tapping a saved-trip row opens that trip's departure board. It records the
   explicit selection and never changes the focused journey; browsing therefore
   never replaces the focused train.
@@ -130,8 +131,15 @@ substitutes for going back.
   the right in the offer-button idiom, a hairline below it, 49px tall with a
   44px tap target. It appears in inferred travel mode only — never above a
   journey the user chose, and never outside travel mode.
+- During `strip-placement`, A2 moves that same question and CHANGE action
+  into the receipt slot and removes the line below the rule. The question
+  stays on one line, ellipsising only if necessary; CHANGE keeps its full
+  44px tap target. At 390×844 the heavy rule is 258px from the top, compared
+  with A3's 214px. Copy and action behavior are identical in both variants.
 - Saved-trip rows are 72px with a `DEPARTURES ›` cue at the right, which the
-  sub line reserves 106px for. The sub line is the status on the focused row,
+  sub line reserves 106px for. Names use 19px type; an overflowing paired
+  name fits down in 0.25px steps to a 16px floor, preserving the row height
+  and full names on the verified long-destination frames. The sub line is the status on the focused row,
   `SHOWN ABOVE` and the distance on the header's own unfocused trip, and the
   distance with the last ride on every other. On the one open where the app
   itself saved the trip it is showing, that row's sub line reads `Just added`
@@ -432,6 +440,27 @@ is the only value that clears 3:1 on T4 and HUN. In the dark scheme, T4, T5,
 T9, CCN and HUN use light ink; the remaining fills use the dark ground,
 including ferry green at 7.21:1.
 
+## Anonymous instrumentation
+
+The fixed event vocabulary and assignment rules are in
+[analytics.md](analytics.md). Screens emit only these categorical counters;
+analytics adds no in-app disclosure or settings.
+
+| Surface | Counters |
+| --- | --- |
+| Home answer | `shown_<kind>`, first-row `hit_<kind>` or `miss_<kind>` |
+| Journey detail | `hit_<kind>` when focusing home's last shown trip and direction |
+| Inferred travel | `entered_inferred`, `change_inferred`, `back_inferred` |
+| Hand-focused return | `back_focus` |
+| Home location panel | `asked_panel`, `granted_panel`, `denied_panel`, `later_panel` |
+| Setup | `shown_setup`, `saved_setup`, `asked_setup`, `granted_setup`, `denied_setup` |
+
+An explicit board selection does not add a home exposure. A row tap followed
+by focusing the same trip adds two hits; later row taps are browsing.
+Silent location fixes do not emit permission outcomes. The first displayed
+answer increments the local open count once; a milestone `opened` event, if
+due, precedes the first `shown_*`.
+
 ## Calibration and verification
 
 The authoritative comps live at `assets/comps/latest/`. It always holds the
@@ -441,7 +470,7 @@ the same change as this contract, and git keeps the history. Every frame in it
 is a `tools/shoot-states.js` shot of the built client, so a frame no state can
 produce is removed rather than left to rot.
 
-The set is thirty-four frames:
+The set is thirty-six frames:
 
 - Board: `board-390x844-hero.png` plus its `past`, `delayed`, `cancelled`,
   `long`, `two-change` and `hero-light` variants, and `board-412x732-hero.png`.
@@ -461,6 +490,8 @@ The set is thirty-four frames:
   variant are inferred travel mode carrying the `Going somewhere else?` line;
   `home-390x844-just-added.png` is the open on which the app saved the pair it
   is showing, marked once in the sub line.
+- Inferred experiment A2: `home-390x844-inferred-a2.png` and
+  `home-390x844-inferred-a2-light.png` put the correction in the receipt slot.
 - Setup: `setup-390x844-origin.png` is the sheet opening with From filled from
   a fix and the destination field focused.
 
@@ -470,8 +501,9 @@ the instrument allows; the header's heavy rule sits 214px from the frame top
 at 390×844 with no receipt, which is what the content-sized block measures;
 a focused journey still shows its boarding cap and pre-departure progress
 marker before it leaves, so `home-390x844-focused-cxl` carries both;
-`home-390x844-inferred` carries the inferred line at 49px with its 48px action,
-and `home-390x844-just-added` the 63px mark inside the sub line's 212px track;
+`home-390x844-inferred` carries the inferred line at 49px with its 48px action;
+its A2 variant has a 44px action and the rule at 258.25px;
+`home-390x844-just-added` carries the 63px mark inside the sub line's 212px track;
 `detail-*-tight` shoots a change shortened by a late first leg,
 so its promoted row reads `5 MIN LATE`.
 

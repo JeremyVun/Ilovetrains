@@ -29,8 +29,8 @@ test('the sheet never prompts for location on load', () => {
   assert.match(boot[1], /permission === 'granted'/, 'a granted one may take the fix');
 });
 
-test('saving carries the redirect, so the sheet can re-enter travel mode', () => {
+test('saving carries the redirect and source, so the controller can attribute the outcome', () => {
   const branch = /if \(action === 'save' && !saveEl\.disabled\) \{([\s\S]*?)\n    \}/.exec(setup);
   assert.ok(branch);
-  assert.match(branch[1], /\}, redirect\);/);
+  assert.match(branch[1], /\}, redirect, fromSource\);/);
 });
