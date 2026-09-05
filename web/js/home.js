@@ -5,7 +5,7 @@ import { esc, figureHtml, shortName, fitStationNames } from './dom.js';
 import {
   focusExpired, focusOf, directionsModel, focusStatus, journeyCancelled
 } from './focus.js';
-import { arrivalMs, departureMs, journeyKey, legsOf } from './journey.js';
+import { arrivalMs, departureMs, departureKey, legsOf } from './journey.js';
 import { clock } from './time.js';
 import { journeyDeviceHtml, clampJourneyBars } from './journeybar.js';
 import { cacheKey, leg } from './storage.js';
@@ -161,7 +161,7 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
       origin: selectedEnds.from,
       destination: selectedEnds.to,
       departureMs: departureMs(activeFocus.journey),
-      journeyKey: journeyKey(activeFocus.journey)
+      journeyKey: departureKey(activeFocus.journey)
     } : null,
     focus: activeFocus,
     status,

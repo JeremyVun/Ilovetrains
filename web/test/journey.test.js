@@ -3,7 +3,7 @@ process.env.TZ = 'Australia/Sydney'; // every clock string the page prints is de
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { journeyDetail, journeyKey, legsOf, TIGHT_CHANGE_MIN } from '../js/journey.js';
+import { journeyDetail, journeyKey, departureKey, legsOf, TIGHT_CHANGE_MIN } from '../js/journey.js';
 import {
   TRANSFER_NOW, TRANSFER_DEPARTED_NOW, transferJourneys, delayLeg, cancelLeg,
   NOW, baseJourneys
@@ -215,4 +215,14 @@ test('the journey key is the pair a delay cannot move', () => {
 
   assert.equal(journeyKey(journey), before);
   assert.equal(before, 'T9|2026-09-01T09:24:18+10:00');
+});
+
+test('a destination redirect matches the first departure across changed connections', () => {
+  const original = transferJourneys()[0];
+  const redirected = structuredClone(original);
+  redirected.legDetail[1].line.name = 'T8';
+  redirected.legDetail[1].departure.scheduled = '2026-09-01T10:00:00+10:00';
+  assert.equal(departureKey(redirected), departureKey(original));
+  redirected.legDetail[0].departure.scheduled = '2026-09-01T09:39:00+10:00';
+  assert.notEqual(departureKey(redirected), departureKey(original));
 });

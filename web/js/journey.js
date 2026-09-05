@@ -51,6 +51,11 @@ export function legsOf(journey, opts = {}) {
     (docs/contracts/client-storage.md): the first leg's line and its
     TIMETABLED departure — the one field a delay cannot move. */
 export function journeyKey(journey) {
+  return departureKey(journey);
+}
+
+// Redirects keep the first service even when their later legs change.
+export function departureKey(journey) {
   const first = legsOf(journey)[0] || {};
   const line = (first.line && first.line.name)
     || (journey && journey.line && journey.line.name) || '';
