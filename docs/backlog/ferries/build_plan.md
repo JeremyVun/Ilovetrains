@@ -165,7 +165,16 @@ server with the key answers `from=<Circular Quay wharf id>&to=<Manly id>`
 with ferry journeys; `from=200080&to=<Manly id>` shows a change whose leg
 detail has one `train` and one `ferry` leg.
 
-## Phase 3 — client colour and words — layout repair verified, owner review pending
+## Phase 3 — client colour and words — typography verification and board design revision
+
+The owner subsequently approved 10% smaller board/detail numerals and
+fixed 12px units. All 274 web tests and 21 real-client captures pass across
+phone sizes, schemes and desktop. Units remain exactly 12px/500 in both
+minute/hour formats, retain state colour, and the old `.21em` mutation
+fails the new size guard. Header/cap design is reopened for the repeated Pyrmont
+Bay Wharf cap and asymmetric endpoint wrapping. The current workshop is
+`/tmp/trains-comps-ferry-board-01`; preserve real boarding distinctions and
+apply an owner-verdict composition before release.
 
 The owner rejected the original distinct-stop screenshot. Commit `45cac58`
 repairs transfer/headsign collisions, full onward service labels, step

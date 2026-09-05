@@ -43,6 +43,10 @@ function journeyGeometryProblems(root = document) {
   }
 
   for (const row of root.querySelectorAll('[data-t="row"]')) {
+    const unit = row.querySelector('.sy-u');
+    if (unit && parseFloat(getComputedStyle(unit).fontSize) < 11.9) {
+      problems.push('countdown unit is smaller than 12px: ' + unit.textContent.trim());
+    }
     const bounds = row.getBoundingClientRect();
     for (const element of row.querySelectorAll('.sy-t, .sy-cap, .sy-pv, [data-pin="a"], [data-transfer-station], .sy-sign')) {
       if (textRects(element, element.classList.contains('sy-sign')).some(({ box }) =>

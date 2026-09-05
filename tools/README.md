@@ -161,6 +161,8 @@ What is checked, with the comp probes the numbers come from:
   each row figure and detail step time ends at `--sy-pad` + `--sy-fig`;
 - the figure fits that column, and our own copy is never ellipsised — an
   upstream headsign may be, but only once it has used the whole row;
+- countdown units stay at least 12px even when an hours figure uses smaller
+  numerals;
 - every change on a row names its station and its boarding platform, inside
   the frame;
 - actual text ranges keep transfer names clear of headsigns, boarding markers

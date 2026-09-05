@@ -4,6 +4,25 @@ Design session 2026-09-05. Rulings are dated and binding; the mechanism is
 what satisfies them. The item is ready to build when "Open questions" is
 empty and `build_plan.md` exists.
 
+## Current board revision — 2026-09-05
+
+1. “The text like min and h are way too tiny, and the minutes number is
+   relatively a bit too big.” The owner approved roughly 10% smaller
+   numerals and fixed 12px units with stronger contrast. Board and promoted
+   detail figures now use 40.5/27.9px on phones and 46.8/36px on desktop;
+   units inherit the figure's state colour at 12px/500 with a 2px gap.
+2. “Pyrmont bay wharf is really long. how would you adjust it? truncate?”
+3. “I already dont like how the top header wraps the destination but not
+   departure station. have a think about how to fix the ui here.”
+
+Header/cap composition is open in `/tmp/trains-comps-ferry-board-01`.
+Every direction must treat both endpoint names consistently and handle a
+named-wharf boarding label without losing useful platform/side facts.
+The public response `/tmp/ferry-pyrmont-doublebay.json`, captured at
+2026-09-05T20:41:23+10:00, confirms the boarding platform is literally
+`Pyrmont Bay Wharf`, equal to the origin. The earlier destination-only
+wrapping rule is superseded by this design review.
+
 ## The owner's words
 
 - "Currently we only do trains. I want to also do metros. it is common for
@@ -290,6 +309,7 @@ place, to satisfy the contract that every service leg is identified.
 
 ## Open questions
 
-None. The owner accepted the shared-stop correction on 2026-09-05.
-Phase-0 findings and fixture provenance are in
+Header/cap composition awaits the current comp verdict. The typography
+change is already approved. The shared-stop correction was accepted on
+2026-09-05. Phase-0 findings and fixture provenance are in
 `docs/references/tfnsw-open-data.md`, “Ferries”.

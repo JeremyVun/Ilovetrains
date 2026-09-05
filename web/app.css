@@ -314,12 +314,12 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
 .sy-fig { grid-column: 1; align-self: center; min-width: 0; text-align: right; }
 .sy-fig .sy-n {
   display: block; white-space: nowrap;
-  font-size: 45px; font-weight: 250; letter-spacing: -.045em; line-height: .84; color: var(--ink);
+  font-size: 40.5px; font-weight: 250; letter-spacing: -.045em; line-height: .84; color: var(--ink);
 }
 .sy-fig .sy-u {
-  font-size: .21em; font-weight: 400; letter-spacing: .01em; padding-left: .03em; color: var(--ink-2);
+  font-size: 12px; line-height: 1; font-weight: 500; letter-spacing: .01em; padding-left: 2px; color: inherit;
 }
-.sy-row.wide .sy-fig .sy-n { font-size: 31px; }
+.sy-row.wide .sy-fig .sy-n { font-size: 27.9px; }
 .sy-fig .sy-st {
   display: block; margin-top: 6px; min-height: 12px; white-space: nowrap;
   font-size: 9px; font-weight: 600; letter-spacing: .13em; text-transform: uppercase; color: var(--ink-3);
@@ -675,8 +675,8 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
   .sy-mast { padding-left: 64px; padding-right: 64px; }
   .sy-tl { width: 100%; }
   body { --sy-pad: 64px; --sy-fig: 120px; --sy-gap: 24px; }
-  .sy-fig .sy-n { font-size: 52px; }
-  .sy-row.wide .sy-fig .sy-n { font-size: 40px; }
+  .sy-fig .sy-n { font-size: 46.8px; }
+  .sy-row.wide .sy-fig .sy-n { font-size: 36px; }
   .hm-c { width: 100%; }
   .hm-c .hm-top, .hm-c .hm-hd, .hm-c .hm-offer, .hm-c .hm-strip, .hm-c .hm-ix,
   .hm-c .hm-bar, .hm-c .hm-ask, .hm-c .hm-mast, .hm-c .hm-sheet {

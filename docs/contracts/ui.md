@@ -242,9 +242,11 @@ substitutes for going back.
   inside 22px page sides; the sides narrow to 18px at ≤375px, and at ≥900px the
   measure opens to 64px sides, a 120px figure column and a 24px gap. The row's
   1px rule is drawn edge to edge of the row rather than inset. The figure is
-  45px, right aligned in its column and vertically centred on the row, its
-  `min` unit at 0.21em, with a 9px uppercase provenance beneath it; a figure
-  too wide for the column drops to 31px. The departure time is 18px, a struck
+  40.5px, right aligned in its column and vertically centred on the row, with
+  a 9px uppercase provenance beneath it; a figure too wide for the column
+  drops to 27.9px. At desktop width these figures are 46.8px and 36px.
+  `min` and `H` stay 12px/500 with a 2px gap, inheriting the figure's colour
+  so scheduled, past and cancelled states retain their distinction. The departure time is 18px, a struck
   scheduled time 13px, the arrival 16px in secondary ink at the right. Beneath
   them sit the 22px journey line — boarding cap, time axis, platform pins — and
   the 13px headsign line.
