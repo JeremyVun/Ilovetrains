@@ -18,6 +18,34 @@ Standing rules for every phase:
 - Copy is only what `design.md` "Copy" records. A string not there is not
   written; it is raised as a question.
 
+## Build status — 2026-09-05 (orchestrator, on owner stop)
+
+Phases 0 and 1 are merged to `main` (`b0049f2`): the baked 386-station
+index, the generator, and the server answering `/api/v1/stops` from it.
+
+Phases 2, 3 and 4 are built and committed on a worktree branch stack
+(`shv2-p2` → `shv2-p3` → `shv2-p4`, tips under `/private/tmp/shv2-p*`) and
+are NOT yet on `main`. Phase 2 (pure client logic) and phase 3 (controller,
+setup, shell) are done, 218 web tests green and a clean 60-state sweep.
+Phase 4 (verification wave) is partway: fixture ids corrected, a
+geolocation seam added to the shooter, the eight new states shot and four
+exemplars added; its contrast probe was found vacuous and the one-line fix
+is committed but the sweep has NOT been re-run, so strip/mark contrast is
+unverified. Phase 5 (closeout) has not started. Full phase-4 detail is under
+its heading below.
+
+Merge is blocked, two ways:
+1. The `metro` design session holds uncommitted edits to
+   `docs/contracts/ui.md`, which the merge touches.
+2. COLLISION: the `ferries` session has edited THIS file and `design.md`
+   (uncommitted, in the shared checkout) to claim it "supplies `stations.js`
+   and its tests" and to add a tier-1 ruling for `here` — "if several
+   qualify, prefer a saved-trip endpoint, then the nearest". Phase 2 already
+   built `web/js/stations.js` with a plain nearest tier 1. Two features now
+   own one module with different tier-1 semantics; this needs an owner
+   decision before either lands. Do not merge `shv2-*` over the ferries
+   `stations.js` without resolving it.
+
 ## Phase 0 — station index and its [verify] — DONE marker: `phase 0 done` commit — DONE 3e74d2d
 
 Owns: `tools/build-stations.js` (new), `web/stations.json` (new),
@@ -90,7 +118,7 @@ says the list is baked, how it is rebuilt (phase 0's command) and that no
 upstream call is made; the "stale window" paragraph loses its stops
 sentence.
 
-## Phase 2 — pure client logic — DONE marker: `phase 2 done`
+## Phase 2 — pure client logic — DONE marker: `phase 2 done` — DONE e91e069
 
 Owns: `web/js/stations.js` (new), `web/js/predict.js`, `web/js/home.js`,
 `web/js/storage.js`, `web/js/focus.js`, their tests, and
@@ -98,7 +126,8 @@ Owns: `web/js/stations.js` (new), `web/js/predict.js`, `web/js/home.js`,
 
 Seams (all pure, deterministic given their arguments):
 
-- `stations.js`: `loadStations()` fetches `/stations.json` once and
+- `stations.js`: the ferries build supplies this module and tests, including
+  the saved-end tie-break inside 200 m; reuse it. `loadStations()` fetches `/stations.json` once and
   resolves to the array (null on failure; the app degrades to the no-`here`
   branch); `nearest(stations, fix, withinKm)` → `{station, km}` or null;
   `here(doc, stations, fix)` → `{station, tier}` or null, tiers exactly as
@@ -171,7 +200,7 @@ and home-station heuristic" replaced by the votes, a new "Travel mode"
 subsection under "Focused journey" with the entry and exit conditions and
 `lastOpen`).
 
-## Phase 3 — controller, setup and shell — DONE marker: `phase 3 done`
+## Phase 3 — controller, setup and shell — DONE marker: `phase 3 done` — DONE e3c38c0
 
 Owns: `web/js/main.js`, `web/js/setup.js`, `web/js/home.js` (markup only,
 if phase 2 left the strip/mark markup to the verdict), `web/app.css`,
@@ -225,7 +254,18 @@ the two rows, no lede), and the location-panel paragraph left as is.
 Then `node tools/shoot-states.js` passes on every existing state (no
 regression) before phase 4 adds states.
 
-## Phase 4 — verification wave — DONE marker: `phase 4 done`
+## Phase 4 — verification wave — DONE marker: `phase 4 done` — IN PROGRESS (stopped 2026-09-05)
+
+Committed on `shv2-p4`: fixture station ids corrected against the index
+(`4f136bf`); a `geo`/`permission` seam in the shooter with the eight new
+states and its README notes (`e0f9db8`); exemplars `home-390x844-inferred`,
+`-inferred-light`, `-just-added` and `setup-390x844-origin` with the `ui.md`
+calibration list and README table updated (`0fde902`); the contrast-probe
+regex fix, unverified (`64cacf8`). Not done: re-run the sweep with the probe
+fix, the measurement/defect report, `measure-open.js`, re-shoot `first-run`
+if its `Use my location` row changed the frame, and the done marker. Resume
+per the notes committed under this heading on the branch.
+
 
 Owns: `tools/shoot-states.js`, `assets/comps/latest/`, `tools/README.md`.
 No product code except fixes for defects this wave finds, each named in
