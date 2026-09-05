@@ -243,8 +243,10 @@ Outside travel mode the header starts where the user is. `locate(doc, now,
 `here` is the station the user is standing at, from the baked station index
 (`web/stations.json`, fetched once per page load, never written to the
 document) and a fix at most 5 minutes old. It is the first of: any index
-station within 200 m; the nearest end of a saved trip within 2 km; the nearest
-index station within 2 km; none. The saved end outranks a nearer stranger so a
+station within 200 m, preferring saved endpoints, then nearest; the nearest
+end of a saved trip within 2 km; the nearest index station within 2 km; none.
+Saved endpoints use the index coordinates when available, falling back to
+the saved snapshot. The saved end outranks a nearer stranger so a
 user whose own origin is a kilometre away is not handed a station they have
 never used. Without the index, or without a fix, there is no `here`.
 

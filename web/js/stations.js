@@ -49,14 +49,16 @@ export function nearest(stations, fix, withinKm) {
 export function here(doc, stations, fix) {
   if (!stations || !fix) return null;
 
-  const standing = nearest(stations, fix, AT_STATION_KM);
-  if (standing) return { station: standing.station, tier: 1 };
-
   const ends = new Map();
   for (const trip of (doc && doc.trips) || []) {
     for (const stop of [trip.from, trip.to]) ends.set(stop.id, stop);
   }
-  const saved = nearest([...ends.values()], fix, NEAR_STATION_KM);
+  const preferred = nearest(stations.filter((station) => ends.has(station.id)), fix, AT_STATION_KM);
+  const standing = preferred || nearest(stations, fix, AT_STATION_KM);
+  if (standing) return { station: standing.station, tier: 1 };
+
+  const indexed = new Map(stations.map((station) => [station.id, station]));
+  const saved = nearest([...ends.values()].map((stop) => indexed.get(stop.id) || stop), fix, NEAR_STATION_KM);
   if (saved) return { station: saved.station, tier: 2 };
 
   const any = nearest(stations, fix, NEAR_STATION_KM);

@@ -141,7 +141,8 @@ Given a fix at most 5 minutes old (`FIX_MAX_AGE_MS`) and the index, `here`
 is the first of:
 
 1. any index station within 200 m (the existing `AT` radius): the user is
-   standing at it, saved or not;
+   standing at it, saved or not. If several qualify, prefer a saved-trip
+   endpoint, then the nearest (ferries ruling, 2026-09-05);
 2. the nearest station that is an end of a saved trip, within 2 km;
 3. the nearest index station within 2 km;
 4. none.

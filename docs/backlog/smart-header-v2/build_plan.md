@@ -18,33 +18,19 @@ Standing rules for every phase:
 - Copy is only what `design.md` "Copy" records. A string not there is not
   written; it is raised as a question.
 
-## Build status — 2026-09-05 (orchestrator, on owner stop)
+## Build status — resumed 2026-09-05
 
-Phases 0 and 1 are merged to `main` (`b0049f2`): the baked 386-station
-index, the generator, and the server answering `/api/v1/stops` from it.
+Phases 0–1 are on main. Phases 2–4 are integrated with current main in
+`shv2-integrate` at `/private/tmp/shv2-integrate`; the analytics storage
+functions and shell entries are preserved. The station helper now uses the
+ferry session's reconciled implementation: saved endpoints win within
+200 m, then distance, and tier 2 resolves saved endpoints against the index
+before falling back to their stored coordinates. Both station test sets
+are retained. No new owner decision is required for the recorded ferry rule.
 
-Phases 2, 3 and 4 are built and committed on a worktree branch stack
-(`shv2-p2` → `shv2-p3` → `shv2-p4`, tips under `/private/tmp/shv2-p*`) and
-are NOT yet on `main`. Phase 2 (pure client logic) and phase 3 (controller,
-setup, shell) are done, 218 web tests green and a clean 60-state sweep.
-Phase 4 (verification wave) is partway: fixture ids corrected, a
-geolocation seam added to the shooter, the eight new states shot and four
-exemplars added; its contrast probe was found vacuous and the one-line fix
-is committed but the sweep has NOT been re-run, so strip/mark contrast is
-unverified. Phase 5 (closeout) has not started. Full phase-4 detail is under
-its heading below.
-
-Merge is blocked, two ways:
-1. The `metro` design session holds uncommitted edits to
-   `docs/contracts/ui.md`, which the merge touches.
-2. COLLISION: the `ferries` session has edited THIS file and `design.md`
-   (uncommitted, in the shared checkout) to claim it "supplies `stations.js`
-   and its tests" and to add a tier-1 ruling for `here` — "if several
-   qualify, prefer a saved-trip endpoint, then the nearest". Phase 2 already
-   built `web/js/stations.js` with a plain nearest tier 1. Two features now
-   own one module with different tier-1 semantics; this needs an owner
-   decision before either lands. Do not merge `shv2-*` over the ferries
-   `stations.js` without resolving it.
+Phase 4 is being verified in `shv2-p4`; controller lifecycle is under review.
+The shared main checkout contains unfinished ferry/metro changes, so landing
+must preserve them. Real-phone speed support remains unobserved.
 
 ## Phase 0 — station index and its [verify] — DONE marker: `phase 0 done` commit — DONE 3e74d2d
 
