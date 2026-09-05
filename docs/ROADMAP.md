@@ -173,9 +173,8 @@ detection via background location, notifications. OS-rendered artifacts
   of *looks*, not rides, and must be named as whatever it really measures.
   Needs ride detection first (M8); the PWA cannot observe it today.
 - General A→B trip planner.
-- Other modes: bus, light rail. Ferries are implemented, with visual review and deployment pending in
-  `docs/backlog/ferries/` (2026-09-05). Metro is not one of them: product
-  class 2 has been served beside class 1 since M1, including train+metro
+- Other modes: bus, light rail. Trains, metro and ferries are served. Metro
+  product class 2 has been served beside class 1 since M1, including train+metro
   changes, and the owner closed a metro item as already built (2026-09-05;
   the copy ruling is in `docs/contracts/ui.md`). Metro loose ends worth a
   live probe when a key is at hand: the only metro fixture answered three

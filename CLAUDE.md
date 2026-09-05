@@ -1,6 +1,6 @@
 # trains_app — ilovetrains
 
-Sydney train and metro clients that answer “What train should I take right
+Sydney train, metro and ferry clients that answer “What train should I take right
 now?” with no account, ads or server-side personal state. The web app is live
 at https://ilovetrains.jeremyvun.com.
 
