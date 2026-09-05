@@ -483,7 +483,7 @@ test('the board balances complete endpoint names and retains the first boarding 
   const html = boardHtml({ trip: source, direction: 'forward', model, nowMs: FERRY_NOW });
 
   assert.match(html, /<h1 class="sy-h1"><b class="endpoint from">Pyrmont Bay Wharf<\/b><span class="conn"><\/span><b class="endpoint to">Double Bay Wharf<\/b><\/h1>/);
-  assert.match(html, /class="sy-cap"[^>]*>Pyrmont Bay Wharf<\/span>/);
+  assert.match(html, /class="sy-cap"[^>]*>Wharf<\/span>/);
   assert.match(html, /aria-label="[^\"]*Pyrmont Bay Wharf · MFF[^\"]*"/,
     'the boarding place also stays in the row accessibility text');
   assert.match(resultRowHtml(model.rows[0], {
@@ -506,7 +506,7 @@ test('the board balances complete endpoint names and retains the first boarding 
     trip: source, direction: 'reverse', model: reverseModel, nowMs: FERRY_NOW
   });
   assert.match(reverseHtml, /class="endpoint from">Double Bay Wharf<\/b>.*class="endpoint to">Pyrmont Bay Wharf<\/b>/);
-  assert.match(reverseHtml, /class="sy-cap"[^>]*>Double Bay Wharf<\/span>/, 'the reverse board retains its own boarding label');
+  assert.match(reverseHtml, /class="sy-cap"[^>]*>Wharf<\/span>/, 'the reverse board retains its own boarding label');
 
   const railTrip = {
     from: { name: 'Rhodes Station' },

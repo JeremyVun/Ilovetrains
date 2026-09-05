@@ -143,20 +143,20 @@ test('a transfer prints each known location when its counterpart is missing', ()
     'a partial rail transfer keeps its established no-marker rendering');
 });
 
-test('the shared device retains full named and numbered boarding caps', () => {
+test('the shared device uses Wharf for unnumbered origins and preserves specific boarding positions', () => {
   const repeated = structuredClone(ferryJourneys()[0]);
   repeated.legDetail[0].from.platform = 'Pyrmont Bay Wharf';
   const originName = '  PYRMONT   bay wharf ';
 
   assert.match(
     journeyDeviceHtml(repeated, { caps: true, originName }).html,
-    /class="sy-cap"[^>]*>Pyrmont Bay Wharf<\/span>/,
-    'the first label stays visible even when it repeats the origin'
+    /class="sy-cap"[^>]*>Wharf<\/span>/,
+    'the first label stays visible for an unnumbered boarding place'
   );
   assert.match(
     journeyDeviceHtml(repeated, { caps: true }).html,
-    /class="sy-cap"[^>]*>Pyrmont Bay Wharf<\/span>/,
-    'a caller without origin context retains the raw boarding label'
+    /class="sy-cap"[^>]*>Wharf<\/span>/,
+    'the unnumbered fallback does not depend on origin context'
   );
 
   const side = journeyDeviceHtml(ferryJourneys()[1], {
@@ -168,7 +168,7 @@ test('the shared device retains full named and numbered boarding caps', () => {
   named.legDetail[0].from.platform = 'Balmain Wharf';
   assert.match(
     journeyDeviceHtml(named, { caps: true, originName: 'Barangaroo Wharf' }).html,
-    /class="sy-cap"[^>]*>Balmain Wharf<\/span>/
+    /class="sy-cap"[^>]*>Wharf<\/span>/
   );
 
   const missing = structuredClone(ferryJourneys()[0]);

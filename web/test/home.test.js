@@ -229,7 +229,7 @@ test('a ferry board drives the home words and every saved-trip colour device', (
   assert.match(html, />Wharf 2, Side A<\/span>/);
 });
 
-test('home retains a full named ferry origin without inventing a wharf number', () => {
+test('home labels an unnumbered ferry origin Wharf without inventing a number', () => {
   const body = ferryBody();
   body.from.name = 'Pyrmont Bay Wharf';
   body.journeys = [structuredClone(body.journeys[0])];
@@ -242,7 +242,7 @@ test('home retains a full named ferry origin without inventing a wharf number', 
   }, body, FERRY_NOW);
   const html = homeHtml(model);
 
-  assert.match(html, /class="sy-cap"[^>]*>Pyrmont Bay Wharf<\/span>/);
+  assert.match(html, /class="sy-cap"[^>]*>Wharf<\/span>/);
   assert.match(html, /data-role="origin"/);
   assert.match(html, /class="hm-stn"[^>]*>Pyrmont Bay Wharf<\/span>/);
 });

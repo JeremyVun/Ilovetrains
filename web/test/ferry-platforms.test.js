@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import { detailHtml } from '../js/detail.js';
 import { directionsModel } from '../js/focus.js';
-import { boardingLabel, journeyDetail, platformChip, transferPlatformChip } from '../js/journey.js';
+import { boardingCapLabel, boardingLabel, journeyDetail, platformChip, transferPlatformChip } from '../js/journey.js';
 import { journeyDeviceHtml } from '../js/journeybar.js';
 import { promotedRow } from '../js/rowmodel.js';
 import { exceptionalFerryJourneys } from './fixture.js';
@@ -34,6 +34,15 @@ test('ferry boarding labels preserve the exceptional values in captured probes',
   assert.equal(boardingLabel('Wharf 3, Side A', 'ferry'), 'Wharf 3, Side A');
   assert.equal(boardingLabel('Side A', 'ferry'), 'Side A');
   assert.equal(boardingLabel('Balmain Wharf', 'ferry'), 'Balmain Wharf');
+  assert.deepEqual([
+    boardingCapLabel('Pyrmont Bay Wharf', 'ferry'),
+    boardingCapLabel('Balmain Wharf', 'ferry'),
+    boardingCapLabel('Wharf 4, Side B', 'ferry'),
+    boardingCapLabel('Wharf 1', 'ferry'),
+    boardingCapLabel('Side A', 'ferry'),
+    boardingCapLabel(null, 'ferry'),
+    boardingCapLabel('Platform 1', 'train')
+  ], ['Wharf', 'Wharf', 'Wharf 4, Side B', 'Wharf 1', 'Side A', '', 'Platform 1']);
   assert.deepEqual([
     platformChip('Wharf 3, Side A'), platformChip('Side A'),
     platformChip('Balmain Wharf'), platformChip('Barangaroo Wharf 2')
@@ -107,8 +116,8 @@ test('captured Pyrmont transfers keep each real side in compact green chips', ()
     caps: true, originName: forward.from.name, changes: forwardDetail.changes, stations: true
   });
 
-  assert.match(forwardDevice.html, /data-role="origin"[^>]*>Pyrmont Bay Wharf<\/span>/,
-    'the first label uses the named boarding location without inventing a number');
+  assert.match(forwardDevice.html, /data-role="origin"[^>]*>Wharf<\/span>/,
+    'an unnumbered first boarding location uses Wharf without inventing a number');
   assert.match(forwardDevice.html,
     /data-ferry-location="Wharf 5, Side B" data-role="alight" data-stop="Circular Quay"[^>]*>5B<\/span>/);
   assert.match(forwardDevice.html,
@@ -141,7 +150,7 @@ test('captured Pyrmont transfers keep each real side in compact green chips', ()
     footer: { dot: 'live', text: 'Live' }
   });
   assert.match(html,
-    /data-ferry-location="Pyrmont Bay Wharf" data-role="origin" data-stop="Pyrmont Bay Wharf"[^>]*>Pyrmont Bay Wharf<\/b>/);
+    /data-ferry-location="Pyrmont Bay Wharf" data-role="origin" data-stop="Pyrmont Bay Wharf"[^>]*>Wharf<\/b>/);
   assert.match(html,
     /data-ferry-location="Wharf 5, Side B" data-role="alight" data-stop="Circular Quay"[^>]*>5B<\/b>/);
   assert.match(html,

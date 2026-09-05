@@ -6,6 +6,7 @@ import { esc } from './dom.js';
 import { resultRowHtml } from './board.js';
 import { chipInk } from './journeybar.js';
 import { lineFill } from './lines.js';
+import { boardingCapLabel } from './journey.js';
 
 export function detailHtml(model) {
   return `
@@ -64,7 +65,7 @@ function chipHtml(chip) {
   const attrs = ferry
     ? ` data-ferry-location="${esc(chip.location)}" data-role="${esc(chip.role)}" data-stop="${esc(chip.stop)}"` : '';
   return `<b class="dchip${full ? ' full-location' : ''}" data-line-code="${esc(chip.code)}"${attrs}${label} style="background:${
-    lineFill(chip.colourKey)};color:${chipInk(chip.colourKey)}">${esc(full ? chip.location : chip.platform)}</b>`;
+    lineFill(chip.colourKey)};color:${chipInk(chip.colourKey)}">${esc(full ? boardingCapLabel(chip.location, 'ferry') : chip.platform)}</b>`;
 }
 
 /* The closing rule answers the masthead's, and the line under it states the

@@ -118,6 +118,12 @@ export function boardingLabel(value, mode) {
   return `${place} ${raw}`;
 }
 
+export function boardingCapLabel(value, mode) {
+  const label = boardingLabel(value, mode);
+  return label && modeWords(mode).place === 'Wharf' && !transferPlatformChip(value, mode)
+    ? 'Wharf' : label;
+}
+
 function lineCode(leg) {
   return (leg && leg.line && leg.line.name) || '';
 }

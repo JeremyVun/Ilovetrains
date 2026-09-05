@@ -188,8 +188,10 @@ substitutes for going back.
   adds that word only when the upstream value needs it. Complete names and
   side-only values remain verbatim: `Wharf 3, Side A`, `Balmain Wharf`, and
   `Side A`, never `Wharf Balmain Wharf` or `Wharf Side A`. These full values
-  remain intact in initial boarding caps, directions and accessibility text.
-  The initial ferry cap uses the full value, such as `Wharf 4, Side A`.
+  remain intact in directions and accessibility text. The initial ferry cap
+  uses the full numbered or side label, such as `Wharf 4, Side A`. When the
+  supplied place has no public number or side, its cap says `Wharf`; it never
+  repeats the stop name or invents `Wharf 1`.
   Transfer chips use the train platform grammar with the side joined to the
   number: `5B` and `2B`. A side-only value uses its side (`B`); a named value
   with no number or side uses an em dash. Both sides retain their full raw
@@ -245,10 +247,11 @@ substitutes for going back.
   is ellipsised. A single word wider than its column wraps within the word
   as a last resort, preserving every character. At widths up to 375px, the type is 24px with a 22px arrow
   and 7px gaps.
-- The first boarding cap shows the full available label in the smart header,
-  result rows and promoted detail row, even when it repeats the origin name.
-  `Pyrmont Bay Wharf` remains a named cap; `Wharf 4, Side A` remains a full
-  numbered cap. Unknown boarding locations stay absent. Ferry transfer pins
+- The first boarding cap stays visible in the smart header, result rows and
+  promoted detail row. An unnumbered ferry place such as `Pyrmont Bay Wharf`
+  displays `Wharf`; `Wharf 4, Side A` remains a full numbered cap. The raw
+  supplied location remains in accessibility text. Unknown boarding locations
+  stay absent. Ferry transfer pins
   use the same compact treatment as rail pins, with the side joined directly
   to the number.
 - The board is a timeline anchored at now. It opens at the anchor, never in the
@@ -375,7 +378,8 @@ substitutes for going back.
   boarding place, then `ARRIVE`, which
   becomes `ARRIVE · JOURNEY CANCELLED` when the final leg is cancelled. The
   boarded leg supplies the place, and its full label keeps the wharf and side
-  together. A ferry's initial step cap uses that full label. Ferry transfer
+  together. A ferry's initial step cap uses the same numbered/side label or
+  unnumbered `Wharf` fallback as the shared journey device. Ferry transfer
   chips use the same compact number-and-side grammar as the board, while the
   secondary boarding direction retains the full label.
 - Every service leg names its line code and headsign. A cancelled leg stays in

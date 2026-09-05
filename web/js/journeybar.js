@@ -3,7 +3,7 @@
    share of the journey at every viewport width. */
 
 import { esc } from './dom.js';
-import { boardingLabel, effective, legsOf, modeWords, platformNumber, transferPlatformChip } from './journey.js';
+import { boardingCapLabel, boardingLabel, effective, legsOf, modeWords, platformNumber, transferPlatformChip } from './journey.js';
 import { colourKey, lineFill } from './lines.js';
 
 const KNOCKOUT = new Set(['T4', 'T5', 'T9', 'CCN', 'HUN']);
@@ -141,9 +141,9 @@ export function journeyDeviceHtml(journey, opts = {}) {
   const spec = journeyBarSpec(journey, opts);
   const first = spec.legs[0] || {};
   const capAttrs = first.mode === 'ferry'
-    ? ` data-ferry-location="${esc(first.fromLabel)}" data-role="origin" data-stop="${esc(first.fromStop)}"` : '';
+    ? ` data-ferry-location="${esc(first.fromLabel)}" data-role="origin" data-stop="${esc(first.fromStop)}" aria-label="${esc(first.fromLabel)}"` : '';
   const cap = opts.showBoardingPlatform === false || !first.fromLabel
-    ? '' : `<span class="sy-cap" data-line-code="${esc(first.code)}"${capAttrs}>${esc(first.fromLabel)}</span>`;
+    ? '' : `<span class="sy-cap" data-line-code="${esc(first.code)}"${capAttrs}>${esc(boardingCapLabel(first.fromRaw, first.mode))}</span>`;
   return {
     spec,
     vars: journeyVars(spec),
