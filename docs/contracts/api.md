@@ -287,16 +287,18 @@ past window has already happened, so its stale window is 24 hours.
 routes always take precedence, and unknown `/api/` paths return the JSON error
 envelope rather than falling through to the file server.
 
-Every static response carries `Cache-Control: no-cache`. Without an explicit
-header, Cloudflare can edge-cache static extensions for hours and delay a
-service-worker update. `no-cache` means revalidate (`Last-Modified` 304s), not
-don't-store; client-side speed comes from the service worker, and `sw.js` must
-never be served stale by a proxy.
+Every static response carries `Cache-Control: no-store`. HTTP caches must
+not combine modules from different releases; the versioned service worker
+explicitly caches the complete shell for fast and offline opens. Production
+Cloudflare rewrote the previous `no-cache` policy to a four-hour browser TTL,
+which allowed a mixed module graph to break a first open. Static requests
+ignore `If-Modified-Since`: source modification times can move backwards
+between builds, so that validator cannot establish identical content.
 
 The client is a PWA, so two of those files are load-bearing:
 `/manifest.webmanifest` must be served as `application/manifest+json` (the
 server registers the type; Go's MIME table does not know it, and a manifest
 served as `text/plain` is not installable), and `/sw.js` must be served from
 the root so its scope covers the whole origin. Neither is cached by the server
-beyond the file server's normal `Last-Modified` handling — the worker's own
-`VERSION` is what governs client-side shell freshness.
+beyond the response itself — the worker's own `VERSION` governs client-side
+shell freshness.

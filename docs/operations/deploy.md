@@ -55,3 +55,8 @@ the new shell.
 Check cached module content as well as the worker version: old HTTP-cached
 assets can otherwise enter a newly named shell cache. Installation reloads
 all shell requests; the cached controller must match the deployed source.
+
+Check static response headers too: `/js/main.js` and `/sw.js` must retain
+`Cache-Control: no-store` through the edge. A cold profile must load the app
+on its first navigation, before a worker-controlled reload can mask stale
+HTTP-cached modules.

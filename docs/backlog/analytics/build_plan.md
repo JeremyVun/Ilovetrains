@@ -13,7 +13,7 @@ Build audit (2026-09-05): analytics phases 0 and 1 are complete. The
 smart-header dependency is now on main, including storage and controller
 integration. Analytics controller instrumentation and A2 are built and unit-tested.
 The browser verification matrix is complete. Deployment succeeded with
-worker v20; protected production readback remains.
+worker v21; protected production readback remains.
 The header's physical-phone speed observation remains in its own backlog.
 
 The same audit fixed three transport defects: overlapping flushes now share
@@ -24,7 +24,7 @@ accepts an optional `isOnline` function for tests; its browser default checks
 The controller still owns the closed event vocabulary: never pass arbitrary
 data or caller-supplied `u` into `track`.
 
-Verification: all 273 web tests and `go test ./...` pass. The first real-client
+Verification: all 274 web tests and `go test ./...` pass. The first real-client
 flows verify exact event order, setup cancellation, repeated actions and
 zero local analytics requests. The required 390×844/412×732 matrix passes
 in both schemes; A2 and its long destination also pass at 360×780. A2
@@ -335,10 +335,10 @@ Gate: `node tools/shoot-states.js` green across the listed states at
 
 ## Phase 5 — deploy and closeout — DEPLOYED; FINAL READBACK PENDING
 
-Implementation commit `f9f2c9d`; multi-architecture registry image
-`sha256:5f6e994fd34133d97d0840f1d4664ea04d3a0671a3ca3c85d781f4914e57bfb6`.
-Deploy job `a892c11ef75884b30a230c6b6e31cccf` succeeded. Production health is
-200, `/sw.js` is v20, and `/js/main.js` matches the verified source SHA-256
+Implementation `f9f2c9d` plus returning-worker fix `e853c5b`; registry image
+`sha256:e9fbb51895c01ca69af44bce22d8675bad80fef06d0bd5de791143778097bbda`.
+Deploy job `70f2e732888e5cca9fc8e3d362ab6a80` succeeded. Production health is
+200, `/sw.js` is v21, and `/js/main.js` matches the verified source SHA-256
 `bdf4ce3fc22cbdae237bb76d6ec8511715249dd83047e13ead5f8860e6e6d940`.
 The protected stats endpoint returns 401. Permission to read only its
 `ANALYTICS_READ_KEY` from the infra analytics secret file has been requested;
@@ -349,8 +349,16 @@ storage, UI, API, project and tool references updated.
 The preserved returning profile caught v20 installing old HTTP-cached
 controller bytes despite the new cache name. v21 reloads every shell request
 on installation. Its executable regression fails with reload mode removed;
-all 274 web tests pass. Repeat the production upgrade check against the same
-profile after redeployment before calling the browser release verified.
+all 274 web tests pass. The preserved profile upgraded to v21 with source-
+identical cached controller bytes; its actual production POST returned 204
+and the persisted queue drained from three events to zero.
+
+A genuinely fresh profile then exposed stale `lines.js` despite Cloudflare
+revalidation: the cached pre-ferry file had a later modification time than
+the replacement, causing a false origin 304. Static responses now use
+`no-store` and ignore `If-Modified-Since`; a behavioral regression recreates
+the backwards timestamp and fails when the guard is removed. All Go tests
+pass. Final cold-start and performance checks await this server redeploy.
 
 Run the `backlog-item` skill's close stage: migrate design.md's
 constraints, vocabulary and reads into the contracts (section 9 lists

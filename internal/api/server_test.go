@@ -810,23 +810,47 @@ func TestStaticFilesAreServedWithoutShadowingTheAPI(t *testing.T) {
 	}
 }
 
-// Without an explicit Cache-Control, Cloudflare edge-caches static extensions
-// for 4h and a deployed service-worker bump does not reach returning phones
-// until it expires (observed live 2026-09-01). no-cache = revalidate; the
-// service worker owns client-side speed.
-func TestStaticFilesCarryNoCache(t *testing.T) {
+func TestStaticFilesCarryNoStore(t *testing.T) {
 	webDir := t.TempDir()
-	for _, name := range []string{"sw.js", "app.css", "index.html"} {
+	for _, name := range []string{"sw.js", "app.css", "index.html", "main.js"} {
 		if err := os.WriteFile(filepath.Join(webDir, name), []byte("x"), 0o600); err != nil {
 			t.Fatalf("writing %s: %v", name, err)
 		}
 	}
 	handler := New(&fakeUpstream{}, webDir).Handler()
 
-	for _, path := range []string{"/sw.js", "/app.css", "/", "/index.html"} {
-		if cc := get(t, handler, path).Header().Get("Cache-Control"); cc != "no-cache" {
-			t.Errorf("GET %s Cache-Control = %q, want no-cache", path, cc)
+	for _, path := range []string{"/sw.js", "/app.css", "/", "/index.html", "/main.js"} {
+		if cc := get(t, handler, path).Header().Get("Cache-Control"); cc != "no-store" {
+			t.Errorf("GET %s Cache-Control = %q, want no-store", path, cc)
 		}
+	}
+}
+
+func TestStaticFilesReplaceNewerCachedModificationTime(t *testing.T) {
+	webDir := t.TempDir()
+	path := filepath.Join(webDir, "main.js")
+	if err := os.WriteFile(path, []byte("old module"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cachedTime := time.Date(2026, 9, 5, 6, 0, 0, 0, time.UTC)
+	if err := os.Chtimes(path, cachedTime, cachedTime); err != nil {
+		t.Fatal(err)
+	}
+	handler := New(&fakeUpstream{}, webDir).Handler()
+	cached := get(t, handler, "/main.js")
+	if err := os.WriteFile(path, []byte("new module"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	builtTime := cachedTime.Add(-time.Hour)
+	if err := os.Chtimes(path, builtTime, builtTime); err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/main.js", nil)
+	req.Header.Set("If-Modified-Since", cached.Header().Get("Last-Modified"))
+	out := httptest.NewRecorder()
+	handler.ServeHTTP(out, req)
+	if out.Code != http.StatusOK || out.Body.String() != "new module" {
+		t.Fatalf("revalidation = %d %q, want 200 with current bytes", out.Code, out.Body.String())
 	}
 }
 
