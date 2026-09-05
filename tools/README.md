@@ -167,9 +167,12 @@ What is checked, with the comp probes the numbers come from:
 - countdown units stay at least 12px even when an hours figure uses smaller
   numerals;
 - every change on a row names its station and its boarding platform, inside
-  the frame;
+  the frame; ferry origins keep the full raw label while compact transfer
+  markers keep their full raw label, role and stop association in data;
 - actual text ranges keep transfer names clear of headsigns, boarding markers
   clear of each other, and step text/chips at least 4px inside their dividers;
+  visible ferry labels stay at least 14px, remain unclipped, and detail keeps
+  the full boarding location visible beside a compact transfer chip;
 - board endpoint names stay inside their title, and change instructions
   visibly name the onward line code;
 - the tight window is painted on the dwell segment alone, never on a ride
@@ -284,7 +287,7 @@ change the produced filename, not the state, so rename by an explicit table and
 then **read every frame**: a stale `OFFLINE` board or a withheld figure is a
 convincing shot of the wrong screen, and so is the wrong route.
 
-The table, all forty frames. `default` means no flags: the state carries its
+The table, all forty-three frames. `default` means no flags: the state carries its
 own size and the dark scheme is unsuffixed.
 
 | Exemplar | State | Invocation |
@@ -313,6 +316,7 @@ own size and the dark scheme is unsuffixed.
 | `detail-412x732-cancelled.png` | `detail-cancelled` | `--size 412x732` |
 | `detail-412x732-long.png` | `detail-long` | `--size 412x732` |
 | `detail-390x844-ferry-pyrmont.png` | `ferry-pyrmont-detail` | default |
+| `detail-390x844-ferry-numeric.png` | `ferry-numeric-detail` | default |
 | `home-390x844-before.png` | `home-before` | default |
 | `home-390x844-change.png` | `home-change` | default |
 | `home-390x844-final.png` | `home-final` | default |
@@ -321,6 +325,8 @@ own size and the dark scheme is unsuffixed.
 | `home-390x844-focused-cxl.png` | `home-focused-cancelled` | default |
 | `home-390x844-late.png` | `home-late` | default |
 | `home-390x844-back.png` | `reverse-real-platforms` | default |
+| `home-390x844-ferry-pyrmont-focused.png` | `ferry-pyrmont-home-focused` | default |
+| `home-390x844-ferry-numeric-focused.png` | `ferry-numeric-home-focused` | default |
 | `home-390x844-before-light.png` | `home-before` | `--media prefers-color-scheme:light` |
 | `home-412x732-change.png` | `home-change` | `--size 412x732` |
 | `home-390x844-inferred.png` | `home-inferred` | default |
@@ -329,6 +335,12 @@ own size and the dark scheme is unsuffixed.
 | `home-390x844-inferred-a2-light.png` | `home-inferred-a2` | `--media prefers-color-scheme:light` |
 | `home-390x844-just-added.png` | `home-here-pair` | default |
 | `setup-390x844-origin.png` | `setup-origin` | default |
+
+The focused Pyrmont state selects its captured 22:11 journey, whose Circular
+Quay transfer is `5B` to `4B`; the reverse focused state uses `5B` to `5A`.
+`ferry-numeric-home-focused` and `ferry-numeric-detail` select the captured
+Circular Quay departure from `Wharf 4, Side B` so the full initial label is
+calibrated separately from compact transfer markers.
 
 `docs/contracts/ui.md` lists the set; the directory holds it and nothing else,
 so a frame no state can produce is removed rather than left to rot.

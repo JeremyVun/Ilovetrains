@@ -510,7 +510,7 @@ the same change as this contract, and git keeps the history. Every frame in it
 is a `tools/shoot-states.js` shot of the built client, so a frame no state can
 produce is removed rather than left to rot.
 
-The set is forty frames:
+The set is forty-three frames:
 
 - Board: `board-390x844-hero.png` plus its `past`, `delayed`, `cancelled`,
   `long`, `two-change` and `hero-light` variants, and `board-412x732-hero.png`.
@@ -518,20 +518,27 @@ The set is forty frames:
 - Ferry board: `board-390x844-ferry-pyrmont.png`,
   `board-390x844-ferry-doublebay.png` and `board-390x844-ferry-numeric.png`
   preserve the equal-column header, exact repeated-origin cap omission in
-  both directions, and full numeric/side caps respectively.
+  both directions, compact transfer number/side markers with their true
+  alight/board associations, and full initial numeric/side caps respectively.
 - Journey detail: `detail-390x844-hero.png` plus its `tight`, `cancelled`,
   `direct`, `long`, `departed`, `focused` and `hero-light` variants, and
   `detail-412x732-hero.png` with its `tight`, `cancelled` and `long` variants.
   `departed` is the post-departure promoted row under `TO CHANGE`; `focused` is
   the already-focused journey, which carries no action rail.
 - Ferry detail: `detail-390x844-ferry-pyrmont.png` carries the same omitted
-  redundant cap while retaining the full origin and boarding instructions.
+  redundant cap, the compact `5B` to `4B` transfer and its full secondary
+  boarding instruction. `detail-390x844-ferry-numeric.png` preserves the full
+  initial `Wharf 4, Side B` cap.
 - Smart home and directions: `home-390x844-before.png` plus `change`, `final`,
   `tight`, `cxl`, `focused-cxl`, `late`, `back` and `before-light`, and
   `home-412x732-change.png`. `tight` is a late unfocused lead, `cxl` the
   unfocused cancelled lead, `focused-cxl` a focused journey cancelled before it
   departs, `late` the `RUNNING LATE` treatment, and `back` the return direction
   with its real transfer platforms after the offer is accepted.
+- Ferry smart home: `home-390x844-ferry-pyrmont-focused.png` calibrates the
+  compact `5B` to `4B` transfer with its redundant named origin omitted;
+  `home-390x844-ferry-numeric-focused.png` calibrates the full initial
+  `Wharf 4, Side B` cap.
 - Location-first home: `home-390x844-inferred.png` and its `inferred-light`
   variant are inferred travel mode carrying the `Going somewhere else?` line;
   `home-390x844-just-added.png` is the open on which the app saved the pair it

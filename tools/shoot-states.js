@@ -239,6 +239,19 @@ async function states() {
   const pyrmontDoubleBayBody = readFixture('departures_pyrmont_doublebay.json');
   const doubleBayPyrmontBody = readFixture('departures_doublebay_pyrmont.json');
   const circularQuayManlyBody = readFixture('departures_circularquay_manly.json');
+  const loc = (role, stop, raw, visible = raw) => `${role}|${stop}|${raw}|${visible}`;
+  const pyrmontRows = [
+    [loc('alight', 'Circular Quay', 'Wharf 4, Side B', '4B'), loc('board', 'Circular Quay', 'Wharf 4, Side B', '4B')],
+    [loc('alight', 'Circular Quay', 'Wharf 5, Side B', '5B'), loc('board', 'Circular Quay', 'Wharf 4, Side B', '4B')],
+    [loc('alight', 'Circular Quay', 'Wharf 5, Side B', '5B'), loc('board', 'Circular Quay', 'Wharf 2, Side B', '2B')],
+    [loc('alight', 'Circular Quay', 'Wharf 5, Side B', '5B'), loc('board', 'Circular Quay', 'Wharf 2, Side B', '2B')]
+  ];
+  const doubleBayRows = [
+    [loc('alight', 'Circular Quay', 'Wharf 5, Side B', '5B'), loc('board', 'Circular Quay', 'Wharf 5, Side A', '5A')],
+    [loc('alight', 'Circular Quay', 'Wharf 4, Side A', '4A'), loc('board', 'Circular Quay', 'Wharf 5, Side A', '5A')],
+    [loc('alight', 'Circular Quay', 'Wharf 4, Side A', '4A'), loc('board', 'Circular Quay', 'Wharf 5, Side B', '5B')],
+    [loc('alight', 'Circular Quay', 'Wharf 5, Side A', '5A'), loc('board', 'Circular Quay', 'Wharf 5, Side B', '5B')]
+  ];
 
   const board = (name, body, opts = {}) => ({
     name,
@@ -1052,6 +1065,7 @@ async function states() {
         boardHeader: ['Pyrmont Bay Wharf', 'Double Bay Wharf'],
         equalHeaderLines: true,
         caps: [],
+        ferryLocations: pyrmontRows.flat(),
         copy: ['Circular Quay'],
         accessibleCopy: ['Pyrmont Bay Wharf'],
         ferryCodes: ['F4', 'F7']
@@ -1064,6 +1078,7 @@ async function states() {
         boardHeader: ['Double Bay Wharf', 'Pyrmont Bay Wharf'],
         equalHeaderLines: true,
         caps: [],
+        ferryLocations: doubleBayRows.flat(),
         copy: ['Circular Quay'],
         accessibleCopy: ['Double Bay Wharf'],
         ferryCodes: ['F7', 'F4']
@@ -1075,28 +1090,130 @@ async function states() {
       expect: {
         boardHeader: ['Circular Quay', 'Manly Wharf'],
         caps: ['Wharf 4, Side A', 'Wharf 4, Side B', 'Wharf 4, Side A', 'Wharf 4, Side A'],
+        ferryLocations: ['A', 'B', 'A', 'A'].map((side) => loc('origin', 'Circular Quay', `Wharf 4, Side ${side}`)),
         ferryCodes: ['F1']
+      }
+    }),
+    ferry('ferry-pyrmont-home', pyrmontDoubleBayBody, {
+      trip: TRIP_PYRMONT_DOUBLE_BAY,
+      route: '#/',
+      now: Date.parse(pyrmontDoubleBayBody.generatedAt),
+      expect: {
+        status: 'Next ferry',
+        caps: [],
+        ferryLocations: pyrmontRows[0],
+        ferryCodes: ['F4', 'F7']
+      }
+    }),
+    ferry('ferry-pyrmont-home-focused', pyrmontDoubleBayBody, {
+      trip: TRIP_PYRMONT_DOUBLE_BAY,
+      route: '#/',
+      now: Date.parse(pyrmontDoubleBayBody.generatedAt),
+      focus: pyrmontDoubleBayBody.journeys[1],
+      expect: {
+        status: 'Running',
+        caps: [],
+        ferryLocations: pyrmontRows[1],
+        ferryCodes: ['F4', 'F7']
+      }
+    }),
+    ferry('ferry-numeric-home', circularQuayManlyBody, {
+      trip: TRIP_FERRY,
+      route: '#/',
+      now: Date.parse(circularQuayManlyBody.generatedAt),
+      expect: {
+        status: 'Next ferry',
+        caps: ['Wharf 4, Side A'],
+        ferryLocations: [loc('origin', 'Circular Quay', 'Wharf 4, Side A')],
+        ferryCodes: ['F1']
+      }
+    }),
+    ferry('ferry-numeric-home-focused', circularQuayManlyBody, {
+      trip: TRIP_FERRY,
+      route: '#/',
+      now: Date.parse(circularQuayManlyBody.generatedAt),
+      focus: circularQuayManlyBody.journeys[1],
+      expect: {
+        status: 'Running',
+        caps: ['Wharf 4, Side B'],
+        ferryLocations: [loc('origin', 'Circular Quay', 'Wharf 4, Side B')],
+        ferryCodes: ['F1']
+      }
+    }),
+    ferry('ferry-doublebay-home', doubleBayPyrmontBody, {
+      trip: TRIP_DOUBLE_BAY_PYRMONT,
+      route: '#/',
+      now: Date.parse(doubleBayPyrmontBody.generatedAt),
+      expect: {
+        status: 'Next ferry',
+        caps: [],
+        ferryLocations: doubleBayRows[0],
+        ferryCodes: ['F7', 'F4']
+      }
+    }),
+    ferry('ferry-doublebay-home-focused', doubleBayPyrmontBody, {
+      trip: TRIP_DOUBLE_BAY_PYRMONT,
+      route: '#/',
+      now: Date.parse(doubleBayPyrmontBody.generatedAt),
+      focus: doubleBayPyrmontBody.journeys[0],
+      expect: {
+        status: 'Running',
+        caps: [],
+        ferryLocations: doubleBayRows[0],
+        ferryCodes: ['F7', 'F4']
       }
     }),
     ferry('ferry-pyrmont-detail', pyrmontDoubleBayBody, {
       trip: TRIP_PYRMONT_DOUBLE_BAY,
       now: Date.parse(pyrmontDoubleBayBody.generatedAt),
-      after: OPEN_ROW(0),
+      after: OPEN_ROW(1),
       expect: {
         rail: true,
+        compactPromoted: true,
         caps: [],
+        ferryLocations: [
+          ...pyrmontRows[1],
+          loc('origin', 'Pyrmont Bay Wharf', 'Pyrmont Bay Wharf'),
+          ...pyrmontRows[1],
+          loc('arrival', 'Double Bay Wharf', 'Double Bay Wharf', '—')
+        ],
+        boardingLocations: ['Wharf 4, Side B'],
         copy: ['Pyrmont Bay Wharf', 'Double Bay Wharf', 'Take this ferry'],
         accessibleCopy: ['Pyrmont Bay Wharf'],
         ferryCodes: ['F4', 'F7']
       }
     }),
-    ferry('ferry-numeric-detail', circularQuayManlyBody, {
-      trip: TRIP_FERRY,
-      now: Date.parse(circularQuayManlyBody.generatedAt),
+    ferry('ferry-doublebay-detail', doubleBayPyrmontBody, {
+      trip: TRIP_DOUBLE_BAY_PYRMONT,
+      now: Date.parse(doubleBayPyrmontBody.generatedAt),
       after: OPEN_ROW(0),
       expect: {
         rail: true,
-        caps: ['Wharf 4, Side A'],
+        compactPromoted: true,
+        caps: [],
+        ferryLocations: [
+          ...doubleBayRows[0],
+          loc('origin', 'Double Bay Wharf', 'Double Bay Wharf'),
+          ...doubleBayRows[0],
+          loc('arrival', 'Pyrmont Bay Wharf', 'Pyrmont Bay Wharf', '—')
+        ],
+        boardingLocations: ['Wharf 5, Side A'],
+        copy: ['Double Bay Wharf', 'Pyrmont Bay Wharf', 'Take this ferry'],
+        ferryCodes: ['F7', 'F4']
+      }
+    }),
+    ferry('ferry-numeric-detail', circularQuayManlyBody, {
+      trip: TRIP_FERRY,
+      now: Date.parse(circularQuayManlyBody.generatedAt),
+      after: OPEN_ROW(1),
+      expect: {
+        rail: true,
+        caps: ['Wharf 4, Side B'],
+        ferryLocations: [
+          loc('origin', 'Circular Quay', 'Wharf 4, Side B'),
+          loc('origin', 'Circular Quay', 'Wharf 4, Side B'),
+          loc('arrival', 'Manly Wharf', 'Wharf 1', '1')
+        ],
         copy: ['Circular Quay', 'Manly Wharf', 'Take this ferry'],
         ferryCodes: ['F1']
       }
@@ -1139,9 +1256,20 @@ async function states() {
       after: OPEN_ROW(0),
       expect: {
         rail: true,
+        compactPromoted: true,
         copy: ['Side A', 'Balmain Wharf', 'Take this ferry'],
         notCopy: ['Wharf Side A', 'Wharf Balmain Wharf'],
-        detailChips: ['1', '—', '—', '—'],
+        detailChips: ['Wharf 1, Side B', 'A', 'A', '—'],
+        ferryLocations: [
+          loc('origin', 'Barangaroo Wharf', 'Wharf 1, Side B'),
+          loc('alight', 'Cockatoo Island Wharf', 'Side A', 'A'),
+          loc('board', 'Cockatoo Island Wharf', 'Side A', 'A'),
+          loc('origin', 'Barangaroo Wharf', 'Wharf 1, Side B'),
+          loc('alight', 'Cockatoo Island Wharf', 'Side A', 'A'),
+          loc('board', 'Cockatoo Island Wharf', 'Side A', 'A'),
+          loc('arrival', 'Balmain Wharf', 'Balmain Wharf', '—')
+        ],
+        boardingLocations: ['Side A'],
         aria: ['Side A · F8', 'Balmain Wharf · F8'],
         ferryCodes: ['F3', 'F8']
       }
@@ -1149,7 +1277,15 @@ async function states() {
     ferry('mixed-board', mixedBody(), {
       trip: TRIP_MIXED,
       now: Date.parse('2026-09-05T15:25:00+10:00'),
-      expect: { copy: ['Circular Quay'], aria: ['Wharf 2, Side A · MFF'], ferryCodes: ['MFF', 'F1'] }
+      expect: {
+        copy: ['Circular Quay'],
+        aria: ['Wharf 2, Side A · MFF'],
+        ferryLocations: [
+          loc('board', 'Circular Quay', 'Wharf 2, Side A', '2A'),
+          loc('board', 'Circular Quay', 'Wharf 3, Side A', '3A')
+        ],
+        ferryCodes: ['MFF', 'F1']
+      }
     }),
     ferry('mixed-detail', mixedBody(), {
       trip: TRIP_MIXED,
@@ -1157,8 +1293,15 @@ async function states() {
       after: OPEN_ROW(1),
       expect: {
         rail: true,
+        compactPromoted: true,
         copy: ['arrives 16:07', 'Board F1 · Manly', 'Wharf 3, Side A', 'Take this train'],
         aria: ['Wharf 3, Side A · F1'],
+        ferryLocations: [
+          loc('board', 'Circular Quay', 'Wharf 3, Side A', '3A'),
+          loc('board', 'Circular Quay', 'Wharf 3, Side A', '3A'),
+          loc('arrival', 'Manly Wharf', 'Wharf 1', '1')
+        ],
+        boardingLocations: ['Wharf 3, Side A'],
         ferryCodes: ['F1']
       }
     }),
@@ -1405,7 +1548,7 @@ function pageScript(state) {
 
       // Long transfer instructions may expand a promoted row.
       const height = promoted ? 100 : 96;
-      const canGrow = promoted && row.classList.contains('change');
+      const canGrow = promoted && row.classList.contains('change') && !expect.compactPromoted;
       if (canGrow ? box.height < height - 0.5 : !near(box.height, height)) {
         problems.push('the row is ' + round(box.height) + 'px, not the ledger’s ' + height);
       }
@@ -1656,12 +1799,111 @@ function pageScript(state) {
             problems.push('board endpoints use ' + lines.join('/') + ' lines, not the same count');
           }
         }
+        const textBounds = endpoints.map((node) => {
+          const range = document.createRange();
+          range.selectNodeContents(node);
+          const boxes = [...range.getClientRects()];
+          return {
+            left: Math.min(...boxes.map((box) => box.left)),
+            right: Math.max(...boxes.map((box) => box.right)),
+            top: Math.min(...boxes.map((box) => box.top)),
+            bottom: Math.max(...boxes.map((box) => box.bottom))
+          };
+        });
+        const sharesLine = Math.min(textBounds[0].bottom, textBounds[1].bottom)
+          > Math.max(textBounds[0].top, textBounds[1].top);
+        if (sharesLine && textBounds[1].left - textBounds[0].right < 8) {
+          problems.push('board endpoint text has no readable connector gap');
+        }
       }
     }
     if (Array.isArray(expect.caps)) {
       const caps = [...document.querySelectorAll('.sy-cap')].map((node) => node.textContent.trim());
       if (caps.join('/') !== expect.caps.join('/')) {
         problems.push('boarding caps are ' + caps.join('/') + ', not ' + expect.caps.join('/'));
+      }
+    }
+    const ferryLocations = [...document.querySelectorAll('[data-ferry-location]')];
+    for (const location of ferryLocations) {
+      const box = location.getBoundingClientRect();
+      const range = document.createRange();
+      range.selectNodeContents(location);
+      const textBoxes = [...range.getClientRects()];
+      const anchor = location.closest('.sy-p');
+      if (!location.dataset.role || !location.dataset.stop) {
+        problems.push('a visible ferry location has no stop/role association: ' + location.textContent.trim());
+      }
+      if (!location.dataset.ferryLocation) {
+        problems.push('a visible ferry location has no full raw label: ' + location.textContent.trim());
+      }
+      const isTransfer = location.dataset.role === 'alight' || location.dataset.role === 'board';
+      const fontSize = px(getComputedStyle(location).fontSize);
+      if (isTransfer && !location.classList.contains('dchip')
+        ? fontSize < 14 - 0.1
+        : !near(fontSize, 14, 0.1)) {
+        problems.push('ferry location type is ' + getComputedStyle(location).fontSize
+          + (isTransfer ? ', below the 14px floor' : ', not 14px'));
+      }
+      if (box.width < 1 || box.height < 1 || box.left < -0.5 || box.right > innerWidth + 0.5
+          || textBoxes.some((textBox) => textBox.left < box.left - 0.5 || textBox.right > box.right + 0.5
+            || textBox.top < box.top - 0.5 || textBox.bottom > box.bottom + 0.5)) {
+        problems.push('ferry location is clipped or outside the frame: ' + location.textContent.trim());
+      }
+      for (let parent = location.parentElement; parent && parent !== document.body; parent = parent.parentElement) {
+        const overflow = getComputedStyle(parent).overflowX;
+        const parentBox = parent.getBoundingClientRect();
+        if (overflow !== 'visible' && textBoxes.some((textBox) =>
+          textBox.left < parentBox.left - 0.5 || textBox.right > parentBox.right + 0.5)) {
+          problems.push('ferry location is clipped by its container: ' + location.textContent.trim());
+          break;
+        }
+      }
+      if (anchor) {
+        const marker = anchor.getBoundingClientRect();
+        const markerX = marker.left + marker.width / 2;
+        if (markerX < box.left - 0.5 || markerX > box.right + 0.5) {
+          problems.push('ferry location moved off its time-axis marker: ' + location.textContent.trim());
+        }
+      }
+    }
+    if (Array.isArray(expect.ferryLocations)) {
+      const actual = ferryLocations.map((node) => [
+        node.dataset.role, node.dataset.stop, node.dataset.ferryLocation, node.textContent.trim()
+      ].join('|'));
+      if (actual.join('/') !== expect.ferryLocations.join('/')) {
+        problems.push('visible ferry locations are ' + actual.join('/')
+          + ', not ' + expect.ferryLocations.join('/'));
+      }
+    }
+    if (Array.isArray(expect.boardingLocations)) {
+      const actual = [...document.querySelectorAll('[data-boarding-location]')].map((node) => {
+        const box = node.getBoundingClientRect();
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        const textBoxes = [...range.getClientRects()];
+        if (box.width < 1 || box.height < 1 || textBoxes.length === 0
+            || textBoxes.some((textBox) => textBox.left < box.left - 0.5 || textBox.right > box.right + 0.5
+              || textBox.top < box.top - 0.5 || textBox.bottom > box.bottom + 0.5)) {
+          problems.push('the full boarding location is not visibly contained: ' + node.dataset.boardingLocation);
+        }
+        if (!node.textContent.includes(node.dataset.boardingLocation)) {
+          problems.push('the full boarding location is not visible: ' + node.dataset.boardingLocation);
+        }
+        return node.dataset.boardingLocation;
+      });
+      if (actual.join('/') !== expect.boardingLocations.join('/')) {
+        problems.push('secondary boarding locations are ' + actual.join('/')
+          + ', not ' + expect.boardingLocations.join('/'));
+      }
+    }
+    if (Array.isArray(expect.ferryCodes)) {
+      const codes = new Set(expect.ferryCodes);
+      for (const device of document.querySelectorAll('.sy-cap[data-line-code],.sy-p[data-line-code],.dchip[data-line-code]')) {
+        if (!codes.has(device.dataset.lineCode) || !device.textContent.trim()) continue;
+        if (device.classList.contains('sy-p') && device.querySelector('[data-ferry-location]')) continue;
+        if (!device.hasAttribute('data-ferry-location')) {
+          problems.push('ferry device still uses a non-location label: ' + device.textContent.trim());
+        }
       }
     }
     if (Array.isArray(expect.copy)) {

@@ -48,7 +48,7 @@ function journeyGeometryProblems(root = document) {
       problems.push('countdown unit is smaller than 12px: ' + unit.textContent.trim());
     }
     const bounds = row.getBoundingClientRect();
-    for (const element of row.querySelectorAll('.sy-t, .sy-cap, .sy-pv, [data-pin="a"], [data-transfer-station], .sy-sign')) {
+    for (const element of row.querySelectorAll('.sy-t, .sy-cap, .sy-pv, [data-pin="a"], [data-ferry-location], [data-transfer-station], .sy-sign')) {
       if (textRects(element, element.classList.contains('sy-sign')).some(({ box }) =>
         box.top < bounds.top - 0.5 || box.bottom > bounds.bottom + 0.5)) {
         problems.push('journey text escapes its row: ' + element.textContent.trim());
@@ -60,7 +60,8 @@ function journeyGeometryProblems(root = document) {
         problems.push('transfer name overlaps the headsign: ' + label.textContent.trim());
       }
     }
-    const devices = [...row.querySelectorAll('.sy-cap, .sy-p')]
+    const devices = [...row.querySelectorAll('.sy-cap, .sy-p, [data-ferry-location]')]
+      .filter((element) => !(element.classList.contains('sy-p') && element.querySelector('[data-ferry-location]')))
       .map((element) => ({ element, box: element.getBoundingClientRect() }))
       .filter(({ box }) => visible(box));
     for (let i = 0; i < devices.length; i++) {
@@ -70,7 +71,8 @@ function journeyGeometryProblems(root = document) {
             + devices[i].element.textContent.trim() + ' / ' + devices[j].element.textContent.trim());
         }
         const cap = [devices[i], devices[j]].find(({ element }) => element.classList.contains('sy-cap'));
-        const pin = [devices[i], devices[j]].find(({ element }) => element.matches('.sy-p[data-clamped="1"]'));
+        const pin = [devices[i], devices[j]].find(({ element }) =>
+          element.matches('.sy-p[data-clamped="1"]') || element.closest('.sy-p[data-clamped="1"]'));
         if (cap && pin && Math.abs(cap.box.right - pin.box.left) <= 1
           && Math.min(cap.box.bottom, pin.box.bottom) > Math.max(cap.box.top, pin.box.top)
           && !hasSeparator(pin.element)) {
