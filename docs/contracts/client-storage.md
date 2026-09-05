@@ -78,9 +78,11 @@ read/write atomic and migration simple):
   only while analytics is enabled (the production origin, no Global Privacy
   Control, no Do Not Track), only by `web/js/analytics.js` and only through
   the normal document update. A malformed value is dropped whole and starts
-  again. The counts themselves never leave the device: the only thing derived
-  from them that does is the word `new` (three opens or fewer) or `ret`, and
-  the experiment arm the bucket selects.
+  again. The counts themselves never leave the device: analytics derives only
+  the usage bands `1`, `2-5`, `6-10`, `11-15`, `16-20`, `21-25`, `26-30`,
+  `31-35`, `36-40`, `41-45`, `46-50`, and `51+`; `opened` also carries a
+  milestone only when the count is 1, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100,
+  150, 200, or 250. The bucket selects the experiment arm.
 - A station's optional `location` is captured from `/api/v1/stops` at save
   time. Trips without coordinates are backfilled lazily by stop id. Missing
   coordinates disable only the location term.
@@ -93,26 +95,30 @@ user's and an event must never rewrite `trains.v1`:
 
 ```json
 {"queue": [{"t": "shown_predicted",
-            "d": {"u": "new", "x.strip-placement": "a3"}, "n": 5}]}
+            "d": {"u": "6-10", "x.strip-placement": "a3"}, "n": 5}]}
 ```
 
 - Written only while analytics is enabled; on any other origin nothing is
   stored, no request is made, and every experiment answers with its control
-  arm. A malformed value is treated as an empty queue.
+  arm. A malformed value or entry is treated as an empty queue. Known-offline
+  flushes preserve the queue without calling fetch or beacon.
 - `t` is an event name, `d` its dimensions, `n` how many times it happened.
   An event whose `t` and `d` match a queued entry increments `n` instead of
   appending, so a week offline is a few dozen entries however many opens it
   held.
 - Capped at 200 entries, oldest dropped.
 - A flush posts the queue as one JSON array to the analytics service, each
-  entry gaining `"p": "ilovetrains"`. Entries clear only on a 2xx, and only
-  the counts that were sent: anything recorded during the request survives.
+  entry gaining `"p": "ilovetrains"`. Fetches clear sent counts only on a
+  2xx; an accepted page-leave beacon clears them when the browser queues it.
+  Overlapping flush triggers share one in-flight fetch, and anything
+  recorded during that request survives.
   These counters are the one thing on the device that is sent anywhere, and
   they never go to this app's server.
-- `d` carries at most the user class `u`, a running experiment's variant
-  `x.<experiment>` and a source word `f`. Never a station, coordinate, trip,
-  line, clock time, journey or anything typed into a field. A new event name
-  or dimension value is a change to this contract, not a build decision.
+- `d` carries at most three keys: the usage band `u`, a running experiment's
+  variant `x.<experiment>`, and either a setup source word `f` or, on
+  `opened` alone, its milestone `m`. Never a station, coordinate, trip, line,
+  clock time, journey or anything typed into a field. A new event name or dimension value is a
+  change to this contract, not a build decision.
 
 ## Trip selection
 

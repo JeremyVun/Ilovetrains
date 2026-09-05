@@ -21,7 +21,7 @@ const bucketed = (bucket, opens = 1) => ({ ...emptyDoc(), telemetry: { opens, bu
 
 /* A document with no bucket still rides in the control arm, so every enabled
    event carries the experiment dimension. */
-const d = (u = 'new') => ({ u, 'x.strip-placement': 'a3' });
+const d = (u = '1') => ({ u, 'x.strip-placement': 'a3' });
 
 function fakeFetch(...responses) {
   const calls = [];
@@ -44,6 +44,7 @@ function make(overrides = {}) {
     beacon: overrides.beacon,
     schedule: overrides.schedule || ((flush) => scheduled.push(flush)),
     getDoc: overrides.getDoc || (() => emptyDoc()),
+    ...('isOnline' in overrides ? { isOnline: overrides.isOnline } : {}),
     ...('enabled' in overrides ? { enabled: overrides.enabled } : {})
   });
   return { analytics, storage, scheduled };
@@ -80,11 +81,11 @@ test('every running experiment dimensions every event, and none does when disabl
     Object.keys(EXPERIMENTS).map((id) => 'x.' + id));
 });
 
-test('an event carries the user class, its own dims and the experiment, and nothing else', () => {
+test('an event carries its usage band, its own dims and the experiment, and nothing else', () => {
   const { analytics } = make({ getDoc: () => bucketed(37, 4) });
   analytics.track('saved_setup', { f: 'search' });
   assert.deepEqual(analytics.events, [
-    { t: 'saved_setup', d: { u: 'ret', f: 'search', 'x.strip-placement': 'a2' } }
+    { t: 'saved_setup', d: { u: '2-5', f: 'search', 'x.strip-placement': 'a2' } }
   ]);
 });
 
@@ -98,7 +99,7 @@ test('repeats compact to a count, a changed dimension starts a new entry', () =>
   analytics.track('shown_predicted');
   assert.deepEqual(analytics.queue(), [
     { t: 'shown_predicted', d: d(), n: 5 },
-    { t: 'shown_predicted', d: { u: 'ret', 'x.strip-placement': 'a2' }, n: 1 }
+    { t: 'shown_predicted', d: { u: '2-5', 'x.strip-placement': 'a2' }, n: 1 }
   ]);
   assert.equal(analytics.events.length, 6, 'the ledger keeps every record');
   assert.deepEqual(JSON.parse(storage._map.get(QUEUE_KEY)).queue.length, 2);
@@ -131,10 +132,45 @@ test('disabled records to the ledger and writes nothing at all', () => {
   const fetchFn = fakeFetch({ ok: true });
   const { analytics, storage, scheduled } = make({ enabled: false, fetchFn });
   analytics.track('shown_predicted');
-  assert.deepEqual(analytics.events, [{ t: 'shown_predicted', d: { u: 'new' } }]);
+  assert.deepEqual(analytics.events, [{ t: 'shown_predicted', d: { u: '1' } }]);
   assert.deepEqual([...storage._map.keys()], []);
   assert.deepEqual(scheduled, []);
   return analytics.flush().then(() => assert.equal(fetchFn.calls.length, 0));
+});
+
+test('malformed queue entries cannot prevent subsequent recording or sending', async () => {
+  for (const entry of [null, {}, { t: 'shown_predicted', n: 1 },
+    { t: 'shown_predicted', d: {}, n: '1' },
+    { t: 'shown_predicted', d: { u: {} }, n: 1 },
+    { t: 'shown_predicted', d: {}, n: -1 }]) {
+    const storage = memoryStore();
+    storage.setItem(QUEUE_KEY, JSON.stringify({ queue: [entry] }));
+    const fetchFn = fakeFetch({ ok: true });
+    const { analytics } = make({ storage, fetchFn });
+    analytics.track('shown_predicted');
+    assert.deepEqual(analytics.queue(), [{ t: 'shown_predicted', d: d(), n: 1 }]);
+    await analytics.flush();
+    assert.equal(fetchFn.calls.length, 1);
+    assert.deepEqual(analytics.queue(), []);
+  }
+});
+
+test('offline flushes keep counts without calling fetch or beacon, then send online', async () => {
+  let online = false;
+  let beacons = 0;
+  const fetchFn = fakeFetch({ ok: true });
+  const { analytics } = make({ fetchFn, isOnline: () => online,
+    beacon: () => { beacons++; return true; } });
+  analytics.track('shown_predicted');
+  await analytics.flush();
+  await analytics.flush({ beacon: true });
+  assert.equal(fetchFn.calls.length, 0);
+  assert.equal(beacons, 0);
+  assert.deepEqual(analytics.queue(), [{ t: 'shown_predicted', d: d(), n: 1 }]);
+  online = true;
+  await analytics.flush();
+  assert.equal(fetchFn.calls.length, 1);
+  assert.deepEqual(analytics.queue(), []);
 });
 
 test('the flush is scheduled once per page load, and it is the flush', () => {
@@ -234,4 +270,24 @@ test('counts recorded while a flush is in flight survive it, including repeats',
     { t: 'shown_predicted', d: d(), n: 1 },
     { t: 'hit_predicted', d: d(), n: 1 }
   ]);
+});
+
+test('overlapping fetch and page-leave flushes share one send and preserve newer counts', async () => {
+  let resolve;
+  const fetchFn = fakeFetch(new Promise((r) => { resolve = r; }), { ok: true });
+  let beacons = 0;
+  const { analytics } = make({ fetchFn, beacon: () => { beacons++; return true; } });
+  analytics.track('shown_predicted');
+  const first = analytics.flush();
+  const second = analytics.flush();
+  analytics.track('shown_predicted');
+  const leaving = analytics.flush({ beacon: true });
+  assert.equal(fetchFn.calls.length, 1);
+  assert.equal(beacons, 0);
+  resolve({ ok: true });
+  await Promise.all([first, second, leaving]);
+  assert.deepEqual(analytics.queue(), [{ t: 'shown_predicted', d: d(), n: 1 }]);
+  await analytics.flush();
+  assert.equal(fetchFn.calls.length, 2);
+  assert.deepEqual(analytics.queue(), []);
 });

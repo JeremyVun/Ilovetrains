@@ -11,6 +11,25 @@ briefed as one code wave against the landed controller. Code waves and the
 verification wave are separate; the wave that blows a budget is
 verification, not code.
 
+Build audit (2026-09-05): main contains phases 0 and 1 only. The required
+smart-header-v2 controller is committed on `shv2-p3` (`e3c38c0`) and inherited
+by `shv2-p4`, whose verification work is unfinished. It has not landed on
+main. The ruling-5 storage/module amendment below is complete and verified;
+controller instrumentation and A2 still wait for that dependency.
+Do not mark phase 2 done on the strength of the amendment alone.
+
+The same audit fixed three transport defects: overlapping flushes now share
+one in-flight fetch, malformed queue entries are treated as an empty queue,
+and known-offline flushes call neither fetch nor beacon. `createAnalytics`
+accepts an optional `isOnline` function for tests; its browser default checks
+`navigator.onLine`. The existing 2xx/beacon acceptance rule is unchanged.
+The controller still owns the closed event vocabulary: never pass arbitrary
+data or caller-supplied `u` into `track`.
+
+Verification: all 201 web tests and `go test ./...` pass. Each transport
+regression fails when its corresponding guard is removed. Browser and
+production analytics verification still belong to phases 4 and 5.
+
 Global rules for every phase:
 
 - No Go changes. The server stays exactly as it is.
@@ -165,15 +184,17 @@ Seam, in `main.js`:
   `headerKind`, set `lastShown`, and `track('shown_' + kind)`. Home
   showing an explicit selection emits nothing. Before the first `shown_`
   of the page load (any kind, including `shown_setup` below), when
-  enabled, run `ctx.update(recordOpen(state.doc, Math.random))` once and
+  enabled, run `ctx.update(recordOpen(state.doc, random))` once, with
+  `random` backed by `crypto.getRandomValues` as design.md section 2 requires, and
   set `opened`, so `u` is computed from the incremented count.
 - **hit / miss.** In `homeAction('open-trip')`, when `headerKind` is set
   and `tapped` is false: `tapped = true`; `track((same ? 'hit_' :
   'miss_') + headerKind)` where `same` is the tapped row's trip id and
   direction equalling `state.selection` at that moment. In
-  `detailAction('focus')`: `track((same ? 'hit_' : 'miss_') +
-  headerKind)` when `headerKind` is set, where `same` compares the focused
-  selection to the selection recorded with `lastShown`; this one is not
+  `detailAction('focus')`: `track('hit_' + headerKind)` only when
+  `headerKind` is set, is not `setup`, and the focused trip and direction
+  equal the selection recorded with `lastShown`; a different
+  selection emits nothing (design.md section 4). This one is not
   guarded by `tapped` (a tap then a focus on the same trip is one hit and
   one hit; the rate read divides by shown, so this double count is the
   accepted cost of keeping the rule simple — record it in `ui.md`).

@@ -9,7 +9,7 @@
    sending is deferred, batched and compacted, because the phones that run
    this are on spotty networks. */
 
-import { userClass } from './storage.js';
+import { band } from './storage.js';
 
 export const ENDPOINT = 'https://analytics.jeremyvun.com/e';
 export const PROJECT = 'ilovetrains';
@@ -71,15 +71,22 @@ export function createAnalytics(options) {
     fetchFn = null,
     beacon = browserBeacon,
     schedule = null,
+    isOnline = () => typeof navigator === 'undefined' || navigator.onLine !== false,
     getDoc = () => null
   } = options || {};
   const events = [];
   let scheduled = false;
+  let inFlight = null;
 
   function readQueue() {
     try {
       const stored = JSON.parse(storage.getItem(QUEUE_KEY));
-      return stored && Array.isArray(stored.queue) ? stored.queue : [];
+      if (!stored || !Array.isArray(stored.queue)) return [];
+      const valid = stored.queue.every((entry) => entry && typeof entry.t === 'string'
+        && entry.t.length > 0 && entry.d && typeof entry.d === 'object'
+        && !Array.isArray(entry.d) && Object.values(entry.d).every((v) => typeof v === 'string')
+        && Number.isSafeInteger(entry.n) && entry.n > 0);
+      return valid ? stored.queue.slice(-QUEUE_CAP) : [];
     } catch (_) {
       return [];
     }
@@ -94,7 +101,7 @@ export function createAnalytics(options) {
   function track(name, dims = {}) {
     try {
       const doc = getDoc();
-      const d = { u: userClass(doc), ...dims, ...experimentDims(doc, enabled) };
+      const d = { u: band(doc), ...dims, ...experimentDims(doc, enabled) };
       events.push({ t: name, d });
       if (!enabled) return;
       const queue = readQueue();
@@ -125,6 +132,8 @@ export function createAnalytics(options) {
   function flush(opts) {
     try {
       if (!enabled) return Promise.resolve();
+      if (inFlight) return inFlight;
+      if (!isOnline()) return Promise.resolve();
       const sent = readQueue();
       if (!sent.length) return Promise.resolve();
       const body = JSON.stringify(sent.map(({ t, d, n }) => ({ p: PROJECT, t, d, n })));
@@ -134,14 +143,15 @@ export function createAnalytics(options) {
         return Promise.resolve();
       }
       if (!fetchFn) return Promise.resolve();
-      return Promise.resolve(fetchFn(ENDPOINT, {
+      inFlight = Promise.resolve(fetchFn(ENDPOINT, {
         method: 'POST',
         body,
         headers: { 'Content-Type': 'text/plain' },
         keepalive: true
       })).then((response) => {
         if (response && response.ok) settle(sent);
-      }).catch(() => {});
+      }).catch(() => {}).finally(() => { inFlight = null; });
+      return inFlight;
     } catch (_) {
       return Promise.resolve();
     }

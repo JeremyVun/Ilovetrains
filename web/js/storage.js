@@ -10,7 +10,7 @@ export const TRIPS_CAP = 10;
 export const SEARCH_CAP = 3;
 export const DIRECTIONS = ['forward', 'reverse'];
 export const LOCATION_ASK_QUIET_MS = 30 * 86_400_000;
-export const NEW_OPENS = 3;
+const MILESTONES = new Set([1, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200, 250]);
 
 export function emptyDoc() {
   return {
@@ -155,8 +155,6 @@ export function declineLocation(doc, atMs) {
   return { ...doc, locationAsk: { declinedAt: new Date(atMs).toISOString() } };
 }
 
-/** The device's own open counter and experiment bucket. Only the word
-    `userClass` derives from it ever leaves the phone; the counts do not. */
 export function recordOpen(doc, random) {
   const current = doc.telemetry;
   return {
@@ -168,9 +166,21 @@ export function recordOpen(doc, random) {
   };
 }
 
-export function userClass(doc) {
-  const telemetry = doc && doc.telemetry;
-  return telemetry && telemetry.opens > NEW_OPENS ? 'ret' : 'new';
+export function band(doc) {
+  const opens = doc && doc.telemetry && doc.telemetry.opens;
+  if (!Number.isInteger(opens) || opens <= 1) return '1';
+  if (opens <= 5) return '2-5';
+  if (opens <= 10) return '6-10';
+  if (opens <= 50) {
+    const first = Math.floor((opens - 1) / 5) * 5 + 1;
+    return `${first}-${first + 4}`;
+  }
+  return '51+';
+}
+
+export function milestone(doc) {
+  const opens = doc && doc.telemetry && doc.telemetry.opens;
+  return MILESTONES.has(opens) ? String(opens) : null;
 }
 
 export function cacheKey(fromId, toId) {

@@ -263,7 +263,9 @@ halves:
   `Content-Type: text/plain` (no preflight) and `keepalive`, and clears
   the sent entries only on a 2xx. A rejected fetch, a 429 (many users
   share one carrier address) or any other status keeps them for the
-  next flush.
+  next flush. Known-offline flushes do not call fetch or beacon. Overlapping
+  triggers share one in-flight fetch so its counts are settled only once.
+  A malformed queue, including malformed entries, is treated as empty.
 
   Flush runs when the page goes to the background (`visibilitychange` to
   hidden, `pagehide`) via `sendBeacon`, which clears the queue on a
@@ -319,7 +321,7 @@ slot may carry the strip's one action while the experiment runs.
 ### 9. Contracts touched at closeout
 
 - `client-storage.md`: the `telemetry` field, its write rule, the queue
-  key, and the sentence that only `new`/`ret` derived from it is sent.
+  key, the usage bands and milestone counts derived from it.
 - `ui.md`: the events each screen emits (the section 4 table), the A2
   exception while the experiment runs.
 - `PROJECT.md`: principle 5 reworded (draft above); the decision log.

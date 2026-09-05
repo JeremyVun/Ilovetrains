@@ -7,7 +7,7 @@ import {
   STORAGE_KEY, HISTORY_CAP, TRIPS_CAP, emptyDoc, parseDoc, serializeDoc, cacheKey, leg,
   addTrip, removeTrip, moveTrip, recordView, recordSearch, recordRide, updateStop,
   putCache, getCache, loadDoc, saveDoc, declineLocation, LOCATION_ASK_QUIET_MS,
-  recordOpen, userClass, NEW_OPENS
+  recordOpen, band, milestone
 } from '../js/storage.js';
 
 const CENTRAL = { id: '200060', name: 'Central Station' };
@@ -231,14 +231,28 @@ test('an open increments the counter and draws the bucket exactly once', () => {
   assert.equal(emptyDoc().telemetry, undefined, 'recordOpen is pure');
 });
 
-test('a device is new for three opens and returning from the fourth', () => {
-  assert.equal(NEW_OPENS, 3);
-  assert.equal(userClass(emptyDoc()), 'new');
-  let doc = emptyDoc();
-  for (const expected of ['new', 'new', 'new', 'ret', 'ret']) {
-    doc = recordOpen(doc, () => 0.37);
-    assert.equal(userClass(doc), expected, `opens ${doc.telemetry.opens}`);
+test('usage bands cover absent telemetry and every boundary', () => {
+  assert.equal(band(emptyDoc()), '1');
+  for (const [opens, expected] of [
+    [0, '1'], [1, '1'], [2, '2-5'], [5, '2-5'], [6, '6-10'], [10, '6-10'],
+    [11, '11-15'], [15, '11-15'], [16, '16-20'], [20, '16-20'],
+    [21, '21-25'], [25, '21-25'], [26, '26-30'], [30, '26-30'],
+    [31, '31-35'], [35, '31-35'], [36, '36-40'], [40, '36-40'],
+    [41, '41-45'], [45, '41-45'], [46, '46-50'], [50, '46-50'], [51, '51+']
+  ]) {
+    assert.equal(band({ telemetry: { opens } }), expected, `opens ${opens}`);
   }
+});
+
+test('open milestones are strings and fire only at their exact counts', () => {
+  const milestones = [1, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200, 250];
+  for (const opens of milestones) {
+    assert.equal(milestone({ telemetry: { opens } }), String(opens));
+  }
+  for (const opens of [0, 2, 4, 6, 11, 26, 39, 51, 249, 251]) {
+    assert.equal(milestone({ telemetry: { opens } }), null, `opens ${opens}`);
+  }
+  assert.equal(milestone(emptyDoc()), null);
 });
 
 test('telemetry round-trips through trains.v1 with the rest of the document', () => {
