@@ -112,11 +112,13 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
       : `You usually travel from ${shortName(home.station.name)}.`;
   }
 
+  const over = Boolean(activeFocus) && (tripIsOver(activeFocus, nowMs) || Boolean(opts.arrived));
   const directions = journey ? directionsModel(journey, nowMs, {
     stale: Boolean(opts.stale),
     fromName: selectedEnds.from.name,
     toName: selectedEnds.to.name,
     leave: opts.leave || '',
+    arrived: over,
     cancelledTime,
     receipt
   }) : {
@@ -142,7 +144,6 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
         && Boolean(opts.predicted) && savedThisOpen(entry.trip, opts.loadedAt)
     };
   });
-  const over = Boolean(activeFocus) && (tripIsOver(activeFocus, nowMs) || Boolean(opts.arrived));
   // A board still in the post is not offline; the pill rests until it answers.
   const waiting = !body && !opts.offline;
   const status = activeFocus ? focusStatus(activeFocus.journey, {

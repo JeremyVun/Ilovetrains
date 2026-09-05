@@ -14,8 +14,6 @@
 import { DIRECTIONS } from './storage.js';
 import { distanceKm, here } from './stations.js';
 
-/* Still part of this module's surface: the geometry moved to stations.js,
-   which the index needs and which cannot import back. */
 export { distanceKm };
 
 const DAY_MS = 86_400_000;
@@ -128,12 +126,7 @@ export function rankTrips(doc, nowMs, opts = {}) {
   }).sort((a, b) => Number(b.selected) - Number(a.selected) || b.score - a.score || a.index - b.index);
 }
 
-/**
- * Where the phone's days start, derived from the daily first-open votes on
- * every read so there is no stale copy. Fewer than three votes falls back to
- * the first saved trip's origin, which claims nothing.
- * @returns {{station: object, confidence: number}|null}
- */
+/* Derived on every read, so no stale copy of home can exist. */
 export function homeOf(doc) {
   const tally = new Map();
   ((doc && doc.homeVotes) || []).forEach((vote, index) => {
@@ -169,12 +162,7 @@ function fromHere(doc, station, nowMs) {
 const chosen = (candidate, leap) =>
   ({ kind: 'trip', tripId: candidate.tripId, direction: candidate.direction, leap });
 
-/**
- * The header's answer outside travel mode (client-storage.md, `locate`).
- * Origin is where the user is; destination is the usual place from there,
- * else home. With no fix and no station index this is today's predictor.
- * @returns {{kind: 'trip'|'pair'|'setup'}} see the contract for each shape.
- */
+/* Three shapes, one per answer the header can give: see client-storage.md. */
 export function locate(doc, nowMs, opts = {}) {
   const spot = here(doc, opts.stations, opts.fix);
   const trips = doc.trips || [];

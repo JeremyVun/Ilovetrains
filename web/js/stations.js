@@ -1,9 +1,6 @@
-/* The baked station index and the one question it answers: which station is
-   the user standing at? Pure but for `loadStations`, which fetches the index
-   once per page load and holds it in memory; it is never written to storage. */
-
-/* The 200 m radius is "standing at it"; 2 km is the band the location term
-   already treats as near (client-storage.md). */
+/* The baked station index, held in memory for the page's life and never written
+   to storage. The 200 m radius is "standing at it"; 2 km is the band the
+   location term already treats as near (client-storage.md). */
 export const AT_STATION_KM = 0.2;
 export const NEAR_STATION_KM = 2;
 

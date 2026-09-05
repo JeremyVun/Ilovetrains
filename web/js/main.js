@@ -2,14 +2,16 @@
 
 import {
   loadDoc, saveDoc, addTrip, findTrip, leg, cacheKey, putCache, getCache, recordView,
-  recordRide, updateStop, declineLocation, LOCATION_ASK_QUIET_MS
+  recordRide, recordHomeVote, recordLastOpen, updateStop, declineLocation, newTripId,
+  LOCATION_ASK_QUIET_MS
 } from './storage.js';
-import { distanceKm, predict } from './predict.js';
+import { distanceKm, locate, predict } from './predict.js';
+import { here, loadStations } from './stations.js';
 import { boardModel, promotedRow } from './rowmodel.js';
 import { journeyDetail, journeyKey, arrivalMs, departureMs } from './journey.js';
 import {
   focusOf, setFocus, clearFocus, isFocused, focusExpired, matchJourney, refreshFocus,
-  directionsModel
+  directionsModel, inferTravel, arrived, journeyCancelled, TRAVEL_LATE_MS
 } from './focus.js';
 import * as Board from './board.js';
 import { clampJourneyBars } from './journeybar.js';
@@ -48,6 +50,11 @@ const state = {
   loadingPast: false,
   pastExhausted: false,
   fix: null,
+  stations: null,
+  loadedAt: Date.now(),
+  leap: null,
+  prefill: null,
+  previousOpen: null,
   predicted: false,
   geoPermission: null,
   locationDismissed: false,
@@ -67,6 +74,8 @@ let pastInflight = null;
 const painted = { home: null, board: null, detail: null };
 let pastRowCount = 0;
 let dissolving = null;
+let indexRequested = false;
+let lastHome = null;
 
 /* The freshness age is the one thing that changes every second, so it is the
    one thing patched outside the comparison. */
@@ -91,15 +100,40 @@ const ctx = {
   get selection() { return state.selection; },
   go(hash) { if (location.hash === hash) route(); else location.hash = hash; },
   update(doc) { state.doc = doc; saveDoc(doc); },
-  saveTrip(trip) {
-    const next = addTrip(state.doc, trip);
-    ctx.update(next);
-    const saved = next.trips.find((item) => item.from.id === trip.from.id && item.to.id === trip.to.id)
-      || next.trips.find((item) => item.from.id === trip.to.id && item.to.id === trip.from.id);
-    state.selection = { tripId: saved.id, direction: saved.from.id === trip.from.id ? 'forward' : 'reverse' };
+  permission: geoPermissionState,
+  fix: takeFix,
+  async saveTrip(trip, redirect) {
+    state.selection = savePair(trip);
+    if (!redirect) return ctx.go('#/');
+    const match = await redirectJourney(trip, redirect);
+    if (!match) return ctx.go('#/board');
+    ctx.update(setFocus(state.doc, state.selection, match, now(), 'inferred'));
     ctx.go('#/');
   }
 };
+
+/* The pair the header answered with, or the sheet saved, becomes a normal saved
+   trip under the ten-trip LRU (client-storage.md, `locate`). */
+function savePair(trip) {
+  const next = addTrip(state.doc, trip);
+  ctx.update(next);
+  const saved = next.trips.find((item) => item.from.id === trip.from.id && item.to.id === trip.to.id)
+    || next.trips.find((item) => item.from.id === trip.to.id && item.to.id === trip.from.id);
+  return { tripId: saved.id, direction: saved.from.id === trip.from.id ? 'forward' : 'reverse' };
+}
+
+/* The redirect keeps the rider on the same departure: the journey key survives
+   a change of destination because the first leg is the same train. */
+async function redirectJourney(trip, redirect) {
+  try {
+    const { body } = await getDepartures(trip.from.id, trip.to.id, {
+      at: redirect.departureMs - 60_000, limit: LIMIT
+    });
+    return (body.journeys || []).find((item) => journeyKey(item) === redirect.journeyKey) || null;
+  } catch (_) {
+    return null;
+  }
+}
 
 function route() {
   stopTimers();
@@ -111,16 +145,23 @@ function route() {
   painted.home = painted.board = painted.detail = null;
   pastRowCount = 0;
   dissolving = null;
+  lastHome = null;
 
-  if (hash === '#/setup' || hash === '#/trips/new') return renderSetup(root, ctx);
+  if (hash === '#/setup' || hash === '#/trips/new') return openSetup(root);
   if (!state.doc.trips.length) {
     if (location.hash !== '#/setup') location.hash = '#/setup';
-    else renderSetup(root, ctx);
+    else openSetup(root);
     return;
   }
   if (hash === '#/journey') return showDetail(root);
   if (hash === '#/board') return showBoard(root);
   showHome(root);
+}
+
+function openSetup(root) {
+  const prefill = state.prefill || {};
+  state.prefill = null;
+  return renderSetup(root, ctx, prefill);
 }
 
 function selectedTrip() {
@@ -151,7 +192,24 @@ function savedSelection() {
 function chooseSelection() {
   const chosen = focusSelection() || savedSelection();
   state.predicted = !chosen;
-  return chosen || predict(state.doc, now(), { fix: validFix() });
+  if (chosen) { state.leap = null; return chosen; }
+  return locateSelection();
+}
+
+/* `locate` may answer with a pair no saved trip covers, which is saved on the
+   spot, or with nothing saved at all, which leaves home for the sheet. */
+function locateSelection() {
+  const answer = locate(state.doc, now(), { fix: validFix(), stations: state.stations });
+  state.leap = answer.leap || null;
+  if (answer.kind === 'trip') return { tripId: answer.tripId, direction: answer.direction };
+  if (answer.kind === 'pair') {
+    return savePair({
+      id: newTripId(), from: answer.from, to: answer.to, createdAt: new Date().toISOString()
+    });
+  }
+  state.prefill = answer.from ? { origin: answer.from } : null;
+  ctx.go('#/trips/new');
+  return null;
 }
 
 function explicitSelection() {
@@ -172,14 +230,47 @@ function loadSelectedCache() {
 
 function showHome(root) {
   state.view = 'home';
+  state.previousOpen = state.doc.lastOpen || null;
   state.selection = chooseSelection();
+  if (!state.selection) return;
   loadSelectedCache();
   renderHome();
   onAction(root, homeAction);
   startTimers(false);
+  noteLastOpen();
   fetchLive();
   backfillCoordinates();
+  loadIndex();
   silentFix();
+}
+
+/* The index arrives after the first paint, so a fix taken without it gets its
+   second chance here rather than waiting for the next open. */
+function loadIndex() {
+  if (indexRequested) return;
+  indexRequested = true;
+  loadStations().then((list) => {
+    if (!list) return;
+    state.stations = list;
+    if (state.view === 'home' && validFix() && state.predicted) useFix();
+  });
+}
+
+/* The record the next open infers travel from. Written where writes happen —
+   the cache paint and each successful refresh — and never from a render
+   (client-storage.md, Travel mode). */
+function noteLastOpen() {
+  if (state.view !== 'home' || focusSelection() || !state.selection) return;
+  const journeys = (state.body && state.body.journeys) || [];
+  const journey = journeys.find((item) => !journeyCancelled(item));
+  if (!journey) return;
+  const spot = here(state.doc, state.stations, validFix());
+  ctx.update(recordLastOpen(state.doc, {
+    station: spot && spot.tier === 1 ? spot.station : null,
+    tripId: state.selection.tripId,
+    direction: state.selection.direction,
+    journey
+  }, now()));
 }
 
 /* An already-granted permission is not a prompt: home may use the fix it can
@@ -191,9 +282,41 @@ async function silentFix() {
     renderHome();
     return;
   }
-  navigator.geolocation.getCurrentPosition(applyFix, () => {}, {
-    enableHighAccuracy: false, timeout: 8000, maximumAge: FIX_MAX_AGE_MS
+  if (await takeFix({ enableHighAccuracy: underWay() })) useFix();
+}
+
+/* High accuracy costs battery, so it is spent only where the speed reading can
+   decide travel mode (client-storage.md, Travel mode). */
+function underWay() {
+  const journey = (state.previousOpen || {}).journey;
+  const departure = departureMs(journey);
+  const arrival = arrivalMs(journey);
+  if (departure === null || arrival === null) return false;
+  return now() >= departure && now() <= arrival + TRAVEL_LATE_MS;
+}
+
+/* The one place a coordinate lands: state.fix, never storage and never a
+   request. Resolves to the fix, or null when the browser will not give one. */
+function takeFix(options = {}) {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition((position) => {
+      state.fix = fixOf(position);
+      resolve(validFix());
+    }, () => resolve(null), {
+      enableHighAccuracy: false, timeout: 8000, maximumAge: FIX_MAX_AGE_MS, ...options
+    });
   });
+}
+
+function fixOf(position) {
+  const speed = position.coords.speed;
+  return {
+    lat: position.coords.latitude,
+    lon: position.coords.longitude,
+    speed: Number.isFinite(speed) ? speed : undefined,
+    at: position.timestamp || Date.now()
+  };
 }
 
 async function geoPermissionState() {
@@ -216,15 +339,31 @@ function shouldAskLocation() {
   return !Number.isFinite(declined) || now() - declined >= LOCATION_ASK_QUIET_MS;
 }
 
-function applyFix(position) {
+/* What a fix answers: where the day starts, whether the rider is already on a
+   train, and — a guess being re-answerable where a tap is not — which trip. */
+function useFix() {
   if (state.view !== 'home') return;
-  state.fix = {
-    lat: position.coords.latitude,
-    lon: position.coords.longitude,
-    at: position.timestamp || Date.now()
-  };
-  // A fix re-answers a guess; a trip the user chose stands.
-  if (state.predicted) state.selection = predict(state.doc, now(), { fix: validFix() });
+  const fix = validFix();
+  if (!fix) return;
+  const spot = here(state.doc, state.stations, fix);
+  if (spot) {
+    const voted = recordHomeVote(state.doc, spot.station, now());
+    if (voted !== state.doc) ctx.update(voted);
+  }
+  // Against the record as it stood when this open began: the cache paint has
+  // already overwritten lastOpen with this open's own header.
+  const entered = focusSelection() ? null
+    : inferTravel({ ...state.doc, lastOpen: state.previousOpen }, now(), fix);
+  if (entered) {
+    ctx.update(setFocus(state.doc, entered, entered.journey, now(), 'inferred'));
+    state.predicted = false;
+    state.leap = null;
+    state.selection = { tripId: entered.tripId, direction: entered.direction };
+  } else if (state.predicted) {
+    const answer = locateSelection();
+    if (!answer) return;
+    state.selection = answer;
+  }
   loadSelectedCache();
   renderHome();
   fetchLive();
@@ -257,8 +396,12 @@ function renderHome() {
     offline: state.offline,
     askLocation,
     predicted: state.predicted,
+    leap: state.leap,
+    loadedAt: state.loadedAt,
+    arrived: arrivedNow(),
     leave: leaveDistance()
   });
+  lastHome = home;
   if (state.offerDismissed) home.over = false;
   const freshness = home.freshness;
   home.freshness = '';
@@ -273,6 +416,15 @@ function renderHome() {
     Home.finishHomeRender(state.root);
   }
   patchFresh(state.root.querySelector('.hm-fresh .lbl'), freshness);
+}
+
+/* The rider stepping off the train ends the trip before the timetable does
+   (client-storage.md, Travel mode). */
+function arrivedNow(doc = state.doc) {
+  const focus = focusOf(doc);
+  const trip = focus && !focusExpired(focus, now()) && findTrip(doc, focus.tripId);
+  if (!trip) return false;
+  return arrived(focus, leg(trip, focus.direction).to, validFix(), now());
 }
 
 function leaveDistance() {
@@ -405,6 +557,20 @@ function homeAction(action, element) {
     renderHome();
     return;
   }
+  if (action === 'change-destination') {
+    const strip = lastHome && lastHome.strip;
+    if (!strip) return;
+    state.prefill = {
+      origin: strip.origin,
+      redirect: {
+        journeyKey: strip.journeyKey,
+        departureMs: strip.departureMs,
+        from: strip.origin,
+        to: strip.destination
+      }
+    };
+    return ctx.go('#/trips/new');
+  }
   if (action === 'skip-location') {
     state.locationDismissed = true;
     ctx.update(declineLocation(state.doc, now()));
@@ -414,14 +580,10 @@ function homeAction(action, element) {
   if (action === 'use-location') return requestLocation();
 }
 
-function requestLocation() {
+async function requestLocation() {
   state.locationDismissed = true;
-  if (!navigator.geolocation) { renderHome(); return; }
-  navigator.geolocation.getCurrentPosition(applyFix, () => renderHome(), {
-    enableHighAccuracy: false,
-    timeout: 8000,
-    maximumAge: 5 * 60_000
-  });
+  if (await takeFix()) useFix();
+  else renderHome();
 }
 
 function boardAction(action, element) {
@@ -533,6 +695,7 @@ async function fetchLive() {
     doc = recordCompletedFocus(doc);
     doc = refreshFocus(doc, state.selection, body, now());
     ctx.update(doc);
+    noteLastOpen();
     if (state.journey) state.journey = matchJourney(body.journeys, state.journey) || state.journey;
   } catch (error) {
     if (error.name === 'AbortError') return;
@@ -543,7 +706,8 @@ async function fetchLive() {
 
 function recordCompletedFocus(doc) {
   const focus = focusOf(doc);
-  if (!focus || arrivalMs(focus.journey) === null || now() < arrivalMs(focus.journey)) return doc;
+  if (!focus || arrivalMs(focus.journey) === null) return doc;
+  if (now() < arrivalMs(focus.journey) && !arrivedNow(doc)) return doc;
   const trip = findTrip(doc, focus.tripId);
   if (!trip) return doc;
   const ends = leg(trip, focus.direction);
@@ -639,6 +803,10 @@ document.addEventListener('visibilitychange', () => {
   if (!onLiveView()) return;
   startTimers(state.view === 'board');
   fetchLive();
+  if (state.view !== 'home') return;
+  state.previousOpen = state.doc.lastOpen || null;
+  if (!validFix()) state.fix = null;
+  silentFix();
 });
 window.addEventListener('hashchange', route);
 

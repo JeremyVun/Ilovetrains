@@ -15,7 +15,9 @@ and API semantics live in `client-storage.md` and `api.md`.
   `MY TRIPS` anchor.
 - The smart header is read-only. It is a section, not a tap target: the
   saved-trip row is the affordance, and the header's own trip carries the same
-  `DEPARTURES ›` cue as every other row.
+  `DEPARTURES ›` cue as every other row. A journey the app inferred rather than
+  the user chose carries one control, and it sits below the heavy rule instead
+  of inside the header, so the header stays read-only there too.
 - Tapping a saved-trip row opens that trip's departure board. It records the
   explicit selection and never changes the focused journey; browsing therefore
   never replaces the focused train.
@@ -31,6 +33,11 @@ and API semantics live in `client-storage.md` and `api.md`.
   or invents transfer platforms.
 - Correction is the ordinary trip choice: the predicted trip is first, every
   saved trip remains visible, and choosing another trip is one tap.
+- `Change destination` is the correction for an inferred journey. It reopens
+  the new-trip sheet with From filled from that journey's origin and the
+  destination field focused; saving re-enters travel mode on the same departure
+  when a journey toward the new destination matches, and opens that pair's
+  board when none does. Browsing another trip still never exits travel mode.
 
 All interactive rows and controls have a tap target of at least 44 logical
 pixels. Back navigation is explicit; labels such as `EDIT` or `DONE` are not
@@ -118,14 +125,28 @@ substitutes for going back.
 - The header may fetch live data only for the selected trip. Saved-trip rows
   use device-held facts such as line identity, distance and last ride; opening
   home must not fan out one upstream request per saved trip.
+- An inferred journey puts one line between the heavy rule and `MY TRIPS`:
+  `Going somewhere else?` at the left in the offer-paragraph type, `CHANGE` at
+  the right in the offer-button idiom, a hairline below it, 49px tall with a
+  44px tap target. It appears in inferred travel mode only — never above a
+  journey the user chose, and never outside travel mode.
 - Saved-trip rows are 72px with a `DEPARTURES ›` cue at the right, which the
   sub line reserves 106px for. The sub line is the status on the focused row,
   `SHOWN ABOVE` and the distance on the header's own unfocused trip, and the
-  distance with the last ride on every other. Rows carry both stacked
+  distance with the last ride on every other. On the one open where the app
+  itself saved the trip it is showing, that row's sub line reads `Just added`
+  in 12px italic in place of `SHOWN ABOVE`, with the distance beside it as
+  usual; the mark is gone by the next open. Rows carry both stacked
   line-colour rules and coloured line-code badges. The web list is capped by
   the storage contract's ten-trip LRU.
 - A receipt explains a prediction only when the app made a meaningful leap.
   It names real evidence. A manually focused trip needs no receipt.
+- A trip chosen because it ends where the phone's days start carries
+  `Your days usually start at <home>.` once three or more daily first-open
+  votes agree, and `You usually travel from <home>.` when home is only the
+  first saved trip's origin. A trip chosen because it is the usual one from
+  where the user is carries no receipt: it explains itself. Nothing offers to
+  move home; the votes re-infer it silently.
 - The view-history receipt appears only when all of: the shown trip was
   predicted rather than tapped or focused; at least two trips are saved; there
   is no location fix; and the shown (trip, direction) has at least three
@@ -155,7 +176,18 @@ substitutes for going back.
 ## Setup and station search
 
 - With no saved trips, setup collects origin and destination, saves the pair,
-  and returns home. Add-trip uses the same search flow.
+  and returns home. Add-trip uses the same search flow. The sheet carries no
+  lede: the two fields say what it is for.
+- From may arrive filled — from an inferred journey's origin, or from a fix on
+  the first run when the permission is already granted — with the destination
+  field focused. A filled From stays editable, and the destination results
+  before any query are then the saved and recent destinations from that origin,
+  newest first, under `YOU SEARCHED BEFORE`.
+- The From results before any query carry one location row, and nothing
+  prompts on load. While the permission is still askable and there is no fix,
+  it is `Use my location`, which asks once when tapped and disappears silently
+  if the answer is no or names no station. Once a fix exists and From is empty,
+  it is a `NEAREST STATION` group holding the single nearest station.
 - The client sends no station query before three normalized characters. Search
   answers are memoized by trimmed, whitespace-normalized, case-insensitive
   query for the browser session; failures are not memoized.

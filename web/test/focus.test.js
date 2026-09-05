@@ -277,6 +277,24 @@ test('entry needs a previous open at this journey\'s own origin, and its trip', 
   assert.equal(inferTravel(seen(), on('09:40'), null), null);
 });
 
+/* design.md section 5, Exit: the header is over the moment the fix says so, and
+   a countdown may not stand under a TRIP OVER status. */
+test('a fix at the destination takes the done treatment before the timetable does', () => {
+  const riding = directionsModel(RIDE, on('09:59'), { toName: 'Bondi Junction Station' });
+  assert.deepEqual([riding.phase, riding.provenance], ['ride', 'TO GO']);
+
+  const done = directionsModel(RIDE, on('09:59'), { toName: 'Bondi Junction Station', arrived: true });
+  assert.equal(done.phase, 'done');
+  assert.equal(done.progress.at, 1);
+  assert.equal(done.figure, 'Now', 'the figure never counts below zero, however early the fix is');
+  assert.equal(done.provenance, 'AGO');
+  assert.equal(done.instruction, 'You arrived at Bondi Junction.');
+  assert.equal(done.showBoardingPlatform, false);
+
+  assert.equal(directionsModel(RIDE, on('10:06'), { arrived: true }).figure, '3',
+    'past the arrival the figure is the real age either way');
+});
+
 test('arrival at the destination ends the trip as the rider steps off', () => {
   const focus = { tripId: 't1', direction: 'forward', by: 'inferred', journey: RIDE };
   const platform = { lat: -33.89015, lon: 151.2477 };

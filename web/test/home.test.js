@@ -349,9 +349,10 @@ test('a station name is shortened by rule rather than ellipsised', () => {
   assert.equal(fit('North Sydney Junction Station', 11), 'N Sydney Jn');
 });
 
-/* Focus is written by `Take this train` and cleared by the return offer or the
-   30-minute expiry, and by nothing else: browsing another trip must not move
-   the journey the rider is following (client-storage.md, Trip selection). */
+/* Focus is written by `Take this train`, by inferred entry and by the redirect
+   that keeps a rider on the same departure — and by nothing else: browsing
+   another trip must not move the journey the rider is following
+   (client-storage.md, Trip selection and Travel mode). */
 test('a saved-trip row tap selects and routes, and leaves focus alone', () => {
   const main = readFileSync(join(import.meta.dirname, '..', 'js', 'main.js'), 'utf8');
   const branch = /if \(action === 'open-trip'\) \{([\s\S]*?)\n  \}/.exec(main);
@@ -360,7 +361,35 @@ test('a saved-trip row tap selects and routes, and leaves focus alone', () => {
   assert.match(branch[1], /state\.selection = \{ tripId: element\.dataset\.id/);
   assert.match(branch[1], /ctx\.go\('#\/board'\)/);
   assert.ok(!/focus/i.test(branch[1]), 'the row tap does not touch focus');
-  assert.equal(main.match(/setFocus\(/g).length, 1, 'only journey detail writes focus');
+  assert.equal(main.match(/setFocus\(/g).length, 3, 'three writers of focus, no more');
+});
+
+/* The record inferred entry reads is written where writes happen, never from a
+   render or a tick, and only for an unfocused header (client-storage.md). */
+test('the controller records the previous open at two write points only', () => {
+  const main = readFileSync(join(import.meta.dirname, '..', 'js', 'main.js'), 'utf8');
+  const body = /function noteLastOpen\(\) \{([\s\S]*?)\n\}/.exec(main);
+
+  assert.ok(body, 'the controller still has noteLastOpen');
+  assert.match(body[1], /state\.view !== 'home' \|\| focusSelection\(\)/);
+  assert.match(body[1], /!journeyCancelled\(item\)/, 'the lead journey is the first running one');
+  assert.match(body[1], /spot && spot\.tier === 1 \? spot\.station : null/);
+  assert.equal(main.match(/^\s*noteLastOpen\(\);$/gm).length, 2, 'the cache paint and the refresh');
+  assert.ok(!/renderHome\(\)[\s\S]{0,40}noteLastOpen/.test(
+    /function renderHome[\s\S]*?\n\}/.exec(main)[0]), 'never from a render');
+});
+
+/* The correction for a wrong inferred entry is one tap: the sheet opens with the
+   origin filled and the departure to re-enter on (design.md, ruling 7). */
+test('change destination carries the origin and the departure into the sheet', () => {
+  const main = readFileSync(join(import.meta.dirname, '..', 'js', 'main.js'), 'utf8');
+  const branch = /if \(action === 'change-destination'\) \{([\s\S]*?)\n  \}/.exec(main);
+
+  assert.ok(branch, 'homeAction handles the strip');
+  assert.match(branch[1], /origin: strip\.origin/);
+  assert.match(branch[1], /journeyKey: strip\.journeyKey/);
+  assert.match(branch[1], /departureMs: strip\.departureMs/);
+  assert.match(branch[1], /ctx\.go\('#\/trips\/new'\)/);
 });
 
 

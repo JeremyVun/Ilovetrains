@@ -242,6 +242,18 @@ export function directionsModel(value, nowMs, opts = {}) {
     model.provenance = 'SCHEDULED';
     return model;
   }
+  /* A fix at the destination ends the journey before its timetable does, so this
+     branch is tested before the countdown ones (client-storage.md, Travel mode). */
+  if (nowMs >= arrMs || opts.arrived) {
+    model.phase = 'done';
+    model.progress = { at: 1, phase: 'done' };
+    model.figure = stale ? '' : countdownFigure(Math.max(0, -minutesUntil(arrMs, nowMs)));
+    model.provenance = 'AGO';
+    model.instruction = `You arrived at ${model.to}.`;
+    model.showBoardingPlatform = false;
+    model.act = true;
+    return model;
+  }
   if (nowMs < depMs) {
     const minutes = minutesUntil(depMs, nowMs);
     model.figure = stale ? '' : countdownFigure(minutes);
@@ -254,16 +266,6 @@ export function directionsModel(value, nowMs, opts = {}) {
       model.receipt = opts.receipt || `You’re ${opts.leave} from ${model.from}.`;
       model.act = true;
     }
-    return model;
-  }
-  if (nowMs >= arrMs) {
-    model.phase = 'done';
-    model.progress = { at: 1, phase: 'done' };
-    model.figure = stale ? '' : countdownFigure(Math.max(0, -minutesUntil(arrMs, nowMs)));
-    model.provenance = 'AGO';
-    model.instruction = `You arrived at ${model.to}.`;
-    model.showBoardingPlatform = false;
-    model.act = true;
     return model;
   }
 

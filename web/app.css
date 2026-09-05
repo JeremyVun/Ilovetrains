@@ -602,8 +602,6 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
   flex: none; font-size: 10px; font-weight: 600; letter-spacing: .14em;
   text-transform: uppercase; color: var(--ink-3); white-space: nowrap;
 }
-.hm-lede { flex: none; padding: 26px 0 20px; font-size: 16px; font-weight: 300; line-height: 1.5; color: var(--ink-2); }
-.hm-lede b { color: var(--ink); font-weight: 400; }
 .hm-bar.save button { flex: 1; justify-content: flex-start; font-size: 13px; letter-spacing: .12em; min-height: 64px; }
 
 @media (prefers-color-scheme: light) {
