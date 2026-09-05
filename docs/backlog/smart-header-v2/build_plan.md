@@ -63,7 +63,10 @@ Owns: `tools/build-stations.js` (new), `web/stations.json` (new),
 Blocker recorded 2026-09-05: `TFNSW_API_KEY` is not in the orchestrator's
 environment and `.env` is never read without the owner's permission, so the
 download and probe in steps 1–2 wait for the owner to supply the key. Phase 2
-is independent and runs first.
+is independent and runs first. Owner ruling 2026-09-05: the phase 0/1 agent
+may source the root `.env` inside its own shell commands for the download
+and the probe only; the key is never printed, committed or passed in a
+prompt.
 
 ## Phase 1 — server answers stops from the index — DONE marker: `phase 1 done`
 
