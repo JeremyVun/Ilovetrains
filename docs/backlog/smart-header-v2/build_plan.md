@@ -24,8 +24,9 @@ Phases 0–3 and the phase-4 automated verification are on `main`, through
 `2055924`. The paused branch stack is integrated with current analytics
 storage and shell entries. The ferry station rule is retained: saved
 endpoints win within 200 m, then distance; tier 2 resolves saved endpoints
-against the index. Both station test sets survive. The ferry/metro work in
-the shared checkout remains uncommitted and was preserved during landing.
+against the index. Both station test sets survive. Concurrent ferry/metro
+work was preserved during landing and subsequently committed as `be1b695`;
+it is outside this header release.
 
 The lifecycle review fixed fresh-fix reuse, delayed-index daily votes,
 late callbacks after navigation, first-run origin paint, and offline
@@ -286,7 +287,7 @@ Verified 2026-09-05:
   drives also passed matched and unmatched redirects; refresh still chooses
   the exact complete itinerary over one sharing its first departure.
 - Final shared checkout: 262 web tests, all Go tests and four tool tests
-  passed. This includes the preserved, still-uncommitted ferry work.
+  passed. This includes the preserved ferry work.
 - The feature shell with real public API data through a local proxy passed
   the hardened performance gate: warm worker-controlled paint 36ms, fresh
   HTTP-200 departures response 74ms. This is local feature performance,
@@ -295,13 +296,22 @@ Verified 2026-09-05:
   Container smoke passed health, new modules, the 386-station rail index
   and baked Rhodes autocomplete, using a harmless placeholder key and no
   upstream requests. This image contains the committed header build;
-  unfinished ferry changes are not in it. The same source was built for
+  the separate ferry changes are not in it. The same source was built for
   linux/amd64 and linux/arm64 and pushed as
   `registry.jeremyvun.com/ilovetrains:latest`, manifest digest
   `sha256:667c17e3f5af761ea16c2d192f8f26e532d540cceab3ed70415be8aaee9b8c98`.
   Deploy job `3889ec2dc1c1df40860942a8ca673040` succeeded on `syd1`.
-  Production health, shell `v18` and the 386-station index were confirmed;
-  returning-worker, offline and real-origin performance checks are running.
+  Production health, shell `v18` and the 386-station index were confirmed.
+- Production returning-profile verification passed: the old `v14` worker
+  upgraded to activated, controlling `v18`, leaving only `shell-v18` with
+  all 29 entries, including station data/modules and analytics. Cold first
+  use opened setup correctly. Offline reopening loaded through the worker;
+  health failed without a network while the cached index returned 386 stations.
+- Production location, inference, redirect, setup and arrival drives passed.
+  The arrival fixture was restored after freezing the clock to avoid an
+  in-flight live response expiring its dated focus. The client hash matched
+  the released integration. Real-origin warm-open performance passed: FCP
+  48ms, fresh successful API response 529ms, eight departure rows.
 
 Remaining: the owner's real-phone `coords.speed` observation below. Do not
 mark the entire phase done or delete this folder without resolving it.
