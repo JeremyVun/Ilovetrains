@@ -171,7 +171,7 @@ and home-station heuristic" replaced by the votes, a new "Travel mode"
 subsection under "Focused journey" with the entry and exit conditions and
 `lastOpen`).
 
-## Phase 3 — controller, setup and shell — DONE marker: `phase 3 done`
+## Phase 3 — controller, setup and shell — DONE marker: `phase 3 done` — DONE e3c38c0
 
 Phase 2 handoff (2026-09-05), binding for this phase:
 
