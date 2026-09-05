@@ -93,6 +93,9 @@ const TIMING_EVAL = `(async () => {
     fcpMs: fcp ? Math.round(fcp.startTime) : null,
     domInteractiveMs: Math.round(nav.domInteractive || 0),
     apiResponseEndMs: api ? Math.round(api.responseEnd) : null,
+    apiStatus: api ? api.responseStatus : null,
+    offline: window.__trains.state.offline,
+    dataAgeMs: Date.now() - Date.parse((window.__trains.state.body || {}).generatedAt || ''),
     apiFromServiceWorker: api ? Boolean(api.workerStart) : null,
     rowsOnScreen: document.querySelectorAll('[data-t="row"]').length,
     figures: [...document.querySelectorAll('[data-figure-column] .sy-n')].map((e) => e.textContent.trim()).slice(0, 3)
@@ -150,11 +153,7 @@ async function main() {
         ' rows=' + t.rowsOnScreen,
         ' figures=' + JSON.stringify(t.figures));
     }
-    const bar = [];
-    if (!(warm.fcpMs < 500)) bar.push(`cached paint ${warm.fcpMs}ms >= 500ms`);
-    if (!(warm.apiResponseEndMs < 2000)) bar.push(`live data ${warm.apiResponseEndMs}ms >= 2000ms`);
-    if (!warm.rowsOnScreen) bar.push('the warm open painted no rows');
-    if (warm.serviceWorker !== 'controlling') bar.push('the warm open was not served by the service worker');
+    const bar = failures(warm);
     if (bar.length) {
       console.error('EXPERIENCE BAR NOT MET: ' + bar.join('; '));
       process.exitCode = 1;
@@ -166,4 +165,24 @@ async function main() {
   }
 }
 
-main().catch((e) => { console.error(String(e.message || e)); process.exit(1); });
+function failures(warm) {
+  const bar = [];
+  if (!(Number.isFinite(warm.fcpMs) && warm.fcpMs > 0 && warm.fcpMs < 500)) {
+    bar.push(`cached paint ${warm.fcpMs}ms is missing or outside 0–500ms`);
+  }
+  if (!(Number.isFinite(warm.apiResponseEndMs) && warm.apiResponseEndMs > 0 && warm.apiResponseEndMs < 2000)) {
+    bar.push(`live data ${warm.apiResponseEndMs}ms is missing or outside 0–2000ms`);
+  }
+  if (warm.apiStatus !== 200 || warm.offline !== false
+      || !Number.isFinite(warm.dataAgeMs) || warm.dataAgeMs > 90_000) {
+    bar.push('the departures request did not produce successful fresh data');
+  }
+  if (!warm.rowsOnScreen) bar.push('the warm open painted no rows');
+  if (warm.serviceWorker !== 'controlling') bar.push('the warm open was not served by the service worker');
+  return bar;
+}
+
+module.exports = { failures };
+if (require.main === module) {
+  main().catch((e) => { console.error(String(e.message || e)); process.exit(1); });
+}
