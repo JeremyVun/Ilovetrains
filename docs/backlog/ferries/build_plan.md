@@ -167,9 +167,9 @@ detail has one `train` and one `ferry` leg.
 
 ## Phase 3 — client colour and words — VERIFIED 2026-09-05
 
-The original 52-frame browser matrix passed at both phone sizes and
-schemes, including real Side A/B labels. Combined-header checks are being
-refreshed after its controller landed. Numeric chips stay compact while caps, directions and
+The 52-frame browser matrix passed at both phone sizes and schemes,
+including real Side A/B labels. Home, focus and setup states were
+refreshed against the combined smart-header implementation and passed. Numeric chips stay compact while caps, directions and
 accessibility retain the full upstream label. F1 and MFF paint FERRY while
 retaining their visible codes.
 
@@ -234,8 +234,8 @@ Verify gate: the test above; the existing tier tests unchanged.
 ## Phase 5 — verification wave and closeout — in progress
 
 Independent review is complete with no unresolved implementation findings.
-Current combined-checkout gates: 263 web tests, all Go tests, 3 generator tests, byte-identical
-indexes and clean diff checks. The production image builds for linux/amd64
+Current combined-checkout gates: 263 web tests, all Go tests, 3 generator
+tests, byte-identical indexes and clean diff checks. The production image builds for linux/amd64
 and linux/arm64 as local `ilovetrains:ferries-review`; container health,
 Manly/Circular Quay stop searches and worker-v19 delivery pass. Docker's
 context now explicitly includes only build inputs, excluding local secrets
@@ -243,17 +243,22 @@ and downloaded feeds. Final-code live API probes pass for Manly, mixed
 Wynyard–Manly, Balmain East and Barangaroo–Balmain, and all returned service
 endpoints match the requested stops. Regression mutations prove ferry exclusion,
 walk arithmetic, index mapping guards, saved-stop preference, itinerary
-identity and dark-chip contrast tests bite. The original 52-frame browser matrix passed. After smart-header landed,
+identity and dark-chip contrast tests bite. The 52-frame browser matrix
+passed. After smart-header landed,
 a duplicated station-index precache entry was removed and a regression
 guard added and proven by mutation. The combined v19 image has been
 rebuilt for both architectures and its runtime smoke passes. Worker v19
-warm install and a true offline reopen pass; the v18-to-v19 returning
-profile and refreshed combined-client browser checks remain in progress. The owner's screenshot verdict,
+warm install and a true offline reopen pass. A persistent profile upgraded
+from shell-v18 to shell-v19, removed the old cache, remained controlled,
+and reopened offline with all required shell cache hits. Refreshed
+smart-header-affected ferry states passed across all four phone/scheme
+combinations. The owner's screenshot verdict,
 exemplar updates, backlog deletion and deployment remain pending.
 
 The build is one integrated code/contracts change with worker v19, so shell
 files receive the version bump atomically. Review artifacts live in
-`/tmp/trains-ferries-review/` while the owner verdict is pending.
+`/tmp/trains-ferries-review/index.html` while the owner verdict is pending.
+Implementation and contracts are committed as `be1b695`.
 
 
 Owns: `tools/shoot-states.js`, `tools/comps/scenarios.js`,
