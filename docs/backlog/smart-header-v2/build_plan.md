@@ -18,19 +18,25 @@ Standing rules for every phase:
 - Copy is only what `design.md` "Copy" records. A string not there is not
   written; it is raised as a question.
 
-## Build status — resumed 2026-09-05
+## Build status — resumed and landed 2026-09-05
 
-Phases 0–1 are on main. Phases 2–4 are integrated with current main in
-`shv2-integrate` at `/private/tmp/shv2-integrate`; the analytics storage
-functions and shell entries are preserved. The station helper now uses the
-ferry session's reconciled implementation: saved endpoints win within
-200 m, then distance, and tier 2 resolves saved endpoints against the index
-before falling back to their stored coordinates. Both station test sets
-are retained. No new owner decision is required for the recorded ferry rule.
+Phases 0–3 and the phase-4 automated verification are on `main`, through
+`2055924`. The paused branch stack is integrated with current analytics
+storage and shell entries. The ferry station rule is retained: saved
+endpoints win within 200 m, then distance; tier 2 resolves saved endpoints
+against the index. Both station test sets survive. The ferry/metro work in
+the shared checkout remains uncommitted and was preserved during landing.
 
-Phase 4 is being verified in `shv2-p4`; controller lifecycle is under review.
-The shared main checkout contains unfinished ferry/metro changes, so landing
-must preserve them. Real-phone speed support remains unobserved.
+The lifecycle review fixed fresh-fix reuse, delayed-index daily votes,
+late callbacks after navigation, first-run origin paint, and offline
+arrival persistence. Completed rides cannot be inferred again from an old
+`lastOpen`. Destination redirects match the first departure independently
+of full-journey matching. Contracts and user stories describe these rules.
+
+Automated gates are green. Phase 4 still owns the physical-phone speed
+observation below; it has not been supplied. Phase 5 closeout and production
+deployment remain pending that observation. No `.env` was read during this
+resumption. A local release image was built and smoke-tested.
 
 ## Phase 0 — station index and its [verify] — DONE marker: `phase 0 done` commit — DONE 3e74d2d
 
@@ -112,7 +118,7 @@ Owns: `web/js/stations.js` (new), `web/js/predict.js`, `web/js/home.js`,
 
 Seams (all pure, deterministic given their arguments):
 
-- `stations.js`: the ferries build supplies this module and tests, including
+- `stations.js`: the ferries build adopts the shv2-p4 module with tests, including
   the saved-end tie-break inside 200 m; reuse it. `loadStations()` fetches `/stations.json` once and
   resolves to the array (null on failure; the app degrades to the no-`here`
   branch); `nearest(stations, fix, withinKm)` → `{station, km}` or null;
@@ -260,65 +266,39 @@ the two rows, no lede), and the location-panel paragraph left as is.
 Then `node tools/shoot-states.js` passes on every existing state (no
 regression) before phase 4 adds states.
 
-## Phase 4 — verification wave — DONE marker: `phase 4 done` — IN PROGRESS, stopped by the owner 2026-09-05
+## Phase 4 — verification wave — AUTOMATED GATES DONE; PHONE CHECK OPEN
 
-Progress when stopped (branch `shv2-p4`, worktree `/private/tmp/shv2-p4`):
+Verified 2026-09-05:
 
-- Done and committed: fixture station ids corrected against the index
-  (`4f136bf`); a `geo`/`permission` seam in the shooter with the eight new
-  states, and its README notes (`e0f9db8`); four exemplars
-  `home-390x844-inferred.png`, `home-390x844-inferred-light.png`,
-  `home-390x844-just-added.png`, `setup-390x844-origin.png` with the
-  `ui.md` calibration list and the README table updated (`0fde902`).
-- Committed with the progress note, not re-run: the shooter's contrast probe
-  had a vacuous regex (`[\d.]+` lost its backslash inside the page-script
-  template literal), so every contrast check it reported passed without
-  measuring anything. The one-character fix is in; the sweep has NOT been
-  re-run with it and the strip/mark contrast ratios are therefore unverified.
-- Not started: the agent's final report (sweep count, measurement table,
-  defects found, strings not in the copy list, owner verdicts), the
-  `measure-open.js` run or skip note, re-shooting `first-run` if the
-  `Use my location` row changed its frame, the phase 4 done marker.
-- Resume by re-running the full sweep on the branch
-  (`python3 -m http.server <port> --directory web`, private `CDP_PORT`,
-  `node tools/shoot-states.js --url http://localhost:<port>`), reading every
-  new frame, and finishing the list above.
+- Paused branch: 98 required frames passed (69-state default sweep, phone
+  sizes/schemes, and the 360px mark stress). Four new exemplars reproduced
+  byte-identically. The repaired contrast probe now measures real colours.
+- Integrated controller: 38 further phone/scheme frames passed and were
+  pixel-identical to the verified baseline. Strip 49px, action 48px, heavy
+  rule 214.3px at 390px. Mark/question/action contrast: dark
+  4.37/8.03/18.05:1; light 4.83/8.17/17.76:1. Station names and the marked
+  row fit at 360, 390 and 412px. Ordinary metadata ellipsis remains allowed.
+- `tools/check-controller-lifecycle.js` passed and fails against the old
+  stale-fix guard. It drives fresh and delayed fixes, navigation races,
+  first-run prefill and persisted offline arrival. Combined ferry/header
+  drives also passed matched and unmatched redirects; refresh still chooses
+  the exact complete itinerary over one sharing its first departure.
+- Final shared checkout: 262 web tests, all Go tests and four tool tests
+  passed. This includes the preserved, still-uncommitted ferry work.
+- The feature shell with real public API data through a local proxy passed
+  the hardened performance gate: warm worker-controlled paint 36ms, fresh
+  HTTP-200 departures response 74ms. This is local feature performance,
+  not a post-deploy production measurement.
+- Local image `ilovetrains:smart-header-v2-review` built for linux/amd64.
+  Container smoke passed health, new modules, the 386-station rail index
+  and baked Rhodes autocomplete, using a harmless placeholder key and no
+  upstream requests. This image contains the committed header build;
+  unfinished ferry changes are not in it. Nothing was pushed or deployed.
 
-Stack state: phases 0–1 are on `main` (`b0049f2`). Phases 2–4 are on the
-`shv2-p2` → `shv2-p3` → `shv2-p4` stack and NOT on `main`: the merge was
-blocked because another session (the `metro` design session) holds
-uncommitted edits to `docs/contracts/ui.md`, which the merge touches. Merge
-`shv2-p4` into `main` once that file is committed; expect trivial conflicts
-in this file and `design.md` only.
-
-Owner verdicts still open (recorded in `design.md`): `Now` over `AGO` for an
-early arrival; the 23 out-of-NSW terminals in the index; the real-phone
-`coords.speed` check.
-
-Phase 0 and 3 handoff (2026-09-05), binding for this phase:
-
-- Fixture ids to correct from `web/stations.json` (never the reverse), in
-  `web/test/fixture.js` and `tools/shoot-states.js`: Bondi Junction is
-  `202210` (`200080` is Wynyard); Epping `212110` (not `213910`); Tallawong
-  `2155384` and Chatswood `206710` (the fixtures had them shifted); Meadowbank
-  `211430` (not `213810`, Concord West); Strathfield `213510` (not `206020`,
-  Waverton); Mount Victoria `278610` (not `253030`); and there is no "Sydney
-  Olympic Park Station": it is `Olympic Park Station`, `212710` (not
-  `206010`, North Sydney). Another session is concurrently editing
-  `tools/shoot-states.js`'s Tallawong/Chatswood lines to these same values;
-  make the identical edits so the merge is clean.
-- The shooter has no geolocation seam. Add one as a repo feature of
-  `tools/shoot-states.js` (a per-state `geo: {lat, lon, speed?}` that grants
-  the permission and answers `getCurrentPosition`, via CDP
-  `Browser.grantPermissions` + `Emulation.setGeolocationOverride` in
-  `screenshot.js` if that works headless, else a `navigator` stub installed
-  before `route()`), and document its trap: `loadStations()` starts at module
-  load, before the fetch freeze, so the index is usually present.
-- `first-run` now shows the `Use my location` row under headless Chrome
-  (permission `prompt`); that is ruling 8, not a regression.
-- `tools/measure-open.js` needs the live API; if it cannot run without the
-  key, report it as skipped rather than faking it.
-- The real-phone `coords.speed` check is the owner's; report it as open.
+Remaining: the owner's real-phone `coords.speed` observation below. Do not
+mark the entire phase done or delete this folder without resolving it.
+The inherited `Now`/`AGO` early-arrival copy remains as specified pending
+an owner verdict; it did not fail a verification gate.
 
 Owns: `tools/shoot-states.js`, `assets/comps/latest/`, `tools/README.md`.
 No product code except fixes for defects this wave finds, each named in

@@ -3,20 +3,17 @@
 Read `design.md` first; this plan cites it and adds nothing to the rulings.
 Every phase is briefed to a fresh agent with this folder and the contracts
 only. Phases 0 and 1 build today, as one wave on a worktree from main. Phases
-2 and 3 wait for `smart-header-v2` phase 3 to land on main (orchestrator,
-2026-09-05): that item's branches rewrite `main.js`, `setup.js`, `home.js`
-and `storage.js` and are not on main yet, so instrumenting today's
-controller would be re-ported within days. Phase 2 and phase 3 are then
-briefed as one code wave against the landed controller. Code waves and the
+2 and 3 can now build against the landed smart-header controller: its phase
+3 and lifecycle fixes are on main through `2055924` (2026-09-05). Brief
+phase 2 and phase 3 as one code wave against that controller. Code waves and the
 verification wave are separate; the wave that blows a budget is
 verification, not code.
 
-Build audit (2026-09-05): main contains phases 0 and 1 only. The required
-smart-header-v2 controller is committed on `shv2-p3` (`e3c38c0`) and inherited
-by `shv2-p4`, whose verification work is unfinished. It has not landed on
-main. The ruling-5 storage/module amendment below is complete and verified;
-controller instrumentation and A2 still wait for that dependency.
-Do not mark phase 2 done on the strength of the amendment alone.
+Build audit (2026-09-05): analytics phases 0 and 1 are complete. The
+smart-header dependency is now on main, including storage and controller
+integration. Analytics controller instrumentation and A2 remain unbuilt;
+do not mark phase 2 done on the strength of the ruling-5 module amendment.
+The header's physical-phone speed observation remains in its own backlog.
 
 The same audit fixed three transport defects: overlapping flushes now share
 one in-flight fetch, malformed queue entries are treated as an empty queue,
