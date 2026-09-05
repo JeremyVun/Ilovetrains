@@ -48,12 +48,12 @@ func TestClientSendsAuthAndRequiredTripParams(t *testing.T) {
 		t.Errorf("Authorization = %q, want %q", auth, "apikey test-key")
 	}
 	want := map[string]string{
-		"outputFormat":      "rapidJSON",
-		"depArrMacro":       "dep",
-		"type_origin":       "any",
-		"name_origin":       "200060",
-		"type_destination":  "any",
-		"name_destination":  "215020",
+		"outputFormat":     "rapidJSON",
+		"depArrMacro":      "dep",
+		"type_origin":      "any",
+		"name_origin":      "200060",
+		"type_destination": "any",
+		"name_destination": "215020",
 		// Spare upstream candidates let the connection floor drop unsafe
 		// routes without under-filling the four-service public answer.
 		"calcNumberOfTrips": "10",
@@ -133,31 +133,6 @@ func TestClientWithoutAtQueriesNowAndEchoesNull(t *testing.T) {
 	}
 }
 
-func TestClientStopFinderUsesTypeAny(t *testing.T) {
-	// type_sf=stop is broken upstream ("stop invalid", code -2000).
-	var got url.Values
-	client, _ := testClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		got = r.URL.Query()
-		if r.URL.Path != "/stop_finder" {
-			t.Errorf("path = %q, want /stop_finder", r.URL.Path)
-		}
-		_, _ = w.Write([]byte(`{"locations":[]}`))
-	}))
-
-	if _, err := client.Stops(context.Background(), "parramatta"); err != nil {
-		t.Fatalf("Stops: %v", err)
-	}
-	if got.Get("type_sf") != "any" {
-		t.Errorf("type_sf = %q, want any", got.Get("type_sf"))
-	}
-	if got.Get("name_sf") != "parramatta" {
-		t.Errorf("name_sf = %q, want parramatta", got.Get("name_sf"))
-	}
-	if got.Get("TfNSWSF") != "true" {
-		t.Errorf("TfNSWSF = %q, want true", got.Get("TfNSWSF"))
-	}
-}
-
 func TestClientRetriesOnceOnServerError(t *testing.T) {
 	var calls atomic.Int32
 	client, _ := testClient(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -165,11 +140,11 @@ func TestClientRetriesOnceOnServerError(t *testing.T) {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
-		_, _ = w.Write([]byte(`{"locations":[]}`))
+		_, _ = w.Write([]byte(`{"journeys":[]}`))
 	}))
 
-	if _, err := client.Stops(context.Background(), "central"); err != nil {
-		t.Fatalf("Stops: %v", err)
+	if _, err := client.Departures(context.Background(), "200060", "215020", 6, time.Time{}); err != nil {
+		t.Fatalf("Departures: %v", err)
 	}
 	if calls.Load() != 2 {
 		t.Errorf("upstream calls = %d, want 2", calls.Load())
@@ -183,7 +158,7 @@ func TestClientGivesUpAfterRetry(t *testing.T) {
 		w.WriteHeader(http.StatusBadGateway)
 	}))
 
-	_, err := client.Stops(context.Background(), "central")
+	_, err := client.Departures(context.Background(), "200060", "215020", 6, time.Time{})
 	if !errors.Is(err, ErrUpstream) {
 		t.Fatalf("err = %v, want ErrUpstream", err)
 	}
@@ -200,7 +175,7 @@ func TestClientDoesNotRetryClientErrors(t *testing.T) {
 		w.WriteHeader(http.StatusForbidden)
 	}))
 
-	_, err := client.Stops(context.Background(), "central")
+	_, err := client.Departures(context.Background(), "200060", "215020", 6, time.Time{})
 	if !errors.Is(err, ErrUpstream) {
 		t.Fatalf("err = %v, want ErrUpstream", err)
 	}
@@ -219,7 +194,7 @@ func TestClientTimeoutIsDistinguishable(t *testing.T) {
 	}))
 	client.MaxAttempts = 1
 
-	_, err := client.Stops(context.Background(), "central")
+	_, err := client.Departures(context.Background(), "200060", "215020", 6, time.Time{})
 	if !errors.Is(err, ErrTimeout) {
 		t.Fatalf("err = %v, want ErrTimeout", err)
 	}
@@ -230,7 +205,7 @@ func TestClientRejectsGarbageBody(t *testing.T) {
 		_, _ = w.Write([]byte(`<html>gateway error</html>`))
 	}))
 
-	_, err := client.Stops(context.Background(), "central")
+	_, err := client.Departures(context.Background(), "200060", "215020", 6, time.Time{})
 	if !errors.Is(err, ErrUpstream) {
 		t.Fatalf("err = %v, want ErrUpstream", err)
 	}

@@ -3,7 +3,9 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -37,16 +39,13 @@ var testNow = time.Date(2026, 9, 1, 17, 52, 0, 0, sydney)
 // network.
 type fakeUpstream struct {
 	departures     *tfnsw.DeparturesResponse
-	stops          *tfnsw.StopsResponse
 	err            error
 	errAfterFirst  error
 	departureCalls atomic.Int32
-	stopCalls      atomic.Int32
 	lastLimit      atomic.Int32
 
-	mu        sync.Mutex
-	lastAt    time.Time
-	lastQuery string
+	mu     sync.Mutex
+	lastAt time.Time
 }
 
 func (f *fakeUpstream) Departures(_ context.Context, from, to string, limit int, at time.Time) (*tfnsw.DeparturesResponse, error) {
@@ -78,26 +77,6 @@ func (f *fakeUpstream) at() time.Time {
 	return f.lastAt
 }
 
-func (f *fakeUpstream) query() string {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.lastQuery
-}
-
-func (f *fakeUpstream) Stops(_ context.Context, query string) (*tfnsw.StopsResponse, error) {
-	call := f.stopCalls.Add(1)
-	f.mu.Lock()
-	f.lastQuery = query
-	f.mu.Unlock()
-	if f.err != nil {
-		return nil, f.err
-	}
-	if call > 1 && f.errAfterFirst != nil {
-		return nil, f.errAfterFirst
-	}
-	return f.stops, nil
-}
-
 func sampleDepartures() *tfnsw.DeparturesResponse {
 	estimated := "2026-08-31T22:50:00+10:00"
 	platform := "Platform 18"
@@ -113,14 +92,6 @@ func sampleDepartures() *tfnsw.DeparturesResponse {
 			Legs:                1,
 		}},
 	}
-}
-
-func sampleStops() *tfnsw.StopsResponse {
-	return &tfnsw.StopsResponse{Stops: []tfnsw.Stop{
-		{ID: "200060", Name: "Central Station", Modes: []string{"train", "metro"},
-			Location: &tfnsw.Location{Lat: -33.884024, Lon: 151.206203}},
-		{ID: "200070", Name: "Town Hall Station", Modes: []string{"train"}},
-	}}
 }
 
 func newTestServer(t *testing.T, upstream Upstream) http.Handler {
@@ -637,8 +608,7 @@ func TestServesStaleDataWhenUpstreamFails(t *testing.T) {
 }
 
 func TestStopsContract(t *testing.T) {
-	upstream := &fakeUpstream{stops: sampleStops()}
-	handler := newTestServer(t, upstream)
+	handler := newTestServer(t, &fakeUpstream{})
 	got := get(t, handler, "/api/v1/stops?q=central")
 
 	if got.Code != http.StatusOK {
@@ -647,75 +617,100 @@ func TestStopsContract(t *testing.T) {
 	if cc := got.Header().Get("Cache-Control"); cc != stopsCacheControl {
 		t.Errorf("Cache-Control = %q, want %q", cc, stopsCacheControl)
 	}
-	var body tfnsw.StopsResponse
+	var body StopsResponse
 	if err := json.Unmarshal(got.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decoding body: %v", err)
 	}
-	if len(body.Stops) != 2 || body.Stops[0].ID != "200060" {
-		t.Errorf("stops = %+v", body.Stops)
+	if len(body.Stops) == 0 || body.Stops[0].Name != "Central Station" || body.Stops[0].ID != "200060" {
+		t.Fatalf("stops = %+v, want Central Station first", body.Stops)
+	}
+	if len(body.Stops) > stopsLimit {
+		t.Errorf("stops = %d, want at most %d", len(body.Stops), stopsLimit)
 	}
 	// Coordinates reach the client so it can rank saved trips by how near the
 	// station is; the position it compares them against never leaves the phone.
 	location := body.Stops[0].Location
-	if location == nil || location.Lat != -33.884024 || location.Lon != 151.206203 {
+	if location == nil || math.IsNaN(location.Lat) || math.IsNaN(location.Lon) ||
+		location.Lat > -33 || location.Lat < -34 || location.Lon < 151 || location.Lon > 152 {
 		t.Errorf("location = %+v, want Central's coordinates", location)
 	}
-	// A station upstream has no coordinates for is null, not (0, 0) — which is
-	// in the Atlantic and would win every nearest-station comparison outright.
-	if body.Stops[1].Location != nil {
-		t.Errorf("location = %+v, want null", *body.Stops[1].Location)
+	for _, stop := range body.Stops {
+		if len(stop.Modes) == 0 {
+			t.Errorf("%s has no modes", stop.Name)
+		}
 	}
-	if !strings.Contains(got.Body.String(), `"location":null`) {
-		t.Errorf("body = %s, want an explicit \"location\":null", got.Body)
-	}
+}
 
-	// Repeating the search must not cost a second upstream request.
-	get(t, handler, "/api/v1/stops?q=central")
-	if upstream.stopCalls.Load() != 1 {
-		t.Errorf("upstream calls = %d, want 1", upstream.stopCalls.Load())
+func TestStopsRanksThePartialAheadOfTheRest(t *testing.T) {
+	handler := newTestServer(t, &fakeUpstream{})
+	for _, tc := range []struct{ query, want string }{
+		{"rhode", "Rhodes Station"},
+		{"central", "Central Station"},
+		{"bondi", "Bondi Junction Station"},
+	} {
+		var body StopsResponse
+		got := get(t, handler, "/api/v1/stops?q="+tc.query)
+		if err := json.Unmarshal(got.Body.Bytes(), &body); err != nil {
+			t.Fatalf("decoding body: %v", err)
+		}
+		if len(body.Stops) == 0 || body.Stops[0].Name != tc.want {
+			t.Errorf("q=%s ranked %+v first, want %s", tc.query, body.Stops, tc.want)
+		}
+	}
+}
+
+// The index is answered from memory, so nothing here reaches TfNSW.
+func TestStopsMakesNoUpstreamCall(t *testing.T) {
+	upstream := &fakeUpstream{err: errors.New("upstream must not be called")}
+	got := get(t, newTestServer(t, upstream), "/api/v1/stops?q=central")
+	if got.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", got.Code, got.Body)
+	}
+	if got.Header().Get("X-Data-Stale") != "" {
+		t.Error("X-Data-Stale set on a baked answer")
+	}
+}
+
+func TestStopsWithNoMatchIsAnEmptyList(t *testing.T) {
+	got := get(t, newTestServer(t, &fakeUpstream{}), "/api/v1/stops?q=qqzzxx")
+	if got.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", got.Code, got.Body)
+	}
+	if !strings.Contains(got.Body.String(), `"stops":[]`) {
+		t.Errorf("body = %s, want an empty list rather than null", got.Body)
 	}
 }
 
 func TestStopsNormalisesTheQuery(t *testing.T) {
-	upstream := &fakeUpstream{stops: sampleStops()}
-	handler := newTestServer(t, upstream)
+	handler := newTestServer(t, &fakeUpstream{})
 
 	first := get(t, handler, "/api/v1/stops?q=Central")
 	if first.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200: %s", first.Code, first.Body)
 	}
-	if q := upstream.query(); q != "central" {
-		t.Errorf("upstream query = %q, want the normalised text", q)
-	}
-
-	// Every spelling of the same search is one cache entry and one upstream
-	// call, so a user backspacing over their own capitals costs nothing.
+	// Every spelling of the same search is one answer, so a user backspacing
+	// over their own capitals sees no change.
 	for _, spelling := range []string{"central", "%20%20CENTRAL%20%20", "CeNtRaL"} {
 		got := get(t, handler, "/api/v1/stops?q="+spelling)
-		if got.Code != http.StatusOK {
-			t.Fatalf("%s: status = %d, want 200: %s", spelling, got.Code, got.Body)
-		}
 		if got.Body.String() != first.Body.String() {
 			t.Errorf("%s: body = %s, want the first answer", spelling, got.Body)
 		}
 	}
-	if calls := upstream.stopCalls.Load(); calls != 1 {
-		t.Errorf("upstream calls = %d, want 1: every spelling is one query", calls)
+	spaced := get(t, handler, "/api/v1/stops?q=central%20%20%20station")
+	if spaced.Body.String() != get(t, handler, "/api/v1/stops?q=Central+Station").Body.String() {
+		t.Error("inner spacing must collapse to one query")
 	}
-
-	// Collapsed inner whitespace is the same query as a single space.
-	get(t, handler, "/api/v1/stops?q=central%20%20%20station")
-	get(t, handler, "/api/v1/stops?q=Central+Station")
-	if calls := upstream.stopCalls.Load(); calls != 2 {
-		t.Errorf("upstream calls = %d, want 2: inner spacing collapses too", calls)
+	var body StopsResponse
+	if err := json.Unmarshal(spaced.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decoding body: %v", err)
 	}
-	if q := upstream.query(); q != "central station" {
-		t.Errorf("upstream query = %q, want single-spaced text", q)
+	if len(body.Stops) == 0 || body.Stops[0].Name != "Central Station" {
+		t.Errorf("q=central station ranked %+v first, want Central Station", body.Stops)
 	}
 }
 
 func TestStopsMeasuresTheMinimumAfterNormalising(t *testing.T) {
-	handler := newTestServer(t, &fakeUpstream{stops: sampleStops()})
+	handler := newTestServer(t, &fakeUpstream{})
 	// One rune once the whitespace is gone, and one multi-byte rune that a
 	// byte-length minimum would have waved through.
 	for _, target := range []string{"/api/v1/stops?q=%20c%20", "/api/v1/stops?q=%C3%A9"} {
@@ -727,7 +722,7 @@ func TestStopsMeasuresTheMinimumAfterNormalising(t *testing.T) {
 }
 
 func TestStopsRejectsShortQuery(t *testing.T) {
-	handler := newTestServer(t, &fakeUpstream{stops: sampleStops()})
+	handler := newTestServer(t, &fakeUpstream{})
 	for _, target := range []string{"/api/v1/stops", "/api/v1/stops?q=", "/api/v1/stops?q=c", "/api/v1/stops?q=%20%20"} {
 		got := get(t, handler, target)
 		if got.Code != http.StatusBadRequest {

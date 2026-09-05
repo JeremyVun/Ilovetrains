@@ -18,7 +18,7 @@ Standing rules for every phase:
 - Copy is only what `design.md` "Copy" records. A string not there is not
   written; it is raised as a question.
 
-## Phase 0 — station index and its [verify] — DONE marker: `phase 0 done` commit
+## Phase 0 — station index and its [verify] — DONE marker: `phase 0 done` commit — DONE 3e74d2d
 
 Owns: `tools/build-stations.js` (new), `web/stations.json` (new),
 `internal/stations/stations.json` (new), `tools/README.md`,
@@ -68,7 +68,7 @@ may source the root `.env` inside its own shell commands for the download
 and the probe only; the key is never printed, committed or passed in a
 prompt.
 
-## Phase 1 — server answers stops from the index — DONE marker: `phase 1 done`
+## Phase 1 — server answers stops from the index — DONE marker: `phase 1 done` — DONE 5f7e79e
 
 Owns: `internal/stations/` (new package: embed, search), `internal/api/
 server.go`, `internal/api/server_test.go`, `internal/tfnsw/client.go` and
