@@ -127,6 +127,19 @@ Owns: `web/js/main.js`, `web/js/setup.js`, `web/js/home.js` (the
 `data-t` hooks only if any are needed), `docs/contracts/ui.md` (the
 events table for the screens that exist today).
 
+Amendment first (ruling 5, 2026-09-05, after phases 0 and 1 shipped
+`new`/`ret`): in `storage.js`, replace `userClass` and `NEW_OPENS` with
+`band(doc)` returning the section 2 band string (`'1'` with no field or
+`opens` 1; `'2-5'`; `'6-10'`; then five-wide to `'46-50'`; `'51+'`), and
+add `milestone(doc)` returning the `m` string when `opens` is exactly in
+`[1, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200, 250]`, else
+`null`. `analytics.js`'s `track` uses `band` for `u`. Pin: opens 0/absent
+→ `'1'`; 5 → `'2-5'`; 6 → `'6-10'`; 50 → `'46-50'`; 51 → `'51+'`;
+`milestone` at 25 → `'25'`, at 26 → `null`. Update the two tests and
+`client-storage.md`. Then, in `main.js`, immediately after the
+`recordOpen` write and before the first `shown_`, `track('opened', {m})`
+when `milestone` is non-null.
+
 Seam, in `main.js`:
 
 - One instance, created at boot before `route()`:

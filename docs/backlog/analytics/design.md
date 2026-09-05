@@ -46,8 +46,19 @@ origin directly; the Go API stays stateless and cacheable per station pair.
    distinct-device counts, then withdrew it: an id lets anyone holding the
    data reconstruct a person's travel pattern. Nothing in an event can
    link it to another event. The behaviour group the id was for is
-   carried instead as `new` or `returning`, from a count of opens the
-   device keeps for itself.
+   carried instead as a usage band, from a count of opens the device
+   keeps for itself (ruling 5).
+5. **Usage is a band of the open count, never the raw count** (owner,
+   2026-09-05, replacing the first `new`/`returning` boolean). The owner
+   asked for the sequential count itself so the dashboard can filter by
+   frequency ("how many events have seq = 50 vs seq = 1"). A raw number
+   is not sent: a high value is held by one device in any hour and would
+   let its opening times be followed across days, and the service folds a
+   dimension past 256 distinct values into `other`. The count is sent as
+   a band no wider than five opens (the owner's rule: "a max band size of
+   ~5 steps, one working week"), and a device announces round-number
+   milestones once each so the dashboard has true device cohorts. The
+   band edges and milestones are in section 2.
 2. **Disclosure is in the docs only, and Global Privacy Control is
    honoured.** No in-app copy. `PROJECT.md` and the contracts state exactly
    what is sent and what never is. A browser that sends GPC, or Do Not
@@ -77,7 +88,7 @@ origin directly; the Go API stays stateless and cacheable per station pair.
 
 - `client-storage.md` "Nothing here is ever sent to the server" stays true
   of everything it lists today. The new `telemetry` field never leaves the
-  device either; only the `new`/`returning` word derived from it does.
+  device either; only the usage band and the milestone derived from it do.
 - Variant assignment lives on the device, so the API stays cacheable.
 - Offline first: events queue on the device and flush when the network
   answers. The service worker ignores cross-origin requests
@@ -94,9 +105,9 @@ Nothing else: no unit id, no session id, no timestamp (the service
 aggregates by arrival anyway), no presence beats.
 
 `d` holds at most three keys, all from closed vocabularies in this
-document: `u` (`new` or `ret`), `x.<experiment>` (a variant name, only
-while that experiment runs) and, on two setup events, `f` (a source
-word). **Never**: a station id or name, a coordinate or distance, a trip
+document: `u` (a usage band from section 2), `x.<experiment>` (a
+variant name, only while that experiment runs), on two setup events `f`
+(a source word) and on `opened` alone `m` (a milestone from section 2). **Never**: a station id or name, a coordinate or distance, a trip
 pair, a line, a clock time or hour-of-day bucket, a journey key, user
 agent or viewport, anything typed into a field. A new name or value is a
 contract change, not a build decision.
@@ -109,10 +120,31 @@ contract change, not a build decision.
 
 - `opens`: how many page loads have reached a first answer (a `shown_`
   event on home or setup), counted once per page load, before that
-  event's `u` is computed. `u` is `new` while `opens ≤ 3` and `ret` from the
-  fourth open. The threshold is the owner's to edit; three is chosen
-  because a device with fewer opens has almost no view history, so the
-  header is still answering from defaults.
+  event's `u` is computed. `u` is the band holding `opens`, from
+  `band(doc)` in `storage.js`:
+
+  | `u` | opens |
+  |---|---|
+  | `1` | the first open |
+  | `2-5` | |
+  | `6-10` | |
+  | `11-15`, `16-20`, `21-25`, `26-30`, `31-35`, `36-40`, `41-45`, `46-50` | five wide each |
+  | `51+` | everything after |
+
+  Twelve values; no band is wider than five opens (ruling 5), and a
+  device with no `telemetry` reads as `1`. "Returning" in ruling 3 means
+  any band from `6-10` up: a device on its second week has view history
+  to answer from. `2-5`, the first week, is read by the new-user rule.
+  Because each device passes through each open number exactly once, the
+  count of `shown_*` at a band is also a count of devices that reached
+  it, not a count of heavy users.
+- A device fires `opened` with `m` when `opens` lands exactly on a
+  milestone: `1`, `5`, `10`, `15`, `20`, `25`, `30`, `40`, `50`, `75`,
+  `100`, `150`, `200`, `250`. Each fires once in a device's life, so
+  `opened[m=N]` is the number of devices that ever reached N opens and
+  `opened[m=1]` is the number of devices that ever opened. A value never
+  repeats for a device, so it links nothing across hours. The list is the
+  owner's to edit.
 - `bucket`: an integer 0–99 from `crypto.getRandomValues`, drawn with
   the first `opens` increment.
 - Both are written only while analytics is enabled (section 6). A
@@ -183,18 +215,22 @@ came back) is not an answer the header made, so it emits nothing.
 | `back_<kind>` | the way-back offer accepted (`focus` or `inferred`) | |
 | `asked_panel`, `granted_panel`, `denied_panel`, `later_panel` | the home location panel appears; the ask resolves granted, denied, or `Not now` | |
 | `asked_setup`, `granted_setup`, `denied_setup` | the setup sheet's location row appears; the ask resolves | |
+| `opened` | `opens` lands exactly on a milestone, with the first `shown_` of that page load | `m`: the milestone |
 | `shown_setup` | the setup sheet opens | `f`: `location` (From prefilled) or `empty` |
 | `saved_setup` | the setup sheet saves | `f`: `location`, `nearby`, `search`, `redirect` (Change destination, journey re-found), `redirect_lost` (not re-found) |
 
-That is 18 header counters (six kinds by shown, hit, miss) plus twelve
+That is 18 header counters (six kinds by shown, hit, miss) plus thirteen
 others, well under the service's 256-key cap, each with `u` and, during
 an experiment, one `x` dimension.
 
 Reads, per kind `k`, from the `/ui` dashboard or `/stats`:
 
-- hit rate, new users: `hit_k[u=new] / shown_k[u=new]`;
-- hit rate, returning users (ruling 3):
-  `(shown_k[u=ret] − miss_k[u=ret]) / shown_k[u=ret]`;
+- hit rate, new users: `hit_k[u=1] / shown_k[u=1]`, and the same for
+  `2-5`;
+- hit rate, returning users (ruling 3), per band `b` from `6-10` up:
+  `(shown_k[u=b] − miss_k[u=b]) / shown_k[u=b]`;
+- retention: `opened[m=N] / opened[m=1]` is the share of devices that
+  reached N opens;
 - strip experiment: `change_inferred[x=a2] / shown_inferred[x=a2]`
   against the same for `a3`; and every other counter split by `x` for
   side effects.
@@ -316,6 +352,10 @@ slot may carry the strip's one action while the experiment runs.
   right size for spotty networks.
 - Keeping the queue inside `trains.v1`: every event would rewrite the
   user's document.
+- The raw open count as a dimension: ruling 5; a quasi-identifier at
+  high values, and folded past 256 values by the service.
+- A `new`/`returning` boolean: built in phases 0 and 1, replaced by the
+  band in the phase 2 wave; it could not filter by frequency.
 - A page-leave "no action" event: unreliable at unload and unnecessary,
   since no-action is `shown − hit − miss` at read time.
 - An in-app disclosure line: ruling 2; the owner has ruled against extra
@@ -323,8 +363,7 @@ slot may carry the strip's one action while the experiment runs.
 
 ## Open questions
 
-None standing. One number is the owner's to confirm or edit: `u` turns
-from `new` to `ret` at the fourth open (section 2).
+None standing.
 
 ## Depends on
 
