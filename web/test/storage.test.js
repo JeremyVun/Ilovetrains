@@ -331,6 +331,10 @@ test('a malformed vote, previous open or focus kind is dropped, not repaired', (
 
   assert.deepEqual(votes([{ day: '2026-09-05', station: RHODES }]).map((v) => v.day), ['2026-09-05']);
   assert.deepEqual(votes([{ day: '5 September', station: RHODES }]), []);
+  for (const day of ['2026-13-01', '2026-02-30', '2026-02-29']) {
+    assert.deepEqual(votes([{ day, station: RHODES }]), []);
+  }
+  assert.equal(votes([{ day: '2028-02-29', station: RHODES }]).length, 1);
   assert.deepEqual(votes([{ day: '2026-09-05' }]), []);
   assert.deepEqual(votes([{ day: '2026-09-05', station: { id: '213820' } }]), []);
   assert.deepEqual(votes('not a list'), []);
@@ -344,6 +348,7 @@ test('a malformed vote, previous open or focus kind is dropped, not repaired', (
   assert.equal(open({ ...good, direction: 'sideways' }), null);
   assert.equal(open({ ...good, journey: null }), null);
   assert.equal(open({ ...good, at: 0 }), null);
+  assert.equal(open({ ...good, at: 'not a timestamp' }), null);
   assert.equal(open({ ...good, station: { name: 'Rhodes Station' } }), null);
 
   const focus = { tripId: 't1', direction: 'forward', focusedAt: '2026-09-05T09:20:00+10:00', journey: JOURNEY };

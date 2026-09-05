@@ -33,7 +33,9 @@ function isStop(s) {
 }
 
 function isDay(value) {
-  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const ms = Date.parse(value + 'T00:00:00Z');
+  return Number.isFinite(ms) && new Date(ms).toISOString().slice(0, 10) === value;
 }
 
 function locationOf(stop) {
@@ -113,7 +115,8 @@ export function parseDoc(raw) {
     doc.homeVotes = doc.homeVotes.slice(-HOME_VOTES_CAP);
   }
   const open = v.lastOpen;
-  if (open && typeof open.at === 'string' && typeof open.tripId === 'string'
+  if (open && typeof open.at === 'string' && Number.isFinite(Date.parse(open.at))
+      && typeof open.tripId === 'string'
       && DIRECTIONS.includes(open.direction) && open.journey && typeof open.journey === 'object'
       && (open.station === null || isStop(open.station))) {
     doc.lastOpen = {
