@@ -3,7 +3,7 @@
    share of the journey at every viewport width. */
 
 import { esc } from './dom.js';
-import { boardingLabel, effective, legsOf, modeWords, platformChip, platformNumber } from './journey.js';
+import { boardingLabel, effective, legsOf, modeWords, platformNumber, transferPlatformChip } from './journey.js';
 import { colourKey, lineFill } from './lines.js';
 
 const KNOCKOUT = new Set(['T4', 'T5', 'T9', 'CCN', 'HUN']);
@@ -43,8 +43,8 @@ export function journeyBarSpec(journey, opts = {}) {
       toPlatform,
       fromLabel: boardingLabel(leg.from && leg.from.platform, line.mode),
       toLabel: boardingLabel(leg.to && leg.to.platform, line.mode),
-      fromChip: platformChip(leg.from && leg.from.platform) || '—',
-      toChip: platformChip(leg.to && leg.to.platform) || '—'
+      fromChip: transferPlatformChip(leg.from && leg.from.platform, line.mode) || '—',
+      toChip: transferPlatformChip(leg.to && leg.to.platform, line.mode) || '—'
     };
   });
   const dwells = [];
@@ -68,8 +68,8 @@ function changeAt(opts, index) {
   return Array.isArray(opts.changes) ? opts.changes[index] || null : null;
 }
 
-function fullLocation(label, role, stop, paint) {
-  return `<span class="sy-pv full-location" data-ferry-location="${esc(label)}" data-role="${role}" data-stop="${esc(stop)}" style="${paint}">${esc(label)}</span>`;
+function ferryTransferHtml(label, chip, role, stop) {
+  return `<span class="sy-pv" data-ferry-location="${esc(label)}" data-role="${role}" data-stop="${esc(stop)}">${esc(chip)}</span>`;
 }
 
 /** Render every segment by cumulative percentages. Supports any leg count;
@@ -105,19 +105,19 @@ export function journeyBarHtml(spec, opts = {}) {
           caps += `<span class="sy-p a" data-pin="a" data-line-code="${esc(leg.code)}" data-transfer-index="${index}" aria-label="${esc(`${leg.toLabel} · ${leg.code}`)}" style="right:${100 - dwellStart}%;${paint(leg.colourKey)}">${esc(leg.toChip)}</span>`
             + `<span class="sy-p b" data-pin="b" data-next-platform-marker data-transfer-platform data-line-code="${esc(next.code)}" data-transfer-index="${index}" aria-label="${esc(`${next.fromLabel} · ${next.code}`)}" style="left:${dwellEnd}%;${paint(next.colourKey)}"><span class="sy-pv">${esc(next.fromChip)}</span>${station}</span>`;
         } else {
-          const alightFull = leg.mode === 'ferry';
-          const boardFull = next.mode === 'ferry';
-          const alight = alightFull
-            ? fullLocation(leg.toLabel, 'alight', leg.toStop, paint(leg.colourKey))
+          const alightFerry = leg.mode === 'ferry';
+          const boardFerry = next.mode === 'ferry';
+          const alight = alightFerry
+            ? ferryTransferHtml(leg.toLabel, leg.toChip, 'alight', leg.toStop)
             : esc(leg.toChip);
-          const board = boardFull
-            ? fullLocation(next.fromLabel, 'board', next.fromStop, paint(next.colourKey))
+          const board = boardFerry
+            ? ferryTransferHtml(next.fromLabel, next.fromChip, 'board', next.fromStop)
             : `<span class="sy-pv">${esc(next.fromChip)}</span>`;
           if (leg.toLabel) {
-            caps += `<span class="sy-p a${alightFull ? ' full-location' : ''}" data-pin="a" data-line-code="${esc(leg.code)}" data-transfer-index="${index}" aria-label="${esc(`${leg.toLabel} · ${leg.code}`)}" style="right:${100 - dwellStart}%;${paint(leg.colourKey)}">${alight}${next.fromLabel ? '' : station}</span>`;
+            caps += `<span class="sy-p a" data-pin="a" data-line-code="${esc(leg.code)}" data-transfer-index="${index}" aria-label="${esc(`${leg.toLabel} · ${leg.code}`)}" style="right:${100 - dwellStart}%;${paint(leg.colourKey)}">${alight}${next.fromLabel ? '' : station}</span>`;
           }
           if (next.fromLabel) {
-            caps += `<span class="sy-p b${boardFull ? ' full-location' : ''}" data-pin="b" data-next-platform-marker data-transfer-platform data-line-code="${esc(next.code)}" data-transfer-index="${index}" aria-label="${esc(`${next.fromLabel} · ${next.code}`)}" style="left:${dwellEnd}%;${paint(next.colourKey)}">${board}${station}</span>`;
+            caps += `<span class="sy-p b" data-pin="b" data-next-platform-marker data-transfer-platform data-line-code="${esc(next.code)}" data-transfer-index="${index}" aria-label="${esc(`${next.fromLabel} · ${next.code}`)}" style="left:${dwellEnd}%;${paint(next.colourKey)}">${board}${station}</span>`;
           } else if (!leg.toLabel && station) {
             caps += `<span class="sy-p b" data-pin="b" data-next-platform-marker data-transfer-platform data-line-code="${esc(next.code)}" data-transfer-index="${index}" aria-label="— · ${esc(next.code)}" style="left:${dwellEnd}%;${paint(next.colourKey)}"><span class="sy-pv">—</span>${station}</span>`;
           }
@@ -142,19 +142,14 @@ export function journeyDeviceHtml(journey, opts = {}) {
   const first = spec.legs[0] || {};
   const duplicateOrigin = normalized(first.fromRaw) !== ''
     && normalized(first.fromRaw) === normalized(opts.originName);
-  const fullTransfer = opts.caps !== false && spec.legs.some((leg, index) => {
-    const next = spec.legs[index + 1];
-    return next && ((leg.mode === 'ferry' && leg.toLabel) || (next.mode === 'ferry' && next.fromLabel));
-  });
   const capAttrs = first.mode === 'ferry'
     ? ` data-ferry-location="${esc(first.fromLabel)}" data-role="origin" data-stop="${esc(first.fromStop)}"` : '';
   const cap = opts.showBoardingPlatform === false || !first.fromLabel || duplicateOrigin
     ? '' : `<span class="sy-cap" data-line-code="${esc(first.code)}"${capAttrs}>${esc(first.fromLabel)}</span>`;
   return {
     spec,
-    fullTransfer,
     vars: journeyVars(spec),
-    html: `<span class="sy-j${fullTransfer ? ' full-transfer' : ''}">${cap}<span class="sy-bar" data-axis="${esc(axisSignature(spec))}">${journeyBarHtml(spec, opts)}</span></span>`
+    html: `<span class="sy-j">${cap}<span class="sy-bar" data-axis="${esc(axisSignature(spec))}">${journeyBarHtml(spec, opts)}</span></span>`
   };
 }
 
@@ -176,20 +171,6 @@ export function clampJourneyBars(root = document) {
   root.querySelectorAll('.sy-bar').forEach((bar) => {
     const bounds = bar.getBoundingClientRect();
     bar.querySelectorAll('.sy-p').forEach((platform) => {
-      const full = platform.querySelector('.sy-pv.full-location');
-      if (full) {
-        full.style.translate = '';
-        delete platform.dataset.clamped;
-        const deviceBounds = (bar.closest('.sy-j') || bar).getBoundingClientRect();
-        const rect = full.getBoundingClientRect();
-        const shift = rect.right > deviceBounds.right + 0.5 ? deviceBounds.right - rect.right
-          : rect.left < deviceBounds.left - 0.5 ? deviceBounds.left - rect.left : 0;
-        if (shift) {
-          full.style.translate = `${shift}px 0`;
-          platform.dataset.clamped = '1';
-        }
-        return;
-      }
       const rect = platform.getBoundingClientRect();
       if (rect.right > bounds.right + 0.5) {
         platform.style.left = 'auto';

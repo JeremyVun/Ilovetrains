@@ -61,7 +61,7 @@ test('every step states a platform chip in its own line colour', () => {
   assert.match(html, /class="dact-unit board"><b[^>]*>5<\/b><span class="dact-copy"><span>Board T4 · Bondi Junction · Platform 5<\/span>/);
 });
 
-test('ferry detail displays the complete location in its green chip', () => {
+test('ferry detail keeps a full origin and compact transfer chip with full directions', () => {
   const journey = ferryJourneys()[1];
   const model = journeyDetail(journey, FERRY_NOW);
   const html = detailHtml({
@@ -83,7 +83,13 @@ test('ferry detail displays the complete location in its green chip', () => {
     footer: { dot: 'live', text: 'Live' }
   });
   assert.match(mixedHtml, /class="sy-row change [^"]*ferry-change[^"]*promoted"/);
-  assert.match(mixedHtml, /class="dact-unit board"><b[^>]*data-ferry-location="Wharf 3, Side A" data-role="board" data-stop="Circular Quay"[^>]*>Wharf 3, Side A<\/b><span class="dact-copy"><span>Board F1 · Manly<\/span>/);
+  assert.match(mixedHtml, /class="dact-unit board"><b[^>]*data-ferry-location="Wharf 3, Side A" data-role="board" data-stop="Circular Quay"[^>]*>3A<\/b><span class="dact-copy"><span>Board F1 · Manly · <span data-boarding-location="Wharf 3, Side A">Wharf 3, <span class="dside">Side A<\/span><\/span>/);
+
+  const cancelled = cancelLeg(mixedJourneys()[1], 1);
+  const cancelledHtml = render(cancelled);
+  assert.match(cancelledHtml, /class="dchange-note">Cancelled<\/span>/);
+  assert.match(cancelledHtml,
+    /data-boarding-location="Wharf 3, Side A">Wharf 3, <span class="dside">Side A<\/span>/);
 });
 
 test('a tight change is the only step that carries the warning', () => {

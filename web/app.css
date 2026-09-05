@@ -205,9 +205,6 @@ button { cursor: pointer; }
 .dwhat > .dplace-act {
   flex-direction: column; align-items: flex-start; gap: 4px;
 }
-.dchange-act.ferry { grid-template-columns: minmax(0, 1fr); row-gap: 7px; }
-.dchange-act.ferry .dact-unit { min-width: 0; }
-.dchange-act.ferry .dact-unit.board { flex-direction: column; align-items: flex-start; gap: 4px; }
 /* The change is bracketed by the masthead's own heavy rule, with its station
    set at the title's step. */
 .dstep.change {
@@ -366,28 +363,6 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
 }
 .sy-bar .sy-p.a { background: var(--stem); color: var(--chipink); border-radius: 0 3px 3px 0; }
 .sy-bar .sy-p.b { background: var(--stem2); color: var(--chipink2); border-radius: 3px 0 0 3px; }
-.sy-bar .sy-p.full-location {
-  width: 1px; min-width: 1px; height: 7px; padding: 0; border-radius: 0;
-}
-.sy-bar .sy-p .sy-pv.full-location {
-  position: absolute; top: 50%; height: 22px; display: flex; align-items: center;
-  padding: 0 7px; white-space: nowrap; transform: translateY(-50%);
-  border-radius: 3px 0 0 3px; font-size: 14px; font-weight: 700;
-  text-transform: uppercase;
-}
-.sy-bar .sy-p.a .sy-pv.full-location { right: 0; }
-.sy-bar .sy-p.b .sy-pv.full-location { left: 0; border-radius: 0 3px 3px 0; }
-.sy-j.full-transfer { position: relative; height: 104px; align-items: flex-start; }
-.sy-j.full-transfer .sy-bar { margin-top: 11px; }
-.sy-j.full-transfer .sy-p.full-location::after {
-  content: ''; position: absolute; left: 0; top: 50%; width: 1px; background: inherit;
-}
-.sy-j.full-transfer .sy-p.a.full-location::after { height: 25.5px; }
-.sy-j.full-transfer .sy-p.b.full-location::after { height: 54.5px; }
-.sy-j.full-transfer .sy-p.a .sy-pv.full-location { top: 29px; transform: none; }
-.sy-j.full-transfer .sy-p.b .sy-pv.full-location { top: 58px; transform: none; }
-.sy-j.full-transfer .sy-pstn { top: 84px; }
-.sy-row.full-transfer { min-height: 176px; }
 /* The station you change at, hung off the platform you board from. It overlays
    the headsign line rather than taking a fourth line from the row. */
 .sy-pstn {
@@ -405,7 +380,7 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
 .sy-row.two .sy-pstn[data-transfer-index="1"]::before { left: 8px; right: auto; }
 /* The second alighting numeral is the only fact the row can lose and still say
    where to get off and what to board. */
-.sy-row.two .sy-bar .sy-p.a:not(.full-location)[data-transfer-index="1"] { display: none; }
+.sy-row.two .sy-bar .sy-p.a[data-transfer-index="1"] { display: none; }
 .sy-row.two .sy-sign { min-width: 56px; }
 .sy-bar .sy-dim { left: 0; background: var(--bg); opacity: .62; }
 .sy-bar .sy-mk { top: -2px; bottom: -2px; width: 8px; margin-left: -4px; background: var(--bg); }
@@ -513,9 +488,6 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
 .hm-hd .sy-cap[data-ferry-location] { font-size: 14px; }
 .hm-hd .sy-bar { height: var(--barh); }
 .hm-hd .sy-bar .sy-p { height: var(--caph); font-size: var(--capf); padding: 0 7px; min-width: 24px; letter-spacing: .02em; }
-.hm-hd .sy-j.full-transfer { height: 94px; }
-.hm-hd .sy-bar .sy-p.full-location { width: 1px; min-width: 1px; height: var(--barh); padding: 0; }
-.hm-hd .sy-bar .sy-p .sy-pv.full-location { height: var(--caph); font-size: 14px; }
 .hm-sign {
   grid-column: 1 / -1; grid-row: 3; margin-top: 8px; min-width: 0;
   font-size: var(--signf); font-weight: 300; line-height: 1.3; color: var(--ink-2);

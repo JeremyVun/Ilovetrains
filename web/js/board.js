@@ -71,7 +71,6 @@ export function resultRowHtml(row, opts = {}) {
     stations: true
   });
   const classes = ['sy-row', changes.length ? 'change' : 'direct',
-    device.fullTransfer ? 'full-transfer' : '',
     changes.length > 1 ? 'two' : '', changes.some((c) => c.tight) ? 'tight' : '',
     changes.some((c) => c.fromStation && c.toStation && c.fromStation !== c.toStation) ? 'distinct-stop' : '',
     changes.some((c) => c.fromPlace === 'Wharf' || c.toPlace === 'Wharf') ? 'ferry-change' : '',

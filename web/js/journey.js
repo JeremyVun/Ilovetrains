@@ -94,6 +94,15 @@ export function platformChip(value) {
   return match ? match[1] : '';
 }
 
+export function transferPlatformChip(value, mode) {
+  if (String(mode || '').toLowerCase() !== 'ferry') return platformChip(value);
+  const raw = String(value || '').trim();
+  const number = platformChip(raw).toUpperCase();
+  const side = /\bside\s+([a-z0-9]+)\b/i.exec(raw)?.[1]?.toUpperCase() || '';
+  if (!number) return side;
+  return side && !number.toUpperCase().endsWith(side) ? number + side : number;
+}
+
 export function modeWords(mode) {
   return String(mode || '').toLowerCase() === 'ferry'
     ? { vehicle: 'ferry', place: 'Wharf' }
@@ -119,7 +128,7 @@ function chip(leg, platform, stop, role) {
   return {
     code: lineCode(leg),
     colourKey: colourKey(leg && leg.line),
-    platform: platformChip(platform) || '—',
+    platform: transferPlatformChip(platform, mode) || '—',
     location: boardingLabel(platform, mode) || null,
     place: words.place,
     role,
@@ -220,7 +229,8 @@ function stepsOf(legs, changes, cancelled, nowMs) {
       // ui.md: a tight change prints its current window and no other.
       label: broken ? 'Cancelled' : tight ? change.minutes + ' min change' : 'Board',
       serviceLabel: boardLabel(legs[index + 1]),
-      boardingPlace: broken ? '' : change.toLabel || '',
+      boardingPlace: broken && modeWords(legs[index + 1].line && legs[index + 1].line.mode).place !== 'Wharf'
+        ? '' : change.toLabel || '',
       tight,
       cancelled: broken,
       done: change.done

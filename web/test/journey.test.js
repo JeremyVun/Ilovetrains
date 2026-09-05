@@ -4,7 +4,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  journeyDetail, journeyKey, departureKey, legsOf, modeWords, platformChip, platformNumber, TIGHT_CHANGE_MIN
+  journeyDetail, journeyKey, departureKey, legsOf, modeWords, platformChip, platformNumber,
+  transferPlatformChip, TIGHT_CHANGE_MIN
 } from '../js/journey.js';
 import {
   TRANSFER_NOW, TRANSFER_DEPARTED_NOW, transferJourneys, delayLeg, cancelLeg,
@@ -53,16 +54,23 @@ test('the journey prints as board, change, arrive in travel order', () => {
   });
 });
 
-test('mode words and platform parsing preserve a ferry boarding side', () => {
+test('mode words and compact ferry transfers preserve a boarding side', () => {
   assert.deepEqual(modeWords('ferry'), { vehicle: 'ferry', place: 'Wharf' });
   assert.deepEqual(modeWords('metro'), { vehicle: 'train', place: 'Platform' });
   assert.equal(platformNumber('Wharf 3, Side B'), '3, Side B');
   assert.equal(platformChip('Wharf 3, Side B'), '3');
+  assert.deepEqual([
+    transferPlatformChip('Wharf 3, Side B', 'ferry'),
+    transferPlatformChip('Wharf 5b, Side B', 'ferry'),
+    transferPlatformChip('Side A', 'ferry'),
+    transferPlatformChip('Balmain Wharf', 'ferry'),
+    transferPlatformChip('Platform 3, Side B', 'train')
+  ], ['3B', '5B', 'A', '', '3']);
 
   const ferry = detail(ferryJourneys()[2], FERRY_NOW);
   assert.equal(ferry.vehicle, 'ferry');
   assert.deepEqual(ferry.steps[0].chip, {
-    code: 'F1', colourKey: 'FERRY', platform: '3', location: 'Wharf 3, Side B', place: 'Wharf',
+    code: 'F1', colourKey: 'FERRY', platform: '3B', location: 'Wharf 3, Side B', place: 'Wharf',
     role: 'origin', stop: 'Circular Quay'
   });
   assert.deepEqual(ferry.arrival, {

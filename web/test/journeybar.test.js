@@ -95,7 +95,7 @@ test('the station a change happens at hangs off the platform it is boarded from'
   assert.match(header.html, /class="sy-g0 warn"/);
 });
 
-test('ferry devices use mode green and keep full locations in their green devices', () => {
+test('ferry devices keep a full origin and compact transfer side', () => {
   const direct = journeyDeviceHtml(ferryJourneys()[1], { caps: true });
   assert.equal(direct.vars, '--stem:var(--line-fill-FERRY);--stem2:var(--line-fill-FERRY);'
     + '--chipink:var(--bg);--chipink2:var(--bg);');
@@ -103,8 +103,7 @@ test('ferry devices use mode green and keep full locations in their green device
   assert.match(direct.html, /data-line-code="F1" data-colour-key="FERRY"[^>]*background:var\(--line-fill-FERRY\)/);
 
   const mixed = journeyDeviceHtml(mixedJourneys()[1], { caps: true });
-  assert.match(mixed.html, /data-ferry-location="Wharf 3, Side A" data-role="board" data-stop="Circular Quay"[^>]*>Wharf 3, Side A<\/span>/);
-  assert.doesNotMatch(mixed.html, /<span class="sy-pv">3<\/span>/);
+  assert.match(mixed.html, /data-ferry-location="Wharf 3, Side A" data-role="board" data-stop="Circular Quay"[^>]*>3A<\/span>/);
 });
 
 test('a transfer prints each known location when its counterpart is missing', () => {
@@ -142,24 +141,6 @@ test('a transfer prints each known location when its counterpart is missing', ()
   });
   assert.doesNotMatch(railDevice.html, /data-pin=|data-transfer-station/,
     'a partial rail transfer keeps its established no-marker rendering');
-});
-
-test('a later ferry alighting location remains visible on a three-leg journey', () => {
-  const journey = structuredClone(transferJourneys()[0]);
-  const second = journey.legDetail[1];
-  second.line = { name: 'F4', mode: 'ferry' };
-  second.from = { name: 'Town Hall', platform: 'Wharf 2, Side A' };
-  second.to = { name: 'Central', platform: 'Wharf 5, Side B' };
-  journey.legDetail.push({
-    ...structuredClone(second),
-    line: { name: 'T1', mode: 'train' },
-    from: { name: 'Central Station', platform: 'Platform 13' },
-    departure: { scheduled: '2026-09-05T10:07:00+10:00', estimated: null }
-  });
-  const device = journeyDeviceHtml(journey, { caps: true });
-
-  assert.match(device.html,
-    /class="sy-p a full-location"[^>]*data-transfer-index="1"[^>]*>[\s\S]*data-ferry-location="Wharf 5, Side B" data-role="alight" data-stop="Central"/);
 });
 
 test('the shared-device origin rule omits only a normalized exact-repeat cap', () => {
