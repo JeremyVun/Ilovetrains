@@ -167,8 +167,9 @@ What is checked, with the comp probes the numbers come from:
 - countdown units stay at least 12px even when an hours figure uses smaller
   numerals;
 - every change on a row names its station and its boarding platform, inside
-  the frame; ferry origins keep the full raw label while compact transfer
-  markers keep their full raw label, role and stop association in data;
+  the frame; ferry origins keep the full raw label in data while their visible
+  cap follows the named-only `Wharf` fallback, and compact transfer markers
+  keep their full raw label, role and stop association in data;
 - actual text ranges keep transfer names clear of headsigns, boarding markers
   clear of each other, and step text/chips at least 4px inside their dividers;
   visible ferry labels stay at least 14px, remain unclipped, and detail keeps
@@ -287,7 +288,7 @@ change the produced filename, not the state, so rename by an explicit table and
 then **read every frame**: a stale `OFFLINE` board or a withheld figure is a
 convincing shot of the wrong screen, and so is the wrong route.
 
-The table, all forty-four frames. `default` means no flags: the state carries its
+The table, all forty-five frames. `default` means no flags: the state carries its
 own size and the dark scheme is unsuffixed.
 
 | Exemplar | State | Invocation |
@@ -303,6 +304,7 @@ own size and the dark scheme is unsuffixed.
 | `board-390x844-ferry-pyrmont.png` | `ferry-pyrmont` | default |
 | `board-390x844-ferry-doublebay.png` | `ferry-doublebay` | default |
 | `board-390x844-ferry-numeric.png` | `ferry-numeric-control` | default |
+| `board-390x844-ferry-side-only.png` | `ferry-side-only-control` | default |
 | `detail-390x844-hero.png` | `detail-hero` | default |
 | `detail-390x844-tight.png` | `detail-tight` | default |
 | `detail-390x844-cancelled.png` | `detail-cancelled` | default |
@@ -338,8 +340,10 @@ own size and the dark scheme is unsuffixed.
 | `setup-390x844-origin.png` | `setup-origin` | default |
 
 The focused Pyrmont state selects its captured 22:11 journey, whose Circular
-Quay transfer is `5B` to `4B`; it keeps the full `Pyrmont Bay Wharf` origin
-cap. The reverse focused state keeps `Double Bay Wharf` and uses `5B` to `5A`.
+Quay transfer is `5B` to `4B`; its raw `Pyrmont Bay Wharf` origin presents as
+`Wharf`. The reverse focused state applies the same fallback to `Double Bay
+Wharf` and uses `5B` to `5A`. `ferry-side-only-control` proves that a supplied
+`Side A` stays visible rather than taking the named-only fallback.
 `ferry-numeric-home-focused` and `ferry-numeric-detail` select the captured
 Circular Quay departure from `Wharf 4, Side B` so the full initial label is
 calibrated separately from compact transfer markers.
