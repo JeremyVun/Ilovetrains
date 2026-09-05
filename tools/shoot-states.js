@@ -48,6 +48,7 @@ const { journeyGeometryProblems } = require('./journey-geometry');
 const ROOT = path.resolve(__dirname, '..');
 const DEFAULT_OUT = path.join(os.tmpdir(), 'trains-states');
 const DEFAULT_URL = 'http://localhost:8092/';
+const readFixture = (name) => JSON.parse(fs.readFileSync(path.join(ROOT, 'tools', 'fixtures', name), 'utf8'));
 
 /* The fixture's pinned moment: 22:45 on Monday 31 August 2026. */
 const NOW_ISO = '2026-08-31T22:45:00+10:00';
@@ -125,6 +126,18 @@ const TRIP_FERRY = {
   from: { id: '200020', name: 'Circular Quay', location: { lat: -33.861351, lon: 151.210813 } },
   to: { id: '209573', name: 'Manly Wharf', location: { lat: -33.799541, lon: 151.284282 } },
   createdAt: '2026-09-05T08:00:00+10:00'
+};
+const TRIP_PYRMONT_DOUBLE_BAY = {
+  id: 'trip-pyrmont-double-bay',
+  from: { id: '2000260', name: 'Pyrmont Bay Wharf' },
+  to: { id: '202823', name: 'Double Bay Wharf' },
+  createdAt: '2026-09-05T20:30:00+10:00'
+};
+const TRIP_DOUBLE_BAY_PYRMONT = {
+  id: 'trip-double-bay-pyrmont',
+  from: { id: '202823', name: 'Double Bay Wharf' },
+  to: { id: '2000260', name: 'Pyrmont Bay Wharf' },
+  createdAt: '2026-09-05T20:30:00+10:00'
 };
 const TRIP_MIXED = {
   id: 'trip-wynyard-manly',
@@ -223,6 +236,9 @@ async function states() {
     FERRY_NOW, ferryBody, ferryJourneys, mixedBody, mixedJourneys,
     balmainEastBody, cockatooBalmainBody
   } = fx;
+  const pyrmontDoubleBayBody = readFixture('departures_pyrmont_doublebay.json');
+  const doubleBayPyrmontBody = readFixture('departures_doublebay_pyrmont.json');
+  const circularQuayManlyBody = readFixture('departures_circularquay_manly.json');
 
   const board = (name, body, opts = {}) => ({
     name,
@@ -1029,6 +1045,63 @@ async function states() {
     transfer('board-cancelled-tight', breakLeg(tighten(transferJourneys()))),
     transfer('board-two-change', twoChangeBoard()),
 
+    ferry('ferry-pyrmont', pyrmontDoubleBayBody, {
+      trip: TRIP_PYRMONT_DOUBLE_BAY,
+      now: Date.parse(pyrmontDoubleBayBody.generatedAt),
+      expect: {
+        boardHeader: ['Pyrmont Bay Wharf', 'Double Bay Wharf'],
+        equalHeaderLines: true,
+        caps: [],
+        copy: ['Circular Quay'],
+        accessibleCopy: ['Pyrmont Bay Wharf'],
+        ferryCodes: ['F4', 'F7']
+      }
+    }),
+    ferry('ferry-doublebay', doubleBayPyrmontBody, {
+      trip: TRIP_DOUBLE_BAY_PYRMONT,
+      now: Date.parse(doubleBayPyrmontBody.generatedAt),
+      expect: {
+        boardHeader: ['Double Bay Wharf', 'Pyrmont Bay Wharf'],
+        equalHeaderLines: true,
+        caps: [],
+        copy: ['Circular Quay'],
+        accessibleCopy: ['Double Bay Wharf'],
+        ferryCodes: ['F7', 'F4']
+      }
+    }),
+    ferry('ferry-numeric-control', circularQuayManlyBody, {
+      trip: TRIP_FERRY,
+      now: Date.parse(circularQuayManlyBody.generatedAt),
+      expect: {
+        boardHeader: ['Circular Quay', 'Manly Wharf'],
+        caps: ['Wharf 4, Side A', 'Wharf 4, Side B', 'Wharf 4, Side A', 'Wharf 4, Side A'],
+        ferryCodes: ['F1']
+      }
+    }),
+    ferry('ferry-pyrmont-detail', pyrmontDoubleBayBody, {
+      trip: TRIP_PYRMONT_DOUBLE_BAY,
+      now: Date.parse(pyrmontDoubleBayBody.generatedAt),
+      after: OPEN_ROW(0),
+      expect: {
+        rail: true,
+        caps: [],
+        copy: ['Pyrmont Bay Wharf', 'Double Bay Wharf', 'Take this ferry'],
+        accessibleCopy: ['Pyrmont Bay Wharf'],
+        ferryCodes: ['F4', 'F7']
+      }
+    }),
+    ferry('ferry-numeric-detail', circularQuayManlyBody, {
+      trip: TRIP_FERRY,
+      now: Date.parse(circularQuayManlyBody.generatedAt),
+      after: OPEN_ROW(0),
+      expect: {
+        rail: true,
+        caps: ['Wharf 4, Side A'],
+        copy: ['Circular Quay', 'Manly Wharf', 'Take this ferry'],
+        ferryCodes: ['F1']
+      }
+    }),
+
     ferry('ferry-home', ferryBody(), {
       route: '#/',
       expect: { status: 'Next ferry', ferryCodes: ['MFF'] }
@@ -1367,6 +1440,24 @@ function pageScript(state) {
         problems.push('figure "' + (mins.firstChild && mins.firstChild.nodeValue) + '" overflows its column: '
           + mins.scrollWidth + ' > ' + mins.clientWidth);
       }
+      const unit = row.querySelector('.sy-u');
+      if (mins && unit) {
+        const wide = row.classList.contains('wide');
+        const expectedFigure = innerWidth >= 900 ? (wide ? 36 : 46.8) : (wide ? 27.9 : 40.5);
+        const figureStyle = getComputedStyle(mins);
+        const unitStyle = getComputedStyle(unit);
+        if (!near(px(figureStyle.fontSize), expectedFigure, 0.1)) {
+          problems.push('figure type is ' + figureStyle.fontSize + ', not ' + expectedFigure + 'px');
+        }
+        if (!near(px(unitStyle.fontSize), 12, 0.1) || unitStyle.fontWeight !== '500'
+          || !near(px(unitStyle.paddingLeft), 2, 0.1)) {
+          problems.push('unit type is ' + unitStyle.fontSize + '/' + unitStyle.fontWeight
+            + ' with ' + unitStyle.paddingLeft + ' inset, not 12px/500 with 2px');
+        }
+        if (unitStyle.color !== figureStyle.color) {
+          problems.push('unit colour ' + unitStyle.color + ' does not inherit figure colour ' + figureStyle.color);
+        }
+      }
       // The provenance shares the figure's 72px column and has no ellipsis, so
       // an overlong one is drawn straight through the departure time.
       const prov = row.querySelector('.sy-st');
@@ -1543,6 +1634,36 @@ function pageScript(state) {
       const said = topStatus ? topStatus.textContent.trim() : null;
       if (said !== expect.status) problems.push('the top line reads "' + said + '", not "' + expect.status + '"');
     }
+    if (Array.isArray(expect.boardHeader)) {
+      const endpoints = [...document.querySelectorAll('.sy-h1 > b')];
+      const values = endpoints.map((node) => node.textContent.trim());
+      if (values.join('/') !== expect.boardHeader.join('/')) {
+        problems.push('board endpoints are ' + values.join('/') + ', not ' + expect.boardHeader.join('/'));
+      }
+      if (endpoints.length === 2) {
+        const widths = endpoints.map((node) => node.getBoundingClientRect().width);
+        if (!near(widths[0], widths[1])) {
+          problems.push('board endpoint tracks are ' + widths.map(round).join('/') + 'px, not equal');
+        }
+        if (expect.equalHeaderLines) {
+          const lineCount = (node) => {
+            const range = document.createRange();
+            range.selectNodeContents(node);
+            return new Set([...range.getClientRects()].map((rect) => round(rect.top))).size;
+          };
+          const lines = endpoints.map(lineCount);
+          if (lines[0] !== lines[1]) {
+            problems.push('board endpoints use ' + lines.join('/') + ' lines, not the same count');
+          }
+        }
+      }
+    }
+    if (Array.isArray(expect.caps)) {
+      const caps = [...document.querySelectorAll('.sy-cap')].map((node) => node.textContent.trim());
+      if (caps.join('/') !== expect.caps.join('/')) {
+        problems.push('boarding caps are ' + caps.join('/') + ', not ' + expect.caps.join('/'));
+      }
+    }
     if (Array.isArray(expect.copy)) {
       const visible = document.body.textContent;
       for (const copy of expect.copy) {
@@ -1565,6 +1686,12 @@ function pageScript(state) {
       const labels = [...document.querySelectorAll('[aria-label]')].map((node) => node.getAttribute('aria-label'));
       for (const label of expect.aria) {
         if (!labels.includes(label)) problems.push('expected accessible label is missing: "' + label + '"');
+      }
+    }
+    if (Array.isArray(expect.accessibleCopy)) {
+      const labels = [...document.querySelectorAll('[aria-label]')].map((node) => node.getAttribute('aria-label')).join(' ');
+      for (const copy of expect.accessibleCopy) {
+        if (!labels.includes(copy)) problems.push('accessible copy is missing: "' + copy + '"');
       }
     }
     if (Array.isArray(expect.ferryCodes)) {
@@ -1723,10 +1850,8 @@ function pageScript(state) {
     const timeline = document.querySelector('.sy-tl');
     const futureRows = timeline ? [...timeline.querySelectorAll('.sy-fwd > .sy-row')] : [];
     if (timeline && futureRows.length === 6 && !timeline.querySelector(':scope > .sy-row')) {
-      const box = timeline.getBoundingClientRect();
       const heights = futureRows.map((row) => row.getBoundingClientRect().height);
-      if (futureRows[0].getBoundingClientRect().top < box.top - 0.5
-          || futureRows[5].getBoundingClientRect().bottom > box.bottom + 0.5
+      if (heights.some((height) => !near(height, 96))
           || Math.max(...heights) - Math.min(...heights) > 0.2) {
         problems.push('six future services are not six whole equal slots');
       }

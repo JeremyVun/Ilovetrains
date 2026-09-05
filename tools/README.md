@@ -6,6 +6,9 @@
   and five ferry/mixed journey responses using verified Trip Planner IDs.
 - `fixtures/` — raw TfNSW responses from probes; golden inputs for backend
   mapping tests. Re-run the probe to refresh; note refresh date in commits.
+  The three `departures_*.json` files are mapped public-API captures from
+  2026-09-05 for the approved ferry-board calibration: Pyrmont Bay → Double
+  Bay, its reverse, and Circular Quay → Manly’s numbered/side wharf control.
 - `screenshot.js` — screenshot any URL at a real device viewport over CDP.
   No npm dependencies; kills Chrome in a `finally`.
 - `shoot-states.js` — drive the real client into every board state and shoot
@@ -157,7 +160,7 @@ What is checked, with the comp probes the numbers come from:
 - three full lines per board row, and a 96px row (at least 100px in detail)
   with its rule drawn edge to edge of a row that is itself edge to edge of the
   region holding it;
-- one figure column per view: detail uses 68px, the phone board uses 72px;
+- one figure column per view: detail uses 69px, the phone board uses 72px;
   each row figure and detail step time ends at `--sy-pad` + `--sy-fig`;
 - the figure fits that column, and our own copy is never ellipsised — an
   upstream headsign may be, but only once it has used the whole row;
@@ -281,7 +284,7 @@ change the produced filename, not the state, so rename by an explicit table and
 then **read every frame**: a stale `OFFLINE` board or a withheld figure is a
 convincing shot of the wrong screen, and so is the wrong route.
 
-The table, all thirty-six frames. `default` means no flags: the state carries its
+The table, all forty frames. `default` means no flags: the state carries its
 own size and the dark scheme is unsuffixed.
 
 | Exemplar | State | Invocation |
@@ -294,6 +297,9 @@ own size and the dark scheme is unsuffixed.
 | `board-390x844-two-change.png` | `board-two-change` | default |
 | `board-390x844-hero-light.png` | `on-time` | `--media prefers-color-scheme:light` |
 | `board-412x732-hero.png` | `short-on-time` | default (the state is 412×732) |
+| `board-390x844-ferry-pyrmont.png` | `ferry-pyrmont` | default |
+| `board-390x844-ferry-doublebay.png` | `ferry-doublebay` | default |
+| `board-390x844-ferry-numeric.png` | `ferry-numeric-control` | default |
 | `detail-390x844-hero.png` | `detail-hero` | default |
 | `detail-390x844-tight.png` | `detail-tight` | default |
 | `detail-390x844-cancelled.png` | `detail-cancelled` | default |
@@ -306,6 +312,7 @@ own size and the dark scheme is unsuffixed.
 | `detail-412x732-tight.png` | `detail-tight` | `--size 412x732` |
 | `detail-412x732-cancelled.png` | `detail-cancelled` | `--size 412x732` |
 | `detail-412x732-long.png` | `detail-long` | `--size 412x732` |
+| `detail-390x844-ferry-pyrmont.png` | `ferry-pyrmont-detail` | default |
 | `home-390x844-before.png` | `home-before` | default |
 | `home-390x844-change.png` | `home-change` | default |
 | `home-390x844-final.png` | `home-final` | default |
