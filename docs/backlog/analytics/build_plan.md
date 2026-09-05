@@ -335,10 +335,13 @@ Gate: `node tools/shoot-states.js` green across the listed states at
 
 ## Phase 5 — deploy and closeout — DEPLOYED; FINAL READBACK PENDING
 
-Implementation `f9f2c9d` plus returning-worker fix `e853c5b`; registry image
-`sha256:e9fbb51895c01ca69af44bce22d8675bad80fef06d0bd5de791143778097bbda`.
-Deploy job `70f2e732888e5cca9fc8e3d362ab6a80` succeeded. Production health is
-200, `/sw.js` is v21, and `/js/main.js` matches the verified source SHA-256
+Implementation `f9f2c9d`, returning-worker fix `e853c5b`, and static
+revalidation fix `6cb8c98`; registry image
+`sha256:bec81596aea196b354b1682dc960d46e18b348bfe371cb87bc33bd61a155253d`.
+Deploy job `0029e4350fe3df557b0e7efe2b6aa972` succeeded. The image also includes
+the concurrent ferry layout commit `45cac58`: all 47 web files in the immutable
+image match the current source. Production health is 200, `/sw.js` is v22,
+and `/js/main.js` matches the verified source SHA-256
 `bdf4ce3fc22cbdae237bb76d6ec8511715249dd83047e13ead5f8860e6e6d940`.
 The protected stats endpoint returns 401. Permission to read only its
 `ANALYTICS_READ_KEY` from the infra analytics secret file has been requested;
@@ -358,7 +361,16 @@ revalidation: the cached pre-ferry file had a later modification time than
 the replacement, causing a false origin 304. Static responses now use
 `no-store` and ignore `If-Modified-Since`; a behavioral regression recreates
 the backwards timestamp and fails when the guard is removed. All Go tests
-pass. Final cold-start and performance checks await this server redeploy.
+pass. Production static responses now retain `no-store` through Cloudflare
+(`BYPASS`), and the formerly incorrect conditional request returns 200 with
+current bytes. A fresh production v22 profile boots on its first navigation,
+records `opened → shown_setup → asked_setup`, and caches source-identical
+controller and line modules. The documented `measure-open.js` warm gate
+passes: worker controlled, first contentful paint 40 ms, live response 562 ms,
+eight rows. CDP-offline navigation still loads the setup shell from v22.
+Artifacts: `/tmp/trains-analytics-postdeploy/` (fresh and offline frames plus
+`performance-v22/`). No browser or implementation gate remains; protected
+counter readback and the subsequent backlog deletion remain pending.
 
 Run the `backlog-item` skill's close stage: migrate design.md's
 constraints, vocabulary and reads into the contracts (section 9 lists
