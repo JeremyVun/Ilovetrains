@@ -160,7 +160,7 @@ button { cursor: pointer; }
 .detail-scroll {
   flex: 1; min-height: 0; overflow-y: auto;
   -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
-  --sy-fig: 68px;
+  --sy-fig: 69px;
 }
 .detail-scroll .sy-row { min-height: 100px; }
 .sy-row.distinct-stop, .sy-row.ferry-change { padding-top: 4px; padding-bottom: 5px; }
@@ -263,7 +263,7 @@ button { cursor: pointer; }
   gap: 9px; align-items: center; min-height: 62px; margin: 2px 0 9px;
   font-size: 25px; font-weight: 300; letter-spacing: -.025em; line-height: 1.03;
 }
-.sy-h1 b { min-width: 0; font-weight: 300; }
+.sy-h1 b { min-width: 0; font-weight: 300; overflow-wrap: anywhere; }
 .sy-h1 b:last-child { text-align: right; }
 .sy-h1 .conn { height: 1px; background: var(--rule-2); position: relative; }
 .sy-h1 .conn::after {

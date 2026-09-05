@@ -236,7 +236,8 @@ substitutes for going back.
   line height, inside a minimum 62px name band. The origin aligns left and
   destination right. Keep `Wharf`, `Junction` and compass words in full;
   only the existing terminal `Station` suffix is dropped. Neither endpoint
-  is ellipsised. At widths up to 375px, the type is 24px with a 22px arrow
+  is ellipsised. A single word wider than its column wraps within the word
+  as a last resort, preserving every character. At widths up to 375px, the type is 24px with a 22px arrow
   and 7px gaps.
 - A row omits its visible boarding cap only when the nonempty raw boarding
   label exactly equals the journey origin after trimming, collapsing
@@ -355,7 +356,7 @@ substitutes for going back.
   summary states no journey duration, because a delay that leaves the arrival
   alone would make the journey read as faster.
 - Under the rule the chosen board row keeps the board's grammar, at least
-  100px tall. Detail uses a 68px figure column, shared by the promoted row
+  100px tall. Detail uses a 69px figure column, shared by the promoted row
   and step times; the board retains 72px. Transfer labels and headsigns must
   remain separate and readable, with extra row height when needed. The
   promoted row is not a tap target. A cancelled journey keeps the board's
