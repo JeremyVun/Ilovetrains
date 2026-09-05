@@ -28,7 +28,10 @@ Round 1 compares balanced endpoint columns (C1), labelled endpoint rows
 recommendation is C1: retain full endpoint names under the same wrapping
 rule and omit a boarding cap only when its label exactly repeats the
 origin after case/whitespace normalization. Numeric wharf and side labels
-remain intact. No owner verdict has been recorded.
+remain intact. Owner verdict, 2026-09-05: “agreed. let's go with c1”.
+Implement C1 as shown; compact numeric/side caps and side-bearing transfer
+pins are outside this approval. The winning C1 frames become current
+calibration assets alongside the unchanged home and detail exemplars.
 
 The workshop's `index.html` and `OPTIONS.md` contain the comparison and
 tradeoffs. All 48 captures cover both phone frames and schemes, the
@@ -325,7 +328,6 @@ place, to satisfy the contract that every service leg is identified.
 
 ## Open questions
 
-Header/cap composition awaits the current comp verdict. The typography
-change is already approved. The shared-stop correction was accepted on
-2026-09-05. Phase-0 findings and fixture provenance are in
+None. C1 and the typography change are approved. The shared-stop correction
+was accepted on 2026-09-05. Phase-0 findings and fixture provenance are in
 `docs/references/tfnsw-open-data.md`, “Ferries”.
