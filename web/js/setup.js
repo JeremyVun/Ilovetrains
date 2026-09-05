@@ -10,7 +10,23 @@ import { MIN_QUERY, createSearcher, hintFor, queryKey, rankStops, fuzzyScore, to
 export const SEARCH_DEBOUNCE_MS = 300;
 const searcher = createSearcher((query, opts) => getStops(query, opts));
 
-export function renderSetup(root, ctx, { origin, redirect } = {}) {
+export async function renderSetup(root, ctx, { origin, redirect } = {}) {
+  const isCurrent = () => root.isConnected && document.getElementById('app') === root;
+  let initialPermission = null;
+  let initialStations = null;
+  let initialFix = null;
+  if (!origin && !ctx.doc.trips.length) {
+    initialPermission = await ctx.permission();
+    if (!isCurrent()) return;
+    if (initialPermission === 'granted') {
+      [initialFix, initialStations] = await Promise.all([
+        ctx.fix({ maximumAge: 0 }), loadStations()
+      ]);
+      if (!isCurrent()) return;
+      const spot = initialFix && initialStations ? here(ctx.doc, initialStations, initialFix) : null;
+      if (spot) origin = spot.station;
+    }
+  }
   const picked = { from: null, to: null };
   let active = 'from';
   let results = [];
@@ -18,9 +34,9 @@ export function renderSetup(root, ctx, { origin, redirect } = {}) {
   let hint = null;
   let debounce = null;
   let inflight = null;
-  let stations = null;
-  let fix = null;
-  let askable = false;
+  let stations = initialStations;
+  let fix = initialFix;
+  let askable = initialPermission === 'prompt';
   let nearby = null;
 
   mount(root, `<div class="hm-c home-screen">
@@ -118,6 +134,7 @@ export function renderSetup(root, ctx, { origin, redirect } = {}) {
     inflight = new AbortController();
     try {
       const stops = await searcher.search(query, { signal: inflight.signal });
+      if (!isCurrent()) return;
       if (role !== active || queryKey(query) !== queryKey(inputs[role].value)) return;
       const combined = [...stops, ...recentFor(role, query)];
       results = rankStops([...new Map(combined.map((stop) => [stop.id, stop])).values()], query);
@@ -125,6 +142,7 @@ export function renderSetup(root, ctx, { origin, redirect } = {}) {
       hint = hintFor({ query, phase: 'done', count: results.length });
     } catch (error) {
       if (error.name === 'AbortError') return;
+      if (!isCurrent()) return;
       results = recentFor(role, query);
       group = results.length ? 'You searched before' : '';
       hint = results.length ? null : hintFor({ query, phase: 'error' });
@@ -191,7 +209,9 @@ export function renderSetup(root, ctx, { origin, redirect } = {}) {
 
   async function useLocation() {
     fix = await ctx.fix();
+    if (!isCurrent()) return;
     if (!stations) stations = await loadStations();
+    if (!isCurrent()) return;
     const spot = fix && stations ? here(ctx.doc, stations, fix) : null;
     if (!spot) {
       askable = false;
@@ -252,10 +272,22 @@ export function renderSetup(root, ctx, { origin, redirect } = {}) {
     inputs.from.focus();
   }
 
+  if (initialPermission !== null) {
+    if (stations) settleLocation();
+    else loadStations().then((list) => {
+      if (!isCurrent()) return;
+      stations = list;
+      settleLocation();
+    });
+    return;
+  }
+
   Promise.all([ctx.permission(), loadStations()]).then(async ([permission, list]) => {
+    if (!isCurrent()) return;
     stations = list;
     askable = permission === 'prompt';
     if (permission === 'granted') fix = await ctx.fix();
+    if (!isCurrent()) return;
     settleLocation();
   });
 }

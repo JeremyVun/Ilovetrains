@@ -15,6 +15,15 @@
   contact sheet. Read `comps/README.md`.
 - `icon.html` + `make-icons.sh` — regenerate the PWA icons through the browser.
 - `build-stations.js` — rebuild the baked station index both clients search.
+- `check-controller-lifecycle.js` — browser-check repeated home fixes and
+  durable arrival completion against a locally served client.
+
+Run the controller check on a private local server; it supplies synthetic
+journeys and CDP geolocation and makes no API request:
+
+```
+node tools/check-controller-lifecycle.js --url http://localhost:<port>
+```
 
 ## comps/
 

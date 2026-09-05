@@ -8,7 +8,7 @@ import {
 import { distanceKm, locate, predict } from './predict.js';
 import { here, loadStations } from './stations.js';
 import { boardModel, promotedRow } from './rowmodel.js';
-import { journeyDetail, journeyKey, arrivalMs, departureMs } from './journey.js';
+import { journeyDetail, journeyKey, departureKey, legsOf, arrivalMs, departureMs } from './journey.js';
 import {
   focusOf, setFocus, clearFocus, isFocused, focusExpired, matchJourney, refreshFocus,
   directionsModel, inferTravel, arrived, journeyCancelled, TRAVEL_LATE_MS
@@ -69,6 +69,7 @@ function onLiveView() {
 const timers = { tick: null, refresh: null, view: null };
 let inflight = null;
 let pastInflight = null;
+let geoGeneration = 0;
 /* A tick may not rewrite a view whose markup is unchanged: the write would
    discard the element a wheel is scrolling and cancel a smooth scroll. */
 const painted = { home: null, board: null, detail: null };
@@ -101,7 +102,7 @@ const ctx = {
   go(hash) { if (location.hash === hash) route(); else location.hash = hash; },
   update(doc) { state.doc = doc; saveDoc(doc); },
   permission: geoPermissionState,
-  fix: takeFix,
+  fix: takeContextFix,
   async saveTrip(trip, redirect) {
     state.selection = savePair(trip);
     if (!redirect) return ctx.go('#/');
@@ -129,13 +130,14 @@ async function redirectJourney(trip, redirect) {
     const { body } = await getDepartures(trip.from.id, trip.to.id, {
       at: redirect.departureMs - 60_000, limit: LIMIT
     });
-    return (body.journeys || []).find((item) => journeyKey(item) === redirect.journeyKey) || null;
+    return (body.journeys || []).find((item) => departureKey(item) === redirect.journeyKey) || null;
   } catch (_) {
     return null;
   }
 }
 
 function route() {
+  geoGeneration += 1;
   stopTimers();
   if (inflight) inflight.abort();
   if (pastInflight) pastInflight.abort();
@@ -217,8 +219,7 @@ function explicitSelection() {
 }
 
 function validFix() {
-  if (!state.fix || !Number.isFinite(state.fix.at) || now() - state.fix.at > FIX_MAX_AGE_MS) return null;
-  return state.fix;
+  return fixIsValid(state.fix) ? state.fix : null;
 }
 
 function loadSelectedCache() {
@@ -230,6 +231,7 @@ function loadSelectedCache() {
 
 function showHome(root) {
   state.view = 'home';
+  state.fix = null;
   state.previousOpen = state.doc.lastOpen || null;
   state.selection = chooseSelection();
   if (!state.selection) return;
@@ -249,11 +251,13 @@ function showHome(root) {
 function loadIndex() {
   if (indexRequested) return;
   indexRequested = true;
-  loadStations().then((list) => {
-    if (!list) return;
-    state.stations = list;
-    if (state.view === 'home' && validFix() && state.predicted) useFix();
-  });
+  loadStations().then(indexReady);
+}
+
+function indexReady(list) {
+  if (!list) return;
+  state.stations = list;
+  if (state.view === 'home' && validFix()) useFix();
 }
 
 /* The record the next open infers travel from. Written where writes happen —
@@ -276,13 +280,18 @@ function noteLastOpen() {
 /* An already-granted permission is not a prompt: home may use the fix it can
    have without asking for one on open (ui.md, smart home). */
 async function silentFix() {
-  if (state.fix) return;
-  state.geoPermission = await geoPermissionState();
+  const generation = ++geoGeneration;
+  const permission = await geoPermissionState();
+  if (generation !== geoGeneration || state.view !== 'home') return;
+  state.geoPermission = permission;
   if (state.geoPermission !== 'granted') {
     renderHome();
     return;
   }
-  if (await takeFix({ enableHighAccuracy: underWay() })) useFix();
+  const fix = await takeFix({ enableHighAccuracy: underWay(), maximumAge: 0 });
+  if (generation !== geoGeneration || state.view !== 'home' || !fix) return;
+  state.fix = fix;
+  useFix();
 }
 
 /* High accuracy costs battery, so it is spent only where the speed reading can
@@ -301,12 +310,24 @@ function takeFix(options = {}) {
   return new Promise((resolve) => {
     if (!navigator.geolocation) return resolve(null);
     navigator.geolocation.getCurrentPosition((position) => {
-      state.fix = fixOf(position);
-      resolve(validFix());
+      const fix = fixOf(position);
+      resolve(fixIsValid(fix) ? fix : null);
     }, () => resolve(null), {
       enableHighAccuracy: false, timeout: 8000, maximumAge: FIX_MAX_AGE_MS, ...options
     });
   });
+}
+
+async function takeContextFix(options = {}) {
+  const generation = ++geoGeneration;
+  const fix = await takeFix(options);
+  if (generation !== geoGeneration || !fix) return null;
+  state.fix = fix;
+  return fix;
+}
+
+function fixIsValid(fix) {
+  return Boolean(fix && Number.isFinite(fix.at) && now() - fix.at <= FIX_MAX_AGE_MS);
 }
 
 function fixOf(position) {
@@ -352,7 +373,7 @@ function useFix() {
   }
   // Against the record as it stood when this open began: the cache paint has
   // already overwritten lastOpen with this open's own header.
-  const entered = focusSelection() ? null
+  const entered = focusSelection() || rideRecorded(state.doc, state.previousOpen) ? null
     : inferTravel({ ...state.doc, lastOpen: state.previousOpen }, now(), fix);
   if (entered) {
     ctx.update(setFocus(state.doc, entered, entered.journey, now(), 'inferred'));
@@ -364,6 +385,8 @@ function useFix() {
     if (!answer) return;
     state.selection = answer;
   }
+  const completed = recordCompletedFocus(state.doc);
+  if (completed !== state.doc) ctx.update(completed);
   loadSelectedCache();
   renderHome();
   fetchLive();
@@ -424,6 +447,7 @@ function arrivedNow(doc = state.doc) {
   const focus = focusOf(doc);
   const trip = focus && !focusExpired(focus, now()) && findTrip(doc, focus.tripId);
   if (!trip) return false;
+  if (rideRecorded(doc, focus)) return true;
   return arrived(focus, leg(trip, focus.direction).to, validFix(), now());
 }
 
@@ -540,7 +564,7 @@ function homeAction(action, element) {
     return ctx.go('#/board');
   }
   if (action === 'way-back') {
-    state.doc = clearFocus(state.doc);
+    state.doc = clearFocus(recordCompletedFocus(state.doc));
     state.selection = {
       tripId: state.selection.tripId,
       direction: state.selection.direction === 'reverse' ? 'forward' : 'reverse'
@@ -582,8 +606,13 @@ function homeAction(action, element) {
 
 async function requestLocation() {
   state.locationDismissed = true;
-  if (await takeFix()) useFix();
-  else renderHome();
+  const generation = ++geoGeneration;
+  const fix = await takeFix({ maximumAge: 0 });
+  if (generation !== geoGeneration || state.view !== 'home') return;
+  if (fix) {
+    state.fix = fix;
+    useFix();
+  } else renderHome();
 }
 
 function boardAction(action, element) {
@@ -715,6 +744,17 @@ function recordCompletedFocus(doc) {
     focus.journey, ends.from, ends.to);
 }
 
+function rideRecorded(doc, selection) {
+  if (!selection || !selection.journey) return false;
+  const first = legsOf(selection.journey)[0] || {};
+  const departure = (first.departure || {}).scheduled
+    || ((selection.journey.departure || {}).scheduled);
+  if (!departure) return false;
+  return (doc.rides || []).some((ride) => ride.tripId === selection.tripId
+    && ride.direction === selection.direction
+    && (ride.scheduledDeparture || ride.departedAt) === departure);
+}
+
 async function fetchPast(initial) {
   if (state.view !== 'board' || state.loadingPast || state.pastExhausted) return;
   state.loadingPast = true;
@@ -801,11 +841,13 @@ async function backfillCoordinates() {
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { stopTimers(); return; }
   if (!onLiveView()) return;
+  if (state.view === 'home') {
+    state.fix = null;
+    state.previousOpen = state.doc.lastOpen || null;
+  }
   startTimers(state.view === 'board');
   fetchLive();
   if (state.view !== 'home') return;
-  state.previousOpen = state.doc.lastOpen || null;
-  if (!validFix()) state.fix = null;
   silentFix();
 });
 window.addEventListener('hashchange', route);
@@ -820,6 +862,7 @@ window.__trains = {
   rerender: renderCurrent,
   onLiveView,
   tick: renderCurrent,
+  indexReady,
   route
 };
 

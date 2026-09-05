@@ -190,8 +190,11 @@ describes the train, browsing another trip never replaces it, refresh
 re-matches the snapshot, expiry is effective arrival + 30 min, and the way-back
 offer follows a finished journey.
 
-**Inferred entry** is evaluated when a valid fix arrives on home and `lastOpen`
-exists and nothing is focused. With `J = lastOpen.journey`, `D` its effective
+**Inferred entry** is evaluated when a valid fix arrives on home, including an
+open or a return to visibility, and `lastOpen` exists and nothing is focused.
+Each of those entries takes its own fix when permission is already granted;
+an older request resolving after navigation cannot alter the current screen.
+With `J = lastOpen.journey`, `D` its effective
 departure, `A` its effective arrival, and `O` and `Z` the origin and
 destination of `leg(trip, lastOpen.direction)` on the saved trip:
 
@@ -217,12 +220,17 @@ gap, not a defect.
 **Exits** are the expiry above, the way-back acceptance above, and one more: a
 fix within 200 m of `Z` when `now ≥ A − 5 min` marks the trip over
 immediately, so the return offer arrives as the rider steps off rather than up
-to half an hour later.
+to half an hour later. That completion writes the ride immediately, including
+offline, so the done state survives reload and accepting the way back. A
+recorded ride for the same trip, direction and scheduled departure cannot be
+inferred again from an older `lastOpen`.
 
 **Correction.** An inferred header carries one control, `Change destination`,
 which opens the new-trip sheet with From set to `O`. Saving there re-enters
 travel mode on the same departure toward the new destination when a journey
-matches, and opens that pair's board when none does. Browsing another trip
+matches the first service’s line name and scheduled departure, and opens
+that pair's board when none does. `departureKey` owns this identity, independently
+of the full-journey key used for refreshes and board rows. Browsing another trip
 never exits travel mode, and there is no "not on it" control: a wrong entry
 that is not a redirect ends by expiry or by `Take this train`.
 
