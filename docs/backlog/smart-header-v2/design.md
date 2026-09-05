@@ -127,15 +127,13 @@ One source, two copies:
 
 A generator in `tools/` (documented in `tools/README.md`) downloads the
 TfNSW static GTFS bundles for Sydney Trains, NSW TrainLink and Sydney
-Metro, keeps `stops.txt` rows with `location_type = 1` (parent stations),
-assigns `modes` by bundle, and writes both copies. A Go test asserts the
-two copies are byte-identical. **[verify, phase 0]**: GTFS parent-station
-ids equal the Trip Planner stop ids the client already stores (Central
-`200060`, Rhodes `213820`, Bondi Junction `202210`; the client fixtures say
-`200080` for Bondi Junction and the probe decides). Probe: `stop_finder`
-for a handful of GTFS ids with `tools/probe-tfnsw.sh`, which needs the API
-key in the environment. If they differ, the generator maps via
-`stop_finder` once per station and the build plan says so.
+Metro, keeps `stops.txt` rows with `location_type = 1` (parent stations)
+that a rail route actually serves, assigns `modes` by bundle, and writes
+both copies. A Go test asserts the two copies are byte-identical. Verified
+2026-09-05: GTFS parent-station ids are the Trip Planner stop ids, on all
+five stations probed, so no `stop_finder` mapping step is needed; `200080`
+is Wynyard, not Bondi Junction, and the client fixtures saying otherwise
+are wrong (see `docs/references/tfnsw-open-data.md`, "Station index").
 
 ### 2. Where the user is: `here`
 
