@@ -165,13 +165,15 @@ server with the key answers `from=<Circular Quay wharf id>&to=<Manly id>`
 with ferry journeys; `from=200080&to=<Manly id>` shows a change whose leg
 detail has one `train` and one `ferry` leg.
 
-## Phase 3 — client colour and words — layout revision in progress
+## Phase 3 — client colour and words — layout repair verified, owner review pending
 
-The 52-frame browser matrix passed at both phone sizes and schemes,
-including real Side A/B labels. Home, focus and setup states were
-refreshed against the combined smart-header implementation and passed. Numeric chips stay compact while caps, directions and
-accessibility retain the full upstream label. F1 and MFF paint FERRY while
-retaining their visible codes.
+The owner rejected the original distinct-stop screenshot. Commit `45cac58`
+repairs transfer/headsign collisions, full onward service labels, step
+containment and adjacent platform markers. The 65px trial overflowed the
+unchanged minutes figure; detail now uses 68px, while the board stays 72px.
+Current four-way ferry/rail shots pass the strengthened geometry checks and
+independent full-size review. Numeric chips remain compact; directions and
+accessibility retain full upstream wharf/side labels.
 
 Owns: `web/js/lines.js`, `web/app.css`, `web/test/theme.test.js`,
 `web/js/rowmodel.js`, `web/js/journey.js`, `web/js/journeybar.js`,
@@ -233,37 +235,27 @@ Verify gate: the test above; the existing tier tests unchanged.
 
 ## Phase 5 — verification wave and closeout — in progress
 
-Owner review reopened layout verification on 2026-09-05. The distinct-stop
-ferry detail screenshot has overlapping transfer/headsign text and change
-instructions against the divider despite the prior automated pass. Trial a
-10% smaller detail figure column (72px → 65px), repair content layout, and
-prove new text-range containment/collision probes fail on the old layout.
-The earlier 52-frame pass does not constitute visual acceptance.
-Current combined-checkout gates: 263 web tests, all Go tests, 3 generator
-tests, byte-identical indexes and clean diff checks. The production image builds for linux/amd64
-and linux/arm64 as local `ilovetrains:ferries-review`; container health,
-Manly/Circular Quay stop searches and worker-v19 delivery pass. Docker's
-context now explicitly includes only build inputs, excluding local secrets
-and downloaded feeds. Final-code live API probes pass for Manly, mixed
-Wynyard–Manly, Balmain East and Barangaroo–Balmain, and all returned service
-endpoints match the requested stops. Regression mutations prove ferry exclusion,
-walk arithmetic, index mapping guards, saved-stop preference, itinerary
-identity and dark-chip contrast tests bite. The 52-frame browser matrix
-passed. After smart-header landed,
-a duplicated station-index precache entry was removed and a regression
-guard added and proven by mutation. The combined v19 image has been
-rebuilt for both architectures and its runtime smoke passes. Worker v19
-warm install and a true offline reopen pass. A persistent profile upgraded
-from shell-v18 to shell-v19, removed the old cache, remained controlled,
-and reopened offline with all required shell cache hits. Refreshed
-smart-header-affected ferry states passed across all four phone/scheme
-combinations. The owner's screenshot verdict,
-exemplar updates, backlog deletion and deployment remain pending.
+Owner review reopened verification after the old checks missed overlapping
+text and instructions against a divider. The repaired implementation and
+contracts are committed as `45cac58`, with shell v22. Current combined
+web tests: 274 passed. Go tests, generator guards, byte-identical indexes
+and earlier live ferry/mixed API probes remain green.
 
-The build is one integrated code/contracts change with worker v19, so shell
-files receive the version bump atomically. Review artifacts live in
-`/tmp/trains-ferries-review/index.html` while the owner verdict is pending.
-Implementation and contracts are committed as `be1b695`.
+Twenty current screenshots cover the distinct-stop board/detail, exceptional
+wharf labels, mixed ferry detail and rail detail at both phone sizes and
+schemes. Independent full-size review passed the exact board/detail and
+representative rail states. Broader rail detail variants also passed.
+The text-range probes reject the original broken screenshot state; removing
+the platform separator also fails. The old 52-frame sheet is superseded.
+
+The v22 image builds for linux/amd64 and linux/arm64 from the clean committed
+snapshot `45cac58` in `/tmp/ferry-layout-release`; runtime health, shell,
+layout modules and 423-stop index smoke pass. Four final integrated
+board/detail screenshots pass. Worker v22 installs all 27 shell entries,
+returns matching cached CSS/detail hashes on a warm reopen, and boots the
+app with the server confirmed down. The verification servers are stopped. The review sheet is
+`/tmp/trains-ferries-layout-review/index.html`. The owner's visual verdict,
+exemplar updates, backlog deletion and deployment remain pending.
 
 
 Owns: `tools/shoot-states.js`, `tools/comps/scenarios.js`,
