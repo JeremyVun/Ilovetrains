@@ -161,7 +161,9 @@ that day that has a valid fix and a `here`. Older entries fall off the end.
 Home is the station with the most votes; at least 3 are required; a tie goes
 to the station of the most recent vote. With fewer than 3 votes, or no
 location ever, home is the first saved trip's origin at confidence 0, as
-today. The stored `home` object is removed: home is derived from the votes
+today. A vote's `station.location` is the station's public coordinate, as
+saved trips already carry; ruling 3's "never coordinates" is about the
+user's fix, which is never written. The stored `home` object is removed: home is derived from the votes
 on every read, so there is no stale copy. Rides no longer vote; `rides`
 stays for receipts and the last-ridden line.
 
@@ -239,7 +241,10 @@ visibility return) and `lastOpen` exists. With `J = lastOpen.journey`,
    or instead of 3: the fix reports `coords.speed ≥ 8 m/s` (about
    30 km/h) and `distance(fix, O) ≥ 200 m`.
 
-All of 1, 2 and (3 or speed) must hold. Entry sets `focus` from the
+All of 1, 2 and (3 or speed) must hold. Condition 3's first clause is
+implied by its second (triangle inequality) and stays for readability; it
+is load-bearing only in the speed clause, where the radius is 200 m. Entry
+sets `focus` from the
 snapshot with `by: "inferred"`, then `refreshFocus` re-matches it in fresh
 data as it does for a hand-focused journey. Condition 3 is what stops a
 return home for a forgotten laptop from reading as a ride. There is no
@@ -256,7 +261,11 @@ speed clause is dead and the plan removes it rather than shipping it.
 **Exit**, for both kinds of focus: the existing expiry, the way-back
 acceptance, and a new one: a fix within 200 m of `Z` when
 `now ≥ A − 5 min` marks the trip over immediately, so the offer arrives
-when the rider steps off rather than up to 30 minutes later.
+when the rider steps off rather than up to 30 minutes later. Over means the
+whole header: the status reads `TRIP OVER`, the directions take their done
+treatment (the arrival figure, `AGO`, `You arrived at <Z>.`) and the offer
+shows; a countdown may not stand under a `TRIP OVER` status (orchestrator
+ruling 2026-09-05, phase 2 handoff).
 
 **Fixes.** The silent fix is taken on home open and on visibility return to
 home when permission is granted (today: open only). Never persisted, never

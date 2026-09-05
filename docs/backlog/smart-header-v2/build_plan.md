@@ -170,6 +170,26 @@ subsection under "Focused journey" with the entry and exit conditions and
 
 ## Phase 3 — controller, setup and shell — DONE marker: `phase 3 done`
 
+Phase 2 handoff (2026-09-05), binding for this phase:
+
+- `homeModel` opts gained `leap` ('usual'|'home', only when predicted and
+  never beside an active focus), `loadedAt` (page-load ms; no row is marked
+  without it) and `arrived` (boolean; makes the model over).
+- `model.strip` is `null` or `{origin, destination, departureMs, journeyKey}`,
+  the ends from the focused trip's leg (with coordinates), the key from
+  `journeyKey(focus.journey)`. Action `data-act="change-destination"`.
+- `inferTravel(doc, nowMs, fix)` returns the focus OBJECT (not a doc) and
+  does not check for an existing focus; the controller guards. `arrived(focus,
+  destination, fix, nowMs)` takes the destination station from
+  `leg(trip, focus.direction).to`.
+- `homeModel` needs at least one saved trip; a `setup` answer routes before
+  rendering home.
+- `lastOpen.station` must be the tier-1 `here` or null.
+- `sw.js` is `v15` with `/js/stations.js` in `SHELL`; this phase adds
+  `/stations.json` and bumps to `v16`.
+- `directionsModel` must take an `arrived` opt that forces the done branch
+  (design.md section 5, Exit).
+
 Owns: `web/js/main.js`, `web/js/setup.js`, `web/js/home.js` (markup only,
 if phase 2 left the strip/mark markup to the verdict), `web/app.css`,
 `web/sw.js`, `web/index.html` if a preload is wanted,
