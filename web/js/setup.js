@@ -4,12 +4,13 @@
 import { esc, mount, onAction, shortName } from './dom.js';
 import { getStops } from './api.js';
 import { newTripId, recordSearch } from './storage.js';
+import { here, loadStations, nearest, NEAR_STATION_KM } from './stations.js';
 import { MIN_QUERY, createSearcher, hintFor, queryKey, rankStops, fuzzyScore, topPick } from './search.js';
 
 export const SEARCH_DEBOUNCE_MS = 300;
 const searcher = createSearcher((query, opts) => getStops(query, opts));
 
-export function renderSetup(root, ctx) {
+export function renderSetup(root, ctx, { origin, redirect } = {}) {
   const picked = { from: null, to: null };
   let active = 'from';
   let results = [];
@@ -17,6 +18,10 @@ export function renderSetup(root, ctx) {
   let hint = null;
   let debounce = null;
   let inflight = null;
+  let stations = null;
+  let fix = null;
+  let askable = false;
+  let nearby = null;
 
   mount(root, `<div class="hm-c home-screen">
     <div class="hm-top">${ctx.doc.trips.length
@@ -26,7 +31,6 @@ export function renderSetup(root, ctx) {
       ${fieldHtml('from', 'From', 'Origin station')}
       ${fieldHtml('to', 'To', 'Destination station')}
       <div data-t="results"></div>
-      <p class="hm-lede">Save <b>one direction only</b>. When today’s ride is done, the way back is ready.</p>
     </div>
     <div class="hm-bar save"><button data-act="save" data-t="save" disabled>Choose where you start</button></div>
   </div>`);
@@ -50,19 +54,47 @@ export function renderSetup(root, ctx) {
       .filter((stop) => !query || fuzzyScore(stop.name, query) > 0);
   }
 
-  function paintResults() {
-    if (hint) {
-      resultsEl.innerHTML = `<div class="hint${hint.warn ? ' warn' : ''}">${esc(hint.text)}</div>`;
-      return;
-    }
-    if (!results.length) { resultsEl.innerHTML = ''; return; }
-    resultsEl.innerHTML = `<div class="hm-grp">${esc(group)}</div><div class="hm-res">${results.map((stop, index) =>
-      `<button data-act="pick" data-index="${index}"><span class="n">${esc(shortName(stop.name))}</span>
+  /* Where this origin already goes: the far end of every saved trip through it,
+     newest first, then what was searched for. */
+  function destinationsFrom(from) {
+    const saved = [...(ctx.doc.trips || [])]
+      .filter((trip) => trip.from.id === from.id || trip.to.id === from.id)
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+      .map((trip) => (trip.from.id === from.id ? trip.to : trip.from));
+    const combined = [...saved, ...recentFor('to')].filter((stop) => stop.id !== from.id);
+    return [...new Map(combined.map((stop) => [stop.id, stop])).values()];
+  }
+
+  /* The From field's two pre-query rows, in the result-row grammar: the ask
+     while the permission is still askable, the nearest station once a fix
+     exists (ui.md, setup and station search). */
+  function leadHtml() {
+    if (active !== 'from' || inputs.from.value.trim()) return '';
+    if (nearby) return `<div class="hm-grp">Nearest station</div>${rowsHtml([nearby], 'pick-near')}`;
+    if (!askable || fix) return '';
+    return `<div class="hm-res"><button data-act="use-location">
+      <span class="n">Use my location</span></button></div>`;
+  }
+
+  function rowsHtml(stops, act) {
+    return `<div class="hm-res">${stops.map((stop, index) =>
+      `<button data-act="${act}" data-index="${index}"><span class="n">${esc(shortName(stop.name))}</span>
         <span class="w">${esc((stop.modes || []).join(' · '))}</span></button>`).join('')}</div>`;
   }
 
+  function paintResults() {
+    const lead = leadHtml();
+    if (hint) {
+      resultsEl.innerHTML = `${lead}<div class="hint${hint.warn ? ' warn' : ''}">${esc(hint.text)}</div>`;
+      return;
+    }
+    if (!results.length) { resultsEl.innerHTML = lead; return; }
+    resultsEl.innerHTML = `${lead}<div class="hm-grp">${esc(group)}</div>${rowsHtml(results, 'pick')}`;
+  }
+
   function showRecents(role, query = '') {
-    results = recentFor(role, query);
+    results = role === 'to' && !query && picked.from
+      ? destinationsFrom(picked.from) : recentFor(role, query);
     group = results.length ? 'You searched before' : '';
     hint = null;
     paintResults();
@@ -157,6 +189,34 @@ export function renderSetup(root, ctx) {
     });
   });
 
+  async function useLocation() {
+    fix = await ctx.fix();
+    if (!stations) stations = await loadStations();
+    const spot = fix && stations ? here(ctx.doc, stations, fix) : null;
+    if (!spot) {
+      askable = false;
+      paintResults();
+      return;
+    }
+    active = 'from';
+    pick(spot.station);
+  }
+
+  /* A returning user whose permission is already granted starts the sheet where
+     they are; everyone else is offered the station rather than given it. */
+  function settleLocation() {
+    if (picked.from || inputs.from.value.trim()) return;
+    const spot = fix && stations ? here(ctx.doc, stations, fix) : null;
+    if (spot && !ctx.doc.trips.length) {
+      active = 'from';
+      pick(spot.station);
+      return;
+    }
+    const near = fix && stations ? nearest(stations, fix, NEAR_STATION_KM) : null;
+    nearby = near ? near.station : null;
+    paintResults();
+  }
+
   onAction(root, (action, element) => {
     if (action === 'home') {
       if (ctx.doc.trips.length) ctx.go('#/');
@@ -166,15 +226,36 @@ export function renderSetup(root, ctx) {
       pick(results[Number(element.dataset.index)]);
       return;
     }
+    if (action === 'pick-near') {
+      active = 'from';
+      pick(nearby);
+      return;
+    }
+    if (action === 'use-location') {
+      useLocation();
+      return;
+    }
     if (action === 'save' && !saveEl.disabled) {
       ctx.saveTrip({
         id: newTripId(),
         from: picked.from,
         to: picked.to,
         createdAt: new Date().toISOString()
-      });
+      }, redirect);
     }
   });
 
-  inputs.from.focus();
+  if (origin) {
+    active = 'from';
+    pick(origin);
+  } else {
+    inputs.from.focus();
+  }
+
+  Promise.all([ctx.permission(), loadStations()]).then(async ([permission, list]) => {
+    stations = list;
+    askable = permission === 'prompt';
+    if (permission === 'granted') fix = await ctx.fix();
+    settleLocation();
+  });
 }

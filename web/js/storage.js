@@ -8,7 +8,9 @@ export const HISTORY_CAP = 500;
 export const RIDES_CAP = 100;
 export const TRIPS_CAP = 10;
 export const SEARCH_CAP = 3;
+export const HOME_VOTES_CAP = 7;
 export const DIRECTIONS = ['forward', 'reverse'];
+export const FOCUS_KINDS = ['focus', 'inferred'];
 export const LOCATION_ASK_QUIET_MS = 30 * 86_400_000;
 const MILESTONES = new Set([1, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200, 250]);
 
@@ -19,7 +21,8 @@ export function emptyDoc() {
     history: [],
     rides: [],
     searches: { from: [], to: [] },
-    home: null,
+    homeVotes: [],
+    lastOpen: null,
     lastViewed: null,
     cache: {}
   };
@@ -27,6 +30,10 @@ export function emptyDoc() {
 
 function isStop(s) {
   return !!s && typeof s.id === 'string' && s.id !== '' && typeof s.name === 'string';
+}
+
+function isDay(value) {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
 function locationOf(stop) {
@@ -96,11 +103,25 @@ export function parseDoc(raw) {
       doc.searches[role] = v.searches[role].filter(isStop).map(stopOf).slice(0, SEARCH_CAP);
     }
   }
-  if (v.home && isStop(v.home.station) && typeof v.home.inferredAt === 'string') {
-    doc.home = {
-      station: stopOf(v.home.station),
-      inferredAt: v.home.inferredAt,
-      confidence: Number.isFinite(v.home.confidence) ? v.home.confidence : 0
+  if (Array.isArray(v.homeVotes)) {
+    const days = new Set();
+    for (const vote of v.homeVotes) {
+      if (!vote || !isDay(vote.day) || days.has(vote.day) || !isStop(vote.station)) continue;
+      days.add(vote.day);
+      doc.homeVotes.push({ day: vote.day, station: stopOf(vote.station) });
+    }
+    doc.homeVotes = doc.homeVotes.slice(-HOME_VOTES_CAP);
+  }
+  const open = v.lastOpen;
+  if (open && typeof open.at === 'string' && typeof open.tripId === 'string'
+      && DIRECTIONS.includes(open.direction) && open.journey && typeof open.journey === 'object'
+      && (open.station === null || isStop(open.station))) {
+    doc.lastOpen = {
+      at: open.at,
+      station: open.station ? { id: open.station.id, name: open.station.name } : null,
+      tripId: open.tripId,
+      direction: open.direction,
+      journey: open.journey
     };
   }
   if (v.lastViewed && typeof v.lastViewed.tripId === 'string' && DIRECTIONS.includes(v.lastViewed.direction)) {
@@ -109,10 +130,14 @@ export function parseDoc(raw) {
   /* The focused journey is optional and self-describing; absence means there
      is no focus. A malformed one is dropped rather than repaired — the
      directions it would draw are a claim about a train. */
-  const f = v.focus;
-  if (f && typeof f.tripId === 'string' && DIRECTIONS.includes(f.direction)
-      && typeof f.focusedAt === 'string' && f.journey && typeof f.journey === 'object') {
-    doc.focus = { tripId: f.tripId, direction: f.direction, focusedAt: f.focusedAt, journey: f.journey };
+  const f = v.focus || {};
+  const by = f.by === undefined ? 'focus' : f.by;
+  if (typeof f.tripId === 'string' && DIRECTIONS.includes(f.direction)
+      && typeof f.focusedAt === 'string' && f.journey && typeof f.journey === 'object'
+      && FOCUS_KINDS.includes(by)) {
+    doc.focus = {
+      tripId: f.tripId, direction: f.direction, focusedAt: f.focusedAt, by, journey: f.journey
+    };
   }
   if (v.locationAsk && typeof v.locationAsk.declinedAt === 'string') {
     doc.locationAsk = { declinedAt: v.locationAsk.declinedAt };
@@ -139,7 +164,8 @@ export function serializeDoc(doc) {
     history: doc.history,
     rides: doc.rides || [],
     searches: doc.searches || { from: [], to: [] },
-    home: doc.home || null,
+    homeVotes: doc.homeVotes || [],
+    lastOpen: doc.lastOpen || null,
     lastViewed: doc.lastViewed,
     cache: doc.cache
   };
@@ -183,6 +209,13 @@ export function milestone(doc) {
   return MILESTONES.has(opens) ? String(opens) : null;
 }
 
+/* The device's own calendar day: a vote is about the user's morning, not UTC's. */
+function localDay(ms) {
+  const d = new Date(ms);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 export function cacheKey(fromId, toId) {
   return fromId + '-' + toId;
 }
@@ -215,8 +248,8 @@ export function addTrip(doc, trip) {
 }
 
 /** Deleting a trip takes its prediction history, cached boards and any
-    lastViewed/focus pointer with it. Completed rides deliberately survive:
-    their endpoint snapshots are the home heuristic's historical evidence. */
+    lastViewed/lastOpen/focus pointer with it. Completed rides deliberately
+    survive: their endpoint snapshots are what the receipts cite. */
 export function removeTrip(doc, tripId) {
   const trip = findTrip(doc, tripId);
   const trips = doc.trips.filter((t) => t.id !== tripId);
@@ -226,6 +259,7 @@ export function removeTrip(doc, tripId) {
     history: doc.history.filter((e) => e.tripId !== tripId),
     rides: doc.rides || [],
     lastViewed: doc.lastViewed && doc.lastViewed.tripId === tripId ? null : doc.lastViewed,
+    lastOpen: doc.lastOpen && doc.lastOpen.tripId === tripId ? null : doc.lastOpen,
     cache: { ...doc.cache }
   };
   if (trip) {
@@ -296,19 +330,31 @@ export function updateStop(doc, stop) {
     from: trip.from.id === stop.id ? stopOf({ ...trip.from, location: stop.location }) : trip.from,
     to: trip.to.id === stop.id ? stopOf({ ...trip.to, location: stop.location }) : trip.to
   }));
-  const home = doc.home && doc.home.station.id === stop.id
-    ? { ...doc.home, station: stopOf({ ...doc.home.station, location: stop.location }) } : doc.home;
-  return { ...doc, trips, home };
+  return { ...doc, trips };
 }
 
-export function setHome(doc, station, confidence, atMs) {
+/** One vote per local calendar day: the station the phone was at when the app
+    first opened that day. Older votes fall off the end. */
+export function recordHomeVote(doc, station, nowMs) {
   if (!isStop(station)) return doc;
+  const day = localDay(nowMs);
+  const votes = doc.homeVotes || [];
+  if (votes.some((vote) => vote.day === day)) return doc;
+  return { ...doc, homeVotes: [...votes, { day, station: stopOf(station) }].slice(-HOME_VOTES_CAP) };
+}
+
+/** The header's previous unfocused answer, which is what makes inferred travel
+    mode possible after the service has left the live board. */
+export function recordLastOpen(doc, { station, tripId, direction, journey }, nowMs) {
+  if (!tripId || !DIRECTIONS.includes(direction) || !journey) return doc;
   return {
     ...doc,
-    home: {
-      station: stopOf(station),
-      confidence: Number.isFinite(confidence) ? confidence : 0,
-      inferredAt: new Date(atMs).toISOString()
+    lastOpen: {
+      at: new Date(nowMs).toISOString(),
+      station: isStop(station) ? { id: station.id, name: station.name } : null,
+      tripId,
+      direction,
+      journey
     }
   };
 }

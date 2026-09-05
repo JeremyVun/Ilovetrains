@@ -7,7 +7,8 @@ import {
   STORAGE_KEY, HISTORY_CAP, TRIPS_CAP, emptyDoc, parseDoc, serializeDoc, cacheKey, leg,
   addTrip, removeTrip, moveTrip, recordView, recordSearch, recordRide, updateStop,
   putCache, getCache, loadDoc, saveDoc, declineLocation, LOCATION_ASK_QUIET_MS,
-  recordOpen, band, milestone
+  recordOpen, band, milestone,
+  recordHomeVote, recordLastOpen, HOME_VOTES_CAP
 } from '../js/storage.js';
 
 const CENTRAL = { id: '200060', name: 'Central Station' };
@@ -261,4 +262,100 @@ test('telemetry round-trips through trains.v1 with the rest of the document', ()
   saveDoc(doc, store);
   assert.deepEqual(loadDoc(store), doc);
   assert.deepEqual([...store._map.keys()], [STORAGE_KEY], 'still one key');
+});
+
+/* ---- home votes, the previous open, and the kind of focus --------------- */
+
+const RHODES = { id: '213820', name: 'Rhodes Station', location: { lat: -33.8308, lon: 151.0879 } };
+const BURWOOD = { id: '213410', name: 'Burwood Station' };
+const JOURNEY = { line: { name: 'T9' }, departure: { scheduled: '2026-09-05T09:24:00+10:00' } };
+const day = (date, time = '08:05') => Date.parse(`2026-09-${date}T${time}:00+10:00`);
+
+test('one home vote per local day, newest last, capped at seven', () => {
+  let doc = emptyDoc();
+  for (let d = 1; d <= 8; d++) doc = recordHomeVote(doc, RHODES, day(String(d).padStart(2, '0')));
+
+  assert.equal(doc.homeVotes.length, HOME_VOTES_CAP);
+  assert.deepEqual(doc.homeVotes.map((vote) => vote.day),
+    ['2026-09-02', '2026-09-03', '2026-09-04', '2026-09-05', '2026-09-06', '2026-09-07', '2026-09-08']);
+  assert.deepEqual(doc.homeVotes[0].station, RHODES, 'the vote keeps the station coordinates');
+
+  // A second open the same day, even much later, is the same day's one vote.
+  const again = recordHomeVote(doc, BURWOOD, day('08', '23:50'));
+  assert.equal(again, doc);
+  assert.equal(recordHomeVote(doc, { id: '', name: 'x' }, day('09')), doc);
+});
+
+test('the day a vote records is the device\'s calendar day, not UTC\'s', () => {
+  // 09:00 on the 6th in Sydney is still 23:00 on the 5th in UTC.
+  const doc = recordHomeVote(emptyDoc(), RHODES, Date.parse('2026-09-06T09:00:00+10:00'));
+  assert.equal(doc.homeVotes[0].day, '2026-09-06');
+});
+
+test('votes, the previous open and the kind of focus survive a round trip', () => {
+  let doc = { ...docWithTrips(), focus: {
+    tripId: 't1', direction: 'forward', focusedAt: '2026-09-05T09:20:00+10:00',
+    by: 'inferred', journey: JOURNEY
+  } };
+  doc = recordHomeVote(doc, RHODES, day('05'));
+  doc = recordLastOpen(doc, {
+    station: { ...RHODES }, tripId: 't1', direction: 'forward', journey: JOURNEY
+  }, day('05', '09:15'));
+
+  assert.deepEqual(doc.lastOpen, {
+    at: '2026-09-04T23:15:00.000Z',
+    station: { id: RHODES.id, name: RHODES.name },
+    tripId: 't1',
+    direction: 'forward',
+    journey: JOURNEY
+  });
+  assert.equal(doc.lastOpen.station.location, undefined, 'no coordinate is ever persisted');
+  assert.deepEqual(parseDoc(serializeDoc(doc)), doc);
+});
+
+test('a document written before this shipped needs no migration', () => {
+  const legacy = JSON.stringify({
+    trips: [], home: { station: RHODES, confidence: 4, inferredAt: '2026-08-31T20:00:00+10:00' },
+    focus: { tripId: 't1', direction: 'forward', focusedAt: '2026-09-05T09:20:00+10:00', journey: JOURNEY }
+  });
+  const doc = parseDoc(legacy);
+
+  assert.equal(doc.home, undefined, 'the stored home is gone, not carried');
+  assert.deepEqual(doc.homeVotes, []);
+  assert.equal(doc.lastOpen, null);
+  assert.equal(doc.focus.by, 'focus', 'an unlabelled focus is a hand-focused one');
+});
+
+test('a malformed vote, previous open or focus kind is dropped, not repaired', () => {
+  const votes = (list) => parseDoc(JSON.stringify({ homeVotes: list })).homeVotes;
+
+  assert.deepEqual(votes([{ day: '2026-09-05', station: RHODES }]).map((v) => v.day), ['2026-09-05']);
+  assert.deepEqual(votes([{ day: '5 September', station: RHODES }]), []);
+  assert.deepEqual(votes([{ day: '2026-09-05' }]), []);
+  assert.deepEqual(votes([{ day: '2026-09-05', station: { id: '213820' } }]), []);
+  assert.deepEqual(votes('not a list'), []);
+  assert.deepEqual(
+    votes([{ day: '2026-09-05', station: RHODES }, { day: '2026-09-05', station: BURWOOD }])
+      .map((v) => v.station.id), ['213820'], 'two votes on one day are one vote');
+
+  const open = (value) => parseDoc(JSON.stringify({ lastOpen: value })).lastOpen;
+  const good = { at: '2026-09-05T09:15:00+10:00', station: null, tripId: 't1', direction: 'forward', journey: JOURNEY };
+  assert.deepEqual(open(good), good);
+  assert.equal(open({ ...good, direction: 'sideways' }), null);
+  assert.equal(open({ ...good, journey: null }), null);
+  assert.equal(open({ ...good, at: 0 }), null);
+  assert.equal(open({ ...good, station: { name: 'Rhodes Station' } }), null);
+
+  const focus = { tripId: 't1', direction: 'forward', focusedAt: '2026-09-05T09:20:00+10:00', journey: JOURNEY };
+  assert.equal(parseDoc(JSON.stringify({ focus: { ...focus, by: 'guessed' } })).focus, undefined);
+  assert.equal(parseDoc(JSON.stringify({ focus: { ...focus, by: 'inferred' } })).focus.by, 'inferred');
+});
+
+test('deleting a trip takes the previous open that described it', () => {
+  const doc = recordLastOpen(docWithTrips(), {
+    station: CENTRAL, tripId: 't1', direction: 'forward', journey: JOURNEY
+  }, day('05', '09:15'));
+
+  assert.equal(removeTrip(doc, 't1').lastOpen, null);
+  assert.deepEqual(removeTrip(doc, 't2').lastOpen, doc.lastOpen);
 });

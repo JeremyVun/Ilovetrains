@@ -13,6 +13,12 @@
  *   --eval "JS"       evaluate JS after load, before the shot
  *   --media K:V       emulate a media feature, repeatable
  *                     (e.g. --media prefers-reduced-motion:reduce)
+ *   --geo LAT,LON[,SPEED]
+ *                     answer getCurrentPosition with this fix, applied AFTER
+ *                     the page has loaded so the app's own first pass runs
+ *                     without one and the driving script decides when the
+ *                     location path re-runs
+ *   --geo-permission S  granted | prompt | denied, same timing as --geo
  *   --profile DIR     reuse (and keep) a browser profile directory instead of
  *                     a throwaway one — the only way to measure a genuinely
  *                     WARM open: run once to install the service worker and
@@ -60,6 +66,12 @@
  *    result's exceptionDetails is read; a failed --eval prints EVAL FAILED
  *    with the message and exits non-zero, saving nothing.
  *
+ * 7. GEOLOCATION BEFORE THE CLOCK. A fix granted before the page loads is
+ *    taken by the app's own first pass, against the real clock and the seeded
+ *    document, which writes home votes and can auto-save a trip. --geo and
+ *    --geo-permission are therefore applied after load, and the fix Chrome
+ *    hands back is stamped with the MACHINE clock, not a pinned one.
+ *
  * Seeding note: localStorage is origin-scoped, so --seed navigates to the URL
  * once to acquire the origin, writes the key, then navigates again. Anything
  * the app wrote during the first load is cleared before seeding.
@@ -87,7 +99,7 @@ function parseArgs(argv) {
   const opt = {
     size: '390x844', dsf: 2, mobile: true, wait: 500,
     seed: null, key: 'trains.v1', evalJs: null, full: false, quiet: false,
-    media: [], profile: null, manifest: false
+    media: [], profile: null, manifest: false, geo: null, geoPermission: null
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -102,6 +114,18 @@ function parseArgs(argv) {
       const [name, value] = String(argv[++i]).split(':');
       if (!name || value === undefined) throw new Error('bad --media, want name:value');
       opt.media.push({ name, value });
+    }
+    else if (a === '--geo') {
+      const [lat, lon, speed] = String(argv[++i]).split(',').map(Number);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error('bad --geo, want LAT,LON[,SPEED]');
+      opt.geo = { latitude: lat, longitude: lon, accuracy: 10 };
+      if (Number.isFinite(speed)) opt.geo.speed = speed;
+    }
+    else if (a === '--geo-permission') {
+      opt.geoPermission = argv[++i];
+      if (!['granted', 'prompt', 'denied'].includes(opt.geoPermission)) {
+        throw new Error('bad --geo-permission, want granted|prompt|denied');
+      }
     }
     else if (a === '--profile') opt.profile = path.resolve(argv[++i]);
     else if (a === '--manifest') opt.manifest = true;
@@ -175,6 +199,20 @@ async function main() {
 
     await navigate(page, args.url);
     await sleep(args.wait);
+
+    // TRAP 7: the fix lands after the load, never before it. Granted on the
+    // first navigation, the app takes a fix against the real clock and writes
+    // home votes and auto-saved trips into the seeded document before the
+    // driving script has pinned anything.
+    if (args.geoPermission) {
+      await ws.send('Browser.setPermission', {
+        origin: new URL(args.url).origin,
+        permission: { name: 'geolocation' },
+        setting: args.geoPermission
+      });
+    }
+    if (args.geo) await page.send('Emulation.setGeolocationOverride', args.geo);
+
     if (args.evalJs) {
       // TRAP 6: a rejected --eval promise comes back in the RESULT, so an
       // unread exceptionDetails shoots whatever the page was showing, exit 0.

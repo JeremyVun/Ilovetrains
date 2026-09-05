@@ -30,6 +30,11 @@
  *    shot the exemplar is judged against.
  *
  * 4. Whatever tools/screenshot.js documents (viewport lie, silent overflow).
+ *
+ * 5. THE LOCATION PATH IS BEHIND route(). A state's `geo`/`permission` is
+ *    installed after the page has loaded, so the whole controller path — the
+ *    permission query, the silent fix, useFix — only runs when route() is
+ *    called again. See the geo block in pageScript.
  */
 'use strict';
 
@@ -72,7 +77,7 @@ const TRIP = {
 const TRIP_2 = {
   id: 'trip-town-hall-epping',
   from: { id: '200070', name: 'Town Hall Station' },
-  to: { id: '213910', name: 'Epping Station' },
+  to: { id: '212110', name: 'Epping Station' },
   createdAt: '2026-08-10T08:00:00+10:00'
 };
 /* The transfer corridor uses the captured fixture shared with the unit tests:
@@ -80,7 +85,7 @@ const TRIP_2 = {
 const TRIP_TRANSFER = {
   id: 'trip-rhodes-bondi',
   from: { id: '213820', name: 'Rhodes Station' },
-  to: { id: '200080', name: 'Bondi Junction Station' },
+  to: { id: '202210', name: 'Bondi Junction Station' },
   createdAt: '2026-08-01T08:00:00+10:00'
 };
 /* The same corridor with the station coordinates the distance line needs; the
@@ -88,7 +93,7 @@ const TRIP_TRANSFER = {
 const TRIP_TRANSFER_LOCATED = {
   ...TRIP_TRANSFER,
   from: { id: '213820', name: 'Rhodes Station', location: { lat: -33.8299, lon: 151.0866 } },
-  to: { id: '200080', name: 'Bondi Junction Station', location: { lat: -33.8915, lon: 151.2477 } }
+  to: { id: '202210', name: 'Bondi Junction Station', location: { lat: -33.8915, lon: 151.2477 } }
 };
 const TRIP_CENTRAL_LOCATED = {
   id: 'trip-central-parramatta',
@@ -98,27 +103,40 @@ const TRIP_CENTRAL_LOCATED = {
 };
 const TRIP_METRO = {
   id: 'trip-tallawong-chatswood',
-  from: { id: '206710', name: 'Tallawong Station', location: { lat: -33.6918, lon: 150.9060 } },
-  to: { id: '207210', name: 'Chatswood Station', location: { lat: -33.7967, lon: 151.1830 } },
+  from: { id: '2155384', name: 'Tallawong Station', location: { lat: -33.6918, lon: 150.9060 } },
+  to: { id: '206710', name: 'Chatswood Station', location: { lat: -33.7967, lon: 151.1830 } },
   createdAt: '2026-08-06T08:00:00+10:00'
 };
 const TRIP_MEADOWBANK = {
   id: 'trip-meadowbank-townhall',
-  from: { id: '213810', name: 'Meadowbank Station', location: { lat: -33.8180, lon: 151.0900 } },
+  from: { id: '211430', name: 'Meadowbank Station', location: { lat: -33.8180, lon: 151.0900 } },
   to: { id: '200070', name: 'Town Hall Station', location: { lat: -33.8735, lon: 151.2070 } },
   createdAt: '2026-08-07T08:00:00+10:00'
 };
 const TRIP_EPPING = {
   id: 'trip-epping-chatswood',
-  from: { id: '213910', name: 'Epping Station', location: { lat: -33.7727, lon: 151.0820 } },
-  to: { id: '207210', name: 'Chatswood Station', location: { lat: -33.7967, lon: 151.1830 } },
+  from: { id: '212110', name: 'Epping Station', location: { lat: -33.7727, lon: 151.0820 } },
+  to: { id: '206710', name: 'Chatswood Station', location: { lat: -33.7967, lon: 151.1830 } },
   createdAt: '2026-08-08T08:00:00+10:00'
 };
 
+/* The coordinates web/stations.json actually carries, so a seeded fix lands
+   where the baked index says the station is and `here` names it. */
+const IX = {
+  rhodes: { id: '213820', name: 'Rhodes Station', location: { lat: -33.83053, lon: 151.087032 } },
+  bondi: { id: '202210', name: 'Bondi Junction Station', location: { lat: -33.891202, lon: 151.248384 } },
+  burwood: { id: '213410', name: 'Burwood Station', location: { lat: -33.877315, lon: 151.104762 } },
+  strathfield: { id: '213510', name: 'Strathfield Station', location: { lat: -33.87181, lon: 151.094427 } }
+};
+
+/* One vote per named day, as the client writes them: the shot's own day is
+   never among them, because this open casts that one. */
+const votesFor = (station, days) => days.map((day) => ({ day, station }));
+
 const TRIP_LONG = {
   id: 'trip-olympicpark-mtvictoria',
-  from: { id: '206010', name: 'Sydney Olympic Park Station' },
-  to: { id: '253030', name: 'Mount Victoria Station' },
+  from: { id: '212710', name: 'Olympic Park Station' },
+  to: { id: '278610', name: 'Mount Victoria Station' },
   createdAt: '2026-08-01T08:00:00+10:00'
 };
 
@@ -253,7 +271,7 @@ async function states() {
     return j;
   };
 
-  /* Sydney Olympic Park → Strathfield → Mount Victoria: a real journey shape
+  /* Olympic Park → Strathfield → Mount Victoria: a real journey shape
      carrying the longest station names and the longest headsign the board has
      ever had to print. */
   const longBody = () => {
@@ -261,20 +279,20 @@ async function states() {
     Object.assign(j.legDetail[0], {
       line: { name: 'T7', mode: 'train' },
       headsign: 'Central via Lidcombe',
-      from: { id: '206010', name: 'Sydney Olympic Park Station', platform: 'Platform 1' },
-      to: { id: '206020', name: 'Strathfield Station', platform: 'Platform 4' }
+      from: { id: '212710', name: 'Olympic Park Station', platform: 'Platform 1' },
+      to: { id: '213510', name: 'Strathfield Station', platform: 'Platform 4' }
     });
     Object.assign(j.legDetail[1], {
       line: { name: 'BMT', mode: 'train' },
       headsign: 'Mount Victoria via Parramatta and Katoomba',
-      from: { id: '206020', name: 'Strathfield Station', platform: 'Platform 6' },
-      to: { id: '253030', name: 'Mount Victoria Station', platform: 'Platform 2' }
+      from: { id: '213510', name: 'Strathfield Station', platform: 'Platform 6' },
+      to: { id: '278610', name: 'Mount Victoria Station', platform: 'Platform 2' }
     });
     j.line = { name: 'T7', mode: 'train' };
     j.destinationHeadsign = 'Central via Lidcombe';
     return {
-      from: { id: '206010', name: 'Sydney Olympic Park Station' },
-      to: { id: '253030', name: 'Mount Victoria Station' },
+      from: { id: '212710', name: 'Olympic Park Station' },
+      to: { id: '278610', name: 'Mount Victoria Station' },
       generatedAt: TRANSFER_AT,
       journeys: [j]
     };
@@ -339,7 +357,7 @@ async function states() {
     legDetail: [
       {
         line: { name: 'T4', mode: 'train' }, headsign: 'Waterfall',
-        from: { id: '200080', name: 'Bondi Junction Station', platform: 'Platform 2' },
+        from: { id: '202210', name: 'Bondi Junction Station', platform: 'Platform 2' },
         to: { id: '200070', name: 'Town Hall Station', platform: 'Platform 4' },
         departure: { scheduled: '2026-09-01T10:18:00+10:00', estimated: '2026-09-01T10:18:00+10:00' },
         arrival: { scheduled: '2026-09-01T10:28:00+10:00', estimated: '2026-09-01T10:28:00+10:00' },
@@ -356,7 +374,7 @@ async function states() {
     ]
   };
   const reverseBody = {
-    from: { id: '200080', name: 'Bondi Junction Station' },
+    from: { id: '202210', name: 'Bondi Junction Station' },
     to: { id: '213820', name: 'Rhodes Station' },
     generatedAt: '2026-09-01T10:11:00+10:00',
     journeys: [reverseJourney]
@@ -377,6 +395,101 @@ async function states() {
     cancelled: false,
     legs: 1
   }));
+
+  const REVERSE_AT = Date.parse('2026-09-01T10:11:00+10:00');
+
+  /* Burwood → Rhodes changes at Strathfield: the pair the app saves itself has
+     to be a journey the corridor could really return. */
+  const burwoodBody = (() => {
+    const on = (hhmm) => `2026-09-01T${hhmm}:00+10:00`;
+    const stamp = (hhmm) => ({ scheduled: on(hhmm), estimated: on(hhmm) });
+    return {
+      from: { id: '213410', name: 'Burwood Station' },
+      to: { id: '213820', name: 'Rhodes Station' },
+      generatedAt: TRANSFER_AT,
+      journeys: [{
+        departure: { ...stamp('09:28'), platform: 'Platform 4' },
+        arrival: stamp('09:52'),
+        line: { name: 'T2', mode: 'train' },
+        destinationHeadsign: 'City via Strathfield',
+        stopsAway: null,
+        cancelled: false,
+        legs: 2,
+        legDetail: [
+          {
+            line: { name: 'T2', mode: 'train' }, headsign: 'City via Strathfield',
+            from: { id: '213410', name: 'Burwood Station', platform: 'Platform 4' },
+            to: { id: '213510', name: 'Strathfield Station', platform: 'Platform 5' },
+            departure: stamp('09:28'), arrival: stamp('09:32'), cancelled: false
+          },
+          {
+            line: { name: 'T9', mode: 'train' }, headsign: 'Hornsby via Strathfield',
+            from: { id: '213510', name: 'Strathfield Station', platform: 'Platform 3' },
+            to: { id: '213820', name: 'Rhodes Station', platform: 'Platform 1' },
+            departure: stamp('09:38'), arrival: stamp('09:52'), cancelled: false
+          }
+        ]
+      }]
+    };
+  })();
+
+  /* Seeded as the client writes it, then driven through route() with the fix in
+     place (pageScript's geo block): every answer below is the controller's. */
+  const smart = (name, opts) => {
+    const generatedAt = opts.generatedAt || TRANSFER_AT;
+    const trips = opts.trips || [];
+    const seed = {
+      schemaVersion: 1,
+      trips,
+      history: opts.hist || [],
+      homeVotes: opts.homeVotes || [],
+      lastOpen: opts.lastOpen || null,
+      lastViewed: null,
+      cache: {}
+    };
+    if (opts.journeys) {
+      seed.cache[trips[0].from.id + '-' + trips[0].to.id] = {
+        fetchedAt: generatedAt, body: transferBody({ journeys: opts.journeys, generatedAt })
+      };
+    }
+    for (const [key, cached] of Object.entries(opts.cache || {})) {
+      seed.cache[key] = { fetchedAt: cached.generatedAt, body: cached };
+    }
+    if (opts.focus) {
+      seed.focus = {
+        tripId: trips[0].id, direction: 'forward', focusedAt: generatedAt,
+        journey: opts.focus, by: opts.focusBy || 'focus'
+      };
+    }
+    return {
+      name,
+      seed,
+      now: opts.now || TRANSFER_NOW,
+      body: opts.body !== undefined ? opts.body
+        : opts.journeys ? transferBody({ journeys: opts.journeys, generatedAt }) : undefined,
+      route: opts.route || '#/',
+      geo: opts.geo || null,
+      permission: opts.permission,
+      after: opts.after,
+      expect: opts.expect
+    };
+  };
+
+  const inferred = () => ({
+    trips: [TRIP_TRANSFER_LOCATED],
+    lastOpen: {
+      at: '2026-09-01T09:15:00+10:00',
+      station: { id: IX.rhodes.id, name: IX.rhodes.name },
+      tripId: TRIP_TRANSFER_LOCATED.id,
+      direction: 'forward',
+      journey: transferJourneys()[0]
+    },
+    journeys: transferJourneys(),
+    now: Date.parse('2026-09-01T09:40:00+10:00'),
+    generatedAt: '2026-09-01T09:40:00+10:00',
+    geo: IX.strathfield.location,
+    expect: { status: 'Running', strip: true, receipt: null, ruleTop: 214.3 }
+  });
 
   return [
     home('home-before', transferJourneys(), { expect: { status: 'Next train' } }),
@@ -487,6 +600,119 @@ async function states() {
   }
 `
     }),
+    /* --- the location-first answers, driven through the real fix path ---- */
+
+    // At Bondi Junction with only the outbound trip saved and three earlier
+    // days voting Rhodes: the header turns the trip around and says why.
+    smart('home-here-home', {
+      trips: [TRIP_TRANSFER_LOCATED],
+      homeVotes: votesFor(IX.rhodes, ['2026-08-29', '2026-08-30', '2026-08-31']),
+      cache: { '202210-213820': reverseBody },
+      now: REVERSE_AT,
+      body: reverseBody,
+      geo: IX.bondi.location,
+      expect: {
+        status: 'At Bondi Junction', strip: false,
+        receipt: 'Your days usually start at Rhodes.'
+      }
+    }),
+    // The same answer with no votes behind it: home is the first saved trip's
+    // origin, and the receipt claims only that.
+    smart('home-here-fallback', {
+      trips: [TRIP_TRANSFER_LOCATED],
+      cache: { '202210-213820': reverseBody },
+      now: REVERSE_AT,
+      body: reverseBody,
+      geo: IX.bondi.location,
+      expect: {
+        status: 'At Bondi Junction', strip: false,
+        receipt: 'You usually travel from Rhodes.'
+      }
+    }),
+    // A station no saved trip mentions. `locate` answers with a pair, the
+    // controller saves it, and the row it just wrote says so once.
+    smart('home-here-pair', {
+      trips: [TRIP_TRANSFER_LOCATED],
+      homeVotes: votesFor(IX.rhodes, ['2026-08-29', '2026-08-30', '2026-08-31']),
+      now: TRANSFER_NOW,
+      body: burwoodBody,
+      geo: { lat: -33.876235, lon: 151.104762 },
+      expect: {
+        status: 'At Burwood', strip: false, receipt: null,
+        sub: 'Just added · 120 m away'
+      }
+    }),
+    // Seen at Rhodes at 09:15 for the 09:24, and now four kilometres down the
+    // line: the app puts the rider back on the train it last showed them.
+    smart('home-inferred', inferred()),
+    // ...and the one control that mode has, which opens the familiar sheet on
+    // the departure station it already knows.
+    smart('setup-redirect', {
+      ...inferred(),
+      expect: {},
+      after: `
+  document.querySelector('[data-act="change-destination"]').click();
+  await sleep(450);
+  {
+    const from = document.querySelector('[data-role="from"]');
+    const to = document.querySelector('[data-role="to"]');
+    if (!from || from.value !== 'Rhodes') console.error('the redirect sheet opens From "' + (from && from.value) + '", not Rhodes');
+    if (document.activeElement !== to) console.error('the redirect sheet did not focus the To field');
+  }
+`
+    }),
+    // Stepping off four minutes before the timetable says so: the fix ends the
+    // trip, and the way back is the only thing left to offer.
+    smart('home-arrived', {
+      trips: [TRIP_TRANSFER_LOCATED],
+      focus: { ...transferJourneys()[0] },
+      focusBy: 'inferred',
+      now: Date.parse('2026-09-01T10:04:00+10:00'),
+      generatedAt: '2026-09-01T10:04:00+10:00',
+      journeys: transferJourneys(),
+      geo: IX.bondi.location,
+      expect: { status: 'Trip over', strip: true }
+    }),
+
+    /* --- the setup sheet's own location rows ----------------------------- */
+
+    // First run with the permission already granted: the sheet opens where the
+    // phone is and asks only for the other end.
+    smart('setup-origin', {
+      trips: [], route: '#/setup', geo: IX.rhodes.location,
+      after: `
+  {
+    const from = document.querySelector('[data-role="from"]');
+    if (!from || from.value !== 'Rhodes') console.error('the sheet opens From "' + (from && from.value) + '", not Rhodes');
+    if (document.activeElement !== document.querySelector('[data-role="to"]')) console.error('the sheet did not focus the To field');
+  }
+`
+    }),
+    // First run with nothing granted: the ask is a row in the results, never a
+    // prompt on load.
+    smart('setup-location-row', {
+      trips: [], route: '#/setup', permission: 'prompt',
+      after: `
+  {
+    const row = [...document.querySelectorAll('[data-act="use-location"]')].find((el) => el.closest('.hm-res'));
+    if (!row) console.error('the From results carry no location row');
+  }
+`
+    }),
+    // Adding a trip with a fix already in hand: the nearest station is offered,
+    // not filled in, because this user is not being presumed upon.
+    smart('setup-nearest', {
+      trips: [TRIP_TRANSFER_LOCATED, TRIP_CENTRAL_LOCATED],
+      route: '#/trips/new', geo: IX.rhodes.location,
+      after: `
+  {
+    const group = [...document.querySelectorAll('.hm-grp')].map((el) => el.textContent.trim());
+    if (!group.includes('Nearest station')) console.error('the nearest-station group is missing: ' + JSON.stringify(group));
+    if (document.querySelectorAll('[data-act="pick-near"]').length !== 1) console.error('the nearest-station group is not one station');
+  }
+`
+    }),
+
     board('on-time', departuresBody()),
     board('past-register', departuresBody(), {
       after: `t.state.pastBodies = [${JSON.stringify(pastBody)}]; t.state.initialBoardLanding = true; t.rerender(); await sleep(80);`
@@ -697,6 +923,26 @@ function pageScript(state) {
   if (t) t.now = () => ${state.now};
 
   ${state.route ? `if (location.hash !== ${JSON.stringify(state.route)}) { location.hash = ${JSON.stringify(state.route)}; await sleep(60); }` : ''}
+
+  ${state.geo || state.permission ? `
+  // The permission and the fix arrived after the load (screenshot.js trap 7),
+  // so nothing has consulted them yet. route() re-runs the controller's whole
+  // location path — permission query, silent fix, useFix — as a fresh open,
+  // which is the only way to reach the answers only that path can produce.
+  // Only home holds the index in controller state; the sheet loads its own copy.
+  if (${JSON.stringify(state.route || '#/')} === '#/' && !t.state.stations) {
+    throw new Error('the station index never loaded: nothing can name where the fix is');
+  }
+  // The load already wrote its own lastOpen over the seeded one, and left a
+  // selection behind that would make this open an explicit one.
+  t.state.doc.lastOpen = ${JSON.stringify(state.seed.lastOpen || null)};
+  t.state.selection = null;
+  t.state.fix = null;
+  t.route();
+  await sleep(${state.geoSettleMs || 500});
+  ${state.geo && (state.permission || 'granted') === 'granted'
+    ? `if (!t.state.fix) throw new Error('the controller took no fix, so no answer on this screen came from one');` : ''}
+  ` : ''}
 
   ${state.type ? `
   // A frozen fetch photographs the WAIT; the mock photographs the answer.
@@ -954,6 +1200,92 @@ function pageScript(state) {
       const said = topStatus ? topStatus.textContent.trim() : null;
       if (said !== expect.status) problems.push('the top line reads "' + said + '", not "' + expect.status + '"');
     }
+    /* The smart header's own furniture. The numbers are the comps round's
+       measurements (docs/backlog/smart-header-v2, OPTIONS-r1.md section 2). */
+    const light = matchMedia('(prefers-color-scheme: light)').matches;
+    const channels = (value) => (String(value).match(/[\\d.]+/g) || []).map(Number);
+    const luminance = (rgb) => {
+      const linear = (v) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
+      return 0.2126 * linear(rgb[0]) + 0.7152 * linear(rgb[1]) + 0.0722 * linear(rgb[2]);
+    };
+    // The ink is drawn on whatever opaque paint is nearest above it.
+    const groundOf = (el) => {
+      for (let node = el; node; node = node.parentElement) {
+        const paint = channels(getComputedStyle(node).backgroundColor);
+        if (paint.length < 4 || paint[3] > 0) return paint;
+      }
+      return light ? [255, 255, 255] : [0, 0, 0];
+    };
+    // The ink tokens are translucent by design (--ink-2, --ink-3), so the ink
+    // that reaches the eye is the composite, not the declared colour.
+    const contrastOf = (el) => {
+      const ink = channels(getComputedStyle(el).color);
+      const ground = groundOf(el);
+      const alpha = ink.length > 3 ? ink[3] : 1;
+      const painted = [0, 1, 2].map((i) => alpha * ink[i] + (1 - alpha) * ground[i]);
+      const [bright, dim] = [luminance(painted), luminance(ground)].sort((a, b) => b - a);
+      return (bright + 0.05) / (dim + 0.05);
+    };
+    for (const [selector, ratios] of [
+      ['.hm-new', [4.3, 4.83]], ['.hm-strip .q', [8, 8.13]], ['.hm-strip button', [17.6, 17.8]]
+    ]) {
+      const el = document.querySelector(selector);
+      if (!el) continue;
+      const want = ratios[light ? 1 : 0];
+      const got = contrastOf(el);
+      // A hundredth of slack: the comps measured the token against --bg, and
+      // the row and the strip are painted on the panel.
+      if (got < want - 0.1) {
+        problems.push(selector + ' is ' + round(got) + ':1 against its ground, under the comps round’s ' + want);
+      }
+    }
+
+    /* A3: one 49px line under the heavy rule and above MY TRIPS. */
+    const strip = document.querySelector('[data-strip]');
+    if (expect.strip === true && !strip) problems.push('the inferred strip is missing');
+    if (expect.strip === false && strip) problems.push('the inferred strip is shown on a header that did not guess');
+    if (strip) {
+      const stripBox = strip.getBoundingClientRect();
+      if (!near(stripBox.height, 49)) problems.push('the strip is ' + round(stripBox.height) + 'px, not 49');
+      const heavyRule = document.querySelector('.hm-rule');
+      const trips = document.querySelector('[data-t="trip-list"]');
+      if (heavyRule && stripBox.top < heavyRule.getBoundingClientRect().bottom - 0.5) {
+        problems.push('the strip is not under the heavy rule');
+      }
+      if (trips && stripBox.bottom > trips.getBoundingClientRect().top + 0.5) {
+        problems.push('the strip is not above the trip list');
+      }
+    }
+
+    /* The heavy rule's own place in the header, which is what chose A3 over
+       A2. It moves with the frame, so it is only asserted at the comps width. */
+    if (expect.ruleTop !== undefined && innerWidth === 390) {
+      const heavy = document.querySelector('.hm-rule');
+      const top = heavy ? heavy.getBoundingClientRect().top : null;
+      if (top === null || Math.abs(top - expect.ruleTop) > 1) {
+        problems.push('the heavy rule is at ' + (top === null ? 'nowhere' : round(top)) + ', not ' + expect.ruleTop);
+      }
+    }
+
+    // Our own copy, on the screen that says what the app decided.
+    if (expect.receipt !== undefined) {
+      const rec = document.querySelector('.hm-rec');
+      const said = rec ? rec.textContent.trim() : null;
+      if (said !== expect.receipt) problems.push('the receipt reads ' + JSON.stringify(said) + ', not ' + JSON.stringify(expect.receipt));
+    }
+    if (expect.sub !== undefined) {
+      const sub = document.querySelector('.tripr.shown .hm-sub, .tripr.focused .hm-sub');
+      const said = sub ? sub.textContent.trim() : null;
+      if (said !== expect.sub) problems.push('the shown row’s sub line reads ' + JSON.stringify(said) + ', not ' + JSON.stringify(expect.sub));
+    }
+
+    // A station name the app itself printed is never abbreviated by the layout.
+    for (const name of document.querySelectorAll('.hm-stn,.hm-nm,.hm-sub,.hm-strip .q,.hm-strip button')) {
+      if (name.scrollWidth > name.clientWidth + 0.5) {
+        problems.push('"' + name.textContent.trim() + '" is truncated: ' + name.scrollWidth + ' > ' + name.clientWidth);
+      }
+    }
+
     // LIVE says the data is live and nothing else; lateness never colours it.
     const dot = document.querySelector('.hm-fresh .pulse');
     const freshness = document.querySelector('.hm-fresh .lbl');
@@ -1113,6 +1445,12 @@ async function main() {
         '--seed', seedFile, '--eval', pageScript(state)
       ];
       if (state.desktop) args.push('--desktop');
+      if (state.geo) {
+        args.push('--geo', [state.geo.lat, state.geo.lon, state.geo.speed]
+          .filter(Number.isFinite).join(','));
+      }
+      const permission = state.permission || (state.geo ? 'granted' : null);
+      if (permission) args.push('--geo-permission', permission);
       for (const feature of media) args.push('--media', feature);
       await run(process.execPath, args, env);
     }

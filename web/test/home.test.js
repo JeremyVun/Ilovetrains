@@ -7,8 +7,9 @@ import { join } from 'node:path';
 
 import { directionsModel } from '../js/focus.js';
 import { fitStationNames } from '../js/dom.js';
-import { homeHtml, homeModel, inferHome, tripIsOver } from '../js/home.js';
+import { homeHtml, homeModel, tripIsOver } from '../js/home.js';
 import { emptyDoc } from '../js/storage.js';
+import { departureMs, journeyKey } from '../js/journey.js';
 import { cancelLeg, delayLeg, transferBody, transferJourneys } from './fixture.js';
 
 const at = (time) => Date.parse(`2026-09-01T${time}:00+10:00`);
@@ -37,24 +38,6 @@ test('directions follows the closed state ladder on one journey', () => {
   assert.equal(done.showBoardingPlatform, false);
 });
 
-test('home inference uses three device-only morning/evening votes', () => {
-  const doc = emptyDoc();
-  const rhodes = { id: '213820', name: 'Rhodes' };
-  const city = { id: '200060', name: 'Central' };
-  doc.trips = [{ id: 't', from: rhodes, to: city, createdAt: new Date(0).toISOString() }];
-  doc.rides = [0, 1, 2].map((day) => ({
-    tripId: 't',
-    direction: 'reverse',
-    departedAt: `2026-08-${28 + day}T17:00:00+10:00`,
-    arrivedAt: `2026-08-${28 + day}T17:30:00+10:00`,
-    from: city,
-    to: rhodes
-  }));
-  const result = inferHome(doc, at('20:00'));
-  assert.equal(result.inferred.station.id, rhodes.id);
-  assert.equal(result.inferred.confidence, 3);
-});
-
 test('a trip becomes over at effective arrival, not at an arbitrary UI age', () => {
   const focus = { journey: transferJourneys()[0] };
   assert.equal(tripIsOver(focus, at('10:07')), false);
@@ -68,7 +51,7 @@ test('a cancelled lead names the cancellation while answering with the next trai
   const trip = {
     id: 't',
     from: { id: '213820', name: 'Rhodes Station' },
-    to: { id: '200080', name: 'Bondi Junction Station' },
+    to: { id: '202210', name: 'Bondi Junction Station' },
     createdAt: new Date(0).toISOString()
   };
   const doc = { ...emptyDoc(), trips: [trip] };
@@ -112,7 +95,7 @@ test('every saved-trip row leads with its distance in bold, not just the tracked
     ...emptyDoc(),
     trips: [
       trip('t1', station('213820', 'Rhodes Station', -33.8299, 151.0866),
-        station('200080', 'Bondi Junction Station', -33.8915, 151.2477)),
+        station('202210', 'Bondi Junction Station', -33.8915, 151.2477)),
       trip('t2', station('200060', 'Central Station', -33.8832, 151.2069),
         station('215020', 'Parramatta Station', -33.8172, 151.0050))
     ]
@@ -135,7 +118,7 @@ test('every saved-trip row leads with its distance in bold, not just the tracked
    screen around the header. */
 function headerOnly(directions, ranked = []) {
   return {
-    directions, ranked, home: { home: null, moved: null }, status: null,
+    directions, ranked, home: null, strip: null, status: null,
     top: { lead: 'Next train', name: '' },
     over: false, freshness: 'Live', dot: 'live', askLocation: false
   };
@@ -145,7 +128,7 @@ function headerOnly(directions, ranked = []) {
 /* ---- the ported smart home ---------------------------------------------- */
 
 const RHODES = { id: '213820', name: 'Rhodes Station', location: { lat: -33.8299, lon: 151.0866 } };
-const BONDI = { id: '200080', name: 'Bondi Junction Station', location: { lat: -33.8915, lon: 151.2477 } };
+const BONDI = { id: '202210', name: 'Bondi Junction Station', location: { lat: -33.8915, lon: 151.2477 } };
 const HOME_TRIP = { id: 't1', from: RHODES, to: BONDI, createdAt: new Date(0).toISOString() };
 const HOME_SELECTION = { tripId: 't1', direction: 'forward' };
 
@@ -366,9 +349,10 @@ test('a station name is shortened by rule rather than ellipsised', () => {
   assert.equal(fit('North Sydney Junction Station', 11), 'N Sydney Jn');
 });
 
-/* Focus is written by `Take this train` and cleared by the return offer or the
-   30-minute expiry, and by nothing else: browsing another trip must not move
-   the journey the rider is following (client-storage.md, Trip selection). */
+/* Focus is written by `Take this train`, by inferred entry and by the redirect
+   that keeps a rider on the same departure — and by nothing else: browsing
+   another trip must not move the journey the rider is following
+   (client-storage.md, Trip selection and Travel mode). */
 test('a saved-trip row tap selects and routes, and leaves focus alone', () => {
   const main = readFileSync(join(import.meta.dirname, '..', 'js', 'main.js'), 'utf8');
   const branch = /if \(action === 'open-trip'\) \{([\s\S]*?)\n  \}/.exec(main);
@@ -377,7 +361,35 @@ test('a saved-trip row tap selects and routes, and leaves focus alone', () => {
   assert.match(branch[1], /state\.selection = \{ tripId: element\.dataset\.id/);
   assert.match(branch[1], /ctx\.go\('#\/board'\)/);
   assert.ok(!/focus/i.test(branch[1]), 'the row tap does not touch focus');
-  assert.equal(main.match(/setFocus\(/g).length, 1, 'only journey detail writes focus');
+  assert.equal(main.match(/setFocus\(/g).length, 3, 'three writers of focus, no more');
+});
+
+/* The record inferred entry reads is written where writes happen, never from a
+   render or a tick, and only for an unfocused header (client-storage.md). */
+test('the controller records the previous open at two write points only', () => {
+  const main = readFileSync(join(import.meta.dirname, '..', 'js', 'main.js'), 'utf8');
+  const body = /function noteLastOpen\(\) \{([\s\S]*?)\n\}/.exec(main);
+
+  assert.ok(body, 'the controller still has noteLastOpen');
+  assert.match(body[1], /state\.view !== 'home' \|\| focusSelection\(\)/);
+  assert.match(body[1], /!journeyCancelled\(item\)/, 'the lead journey is the first running one');
+  assert.match(body[1], /spot && spot\.tier === 1 \? spot\.station : null/);
+  assert.equal(main.match(/^\s*noteLastOpen\(\);$/gm).length, 2, 'the cache paint and the refresh');
+  assert.ok(!/renderHome\(\)[\s\S]{0,40}noteLastOpen/.test(
+    /function renderHome[\s\S]*?\n\}/.exec(main)[0]), 'never from a render');
+});
+
+/* The correction for a wrong inferred entry is one tap: the sheet opens with the
+   origin filled and the departure to re-enter on (design.md, ruling 7). */
+test('change destination carries the origin and the departure into the sheet', () => {
+  const main = readFileSync(join(import.meta.dirname, '..', 'js', 'main.js'), 'utf8');
+  const branch = /if \(action === 'change-destination'\) \{([\s\S]*?)\n  \}/.exec(main);
+
+  assert.ok(branch, 'homeAction handles the strip');
+  assert.match(branch[1], /origin: strip\.origin/);
+  assert.match(branch[1], /journeyKey: strip\.journeyKey/);
+  assert.match(branch[1], /departureMs: strip\.departureMs/);
+  assert.match(branch[1], /ctx\.go\('#\/trips\/new'\)/);
 });
 
 
@@ -397,4 +409,92 @@ test('the freshness pill rests while the first board is still in the post', () =
   assert.deepEqual([waiting.freshness, waiting.dot], ['', 'idle']);
   const offline = homeModel(homeDoc(), HOME_SELECTION, null, at('09:21'), { stale: true, offline: true });
   assert.deepEqual([offline.freshness, offline.dot], ['Offline', 'stale']);
+});
+
+
+/* ---- home from votes, its receipts, and the two marks the fix earns ----- */
+
+const rhodesVotes = (count) => Array.from({ length: count }, (_, index) => ({
+  day: `2026-08-2${4 + index}`, station: RHODES
+}));
+
+function leapModel(votes, opts) {
+  const doc = { ...emptyDoc(), trips: [HOME_TRIP], homeVotes: rhodesVotes(votes) };
+  return homeModel(doc, { tripId: 't1', direction: 'reverse' }, transferBody(), at('17:40'), {
+    predicted: true, fix: { lat: BONDI.location.lat, lon: BONDI.location.lon }, ...opts
+  });
+}
+
+test('the way home names the evidence that chose it, and only when there is a leap', () => {
+  assert.equal(leapModel(3, { leap: 'home' }).directions.receipt, 'Your days usually start at Rhodes.');
+  assert.equal(leapModel(0, { leap: 'home' }).directions.receipt, 'You usually travel from Rhodes.');
+  assert.equal(leapModel(3, { leap: 'usual' }).directions.receipt, '', 'the usual trip explains itself');
+  assert.equal(leapModel(3, {}).directions.receipt, '');
+  assert.equal(leapModel(3, { leap: 'home', predicted: false }).directions.receipt, '',
+    'an explicit tap needs no receipt');
+});
+
+test('home is derived from the votes on every read, with no stored copy', () => {
+  assert.deepEqual(leapModel(3, {}).home, { station: RHODES, confidence: 3 });
+  assert.deepEqual(leapModel(0, {}).home, { station: RHODES, confidence: 0 });
+});
+
+test('the trip the app just saved is marked once, on the open that saved it', () => {
+  const loadedAt = at('09:20');
+  const doc = (createdAt) => ({
+    ...emptyDoc(),
+    trips: [{ ...HOME_TRIP, createdAt: new Date(createdAt).toISOString() }]
+  });
+  const mark = (createdAt, opts = {}) => homeHtml(homeModel(doc(createdAt), HOME_SELECTION,
+    transferBody(), at('09:21'), { predicted: true, loadedAt, ...opts }));
+
+  assert.match(mark(at('09:20')), /<i class="hm-new">Just added<\/i>/);
+  assert.ok(!mark(at('09:20')).includes('<b>Shown above</b>'), 'SHOWN ABOVE gives way for this open');
+  assert.ok(mark(at('09:19')).includes('<b>Shown above</b>'), 'a trip saved before this open is not new');
+  assert.ok(!mark(at('09:20'), { predicted: false }).includes('hm-new'));
+  assert.ok(!mark(at('09:20'), { loadedAt: undefined }).includes('hm-new'));
+});
+
+test('the strip is the inferred header\'s receipt, and only its own', () => {
+  const journey = transferJourneys()[0];
+  const focused = (by) => ({
+    ...emptyDoc(),
+    trips: [HOME_TRIP],
+    focus: { tripId: 't1', direction: 'forward', focusedAt: '2026-09-01T09:21:00+10:00', by, journey }
+  });
+  const model = homeModel(focused('inferred'), HOME_SELECTION, transferBody(), at('09:33'), {});
+  const html = homeHtml(model);
+
+  assert.deepEqual(model.strip, {
+    origin: RHODES,
+    destination: BONDI,
+    departureMs: departureMs(journey),
+    journeyKey: journeyKey(journey)
+  });
+  assert.match(html, /<div class="hm-rule"><\/div>\s*<div class="hm-strip" data-strip>/,
+    'the strip sits under the heavy rule');
+  assert.ok(html.includes('<div class="hm-strip" data-strip><span class="q">Going somewhere else?</span>'
+    + '<button data-act="change-destination" data-tap>Change</button></div>'), 'one line, two parts');
+  assert.ok(html.indexOf('hm-strip') < html.indexOf('data-t="trip-list"'), 'and above MY TRIPS');
+
+  assert.equal(homeModel(focused('focus'), HOME_SELECTION, transferBody(), at('09:33'), {}).strip, null);
+  assert.ok(!homeHtml(homeModel(focused('focus'), HOME_SELECTION, transferBody(), at('09:33'), {}))
+    .includes('hm-strip'));
+  assert.equal(homeModel({ ...emptyDoc(), trips: [HOME_TRIP] }, HOME_SELECTION,
+    transferBody(), at('09:33'), {}).strip, null);
+});
+
+test('a fix at the destination ends the trip before its timetable does', () => {
+  const journey = transferJourneys()[0];
+  const doc = {
+    ...emptyDoc(),
+    trips: [HOME_TRIP],
+    focus: { tripId: 't1', direction: 'forward', focusedAt: '2026-09-01T09:21:00+10:00', by: 'inferred', journey }
+  };
+  const model = (opts) => homeModel(doc, HOME_SELECTION, transferBody(), at('10:03'), opts);
+
+  assert.equal(model({}).over, false);
+  assert.equal(model({ arrived: true }).over, true);
+  assert.equal(model({ arrived: true }).status.text, 'Trip over');
+  assert.ok(homeHtml(model({ arrived: true })).includes('Show the way back'));
 });

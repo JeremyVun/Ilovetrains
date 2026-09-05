@@ -40,10 +40,16 @@ read/write atomic and migration simple):
               "location": {"lat": -33.8308, "lon": 151.0879}}],
     "to": [{"id": "202210", "name": "Bondi Junction"}]
   },
-  "home": {
+  "homeVotes": [
+    {"day": "2026-09-05",
+     "station": {"id": "213820", "name": "Rhodes",
+                 "location": {"lat": -33.8308, "lon": 151.0879}}}
+  ],
+  "lastOpen": {
+    "at": "2026-09-05T08:05:12+10:00",
     "station": {"id": "213820", "name": "Rhodes"},
-    "confidence": 4,
-    "inferredAt": "2026-08-31T20:00:00+10:00"
+    "tripId": "uuid", "direction": "forward",
+    "journey": {"…": "verbatim snapshot of the header's lead journey"}
   },
   "lastViewed": {"tripId": "uuid", "direction": "forward"},
   "locationAsk": {"declinedAt": "2026-09-01T09:21:00+10:00"},
@@ -70,6 +76,13 @@ read/write atomic and migration simple):
   useful station answers, not raw keystrokes. Add-trip shows them before a
   query and ranks returned stops fuzzily, so a prefix such as `Rhode` ranks
   `Rhodes` first.
+- `homeVotes` holds at most seven daily votes for where the phone's days start,
+  newest last, at most one per LOCAL calendar day. A malformed vote is dropped,
+  not repaired, and a second vote on a day already voted is ignored.
+- `lastOpen` is the header's previous unfocused answer: when, which station the
+  phone was at (tier 1 only, or null), which trip and direction, and a verbatim
+  snapshot of the lead journey. It is what makes inferred travel mode possible
+  after the service has left the live board. Deleting the trip deletes it.
 - `locationAsk` is optional and holds only the time the user last declined the
   location panel. Absence means never declined; a malformed value is dropped,
   not repaired.
@@ -144,14 +157,18 @@ The document may contain an optional `focus` field — "I'm on this train":
   "tripId": "uuid",
   "direction": "forward",
   "focusedAt": "2026-09-01T09:07:00+10:00",
+  "by": "focus",
   "journey": { "…": "verbatim snapshot of the focused journey object" }
 }
 ```
 
-- Set only by `Take this train` on journey detail; nothing else writes it.
-  There is no unfocus control: it clears itself once now > the journey's
-  effective arrival + 30 min, and accepting the return offer that a finished
-  focus produces clears it too.
+- `by` is `"focus"` when the user tapped `Take this train` and `"inferred"`
+  when the app entered travel mode from a fix. A focus written before `by`
+  shipped reads as `"focus"`; any other value drops the focus.
+- Written by `Take this train` on journey detail and by inferred entry below;
+  nothing else writes it. There is no unfocus control: it clears itself once
+  now > the journey's effective arrival + 30 min, and accepting the return
+  offer that a finished focus produces clears it too.
 - `journey` is a full snapshot so directions and detail stay viewable after
   departure and offline. On each refresh the client re-matches it in fresh
   data by (first leg's line.name, departure.scheduled) and updates the
@@ -165,9 +182,102 @@ The document may contain an optional `focus` field — "I'm on this train":
   immediately either way; rendering never touches storage, because the client
   paints once with the real clock before anything can pin it.
 
-## Prediction heuristic (v1 — keep it this simple)
+### Travel mode
 
-On app open, score every (trip, direction) candidate:
+Travel mode IS the focused journey, whichever way it was entered. Every rule
+above applies to both kinds: the header is directions, the status line
+describes the train, browsing another trip never replaces it, refresh
+re-matches the snapshot, expiry is effective arrival + 30 min, and the way-back
+offer follows a finished journey.
+
+**Inferred entry** is evaluated when a valid fix arrives on home and `lastOpen`
+exists and nothing is focused. With `J = lastOpen.journey`, `D` its effective
+departure, `A` its effective arrival, and `O` and `Z` the origin and
+destination of `leg(trip, lastOpen.direction)` on the saved trip:
+
+1. under way: `D ≤ now ≤ A + 30 min`;
+2. seen at the platform: `lastOpen.station.id == O.id` and
+   `D − lastOpen.at ≤ 15 min`;
+3. moved toward: `distance(fix, O) ≥ 1 km` and
+   `distance(fix, Z) ≤ distance(O, Z) − 1 km`;
+   or instead of 3: the fix reports `speed ≥ 8 m/s` (about 30 km/h) and
+   `distance(fix, O) ≥ 200 m`.
+
+All of 1, 2 and (3 or speed) must hold. A deleted trip, or an endpoint with no
+coordinates, is no entry. Entry sets `focus` from the snapshot with
+`by: "inferred"`, and `refreshFocus` then re-matches it in fresh data exactly
+as it does a hand-focused journey. Condition 3 is what stops a walk back home
+for a forgotten laptop reading as a ride. There is no history term: a waiver
+would buy wrong entries for people whose days vary.
+
+Inference attaches to the journey that was SHOWN, so a rider who missed it and
+took the next one gets directions one service off. That is a known and accepted
+gap, not a defect.
+
+**Exits** are the expiry above, the way-back acceptance above, and one more: a
+fix within 200 m of `Z` when `now ≥ A − 5 min` marks the trip over
+immediately, so the return offer arrives as the rider steps off rather than up
+to half an hour later.
+
+**Correction.** An inferred header carries one control, `Change destination`,
+which opens the new-trip sheet with From set to `O`. Saving there re-enters
+travel mode on the same departure toward the new destination when a journey
+matches, and opens that pair's board when none does. Browsing another trip
+never exits travel mode, and there is no "not on it" control: a wrong entry
+that is not a redirect ends by expiry or by `Take this train`.
+
+## Where the header starts: `locate`
+
+Outside travel mode the header starts where the user is. `locate(doc, now,
+{fix, stations})` is pure and returns one of three answers:
+
+- `{kind: "trip", tripId, direction, leap}` — a saved trip, `leap` being
+  `"usual"` or `"home"` (it chooses the receipt, below);
+- `{kind: "pair", from, to}` — a pair no saved trip covers. The controller
+  saves it with `addTrip` and selects it, and the ten-trip LRU governs it like
+  any other; the row it creates carries a once-only `Just added` mark on that
+  open;
+- `{kind: "setup", from}` — nothing saved yet; the controller opens the
+  new-trip sheet with From filled, or empty when `from` is null.
+
+`here` is the station the user is standing at, from the baked station index
+(`web/stations.json`, fetched once per page load, never written to the
+document) and a fix at most 5 minutes old. It is the first of: any index
+station within 200 m; the nearest end of a saved trip within 2 km; the nearest
+index station within 2 km; none. The saved end outranks a nearer stranger so a
+user whose own origin is a kilometre away is not handed a station they have
+never used. Without the index, or without a fix, there is no `here`.
+
+```
+here = above, or none
+if no here:
+  no trips → setup with no origin
+  else → today's formula below
+home = the votes, below
+candidates = every (trip, direction) whose origin is here, reverse included
+if candidates:
+  score each by today's base history score (day type, hour, recency; no
+    location term and no floor)
+  best > 0 and unique → that one, leap "usual"
+  else if here ≠ home and a candidate ends at home → that one, leap "home"
+  else → lastViewed among them, else the first, leap "usual"
+else if here ≠ home → {pair: here → home}
+else if trips → today's formula below
+else → setup with From = here
+```
+
+Real history from where the user is outranks the home rule: a freelancer with a
+record of going A → B from client A is not shown the way home instead. There
+is no clock rule anywhere in this.
+
+A fix arriving after the cached paint re-runs `locate` only when the selection
+was predicted, never over an explicit tap. Trip rows stay ordered by
+`rankTrips`, with the header's trip first.
+
+### The no-`here` branch: today's formula, unchanged
+
+With no fix, no station index, or more than 2 km from every station, the
+predictor answers as it always has. Score every (trip, direction) candidate:
 
 ```
 score = Σ over history events e matching (trip, direction):
@@ -205,10 +315,11 @@ candidate carries the same floor, so they tie and the fallback answers as
 before. Any real history dwarfs the floor: a single view an hour off and a day
 old scores about 0.97, which outranks it from any distance.
 
-Deterministic given (storage document, current time, fix). The fix never leaves
-the device: it is never persisted and never sent to the server. Permission is
-requested contextually (user has ≥2 saved trips), never on first load; denial
-degrades silently to time+history. Declining writes `locationAsk.declinedAt`,
+Deterministic given (storage document, current time, fix). The fix is never
+persisted and never leaves the device; the document holds station ids and times
+derived from it, and never a coordinate. Permission is requested contextually
+(user has ≥2 saved trips), never on first load; denial degrades silently to
+time+history. Declining writes `locationAsk.declinedAt`,
 which suppresses the panel for 30 days across reloads; a Permissions API state
 of `granted` or `denied` suppresses it outright, because the question has
 already been answered. A client whose permission is already granted takes one
@@ -216,29 +327,39 @@ silent fix when home opens, without a prompt. Wherever trips are
 listed (switcher, trip management), they are ordered by current score with the
 predicted one visually highlighted at the top.
 
-## Completed rides and home-station heuristic
+## Home, from the daily first-open votes
+
+Each day, the first home open with a valid fix and a `here` casts one vote for
+that station into `homeVotes`. Home is then, on every read:
+
+- the station with the most votes among the stored ones, needing at least
+  three; a tie goes to the station of the most recent vote among the tied;
+- otherwise the first saved trip's origin at confidence 0, which claims
+  nothing;
+- otherwise nothing at all, when no trip is saved either.
+
+Seven days of votes is the whole memory, so home re-infers itself silently when
+someone moves: no offer, no confirmation, no stored copy to go stale. The
+correction for a wrong home is the ordinary one-tap trip choice.
+
+Completed rides no longer vote, and there are no clock windows. The receipt the
+`home` leap prints names the votes when there are three (`Your days usually
+start at <home>.`) and the fallback when there are not (`You usually travel
+from <home>.`); a `usual` leap prints no receipt, because it explains itself.
+
+## Completed rides
 
 `rides` records a focused journey once its effective arrival has passed. It is
 capped at 100 and deduplicated by trip, direction and `scheduledDeparture`;
 `departedAt` and `arrivedAt` retain the effective times. A ride stores both
 endpoint snapshots so later trip edits or deletion do not rewrite the evidence.
 Completed rides therefore survive deletion or LRU eviction of their saved-trip
-entry; prediction history and cached boards do not.
+entry; prediction history and cached boards do not. They are what the
+last-ridden line and the reverse receipt cite.
 
-Home evidence is intentionally small and tuneable:
-
-- an origin used before 11:00 adds one morning vote;
-- a destination reached from 16:00 adds one evening vote;
-- three votes establish a candidate; the stored `home` keeps the station,
-  evidence count and inference time;
-- until three votes exist, the first saved trip's origin is the low-confidence
-  fallback and the UI makes no behavioural-history claim;
-- if the last three completed evening rides all end at another station, home
-  surfaces “Home may have moved” in place. It changes only after the user
-  accepts.
-
-A focused trip is OVER once `now` is later than its effective arrival. Home may
-then offer the opposite direction, and accepting that offer is the one path
+A focused trip is OVER once `now` is later than its effective arrival, or once
+a fix places the phone within 200 m of the destination from `A − 5 min`. Home
+may then offer the opposite direction, and accepting that offer is the one path
 other than expiry that clears a focus; it then fetches a real return journey.
 Transfer platforms therefore come from that return response; they are never
 produced by reversing the outbound snapshot. Focusing a journey is the user's

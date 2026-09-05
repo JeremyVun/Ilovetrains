@@ -183,6 +183,45 @@ node tools/shoot-states.js detail-hero detail-direct detail-tight \
 # add --size 412x732 or --media prefers-color-scheme:light --prefix light-
 ```
 
+### The geolocation seam
+
+A state may declare `geo: {lat, lon, speed?}` and `permission: 'granted' |
+'prompt' | 'denied'` (a `geo` alone implies `granted`). `screenshot.js` answers
+both over CDP — `Browser.setPermission` and `Emulation.setGeolocationOverride`,
+which headless Chrome supports including `coords.speed` — and the state's page
+script then calls `t.route()`. That call is the point: the permission query, the
+silent fix, `useFix`, the home vote, inferred entry and the auto-saved pair all
+live behind `route()`, so a state that only writes `t.state.fix` photographs a
+screen the controller never decided.
+
+Its traps:
+
+- **The fix arrives after the load, deliberately.** Granted before the first
+  navigation, the app takes a fix against the real clock and writes home votes,
+  a `lastOpen` and possibly an auto-saved trip into the seeded document before
+  anything is pinned. Both CDP calls therefore run between the load and the
+  `--eval`.
+- **A second `route()` is not a second open unless you make it one.** The load
+  left a `selection` behind, which makes `chooseSelection` treat the open as an
+  explicit one and never re-locate, and it overwrote the seeded `lastOpen` with
+  its own. The geo block clears the selection and restores `lastOpen` from the
+  seed before re-routing.
+- **The index is already there, but only on home.** `loadStations()` is started
+  by `showHome`, so it has resolved long before the eval freezes `fetch` — the
+  block asserts `t.state.stations` rather than trusting it. The setup sheet
+  holds its own copy and never fills `state.stations`, so the assertion is
+  scoped to the home route.
+- **Two clocks.** `t.now` is the pinned clock; the fix Chrome returns is stamped
+  with the machine clock, and `state.loadedAt` (which decides the `Just added`
+  mark) is real page-load time. The fix passes `validFix` because every pinned
+  state sits in the past; a state pinned to the future would need a page stub
+  instead.
+- **`change-destination` is a hash change.** Allow at least 400ms after the
+  click before reading the sheet, or the frame is still home.
+- **Measure the header rule with a body.** A null body draws a figure-less
+  header and the heavy rule lands at 189px, not the 214px `ui.md` binds. Seed
+  `t.state.body` first.
+
 **Trap: a post-departure state moves two clocks.** `detail-departed` advances
 the pinned clock *and* `t.state.body.generatedAt` together. Advance only the
 clock and the seeded board is four hours old, so the client correctly withholds
@@ -208,7 +247,7 @@ change the produced filename, not the state, so rename by an explicit table and
 then **read every frame**: a stale `OFFLINE` board or a withheld figure is a
 convincing shot of the wrong screen, and so is the wrong route.
 
-The table, all thirty frames. `default` means no flags: the state carries its
+The table, all thirty-four frames. `default` means no flags: the state carries its
 own size and the dark scheme is unsuffixed.
 
 | Exemplar | State | Invocation |
@@ -243,6 +282,10 @@ own size and the dark scheme is unsuffixed.
 | `home-390x844-back.png` | `reverse-real-platforms` | default |
 | `home-390x844-before-light.png` | `home-before` | `--media prefers-color-scheme:light` |
 | `home-412x732-change.png` | `home-change` | `--size 412x732` |
+| `home-390x844-inferred.png` | `home-inferred` | default |
+| `home-390x844-inferred-light.png` | `home-inferred` | `--media prefers-color-scheme:light` |
+| `home-390x844-just-added.png` | `home-here-pair` | default |
+| `setup-390x844-origin.png` | `setup-origin` | default |
 
 `docs/contracts/ui.md` lists the set; the directory holds it and nothing else,
 so a frame no state can produce is removed rather than left to rot.

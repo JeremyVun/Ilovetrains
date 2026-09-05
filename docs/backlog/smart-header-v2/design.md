@@ -159,7 +159,9 @@ that day that has a valid fix and a `here`. Older entries fall off the end.
 Home is the station with the most votes; at least 3 are required; a tie goes
 to the station of the most recent vote. With fewer than 3 votes, or no
 location ever, home is the first saved trip's origin at confidence 0, as
-today. The stored `home` object is removed: home is derived from the votes
+today. A vote's `station.location` is the station's public coordinate, as
+saved trips already carry; ruling 3's "never coordinates" is about the
+user's fix, which is never written. The stored `home` object is removed: home is derived from the votes
 on every read, so there is no stale copy. Rides no longer vote; `rides`
 stays for receipts and the last-ridden line.
 
@@ -192,6 +194,10 @@ else → setup with From = here
 
 `leap` drives the receipt (section 8). The location multiplier and floor
 survive only inside today's `predict()`, which is the no-`here` branch.
+The `setup` answers are unreachable from home in practice: the router sends
+a trip-less document to the sheet before home renders, so first-run
+prefilling is the sheet's own silent fix (section 7). The shape stays in the
+contract.
 Trip rows stay ordered by `rankTrips` with the header's trip first.
 
 A fix arriving after the cached paint re-runs `locate` only when the
@@ -222,7 +228,14 @@ each successful refresh), the document's `lastOpen` becomes:
 
 `station` is the tier-1 `here` (within 200 m) at that open, or null. The
 snapshot is what makes entry possible after the service has left the live
-board. No coordinate is stored.
+board. No coordinate is stored. Two consequences found in phase 3
+(2026-09-05): inferred entry reads the record as it stood BEFORE this open
+wrote it (the controller snapshots `lastOpen` on open and on visibility
+return, since the cache-paint write lands before the fix does); and the
+cache-paint write carries no station, because neither the index nor a fix
+exists yet, so the fix's own refresh (write point 2) is what fills it. An
+open whose refresh fails after the fix therefore leaves no platform
+sighting, and the next open cannot infer entry from it.
 
 **Inferred entry** is evaluated when a valid fix arrives on home (open, and
 visibility return) and `lastOpen` exists. With `J = lastOpen.journey`,
@@ -237,7 +250,10 @@ visibility return) and `lastOpen` exists. With `J = lastOpen.journey`,
    or instead of 3: the fix reports `coords.speed ≥ 8 m/s` (about
    30 km/h) and `distance(fix, O) ≥ 200 m`.
 
-All of 1, 2 and (3 or speed) must hold. Entry sets `focus` from the
+All of 1, 2 and (3 or speed) must hold. Condition 3's first clause is
+implied by its second (triangle inequality) and stays for readability; it
+is load-bearing only in the speed clause, where the radius is 200 m. Entry
+sets `focus` from the
 snapshot with `by: "inferred"`, then `refreshFocus` re-matches it in fresh
 data as it does for a hand-focused journey. Condition 3 is what stops a
 return home for a forgotten laptop from reading as a ride. There is no
@@ -254,7 +270,15 @@ speed clause is dead and the plan removes it rather than shipping it.
 **Exit**, for both kinds of focus: the existing expiry, the way-back
 acceptance, and a new one: a fix within 200 m of `Z` when
 `now ≥ A − 5 min` marks the trip over immediately, so the offer arrives
-when the rider steps off rather than up to 30 minutes later.
+when the rider steps off rather than up to 30 minutes later. Over means the
+whole header: the status reads `TRIP OVER`, the directions take their done
+treatment (the arrival figure, `AGO`, `You arrived at <Z>.`) and the offer
+shows; a countdown may not stand under a `TRIP OVER` status (orchestrator
+ruling 2026-09-05, phase 2 handoff).
+Open for the owner (phase 3, 2026-09-05): a rider stepping off up to five
+minutes early reads `Now` over `AGO` for those minutes, because
+`countdownFigure(0)` is `Now`; the same pair already showed for the one
+minute at the timetabled arrival. Ships as specified pending a verdict.
 
 **Fixes.** The silent fix is taken on home open and on visibility return to
 home when permission is granted (today: open only). Never persisted, never
@@ -293,7 +317,10 @@ before any query, in the existing result-row grammar:
 First run with permission already granted (a returning user, or a PWA
 installed after the site was granted) takes the silent fix and opens the
 sheet with From filled. First run with `prompt` shows the row. Nothing
-prompts on load.
+prompts on load. Auto-fill applies to first run only (no trips saved);
+add-trip with a fix shows the `NEAREST STATION` group instead, so both
+designed states are reachable and a returning user is not presumed upon
+(phase 3 reading, 2026-09-05).
 
 **The home panel is unchanged (ruling 11).** Trigger, copy and quiet
 rules stay exactly as `playtest-fixes` shipped them: two or more saved

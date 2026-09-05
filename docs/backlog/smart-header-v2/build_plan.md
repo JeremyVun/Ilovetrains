@@ -202,6 +202,26 @@ subsection under "Focused journey" with the entry and exit conditions and
 
 ## Phase 3 — controller, setup and shell — DONE marker: `phase 3 done` — DONE e3c38c0
 
+Phase 2 handoff (2026-09-05), binding for this phase:
+
+- `homeModel` opts gained `leap` ('usual'|'home', only when predicted and
+  never beside an active focus), `loadedAt` (page-load ms; no row is marked
+  without it) and `arrived` (boolean; makes the model over).
+- `model.strip` is `null` or `{origin, destination, departureMs, journeyKey}`,
+  the ends from the focused trip's leg (with coordinates), the key from
+  `journeyKey(focus.journey)`. Action `data-act="change-destination"`.
+- `inferTravel(doc, nowMs, fix)` returns the focus OBJECT (not a doc) and
+  does not check for an existing focus; the controller guards. `arrived(focus,
+  destination, fix, nowMs)` takes the destination station from
+  `leg(trip, focus.direction).to`.
+- `homeModel` needs at least one saved trip; a `setup` answer routes before
+  rendering home.
+- `lastOpen.station` must be the tier-1 `here` or null.
+- `sw.js` is `v15` with `/js/stations.js` in `SHELL`; this phase adds
+  `/stations.json` and bumps to `v16`.
+- `directionsModel` must take an `arrived` opt that forces the done branch
+  (design.md section 5, Exit).
+
 Owns: `web/js/main.js`, `web/js/setup.js`, `web/js/home.js` (markup only,
 if phase 2 left the strip/mark markup to the verdict), `web/app.css`,
 `web/sw.js`, `web/index.html` if a preload is wanted,
@@ -254,18 +274,65 @@ the two rows, no lede), and the location-panel paragraph left as is.
 Then `node tools/shoot-states.js` passes on every existing state (no
 regression) before phase 4 adds states.
 
-## Phase 4 — verification wave — DONE marker: `phase 4 done` — IN PROGRESS (stopped 2026-09-05)
+## Phase 4 — verification wave — DONE marker: `phase 4 done` — IN PROGRESS, stopped by the owner 2026-09-05
 
-Committed on `shv2-p4`: fixture station ids corrected against the index
-(`4f136bf`); a `geo`/`permission` seam in the shooter with the eight new
-states and its README notes (`e0f9db8`); exemplars `home-390x844-inferred`,
-`-inferred-light`, `-just-added` and `setup-390x844-origin` with the `ui.md`
-calibration list and README table updated (`0fde902`); the contrast-probe
-regex fix, unverified (`64cacf8`). Not done: re-run the sweep with the probe
-fix, the measurement/defect report, `measure-open.js`, re-shoot `first-run`
-if its `Use my location` row changed the frame, and the done marker. Resume
-per the notes committed under this heading on the branch.
+Progress when stopped (branch `shv2-p4`, worktree `/private/tmp/shv2-p4`):
 
+- Done and committed: fixture station ids corrected against the index
+  (`4f136bf`); a `geo`/`permission` seam in the shooter with the eight new
+  states, and its README notes (`e0f9db8`); four exemplars
+  `home-390x844-inferred.png`, `home-390x844-inferred-light.png`,
+  `home-390x844-just-added.png`, `setup-390x844-origin.png` with the
+  `ui.md` calibration list and the README table updated (`0fde902`).
+- Committed with the progress note, not re-run: the shooter's contrast probe
+  had a vacuous regex (`[\d.]+` lost its backslash inside the page-script
+  template literal), so every contrast check it reported passed without
+  measuring anything. The one-character fix is in; the sweep has NOT been
+  re-run with it and the strip/mark contrast ratios are therefore unverified.
+- Not started: the agent's final report (sweep count, measurement table,
+  defects found, strings not in the copy list, owner verdicts), the
+  `measure-open.js` run or skip note, re-shooting `first-run` if the
+  `Use my location` row changed its frame, the phase 4 done marker.
+- Resume by re-running the full sweep on the branch
+  (`python3 -m http.server <port> --directory web`, private `CDP_PORT`,
+  `node tools/shoot-states.js --url http://localhost:<port>`), reading every
+  new frame, and finishing the list above.
+
+Stack state: phases 0–1 are on `main` (`b0049f2`). Phases 2–4 are on the
+`shv2-p2` → `shv2-p3` → `shv2-p4` stack and NOT on `main`: the merge was
+blocked because another session (the `metro` design session) holds
+uncommitted edits to `docs/contracts/ui.md`, which the merge touches. Merge
+`shv2-p4` into `main` once that file is committed; expect trivial conflicts
+in this file and `design.md` only.
+
+Owner verdicts still open (recorded in `design.md`): `Now` over `AGO` for an
+early arrival; the 23 out-of-NSW terminals in the index; the real-phone
+`coords.speed` check.
+
+Phase 0 and 3 handoff (2026-09-05), binding for this phase:
+
+- Fixture ids to correct from `web/stations.json` (never the reverse), in
+  `web/test/fixture.js` and `tools/shoot-states.js`: Bondi Junction is
+  `202210` (`200080` is Wynyard); Epping `212110` (not `213910`); Tallawong
+  `2155384` and Chatswood `206710` (the fixtures had them shifted); Meadowbank
+  `211430` (not `213810`, Concord West); Strathfield `213510` (not `206020`,
+  Waverton); Mount Victoria `278610` (not `253030`); and there is no "Sydney
+  Olympic Park Station": it is `Olympic Park Station`, `212710` (not
+  `206010`, North Sydney). Another session is concurrently editing
+  `tools/shoot-states.js`'s Tallawong/Chatswood lines to these same values;
+  make the identical edits so the merge is clean.
+- The shooter has no geolocation seam. Add one as a repo feature of
+  `tools/shoot-states.js` (a per-state `geo: {lat, lon, speed?}` that grants
+  the permission and answers `getCurrentPosition`, via CDP
+  `Browser.grantPermissions` + `Emulation.setGeolocationOverride` in
+  `screenshot.js` if that works headless, else a `navigator` stub installed
+  before `route()`), and document its trap: `loadStations()` starts at module
+  load, before the fetch freeze, so the index is usually present.
+- `first-run` now shows the `Use my location` row under headless Chrome
+  (permission `prompt`); that is ruling 8, not a regression.
+- `tools/measure-open.js` needs the live API; if it cannot run without the
+  key, report it as skipped rather than faking it.
+- The real-phone `coords.speed` check is the owner's; report it as open.
 
 Owns: `tools/shoot-states.js`, `assets/comps/latest/`, `tools/README.md`.
 No product code except fixes for defects this wave finds, each named in
