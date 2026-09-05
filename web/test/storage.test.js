@@ -207,7 +207,7 @@ test('a declined location ask is remembered, and a malformed one is dropped', ()
 /* ---- home votes, the previous open, and the kind of focus --------------- */
 
 const RHODES = { id: '213820', name: 'Rhodes Station', location: { lat: -33.8308, lon: 151.0879 } };
-const BURWOOD = { id: '213110', name: 'Burwood Station' };
+const BURWOOD = { id: '213410', name: 'Burwood Station' };
 const JOURNEY = { line: { name: 'T9' }, departure: { scheduled: '2026-09-05T09:24:00+10:00' } };
 const day = (date, time = '08:05') => Date.parse(`2026-09-${date}T${time}:00+10:00`);
 

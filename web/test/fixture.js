@@ -108,7 +108,7 @@ export function transferJourneys() {
         line: { name: 'T4', mode: 'train' },
         headsign: 'Bondi Junction',
         from: { id: '200070', name: 'Town Hall Station', platform: 'Platform 5' },
-        to: { id: '200080', name: 'Bondi Junction Station', platform: 'Platform ' + r.platform },
+        to: { id: '202210', name: 'Bondi Junction Station', platform: 'Platform ' + r.platform },
         departure: times(r.depTH, r.realtime),
         arrival: times(r.arr, r.realtime),
         cancelled: false
@@ -130,7 +130,7 @@ export function transferJourneys() {
 export function transferBody(overrides = {}) {
   return {
     from: { id: '213820', name: 'Rhodes Station' },
-    to: { id: '200080', name: 'Bondi Junction Station' },
+    to: { id: '202210', name: 'Bondi Junction Station' },
     generatedAt: overrides.generatedAt || sydney('09:21:00'),
     journeys: overrides.journeys || transferJourneys()
   };
@@ -170,7 +170,7 @@ export function threeLegJourney() {
     line: { name: 'T1', mode: 'train' },
     headsign: 'Bondi Junction',
     from: { id: '200060', name: 'Central Station', platform: 'Platform 13' },
-    to: { id: '200080', name: 'Bondi Junction Station', platform: 'Platform 2' },
+    to: { id: '202210', name: 'Bondi Junction Station', platform: 'Platform 2' },
     departure: at('10:07'),
     arrival: at('10:22'),
     cancelled: false
@@ -185,16 +185,16 @@ export function threeLegJourney() {
    index. Every distance the location tests assert is arithmetic on these. */
 export const STATIONS = {
   rhodes: { id: '213820', name: 'Rhodes Station', modes: ['train'], location: { lat: -33.8308, lon: 151.0879 } },
-  meadowbank: { id: '213810', name: 'Meadowbank Station', modes: ['train'], location: { lat: -33.8175, lon: 151.0895 } },
-  burwood: { id: '213110', name: 'Burwood Station', modes: ['train'], location: { lat: -33.8772, lon: 151.1040 } },
-  strathfield: { id: '213210', name: 'Strathfield Station', modes: ['train'], location: { lat: -33.8720, lon: 151.0944 } },
+  meadowbank: { id: '211430', name: 'Meadowbank Station', modes: ['train'], location: { lat: -33.8175, lon: 151.0895 } },
+  burwood: { id: '213410', name: 'Burwood Station', modes: ['train'], location: { lat: -33.8772, lon: 151.1040 } },
+  strathfield: { id: '213510', name: 'Strathfield Station', modes: ['train'], location: { lat: -33.8720, lon: 151.0944 } },
   townhall: { id: '200070', name: 'Town Hall Station', modes: ['train'], location: { lat: -33.8735, lon: 151.2070 } },
   wynyard: { id: '200080', name: 'Wynyard Station', modes: ['train'], location: { lat: -33.8659, lon: 151.2064 } },
   central: { id: '200060', name: 'Central Station', modes: ['train'], location: { lat: -33.8832, lon: 151.2069 } },
   bondi: { id: '202210', name: 'Bondi Junction Station', modes: ['train'], location: { lat: -33.8915, lon: 151.2477 } },
   parramatta: { id: '215020', name: 'Parramatta Station', modes: ['train'], location: { lat: -33.8173, lon: 151.0053 } },
-  olympicpark: { id: '214710', name: 'Olympic Park Station', modes: ['train'], location: { lat: -33.8471, lon: 151.0637 } },
-  epping: { id: '212510', name: 'Epping Station', modes: ['train', 'metro'], location: { lat: -33.7726, lon: 151.0819 } },
+  olympicpark: { id: '212710', name: 'Olympic Park Station', modes: ['train'], location: { lat: -33.8471, lon: 151.0637 } },
+  epping: { id: '212110', name: 'Epping Station', modes: ['train', 'metro'], location: { lat: -33.7726, lon: 151.0819 } },
   chatswood: { id: '206710', name: 'Chatswood Station', modes: ['train', 'metro'], location: { lat: -33.7967, lon: 151.1805 } }
 };
 

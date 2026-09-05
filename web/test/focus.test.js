@@ -16,7 +16,7 @@ import {
 const TRIP = {
   id: 'trip-rhodes-bondi',
   from: { id: '213820', name: 'Rhodes Station' },
-  to: { id: '200080', name: 'Bondi Junction Station' },
+  to: { id: '202210', name: 'Bondi Junction Station' },
   createdAt: '2026-08-01T08:00:00+10:00'
 };
 const SELECTION = { tripId: TRIP.id, direction: 'forward' };

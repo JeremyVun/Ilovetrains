@@ -51,7 +51,7 @@ test('a cancelled lead names the cancellation while answering with the next trai
   const trip = {
     id: 't',
     from: { id: '213820', name: 'Rhodes Station' },
-    to: { id: '200080', name: 'Bondi Junction Station' },
+    to: { id: '202210', name: 'Bondi Junction Station' },
     createdAt: new Date(0).toISOString()
   };
   const doc = { ...emptyDoc(), trips: [trip] };
@@ -95,7 +95,7 @@ test('every saved-trip row leads with its distance in bold, not just the tracked
     ...emptyDoc(),
     trips: [
       trip('t1', station('213820', 'Rhodes Station', -33.8299, 151.0866),
-        station('200080', 'Bondi Junction Station', -33.8915, 151.2477)),
+        station('202210', 'Bondi Junction Station', -33.8915, 151.2477)),
       trip('t2', station('200060', 'Central Station', -33.8832, 151.2069),
         station('215020', 'Parramatta Station', -33.8172, 151.0050))
     ]
@@ -128,7 +128,7 @@ function headerOnly(directions, ranked = []) {
 /* ---- the ported smart home ---------------------------------------------- */
 
 const RHODES = { id: '213820', name: 'Rhodes Station', location: { lat: -33.8299, lon: 151.0866 } };
-const BONDI = { id: '200080', name: 'Bondi Junction Station', location: { lat: -33.8915, lon: 151.2477 } };
+const BONDI = { id: '202210', name: 'Bondi Junction Station', location: { lat: -33.8915, lon: 151.2477 } };
 const HOME_TRIP = { id: 't1', from: RHODES, to: BONDI, createdAt: new Date(0).toISOString() };
 const HOME_SELECTION = { tripId: 't1', direction: 'forward' };
 

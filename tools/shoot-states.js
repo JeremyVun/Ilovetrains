@@ -72,7 +72,7 @@ const TRIP = {
 const TRIP_2 = {
   id: 'trip-town-hall-epping',
   from: { id: '200070', name: 'Town Hall Station' },
-  to: { id: '213910', name: 'Epping Station' },
+  to: { id: '212110', name: 'Epping Station' },
   createdAt: '2026-08-10T08:00:00+10:00'
 };
 /* The transfer corridor uses the captured fixture shared with the unit tests:
@@ -80,7 +80,7 @@ const TRIP_2 = {
 const TRIP_TRANSFER = {
   id: 'trip-rhodes-bondi',
   from: { id: '213820', name: 'Rhodes Station' },
-  to: { id: '200080', name: 'Bondi Junction Station' },
+  to: { id: '202210', name: 'Bondi Junction Station' },
   createdAt: '2026-08-01T08:00:00+10:00'
 };
 /* The same corridor with the station coordinates the distance line needs; the
@@ -88,7 +88,7 @@ const TRIP_TRANSFER = {
 const TRIP_TRANSFER_LOCATED = {
   ...TRIP_TRANSFER,
   from: { id: '213820', name: 'Rhodes Station', location: { lat: -33.8299, lon: 151.0866 } },
-  to: { id: '200080', name: 'Bondi Junction Station', location: { lat: -33.8915, lon: 151.2477 } }
+  to: { id: '202210', name: 'Bondi Junction Station', location: { lat: -33.8915, lon: 151.2477 } }
 };
 const TRIP_CENTRAL_LOCATED = {
   id: 'trip-central-parramatta',
@@ -98,27 +98,27 @@ const TRIP_CENTRAL_LOCATED = {
 };
 const TRIP_METRO = {
   id: 'trip-tallawong-chatswood',
-  from: { id: '206710', name: 'Tallawong Station', location: { lat: -33.6918, lon: 150.9060 } },
-  to: { id: '207210', name: 'Chatswood Station', location: { lat: -33.7967, lon: 151.1830 } },
+  from: { id: '2155384', name: 'Tallawong Station', location: { lat: -33.6918, lon: 150.9060 } },
+  to: { id: '206710', name: 'Chatswood Station', location: { lat: -33.7967, lon: 151.1830 } },
   createdAt: '2026-08-06T08:00:00+10:00'
 };
 const TRIP_MEADOWBANK = {
   id: 'trip-meadowbank-townhall',
-  from: { id: '213810', name: 'Meadowbank Station', location: { lat: -33.8180, lon: 151.0900 } },
+  from: { id: '211430', name: 'Meadowbank Station', location: { lat: -33.8180, lon: 151.0900 } },
   to: { id: '200070', name: 'Town Hall Station', location: { lat: -33.8735, lon: 151.2070 } },
   createdAt: '2026-08-07T08:00:00+10:00'
 };
 const TRIP_EPPING = {
   id: 'trip-epping-chatswood',
-  from: { id: '213910', name: 'Epping Station', location: { lat: -33.7727, lon: 151.0820 } },
-  to: { id: '207210', name: 'Chatswood Station', location: { lat: -33.7967, lon: 151.1830 } },
+  from: { id: '212110', name: 'Epping Station', location: { lat: -33.7727, lon: 151.0820 } },
+  to: { id: '206710', name: 'Chatswood Station', location: { lat: -33.7967, lon: 151.1830 } },
   createdAt: '2026-08-08T08:00:00+10:00'
 };
 
 const TRIP_LONG = {
   id: 'trip-olympicpark-mtvictoria',
-  from: { id: '206010', name: 'Sydney Olympic Park Station' },
-  to: { id: '253030', name: 'Mount Victoria Station' },
+  from: { id: '212710', name: 'Olympic Park Station' },
+  to: { id: '278610', name: 'Mount Victoria Station' },
   createdAt: '2026-08-01T08:00:00+10:00'
 };
 
@@ -253,7 +253,7 @@ async function states() {
     return j;
   };
 
-  /* Sydney Olympic Park → Strathfield → Mount Victoria: a real journey shape
+  /* Olympic Park → Strathfield → Mount Victoria: a real journey shape
      carrying the longest station names and the longest headsign the board has
      ever had to print. */
   const longBody = () => {
@@ -261,20 +261,20 @@ async function states() {
     Object.assign(j.legDetail[0], {
       line: { name: 'T7', mode: 'train' },
       headsign: 'Central via Lidcombe',
-      from: { id: '206010', name: 'Sydney Olympic Park Station', platform: 'Platform 1' },
-      to: { id: '206020', name: 'Strathfield Station', platform: 'Platform 4' }
+      from: { id: '212710', name: 'Olympic Park Station', platform: 'Platform 1' },
+      to: { id: '213510', name: 'Strathfield Station', platform: 'Platform 4' }
     });
     Object.assign(j.legDetail[1], {
       line: { name: 'BMT', mode: 'train' },
       headsign: 'Mount Victoria via Parramatta and Katoomba',
-      from: { id: '206020', name: 'Strathfield Station', platform: 'Platform 6' },
-      to: { id: '253030', name: 'Mount Victoria Station', platform: 'Platform 2' }
+      from: { id: '213510', name: 'Strathfield Station', platform: 'Platform 6' },
+      to: { id: '278610', name: 'Mount Victoria Station', platform: 'Platform 2' }
     });
     j.line = { name: 'T7', mode: 'train' };
     j.destinationHeadsign = 'Central via Lidcombe';
     return {
-      from: { id: '206010', name: 'Sydney Olympic Park Station' },
-      to: { id: '253030', name: 'Mount Victoria Station' },
+      from: { id: '212710', name: 'Olympic Park Station' },
+      to: { id: '278610', name: 'Mount Victoria Station' },
       generatedAt: TRANSFER_AT,
       journeys: [j]
     };
@@ -339,7 +339,7 @@ async function states() {
     legDetail: [
       {
         line: { name: 'T4', mode: 'train' }, headsign: 'Waterfall',
-        from: { id: '200080', name: 'Bondi Junction Station', platform: 'Platform 2' },
+        from: { id: '202210', name: 'Bondi Junction Station', platform: 'Platform 2' },
         to: { id: '200070', name: 'Town Hall Station', platform: 'Platform 4' },
         departure: { scheduled: '2026-09-01T10:18:00+10:00', estimated: '2026-09-01T10:18:00+10:00' },
         arrival: { scheduled: '2026-09-01T10:28:00+10:00', estimated: '2026-09-01T10:28:00+10:00' },
@@ -356,7 +356,7 @@ async function states() {
     ]
   };
   const reverseBody = {
-    from: { id: '200080', name: 'Bondi Junction Station' },
+    from: { id: '202210', name: 'Bondi Junction Station' },
     to: { id: '213820', name: 'Rhodes Station' },
     generatedAt: '2026-09-01T10:11:00+10:00',
     journeys: [reverseJourney]
