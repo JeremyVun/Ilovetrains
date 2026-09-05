@@ -165,7 +165,7 @@ server with the key answers `from=<Circular Quay wharf id>&to=<Manly id>`
 with ferry journeys; `from=200080&to=<Manly id>` shows a change whose leg
 detail has one `train` and one `ferry` leg.
 
-## Phase 3 — client colour and words — VERIFIED 2026-09-05
+## Phase 3 — client colour and words — layout revision in progress
 
 The 52-frame browser matrix passed at both phone sizes and schemes,
 including real Side A/B labels. Home, focus and setup states were
@@ -233,7 +233,12 @@ Verify gate: the test above; the existing tier tests unchanged.
 
 ## Phase 5 — verification wave and closeout — in progress
 
-Independent review is complete with no unresolved implementation findings.
+Owner review reopened layout verification on 2026-09-05. The distinct-stop
+ferry detail screenshot has overlapping transfer/headsign text and change
+instructions against the divider despite the prior automated pass. Trial a
+10% smaller detail figure column (72px → 65px), repair content layout, and
+prove new text-range containment/collision probes fail on the old layout.
+The earlier 52-frame pass does not constitute visual acceptance.
 Current combined-checkout gates: 263 web tests, all Go tests, 3 generator
 tests, byte-identical indexes and clean diff checks. The production image builds for linux/amd64
 and linux/arm64 as local `ilovetrains:ferries-review`; container health,

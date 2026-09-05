@@ -269,6 +269,25 @@ Quay, following revised ruling 1.
 - **Home inferred as a wharf.** Legitimate for a Manly resident; the
   reverse-trip and way-back logic is station-agnostic.
 
+## Visual revision — 2026-09-05
+
+The owner rejected the Circular Quay → Balmain East detail screenshot:
+its long Wynyard → Barangaroo transfer name overlaps the headsign, and
+wrapped boarding instructions crowd the change-step divider. Previous
+geometry checks did not detect these text collisions. Release approval
+remains pending until corrected frames are reviewed.
+
+The owner suggested shrinking the minutes column “maybe by 10%”. Trial
+72px → 65px in detail while retaining alignment between its promoted row
+and step times. Browser measurement found the unchanged `27 min` figure
+needs 68px; use 68px (a 5.6% reduction) to preserve the existing type size. Keep readable type and complete stop, wharf and side labels;
+long transfers must receive enough vertical space for their content.
+
+The same review found that change steps discarded the onward line code and
+headsign even though the journey carried them. Restore the existing
+`Board <code> · <headsign>` format at each change, with its full boarding
+place, to satisfy the contract that every service leg is identified.
+
 ## Open questions
 
 None. The owner accepted the shared-stop correction on 2026-09-05.
