@@ -34,9 +34,11 @@ arrival persistence. Completed rides cannot be inferred again from an old
 of full-journey matching. Contracts and user stories describe these rules.
 
 Automated gates are green. Phase 4 still owns the physical-phone speed
-observation below; it has not been supplied. Phase 5 closeout and production
-deployment remain pending that observation. No `.env` was read during this
-resumption. A local release image was built and smoke-tested.
+observation below; it has not been supplied. The paused handoff explicitly
+assigns that check to the owner and says to report it as open. Production
+deployment proceeds under the repository's standing authorization; complete
+closeout awaits the observation or an owner deferral. No `.env` was read
+during this resumption. A local release image was built and smoke-tested.
 
 ## Phase 0 — station index and its [verify] — DONE marker: `phase 0 done` commit — DONE 3e74d2d
 
