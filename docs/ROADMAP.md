@@ -57,17 +57,19 @@ The shared baked station index now serves client location lookup and server
 autocomplete. Rules are in the client-storage and UI contracts. The optional
 real-phone speed observation remains open in `docs/backlog/smart-header-v2/`.
 
+### Settings — shipped 2026-09-06
+Local location/home preferences, independent train/metro/ferry filters,
+System/Light/Dark appearance, feedback and release version. Service changes
+fetch eligible replacements through the web API; followed journeys keep
+independent updates. Feedback drafts survive navigation within the app visit.
+Rules are in the [UI](contracts/ui.md#settings), [client storage](contracts/client-storage.md)
+and [API](contracts/api.md) contracts; calibration frames are in `assets/comps/latest/`.
+
 ## Next
 
 Decide after living with M3 on real commutes. The owner's playtest notes
 are the spec for the next round, verbatim, as they were for board v2.
 Suggested order, each its own backlog folder:
-
-### Settings — implementation complete, release verification in progress
-The [Settings](backlog/settings/design.md) C1 page includes local preferences,
-web API mode replacements and an in-memory feedback draft. Local verification
-passes; rollout awaits authenticated feedback retrieval. Native offline routing
-remains separate.
 
 ### M4 — Smart header accuracy
 The number one metric. A nearby station sets the origin, view history sets

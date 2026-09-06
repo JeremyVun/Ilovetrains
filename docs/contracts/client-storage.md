@@ -95,6 +95,14 @@ read/write atomic and migration simple):
   Filtering creates a display copy and never rewrites the raw cached body.
   Cache entries optionally retain `serverStale: true` from `X-Data-Stale` so
   navigation cannot promote a degraded response to live. Missing means false.
+- A service change immediately invalidates and aborts outstanding suggestion
+  and past-page requests, then fetches the selected pair with the new mode set.
+  All-off skips that suggestion request. Both success and failure handlers check request generation as well as cache
+  key, including an off/on cycle that returns to the same set. A narrower
+  response is not a complete search for a wider set. Load the new set's raw
+  cache when available and retain only eligible fallback results while fetching.
+  Preference repaint preserves selection provenance and source freshness;
+  failed retrieval remains distinct from a successful empty result.
 - A displayed journey is eligible only when every service leg is enabled. Read
   `legDetail[].line.mode` when available and otherwise the top-level line;
   walking does not count. A train+ferry journey therefore needs both modes.
@@ -386,7 +394,8 @@ predicted one visually highlighted at the top.
 prompt, even when permission was previously granted. Pure prediction and
 location-first selection ignore a supplied fix in that state. Permission status
 may still be read for the Settings row, but no coordinate is obtained; turning
-the preference off clears only the in-memory fix.
+the preference off clears only the in-memory fix and invalidates pending
+location callbacks, so a late grant or fix cannot restore location use.
 
 ## Home, from the daily first-open votes
 

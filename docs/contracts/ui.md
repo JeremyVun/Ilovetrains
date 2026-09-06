@@ -609,10 +609,10 @@ Changing services fetches replacements through the existing departures API.
 Keep eligible cached results while it answers; never restore excluded
 journeys on failure. All-off suppresses new suggestions and points to Settings.
 Saved trips remain visible. A saved pair with a definitively ferry-only endpoint
-  in the station index offers `Turn on ferries` when ferries are disabled; an
-  old ferry journey alone cannot establish that restriction. A followed journey and its realtime updates survive
-any service selection, including all-off. Preferences cause no new history or
-prediction exposure event.
+in the station index offers `Turn on ferries` when ferries are disabled; an old
+ferry journey alone cannot establish that restriction. A followed journey and
+its realtime updates survive any service selection, including all-off.
+Preferences cause no new history or prediction exposure event.
 
 Appearance has radio semantics for System, Light and Dark. Manual choice wins
 before first paint and updates browser chrome; System follows device changes.
