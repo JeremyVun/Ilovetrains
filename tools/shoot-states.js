@@ -665,7 +665,7 @@ async function states() {
     now: Date.parse('2026-09-01T09:40:00+10:00'),
     generatedAt: '2026-09-01T09:40:00+10:00',
     geo: IX.strathfield.location,
-    expect: { status: 'Running', strip: true, receipt: null, ruleTop: 222.3 }
+    expect: { status: 'Running', strip: true, receipt: null, ruleTop: 218.3 }
   });
 
   const inferredLong = () => {
@@ -1152,12 +1152,12 @@ async function states() {
     smart('home-inferred-a2', {
       ...inferred(), telemetry: { opens: 5, bucket: 37 }, variant: 'a2',
       events: ['shown_predicted', 'entered_inferred', 'shown_inferred'],
-      expect: { status: 'Running', strip: true, stripSlot: 'receipt', ruleTop: 266.3 }
+      expect: { status: 'Running', strip: true, stripSlot: 'receipt', ruleTop: 262.3 }
     }),
     smart('home-inferred-a2-long', {
       ...inferredLong(), telemetry: { opens: 5, bucket: 37 }, variant: 'a2',
       events: ['shown_predicted', 'entered_inferred', 'shown_inferred'],
-      expect: { status: 'Running', strip: true, stripSlot: 'receipt', ruleTop: 266.3 }
+      expect: { status: 'Running', strip: true, stripSlot: 'receipt', ruleTop: 262.3 }
     }),
     // ...and the one control that mode has, which opens the familiar sheet on
     // the departure station it already knows.
@@ -2165,6 +2165,33 @@ function pageScript(state) {
     };
     if (fromTime && toTime && Math.abs(baselineOf(fromTime) - baselineOf(toTime)) > 1.01) {
       problems.push('home endpoint times do not share a baseline');
+    }
+
+    /* An ordinary next service has no useful provenance word. Its empty slot
+       must collapse, while LATE / TO CHANGE / TO GO / AGO still reserve the
+       same labelled line above the journey bar. */
+    const homeProvenance = document.querySelector('.hm-hd .hm-st');
+    const homeNumber = document.querySelector('.hm-hd .hm-n');
+    const homeEnds = document.querySelector('.hm-hd .hm-ends');
+    const homeJourney = document.querySelector('.hm-hd .sy-j');
+    if (homeProvenance && homeNumber && homeEnds && homeJourney) {
+      const empty = !homeProvenance.textContent.trim();
+      const hidden = getComputedStyle(homeProvenance).display === 'none';
+      if (empty !== hidden) {
+        problems.push(empty
+          ? 'the empty home status line still reserves space'
+          : 'the meaningful home status line is collapsed');
+      }
+      const statusBottom = empty ? -Infinity : homeProvenance.getBoundingClientRect().bottom;
+      const contentBottom = Math.max(
+        homeNumber.getBoundingClientRect().bottom,
+        homeEnds.getBoundingClientRect().bottom,
+        statusBottom
+      );
+      const gap = homeJourney.getBoundingClientRect().top - contentBottom;
+      if (Math.abs(gap - 12) > 0.6) {
+        problems.push('the home journey sits ' + round(gap) + 'px below its visible figure content, not 12');
+      }
     }
 
     /* One status word for one journey: the header's top line and the focused

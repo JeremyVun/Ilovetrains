@@ -202,8 +202,11 @@ What is checked, with the comp probes the numbers come from:
 - home: the endpoint names share a top edge and the clocks share a *baseline*
   (measured with a zero-height inline-block probe, because the two clocks are
   different sizes and a shared box top is not the shared baseline ui.md binds),
-  one status string in both the top line and the focused saved-trip row, and a
-  `LIVE` dot that stays the live colour however late the journey is;
+  an empty scheduled or ordinary realtime status collapses instead of reserving
+  a blank line, meaningful `LATE` / `TO CHANGE` / `TO GO` / `AGO` text keeps
+  that line, one status string appears in both the top line and the focused
+  saved-trip row, and a `LIVE` dot stays the live colour however late the
+  journey is;
 - home station names, the inferred strip and the complete `Just added` sub line
   never ellipsise; ordinary saved-row metadata may use its designed ellipsis;
 - in the light scheme, T1 and BMT fill `#F99D1C` with paper numerals while the
