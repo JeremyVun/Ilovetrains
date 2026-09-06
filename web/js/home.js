@@ -304,7 +304,7 @@ export function homeHtml(model) {
     <div class="hm-ix tl" data-t="trip-list" data-scroller>
       <div class="hm-anchor"><div class="l">My trips</div></div>
       ${model.ranked.map((entry) => tripRowHtml(entry, model)).join('')}
-      <div class="hm-end">— That’s everything on this phone</div>
+      <div class="hm-end">— End of trips</div>
     </div>
     ${model.askLocation ? locationAskHtml() : footerHtml()}
   </div>`;

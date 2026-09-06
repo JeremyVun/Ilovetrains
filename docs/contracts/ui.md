@@ -12,7 +12,7 @@ and API semantics live in `client-storage.md` and `api.md`.
 
 - Home is the open state. Its smart header is the zero-tap answer for the
   predicted or focused trip; saved trips sit immediately below it under the
-  `MY TRIPS` anchor.
+  `MY TRIPS` anchor. The saved list ends with `— End of trips`.
 - The smart header is a section, not a single tap target: the
   saved-trip row is the affordance, and the header's own trip carries the same
   `DEPARTURES ›` cue as every other row. A journey the app inferred rather than
@@ -680,3 +680,7 @@ Feedback requires Problem, Suggestion or Other plus a message. The form says
 within this visit; reload discards it. Submission disables duplicate taps,
 retains the draft on errors, and clears only after 201. See analytics.md for
 transport and operator access.
+
+The feedback message field indicates focus with a strong bottom rule and its
+label in primary ink. It has no surrounding focus rectangle; keyboard and
+pointer focus receive the same visible field treatment.
