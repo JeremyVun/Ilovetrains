@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  setFocus, clearFocus, isFocused, focusExpired, matchJourney, refreshFocus,
+  setFocus, visibleFocus, clearFocus, isFocused, focusExpired, matchJourney, refreshFocus,
   directionsModel, focusStatus, inferTravel, arrived, FOCUS_CLEAR_MS
 } from '../js/focus.js';
 import { parseDoc, serializeDoc, emptyDoc, recordLastOpen, removeTrip } from '../js/storage.js';
@@ -322,4 +322,35 @@ test('arrival at the destination ends the trip as the rider steps off', () => {
   assert.equal(arrived(focus, STATIONS.bondi, AT_STRATHFIELD, on('09:59')), false);
   assert.equal(arrived(focus, STATIONS.bondi, null, on('09:59')), false);
   assert.equal(arrived(null, STATIONS.bondi, platform, on('09:59')), false);
+});
+
+
+test('every service leg gates displayed focus, including a later metro leg', () => {
+  const journey = structuredClone(transferJourneys()[0]);
+  journey.legDetail[0].line = { name: 'T8', mode: 'train' };
+  journey.legDetail[1].line = { name: 'M1', mode: 'metro' };
+  journey.line = journey.legDetail[0].line;
+  for (const by of ['focus', 'inferred']) {
+    const doc = { ...docWithFocus(journey), preferences: { enabledModes: ['train'] } };
+    doc.focus.by = by;
+    const original = structuredClone(doc);
+    assert.equal(visibleFocus(doc, TRANSFER_NOW), null, 'a train first leg cannot exempt a later metro leg');
+    assert.deepEqual(doc, original, 'hiding leaves the stored snapshot untouched');
+    doc.preferences.enabledModes = ['train', 'metro'];
+    assert.equal(visibleFocus(doc, TRANSFER_NOW), doc.focus, 're-enable restores the same focus');
+    doc.preferences.enabledModes = [];
+    assert.equal(visibleFocus(doc, TRANSFER_NOW), null, 'all-off hides even a followed journey');
+  }
+});
+
+test('focus visibility treats trains, metro and ferries identically', () => {
+  for (const mode of ['train', 'metro', 'ferry']) {
+    const journey = structuredClone(transferJourneys()[0]);
+    journey.line = { name: mode, mode };
+    for (const detail of journey.legDetail) detail.line = { name: mode, mode };
+    const doc = { ...docWithFocus(journey), preferences: { enabledModes: [mode] } };
+    assert.equal(visibleFocus(doc, TRANSFER_NOW), doc.focus);
+    doc.preferences.enabledModes = ['train', 'metro', 'ferry'].filter((item) => item !== mode);
+    assert.equal(visibleFocus(doc, TRANSFER_NOW), null);
+  }
 });

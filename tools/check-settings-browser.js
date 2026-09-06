@@ -38,6 +38,7 @@ const longHome = {
   modes: ['train'],
   location: { lat: -33.934968, lon: 151.165958 }
 };
+const mascot = { id: '202010', name: 'Mascot Station', modes: ['train'], location: { lat: -33.923188, lon: 151.180786 } };
 const kellyville = { id: '2155382', name: 'Kellyville Station', modes: ['metro'], location: { lat: -33.713514, lon: 150.935304 } };
 const rouseHill = { id: '2155383', name: 'Rouse Hill Station', modes: ['metro'], location: { lat: -33.691986, lon: 150.924306 } };
 const pyrmont = { id: '2000260', name: 'Pyrmont Bay Wharf', modes: ['ferry'], location: { lat: -33.868482, lon: 151.198818 } };
@@ -65,6 +66,33 @@ function journey(id, mode = 'train', delayMinutes = 0) {
       arrival: { scheduled: new Date(nowMs + 55 * 60_000).toISOString(), estimated: arrival },
       line: { name: lineName, mode }
     }]
+  };
+}
+
+function mixedJourney(id = 'MIXED') {
+  const firstDeparture = new Date(nowMs + 20 * 60_000).toISOString();
+  const changeArrival = new Date(nowMs + 35 * 60_000).toISOString();
+  const secondDeparture = new Date(nowMs + 39 * 60_000).toISOString();
+  const finalArrival = new Date(nowMs + 75 * 60_000).toISOString();
+  return {
+    id,
+    departure: { scheduled: firstDeparture, estimated: firstDeparture },
+    arrival: { scheduled: finalArrival, estimated: finalArrival },
+    line: { name: 'T8', mode: 'train' },
+    legDetail: [
+      {
+        from: { ...mascot, platform: '2' }, to: { ...central, platform: '21' },
+        departure: { scheduled: firstDeparture, estimated: firstDeparture },
+        arrival: { scheduled: changeArrival, estimated: changeArrival },
+        line: { name: 'T8', mode: 'train' }
+      },
+      {
+        from: { ...central, platform: '26' }, to: { ...kellyville, platform: '2' },
+        departure: { scheduled: secondDeparture, estimated: secondDeparture },
+        arrival: { scheduled: finalArrival, estimated: finalArrival },
+        line: { name: 'M1', mode: 'metro' }
+      }
+    ]
   };
 }
 
@@ -129,7 +157,7 @@ function geometryScript(extra = '') {
         versionBottom, scrollerBottom, scrollTop: scroller.scrollTop,
         scrollHeight: scroller.scrollHeight, clientHeight: scroller.clientHeight
       }));
-    assert(version.textContent.trim() === 'Version 1.0.0',
+    assert(version.textContent.trim() === 'Version 1.0.1',
       'settings did not show the canonical version: ' + version.textContent.trim());
     scroller.scrollTop = 0;
     ${extra}
@@ -261,10 +289,6 @@ function focusFreshnessScript() {
 }
 
 function serviceEligibilityScript(stations) {
-  const focusedFerry = journey('F3', 'ferry');
-  focusedFerry.id = 'FOCUSED-FERRY';
-  focusedFerry.legDetail[0].from = { ...pyrmont, platform: 'B' };
-  focusedFerry.legDetail[0].to = { ...doubleBay, platform: 'A' };
   const freshTrain = { generatedAt: new Date(nowMs).toISOString(), journeys: [train] };
   return `(async () => {
     ${browserPrelude()}
@@ -304,24 +328,10 @@ function serviceEligibilityScript(stations) {
     assert(ids().includes('metro-trip') && ids().includes('ferry-trip'),
       're-enabling services did not restore metro and ferry trips');
 
-    t.state.doc.focus = {
-      tripId: 'ferry-trip', direction: 'forward', focusedAt: new Date().toISOString(),
-      by: 'focus', journey: ${JSON.stringify(focusedFerry)}
-    };
     t.setPreferences({ enabledModes: ['train'] });
-    history.replaceState(null, '', '#/settings');
-    t.route();
-    history.replaceState(null, '', '#/');
-    t.route();
-    assert(t.state.doc.focus?.journey?.id === 'FOCUSED-FERRY', 'service filtering cleared active focus');
-    await waitFor(() => ids().includes('ferry-trip'), 'active focused trip disappeared from Home');
-    assert(document.querySelector('.tripr[data-id="ferry-trip"]')?.classList.contains('focused'),
-      'active focus was not presented as the selected Home trip');
-    assert(!ids().includes('metro-trip'), 'unfocused metro-only trip returned beside active focus');
 
     // A coordinate requested under the old mode set must be filtered using the
     // current mode set when it arrives.
-    t.state.doc.focus = null;
     t.setPreferences({ enabledModes: ['train', 'metro', 'ferry'], useLocation: true });
     t.state.selection = { tripId: 'metro-trip', direction: 'forward' };
     let lateFix = null;
@@ -359,63 +369,121 @@ function serviceEligibilityScript(stations) {
   })()`;
 }
 
-function focusExitReconcileScript(stations) {
-  const focusedFerry = journey('F3', 'ferry');
-  focusedFerry.id = 'FOCUSED-FERRY';
-  focusedFerry.legDetail[0].from = { ...pyrmont, platform: 'B' };
-  focusedFerry.legDetail[0].to = { ...doubleBay, platform: 'A' };
-  const pastFerry = structuredClone(focusedFerry);
-  const departure = new Date(nowMs - 30 * 60_000).toISOString();
-  const arrival = new Date(nowMs - 5 * 60_000).toISOString();
-  pastFerry.departure = { scheduled: departure, estimated: departure };
-  pastFerry.arrival = { scheduled: arrival, estimated: arrival };
-  pastFerry.legDetail[0].departure = { scheduled: departure, estimated: departure };
-  pastFerry.legDetail[0].arrival = { scheduled: arrival, estimated: arrival };
-  const trainBody = { generatedAt: new Date(nowMs).toISOString(), journeys: [train] };
+function hiddenFocusScript(stations, by, refreshed) {
   return `(async () => {
     ${browserPrelude()}
-    t.indexReady(${JSON.stringify(stations)});
+    const stations = ${JSON.stringify(stations)};
     const pending = [];
     window.fetch = (input, init = {}) => new Promise((resolve, reject) => {
       pending.push({ url: String(input), init, resolve, reject });
     });
-
-    t.state.doc.focus = {
-      tripId: 'ferry-trip', direction: 'forward', focusedAt: new Date().toISOString(),
-      by: 'focus', journey: ${JSON.stringify(focusedFerry)}
+    const ids = () => [...document.querySelectorAll('.tripr[data-id]')].map((row) => row.dataset.id);
+    const assertHidden = (stage, indexed) => {
+      assert(t.state.doc.focus?.by === ${JSON.stringify(by)}, stage + ': stored focus changed');
+      assert(document.querySelector('.home-screen')?.dataset.focused === 'false',
+        stage + ': excluded focus became the Home header');
+      assert(!document.querySelector('.tripr.focused'), stage + ': excluded focus received focused row treatment');
+      assert(!document.querySelector('.hm-hd [data-line-code="M1"]'), stage + ': excluded M1 directions appeared');
+      if (indexed) {
+        assert(!ids().includes('mixed-trip'), stage + ': indexed Kellyville trip remained visible');
+        assert(ids().includes('train-trip'), stage + ': eligible Rhodes trip disappeared');
+      }
     };
-    t.state.selection = { tripId: 'ferry-trip', direction: 'forward' };
+
+    history.replaceState(null, '', '#/settings');
+    t.route();
+    t.state.stations = null;
+    t.state.selection = { tripId: 'mixed-trip', direction: 'forward' };
     history.replaceState(null, '', '#/');
     t.route();
-    await waitFor(() => document.querySelector('.tripr[data-id="ferry-trip"].focused'),
-      'active ferry focus did not render before expiry');
-    t.now = () => ${nowMs + 3 * 60 * 60_000};
-    t.tick();
-    assert(t.state.selection?.tripId === 'train-trip', 'focus expiry did not reconcile to the train trip on tick');
-    const beforeRefresh = pending.length;
-    t.refresh();
-    await waitFor(() => pending.length > beforeRefresh, 'post-expiry refresh did not start for the replacement');
-    pending.at(-1).resolve(new Response(${JSON.stringify(JSON.stringify(trainBody))}, { status: 200 }));
-    await waitFor(() => !t.state.doc.focus, 'successful post-expiry refresh did not clear focus');
-    assert(t.state.selection?.tripId === 'train-trip', 'post-expiry refresh restored the incompatible trip');
-
-    t.now = () => ${nowMs};
-    t.state.doc.focus = {
-      tripId: 'ferry-trip', direction: 'forward', focusedAt: new Date().toISOString(),
-      by: 'focus', journey: ${JSON.stringify(pastFerry)}
-    };
-    t.state.selection = { tripId: 'ferry-trip', direction: 'forward' };
-    t.rerender();
-    const wayBack = await waitFor(() => document.querySelector('[data-act="way-back"]'),
-      'completed focus did not offer the way back');
-    wayBack.click();
+    await waitFor(() => document.querySelector('.home-screen'), 'pre-index Home did not render');
+    assertHidden('before index', false);
+    await waitFor(() => pending.some((item) =>
+      new URL(item.url, location.href).searchParams.get('modes') === 'train,metro,ferry'),
+      'hidden focus did not keep its independent all-mode refresh');
+    t.indexReady(stations);
     await waitFor(() => t.state.selection?.tripId === 'train-trip',
-      'way-back did not reconcile the incompatible focused trip');
-    assert(!t.state.doc.focus, 'way-back did not clear focus');
+      'index did not reselect the eligible Rhodes trip');
     t.rerender();
-    assert(!document.querySelector('.tripr[data-id="ferry-trip"]'),
-      'way-back left the ferry-only trip visible with Ferries off');
-    assert(t.state.doc.trips.length === 4, 'focus exit reconciliation changed stored trips');
+    assertHidden('after index', true);
+    const focusRequest = pending.filter((item) =>
+      new URL(item.url, location.href).searchParams.get('modes') === 'train,metro,ferry').at(-1);
+
+    focusRequest.resolve(new Response(${JSON.stringify(JSON.stringify({
+      generatedAt: new Date(nowMs + 2_000).toISOString(), journeys: [refreshed]
+    }))}, { status: 200 }));
+    await waitFor(() => t.state.doc.focus?.journey?.id === ${JSON.stringify(refreshed.id)},
+      'hidden focus snapshot did not refresh in storage');
+    t.rerender();
+    assertHidden('after focus refresh', true);
+    t.tick();
+    assertHidden('after tick', true);
+    t.refresh();
+    await sleep(50);
+    assertHidden('after independent refresh', true);
+
+    const beforeRestore = pending.length;
+    t.setPreferences({ enabledModes: ['train', 'metro', 'ferry'] });
+    assert(t.state.selection?.tripId === 'mixed-trip',
+      're-enabling Metro did not synchronize the controller selection to stored focus');
+    const restoredRequest = await waitFor(() => pending.length > beforeRestore && pending.at(-1),
+      'restored focus did not start its matching suggestion request');
+    const restoredURL = new URL(restoredRequest.url, location.href);
+    assert(restoredURL.searchParams.get('from') === ${JSON.stringify(mascot.id)}
+      && restoredURL.searchParams.get('to') === ${JSON.stringify(kellyville.id)},
+      'restored focus fetched the previous suggestion pair: ' + restoredURL.href);
+    t.rerender();
+    await waitFor(() => document.querySelector('.tripr[data-id="mixed-trip"].focused'),
+      're-enabling Metro did not restore the stored focus');
+    assert(document.querySelector('.home-screen')?.dataset.focused === 'true',
+      'restored focus did not return to the Home header');
+    assert(!document.querySelector('.hm-hd [data-line-code="T9"]')
+      && !document.querySelector('.hm-hd')?.textContent.includes('Bondi'),
+      'cancelled restored focus reused the prior Rhodes suggestion as a replacement');
+
+    t.setPreferences({ enabledModes: ['train'] });
+    t.rerender();
+    assertHidden('after filtering again', true);
+    t.setPreferences({ enabledModes: [] });
+    t.rerender();
+    await waitFor(() => document.querySelector('[data-filtered-empty]'), 'all-off hidden focus was not recoverable');
+    assert(t.state.doc.focus?.journey?.id === ${JSON.stringify(refreshed.id)}, 'all-off deleted stored focus');
+    assert(document.querySelector('.hm-filtered-empty [data-act="settings"]'), 'all-off lost its Settings recovery action');
+    t.setPreferences({ enabledModes: ['train'] });
+    t.rerender();
+    await waitFor(() => ids().includes('train-trip'), 'turning Trains back on did not recover Rhodes');
+    assertHidden('final train-only state', true);
+  })()`;
+}
+
+function hiddenFocusReloadScript(by, refreshedId) {
+  return `(async () => {
+    ${browserPrelude()}
+    await waitFor(() => Array.isArray(t.state.stations), 'reload did not load the station index');
+    await waitFor(() => document.querySelector('.home-screen'), 'reload did not render Home');
+    assert(t.state.doc.focus?.by === ${JSON.stringify(by)}
+      && t.state.doc.focus?.journey?.id === ${JSON.stringify(refreshedId)}, 'reload lost stored focus');
+    assert(t.state.selection?.tripId === 'train-trip', 'reload did not retain the eligible Rhodes selection');
+    assert(document.querySelector('.tripr[data-id="train-trip"]'), 'reload hid Rhodes');
+    assert(!document.querySelector('.tripr[data-id="mixed-trip"]') && !document.querySelector('.tripr.focused'),
+      'reload resurrected the excluded focus');
+    t.tick();
+    assert(!document.querySelector('.tripr[data-id="mixed-trip"]'), 'reload tick resurrected the excluded focus');
+  })()`;
+}
+
+function hiddenFocusJourneyScript(by, refreshedId) {
+  return `(async () => {
+    ${browserPrelude()}
+    await waitFor(() => Array.isArray(t.state.stations), 'cold journey did not load the station index');
+    await waitFor(() => t.state.view === 'home' && document.querySelector('.home-screen'),
+      'excluded cold #/journey did not return Home');
+    assert(t.state.doc.focus?.by === ${JSON.stringify(by)}
+      && t.state.doc.focus?.journey?.id === ${JSON.stringify(refreshedId)}, 'cold journey changed stored focus');
+    assert(t.state.selection?.tripId === 'train-trip', 'cold journey did not select eligible Rhodes');
+    assert(!document.querySelector('.tripr[data-id="mixed-trip"]') && !document.querySelector('.tripr.focused'),
+      'cold journey resurrected excluded focus UI');
+    assert(!document.querySelector('[data-act="focus"]'), 'cold journey rendered excluded Detail fallback');
   })()`;
 }
 
@@ -719,6 +787,19 @@ async function runColdBoard(doc, port) {
   });
 }
 
+async function runHiddenFocus(doc, stations, by, refreshed, port) {
+  const profile = path.join(tmp, `hidden-focus-${by}`);
+  await run(`hidden-focus-${by}`, doc, hiddenFocusScript(stations, by, refreshed), port, {
+    profile, out: by === 'focus' ? frame('home-390x844-services-filtered.png') || undefined : undefined
+  });
+  await run(`hidden-focus-reload-${by}`, doc, hiddenFocusReloadScript(by, refreshed.id), port, {
+    profile, noSeed: true
+  });
+  return run(`hidden-focus-journey-${by}`, doc, hiddenFocusJourneyScript(by, refreshed.id), port, {
+    hash: '#/journey', profile, noSeed: true
+  });
+}
+
 function frame(name) {
   return framesDir ? path.resolve(ROOT, framesDir, name) : null;
 }
@@ -758,6 +839,31 @@ try {
     preferences: { useLocation: false, enabledModes: ['train'] },
     cache: { [`${rhodes.id}-${bondi.id}|train`]: { fetchedAt: body.generatedAt, body } }
   });
+  const focusStations = [mascot, central, kellyville, rhodes, bondi];
+  const mixed = mixedJourney();
+  const refreshedMixed = structuredClone(mixed);
+  refreshedMixed.id = 'MIXED-FRESH';
+  refreshedMixed.cancelled = true;
+  refreshedMixed.arrival.estimated = new Date(nowMs + 79 * 60_000).toISOString();
+  refreshedMixed.legDetail[1].arrival.estimated = refreshedMixed.arrival.estimated;
+  const focusTrips = [
+    {
+      id: 'mixed-trip',
+      from: { id: mascot.id, name: mascot.name, location: mascot.location },
+      to: { id: kellyville.id, name: kellyville.name, location: kellyville.location },
+      createdAt: savedAt
+    },
+    serviceTrips.find((trip) => trip.id === 'train-trip')
+  ];
+  const hiddenFocusSeed = (by) => seed({
+    trips: focusTrips,
+    lastViewed: { tripId: 'mixed-trip', direction: 'forward' },
+    focus: {
+      tripId: 'mixed-trip', direction: 'forward', focusedAt: new Date(nowMs).toISOString(), by, journey: mixed
+    },
+    preferences: { useLocation: false, enabledModes: ['train'] },
+    cache: { [`${rhodes.id}-${bondi.id}|train`]: { fetchedAt: body.generatedAt, body } }
+  });
 
   const only = value('--only');
   if (only === 'service-eligibility') {
@@ -774,9 +880,10 @@ try {
     fs.rmSync(tmp, { recursive: true, force: true });
     process.exit(0);
   }
-  if (only === 'focus-exit') {
-    await run('focus-exit', serviceSeed, focusExitReconcileScript(serviceStations), firstPort);
-    console.log('settings focus-exit browser check passed');
+  if (only === 'hidden-focus') {
+    await runHiddenFocus(hiddenFocusSeed('focus'), focusStations, 'focus', refreshedMixed, firstPort);
+    await runHiddenFocus(hiddenFocusSeed('inferred'), focusStations, 'inferred', refreshedMixed, firstPort);
+    console.log('settings hidden-focus browser checks passed');
     fs.rmSync(tmp, { recursive: true, force: true });
     process.exit(0);
   }
@@ -853,7 +960,8 @@ try {
   await run('empty-recovery', hiddenSeed, emptyRecoveryScript(), firstPort, {
     out: frame('home-390x844-services-empty.png') || undefined
   });
-  await run('focus-exit', serviceSeed, focusExitReconcileScript(serviceStations), firstPort);
+  await runHiddenFocus(hiddenFocusSeed('focus'), focusStations, 'focus', refreshedMixed, firstPort);
+  await runHiddenFocus(hiddenFocusSeed('inferred'), focusStations, 'inferred', refreshedMixed, firstPort);
   await runColdBoard(coldBoardSeed, firstPort);
   await run('cache-attribution', visualSeed, cacheAndAttributionScript(), firstPort);
 

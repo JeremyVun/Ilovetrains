@@ -117,7 +117,8 @@ read/write atomic and migration simple):
   A mode change or late station-index load replaces an incompatible selection
   before the next Home paint; all-hidden keeps Home open without a selection.
   Location-driven pairing also excludes incompatible stations and home
-  overrides, while deriving automatic home from the full saved document. The active focused journey remains exempt, including its row.
+  overrides, while deriving automatic home from the full saved document.
+  Focus does not exempt a trip from these visibility rules.
 - `searches.from` and `searches.to` each hold the three most recently selected
   stations for that field, newest first and deduplicated by stop id. They store
   useful station answers, not raw keystrokes. Add-trip shows them before a
@@ -225,8 +226,17 @@ The document may contain an optional `focus` field — "I'm on this train":
   delays keep flowing). This distinguishes routes sharing the same first
   train but connecting to different ferries. Unmatched (departed)
   keeps the last snapshot.
-- Service preferences never stop the followed journey's refresh. Its separate
-  all-mode request uses the followed pair; after departure it asks for the
+- Displayed focus uses one shared predicate: the focus must be unexpired,
+  both endpoints compatible, and every service leg enabled. A train first leg
+  cannot exempt a later metro or ferry leg. Hidden focus contributes no Home
+  header/status or Detail fallback, and does not force its pair into the list.
+  Retain the snapshot for restoration when modes are re-enabled; while it is
+  unexpired, automatic inference cannot overwrite it with another journey.
+  Restoring visible focus synchronizes the Home controller selection and
+  reloads that pair’s cache before fetching. Cancellation replacements must
+  come from the focused pair and direction, with their own source freshness.
+- Service preferences never stop the stored followed journey's refresh. Its
+  separate all-mode request uses the followed pair; after departure it asks for the
   departure window so upstream can still match the service. Focus freshness
   comes from a matching response for that pair (or its matching raw cache),
   never from an unrelated suggestion request. No matching source means stale

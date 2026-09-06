@@ -3,7 +3,7 @@
 
 import { esc, figureHtml, shortName, fitStationNames } from './dom.js';
 import {
-  focusExpired, focusOf, directionsModel, focusStatus, journeyCancelled
+  visibleFocus, directionsModel, focusStatus, journeyCancelled
 } from './focus.js';
 import { arrivalMs, departureMs, departureKey, legsOf, modeWords } from './journey.js';
 import { colourKey, lineFill } from './lines.js';
@@ -83,8 +83,7 @@ function savedThisOpen(trip, loadedAt) {
 export function homeModel(doc, selection, body, nowMs, opts = {}) {
   const preferences = preferencesOf(doc);
   const enabledModes = preferences.enabledModes;
-  const focus = focusOf(doc);
-  const activeFocus = focus && !focusExpired(focus, nowMs) ? focus : null;
+  const activeFocus = visibleFocus(doc, nowMs, opts.stations);
   const trip = doc.trips.find((item) => item.id === selection.tripId) || doc.trips[0];
   const ends = leg(trip, selection.direction);
   const journeys = body && Array.isArray(body.journeys)
@@ -96,7 +95,9 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
   const focusDep = activeFocus ? departureMs(activeFocus.journey) : null;
   // Cancelled before it leaves, the header shows the next running service
   // while the status still reads CANCELLED.
-  const candidateReplacement = activeFocus && journeyCancelled(activeFocus.journey)
+  const sameFocusedPair = activeFocus && selection.tripId === activeFocus.tripId
+    && selection.direction === activeFocus.direction;
+  const candidateReplacement = sameFocusedPair && journeyCancelled(activeFocus.journey)
     && focusDep !== null && nowMs < focusDep
     ? journeys.find((item) => !journeyCancelled(item)
       && departureMs(item) !== null && departureMs(item) > focusDep) || null : null;
@@ -168,9 +169,6 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     allServicesOff: !enabledModes.length
   };
   const visibleDoc = tripsForModes(doc, opts.stations);
-  if (activeFocus && !visibleDoc.trips.some((item) => item.id === activeFocus.tripId)) {
-    visibleDoc.trips = [selectedTrip, ...visibleDoc.trips];
-  }
   const ranked = rankTrips(visibleDoc, nowMs, { fix: opts.fix, selection: selected }).map((entry) => {
     const entryEnds = leg(entry.trip, entry.direction);
     return {

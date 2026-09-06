@@ -620,8 +620,13 @@ cached journey does not prove an endpoint or pair requires that mode.
 Hidden trips, history and caches remain stored and return when re-enabled.
 If every saved trip is hidden, Home shows a short empty state with Change
 settings and the usual footer, with no blank journey or Live indicator.
-A followed journey and its own saved row remain visible, with realtime
-updates intact, until that journey ends. Other incompatible rows stay hidden.
+Service filters also apply to followed journeys, including every leg of a
+mixed train/metro/ferry trip. An incompatible followed journey contributes
+no header, status, directions or forced saved-trip row. Its stored snapshot
+and background updates remain intact; re-enabling its modes restores it while
+it is still current. Home shows an eligible suggestion or the filtered empty
+state. A saved pair remains eligible for alternative routes only when its
+endpoints support the enabled modes; focus never bypasses that check.
 Preferences cause no new history or prediction exposure event.
 
 Appearance has radio semantics for System, Light and Dark. Manual choice wins

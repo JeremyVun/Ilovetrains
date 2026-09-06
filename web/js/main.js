@@ -10,7 +10,7 @@ import { here, loadStations } from './stations.js';
 import { boardModel, promotedRow } from './rowmodel.js';
 import { journeyDetail, journeyKey, departureKey, legsOf, arrivalMs, departureMs } from './journey.js';
 import {
-  focusOf, setFocus, clearFocus, isFocused, focusExpired, matchJourney, refreshFocus,
+  focusOf, visibleFocus, setFocus, clearFocus, isFocused, focusExpired, matchJourney, refreshFocus,
   directionsModel, inferTravel, arrived, journeyCancelled, TRAVEL_LATE_MS
 } from './focus.js';
 import * as Board from './board.js';
@@ -194,7 +194,12 @@ const ctx = {
       const previousSelection = state.selection;
       const previousBody = filterBody(state.body, after.enabledModes);
       const previousStale = state.serverStale;
-      if (!focusSelection() && !suggestionAllowed(state.selection)) {
+      const followed = focusSelection();
+      if (followed) {
+        state.selection = followed;
+        state.predicted = false;
+        state.leap = null;
+      } else if (!suggestionAllowed(state.selection)) {
         state.selection = null;
         state.predicted = true;
         state.selection = locateSelection();
@@ -213,7 +218,7 @@ const ctx = {
       state.seenLive = new Map();
       state.seenKey = null;
       state.journey = null;
-      if (state.selection) fetchLive();
+      fetchLive();
     }
     return state.doc;
   },
@@ -336,9 +341,8 @@ function currentKey() {
 }
 
 function focusSelection() {
-  const focus = focusOf(state.doc);
-  return focus && !focusExpired(focus, now()) && findTrip(state.doc, focus.tripId)
-    ? { tripId: focus.tripId, direction: focus.direction } : null;
+  const focus = visibleFocus(state.doc, now(), state.stations);
+  return focus ? { tripId: focus.tripId, direction: focus.direction } : null;
 }
 
 function savedSelection() {
@@ -352,8 +356,10 @@ function suggestionAllowed(selection) {
 /* Home leads with the focused journey; the board answers the tap that opened
    it (client-storage.md, Trip selection). */
 function chooseSelection() {
+  const followed = focusSelection();
+  if (followed) { state.predicted = false; state.leap = null; return followed; }
   if (preserveSelection && suggestionAllowed(savedSelection())) return state.selection;
-  const chosen = focusSelection() || (suggestionAllowed(savedSelection()) ? savedSelection() : null);
+  const chosen = suggestionAllowed(savedSelection()) ? savedSelection() : null;
   state.predicted = !chosen;
   if (chosen) { state.leap = null; return chosen; }
   return locateSelection();
@@ -383,15 +389,18 @@ function explicitSelection() {
     || focusSelection() || predict(tripsForModes(state.doc, state.stations), now(), { fix: validFix() });
 }
 
-/* Ending the focus exemption must not leave its incompatible pair as the
-   next prediction. This changes controller state only; saved data is intact. */
+/* Hiding, restoring or ending a followed journey reconciles the selected
+   pair without changing saved data. */
 function reconcileSuggestionSelection() {
-  if (focusSelection() || suggestionAllowed(state.selection)) return false;
-  const next = predict(tripsForModes(state.doc, state.stations), now(), { fix: validFix() });
+  const followed = focusSelection();
+  if (followed && state.selection?.tripId === followed.tripId
+      && state.selection?.direction === followed.direction) return false;
+  if (!followed && suggestionAllowed(state.selection)) return false;
+  const next = followed || predict(tripsForModes(state.doc, state.stations), now(), { fix: validFix() });
   if (!state.selection && !next) return false;
   invalidateSuggestions();
   state.selection = next;
-  state.predicted = true;
+  state.predicted = !followed;
   state.leap = null;
   state.body = null;
   state.journey = null;
@@ -576,7 +585,9 @@ function useFix() {
     if (voted !== state.doc) ctx.update(voted);
   }
   // Compare with the opening record before the cache paint replaced it.
-  const entered = focusSelection() || rideRecorded(state.doc, state.previousOpen) ? null
+  const storedFocus = focusOf(state.doc);
+  const entered = (storedFocus && !focusExpired(storedFocus, now()))
+    || rideRecorded(state.doc, state.previousOpen) ? null
     : journeyAllowed(state.previousOpen?.journey, enabledModes())
       ? inferTravel({ ...state.doc, lastOpen: state.previousOpen }, now(), fix) : null;
   if (entered) {
@@ -722,8 +733,8 @@ function renderHome() {
 }
 
 function homeAnswerKind() {
-  const focus = focusOf(state.doc);
-  if (focus && !focusExpired(focus, now())) return focus.by === 'inferred' ? 'inferred' : 'focus';
+  const focus = visibleFocus(state.doc, now(), state.stations);
+  if (focus) return focus.by === 'inferred' ? 'inferred' : 'focus';
   if (!state.predicted) return null;
   return state.leap || 'predicted';
 }
@@ -761,7 +772,7 @@ function leaveDistance() {
   if (!fix || !selectedTrip()) return '';
   const origin = currentLeg().from;
   const distanceKmFromOrigin = distanceKm(fix, origin.location);
-  const focus = focusOf(state.doc);
+  const focus = visibleFocus(state.doc, now(), state.stations);
   const journey = focus && focus.tripId === state.selection.tripId
     && focus.direction === state.selection.direction ? focus.journey
     : state.body && (state.body.journeys || []).find((item) => !item.cancelled);
@@ -964,12 +975,14 @@ function boardAction(action, element) {
 }
 
 function showDetail(root) {
-  const focus = focusOf(state.doc);
-  if (!state.journey && focus && !focusExpired(focus, now())) {
+  const focus = visibleFocus(state.doc, now(), state.stations);
+  if (!state.journey && focus) {
     state.journey = focus.journey;
     state.selection = { tripId: focus.tripId, direction: focus.direction };
   }
-  if (!state.journey || !state.selection || !selectedTrip()) {
+  if (!state.journey || !state.selection || !selectedTrip()
+      || !journeyAllowed(state.journey, enabledModes())
+      || !suggestionAllowed(state.selection)) {
     location.hash = '#/';
     return;
   }

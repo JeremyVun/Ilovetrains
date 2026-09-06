@@ -17,6 +17,7 @@ import {
 import { shortName } from './dom.js';
 import { distanceKm } from './stations.js';
 import { findTrip, leg } from './storage.js';
+import { journeyAllowed, preferencesOf, tripAllowed } from './preferences.js';
 
 /* Half an hour past arrival the journey is over and directions are clutter
    (client-storage.md). Clearing is automatic so nobody has to remember to. */
@@ -36,6 +37,17 @@ export const ARRIVED_EARLY_MS = 5 * 60_000;
 
 export function focusOf(doc) {
   return (doc && doc.focus) || null;
+}
+
+/* Stored focus and displayed focus have separate lifetimes. Filtering hides
+   an incompatible journey without discarding the rider's saved snapshot. */
+export function visibleFocus(doc, nowMs, stations) {
+  const focus = focusOf(doc);
+  const modes = preferencesOf(doc).enabledModes;
+  const trip = focus && findTrip(doc, focus.tripId);
+  return focus && !focusExpired(focus, nowMs)
+    && tripAllowed(trip, modes, stations) && journeyAllowed(focus.journey, modes)
+    ? focus : null;
 }
 
 /** At most one focused journey: focusing another replaces it. */

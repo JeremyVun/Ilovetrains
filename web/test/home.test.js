@@ -641,3 +641,53 @@ test('a fix at the destination ends the trip before its timetable does', () => {
   assert.equal(model({ arrived: true }).status.text, 'Trip over');
   assert.ok(homeHtml(model({ arrived: true })).includes('Show the way back'));
 });
+
+
+test('Metro off hides a followed Mascot–Kellyville T8/M1 journey and its row', () => {
+  const journey = structuredClone(transferJourneys()[0]);
+  journey.line = { name: 'T8', mode: 'train' };
+  journey.legDetail[0].line = journey.line;
+  journey.legDetail[1].line = { name: 'M1', mode: 'metro' };
+  const mascot = { id: 'mascot', name: 'Mascot Station', modes: ['train'] };
+  const kellyville = { id: 'kellyville', name: 'Kellyville Station', modes: ['metro'] };
+  journey.legDetail[0].from = mascot;
+  journey.legDetail[1].to = kellyville;
+  const focusedTrip = { id: 'mascot-kellyville', from: mascot, to: kellyville };
+  const trainTrip = { id: 'rhodes-central', from: { id: 'rhodes', name: 'Rhodes Station', modes: ['train'] },
+    to: { id: 'central', name: 'Central Station', modes: ['train', 'metro'] } };
+  const selection = { tripId: trainTrip.id, direction: 'forward' };
+  for (const by of ['focus', 'inferred']) {
+    const doc = { ...emptyDoc(), trips: [focusedTrip, trainTrip],
+      preferences: { enabledModes: ['train'] },
+      focus: { tripId: focusedTrip.id, direction: 'forward', by, journey } };
+    const model = homeModel(doc, selection, transferBody(), at('09:33'), {
+      stations: [mascot, kellyville, trainTrip.from, trainTrip.to]
+    });
+    assert.equal(model.focus, null);
+    assert.equal(model.status, null);
+    assert.deepEqual(model.ranked.map((entry) => entry.trip.id), ['rhodes-central']);
+    const html = homeHtml(model);
+    assert.doesNotMatch(html, /Kellyville|Mascot|data-line-code="M1"|data-focused="true"/);
+    assert.equal(doc.focus.journey, journey);
+    const restored = homeModel({ ...doc, preferences: { enabledModes: ['train', 'metro'] } },
+      selection, transferBody(), at('09:33'));
+    assert.equal(restored.focus, doc.focus);
+    assert.equal(restored.selected.tripId, focusedTrip.id);
+  }
+});
+
+
+test('a restored cancelled focus cannot borrow a replacement from another selected pair', () => {
+  const journeys = transferJourneys();
+  cancelLeg(journeys[0], 0);
+  const doc = homeDoc(journeys[0]);
+  doc.trips.push({ ...HOME_TRIP, id: 'other-pair', to: { id: 'different', name: 'Another Station' } });
+  const model = homeModel(doc, { tripId: 'other-pair', direction: 'forward' },
+    transferBody({ journeys: [journeys[1]] }), at('09:21'), {
+      candidateSource: { stale: false, freshness: 'Live', dot: 'live' },
+      focusSource: { stale: true, freshness: 'Offline', dot: 'stale' }
+    });
+  assert.equal(model.directions.journey, journeys[0]);
+  assert.equal(model.directions.depTime, '09:24');
+  assert.equal(model.freshness, 'Offline');
+});
