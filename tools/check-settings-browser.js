@@ -720,6 +720,7 @@ function feedbackFrameScript() {
     const textarea = await waitFor(() => document.querySelector('[data-role="feedback-message"]'), 'feedback form did not render');
     textarea.value = 'The platform changed after I opened the app.';
     textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    textarea.focus();
   })()`;
 }
 
