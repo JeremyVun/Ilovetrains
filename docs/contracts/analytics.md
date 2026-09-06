@@ -8,7 +8,9 @@ experiment assignment stay on the device.
 ## Privacy and enablement
 
 Sending requires the production hostname `ilovetrains.jeremyvun.com`, usable
-localStorage, no Global Privacy Control, and no Do Not Track (`'1'`). Otherwise
+localStorage, and no Do Not Track (`'1'`). Global Privacy Control is not an
+opt-out here: it objects to selling or sharing personal data, and these
+counters contain none. Otherwise
 the client neither writes telemetry nor queues or sends events, and every
 experiment uses its control. The in-memory event ledger still records the
 approved events for local verification. Disclosure is in the documentation;
@@ -114,7 +116,10 @@ Going hidden or leaving the page tries `sendBeacon` with a `text/plain` Blob;
 if refused, it falls back to `fetch` with `keepalive`. An `online` event
 also flushes. Known-offline calls keep the queue without sending. Fetches
 POST one JSON array with `Content-Type: text/plain`, avoiding preflight.
-The service worker ignores the cross-origin request.
+The service worker ignores the cross-origin request. The client sends no
+ingest key; the analytics deployment runs open ingest for this project.
+Configuring ingest keys on the service silently drops these events until the
+client carries one.
 
 A 2xx fetch response settles only the snapshot sent; new counts survive.
 An accepted beacon settles immediately, meaning browser acceptance rather
@@ -142,3 +147,21 @@ usage and variant dimensions. For header kind `k`:
 Zero denominators mean no observation. No-action acceptance is a product
 assumption, not proof that the rider took that service. Browser and production
 verification commands live in [tools/README.md](../../tools/README.md).
+
+## Explicit feedback
+
+Settings sends user-authored feedback directly to
+`https://analytics.jeremyvun.com/feedback` using POST JSON with exactly
+`{project: "ilovetrains", category, feedback}`. Category is Problem, Suggestion
+or Other; category and message are required after trimming. NUL is rejected;
+message is limited to 8,192 UTF-8 bytes and encoded JSON to 10,240 bytes.
+Requests omit credentials and referrer. No message enters `/e`, the train API,
+localStorage, logs or the service-worker cache. This deliberate submission is
+independent of anonymous-counter enablement and sends no analytics event.
+
+One form draft and in-flight guard live in page memory across route navigation.
+Only 201 clears the draft. Errors preserve it with an explicit retry action;
+there is no automatic retry because a lost response may follow a committed
+record. Submission errors never display upstream response text. Operator
+listing, export and deletion stay behind the analytics service's existing
+Authelia gate; no operator credential is shipped to the browser.

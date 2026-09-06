@@ -46,8 +46,8 @@ function storageWorks(storage) {
 }
 
 export function isEnabled(env) {
-  const { hostname, gpc, dnt, storage } = env || {};
-  if (hostname !== HOST || gpc === true || dnt === '1') return false;
+  const { hostname, dnt, storage } = env || {};
+  if (hostname !== HOST || dnt === '1') return false;
   return !!storage && storageWorks(storage);
 }
 

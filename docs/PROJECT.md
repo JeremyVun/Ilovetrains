@@ -113,7 +113,8 @@ moves through are binding in `docs/contracts/ui.md`.
    our self-hosted analytics service: which kind of answer the header gave,
    whether it was acted on, a usage band and an experiment variant. Events
    contain no device or session identifier, station, trip, coordinate or
-   clock time. Global Privacy Control and Do Not Track disable analytics.
+   clock time. Do Not Track disables analytics; Global Privacy Control does
+   not, because nothing here is personal data to sell or share.
    The exact vocabulary is in `docs/contracts/analytics.md`.
 6. **Subtraction is the default.** Under "every affordance earns its place",
    iterate by deletion. The round that produced the current design deleted

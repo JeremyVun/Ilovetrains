@@ -60,7 +60,7 @@ test('analytics is enabled only on the production origin, with consent and a usa
   const storage = memoryStore();
   assert.equal(isEnabled({ hostname: 'ilovetrains.jeremyvun.com', storage }), true);
   assert.equal(isEnabled({ hostname: 'localhost', storage }), false);
-  assert.equal(isEnabled({ hostname: 'ilovetrains.jeremyvun.com', gpc: true, storage }), false);
+  assert.equal(isEnabled({ hostname: 'ilovetrains.jeremyvun.com', gpc: true, storage }), true);
   assert.equal(isEnabled({ hostname: 'ilovetrains.jeremyvun.com', dnt: '1', storage }), false);
   assert.equal(isEnabled({ hostname: 'ilovetrains.jeremyvun.com' }), false);
   assert.equal(isEnabled({

@@ -449,8 +449,8 @@ Rulings:
 - **A/B testing and analytics.** The owner: "we probably need to build a/b
   testing and analytics into this app from the get go. create backlog item
   for instrumenting this. The first use case will be a/b testing how to
-  show this strip feature." Opened as `docs/backlog/analytics/`. This item
-  ships A3; that item's first experiment is A2 versus A3.
+  show this strip feature." Shipped: see `docs/contracts/analytics.md`.
+  This item ships A3; the `strip-placement` experiment compares A2 and A3.
 
 Contract additions the build makes: a second offer grammar below the rule
 (one line, question and action), and the row-status slot may carry a fact

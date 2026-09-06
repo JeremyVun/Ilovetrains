@@ -258,7 +258,7 @@ async function main() {
     ws = await connect(await debuggerUrl());
     const scenarios = [
       { name: 'enabled-first-open', enabled: true, flush: true, events: ['opened', 'shown_predicted'] },
-      { name: 'gpc', gpc: true, events: ['shown_predicted'] },
+      { name: 'gpc-ignored', gpc: true, enabled: true, flush: true, events: ['opened', 'shown_predicted'] },
       { name: 'dnt', dnt: '1', events: ['shown_predicted'] },
       { name: 'storage-denied', storageDenied: true, events: ['shown_setup'] }
     ];

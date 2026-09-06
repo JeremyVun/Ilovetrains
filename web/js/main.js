@@ -83,7 +83,6 @@ const state = {
 
 const analyticsEnabled = isEnabled({
   hostname: location.hostname,
-  gpc: navigator.globalPrivacyControl,
   dnt: navigator.doNotTrack,
   storage
 }) && Boolean(globalThis.crypto && crypto.getRandomValues);

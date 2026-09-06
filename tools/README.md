@@ -439,8 +439,8 @@ It maps `ilovetrains.jeremyvun.com` to the local static server inside Chrome,
 maps the analytics host to loopback as a backstop, and captures attempted
 analytics fetches in the page. It proves a first enabled open assigns a bucket,
 emits `opened` before `shown_predicted`, and builds only the approved payload.
-Separate fresh targets prove GPC, DNT and denied storage force A3 without a
-telemetry write, queue or request. No synthetic event leaves the machine.
+Separate fresh targets prove DNT and denied storage force A3 without a
+telemetry write, queue or request, and that GPC alone leaves analytics on. No synthetic event leaves the machine.
 
 After deployment, open the real production app once in an ordinary browser,
 then read the collector with the operator-held key in the header:
