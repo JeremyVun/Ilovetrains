@@ -66,6 +66,8 @@ journeys, calendars, midnight/DST and bounded planning. The UI calibration
 test renders controlled states using the same Compose entry point as the
 application. Screenshot and real-client verification commands are indexed in
 `tools/README.md`. Test hooks live in `androidTest`, outside release code.
+The measured release checks and reviewed captures are recorded in
+[android-verification.md](android-verification.md).
 
 The public shared-data API, source joins, timetable replacement and routing
 boundaries are in [native-data.md](../contracts/native-data.md). Deliberate
