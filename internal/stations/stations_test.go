@@ -134,11 +134,13 @@ func TestEveryStationHasAUsableLocation(t *testing.T) {
 // The client loads its own copy of the same file; a divergence would give the
 // two sides different station ids for the same name.
 func TestEmbeddedIndexEqualsTheClientCopy(t *testing.T) {
-	web, err := os.ReadFile("../../web/stations.json")
-	if err != nil {
-		t.Fatalf("reading web/stations.json: %v", err)
-	}
-	if string(web) != string(indexJSON) {
-		t.Error("internal/stations/stations.json and web/stations.json differ; run node tools/build-stations.js")
+	for _, path := range []string{"../../web/stations.json", "../../android/app/src/main/assets/stations.json"} {
+		client, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("reading %s: %v", path, err)
+		}
+		if string(client) != string(indexJSON) {
+			t.Errorf("internal/stations/stations.json and %s differ; run node tools/build-stations.js", path)
+		}
 	}
 }

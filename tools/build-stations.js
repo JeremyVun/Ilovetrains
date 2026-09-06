@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* Builds the baked station index both clients search. See tools/README.md. */
+/* Builds the station index for the API, web and Android. See tools/README.md. */
 
 import { spawn } from 'node:child_process';
 import { createWriteStream } from 'node:fs';
@@ -203,7 +203,8 @@ async function main() {
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
   const json = serialise(stations);
-  for (const target of [join(ROOT, 'web', 'stations.json'), join(ROOT, 'internal', 'stations', 'stations.json')]) {
+  for (const target of [join(ROOT, 'web/stations.json'), join(ROOT, 'internal/stations/stations.json'),
+    join(ROOT, 'android/app/src/main/assets/stations.json')]) {
     await mkdir(dirname(target), { recursive: true });
     await writeFile(target, json);
   }

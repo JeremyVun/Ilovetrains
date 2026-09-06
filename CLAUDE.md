@@ -4,8 +4,9 @@ Sydney train, metro and ferry clients that answer “What train should I take ri
 now?” with no account, ads or server-side personal state. The web app is live
 at https://ilovetrains.jeremyvun.com.
 
-The installable web PWA (and, later, native Android and iOS clients) use the
-same stateless Go JSON API, which caches Transport for NSW Open Data. Saved trips, history, prediction,
+The installable web PWA and Kotlin Android app use the same stateless Go API,
+which caches Transport for NSW Open Data. Android also routes over a bundled,
+updatable offline timetable. Saved trips, history, prediction,
 location and focused journeys stay on the device.
 
 ## Read first
@@ -19,6 +20,9 @@ location and focused journeys stay on the device.
   calibration rules.
 - `docs/contracts/analytics.md` — anonymous event vocabulary, experiment
   assignment, privacy controls and aggregate interpretation.
+- `docs/contracts/native-data.md` — Android timetable, routing and realtime.
+- `docs/contracts/android-deviations.md` — reviewable native differences.
+- `docs/operations/android.md` — build, signing, installation and verification.
 - `assets/comps/latest/` — the authoritative comps: the current calibration
   exemplar frames every screen is judged against. Replaced, never
   accumulated, when an owner verdict changes a design.
@@ -42,6 +46,9 @@ references, and delete the entire folder. Git retains any history.
 - `internal/cache/` — TTL cache, single-flight and stale-on-error behavior.
 - `internal/tfnsw/` — TfNSW client, upstream types and response mapping.
 - `web/` — dependency-free vanilla ES-module PWA, service worker and tests.
+- `android/` — native Kotlin/Compose app, JVM and emulator tests.
+- `internal/native/` — shared timetable publication and realtime ingestion.
+- `native-data/bootstrap/` — verified public timetable bundled in the server.
 - `assets/` — durable media; `assets/comps/latest/` is the only comps
   location.
 - `tools/` — TfNSW probes, captured fixtures and browser verification tools.
@@ -69,6 +76,7 @@ Primary test gates:
 ```sh
 go test ./...
 (cd web && npm test)
+tools/build-android.sh
 ```
 
 The web app is the reference implementation every later port is measured against

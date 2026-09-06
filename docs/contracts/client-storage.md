@@ -1,10 +1,33 @@
 # Contract: Client-side storage & trip prediction
 
-All personal state lives in `localStorage` on the device and the document is
-never uploaded. A departures request carries only its station pair and current
+Web personal state lives in `localStorage`; Android uses private atomic files.
+The personal document is never uploaded. A departures request carries only its station pair and current
 mode allow-list; that request is stateless and creates no server-side profile.
 This is a product guarantee, not an implementation detail — see PROJECT.md
 principles.
+
+## Android storage
+
+Android's `personal-v1.json` is an atomically replaced schema-version-1 file
+in private app storage. It contains saved trips, history, completed rides,
+daily home votes, recent stations, preferences, the last answer and the full
+focused journey with its source evidence. The Kotlin `Wire` adapter owns its
+explicit encoding; it accepts API ISO timestamps and stores epoch milliseconds.
+Raw coordinates obtained from Android location providers are never serialized.
+Cloud backup and device transfer are excluded.
+
+Android retains trips until the user deletes them. Deletion removes the trip's
+view history, cached boards, focus and last-answer evidence; completed rides
+remain. The web's ten-trip automatic LRU eviction does not apply. Board files
+are keyed by both directed station IDs and canonical modes in the app cache;
+Android may evict them, while personal state and installed timetable generations
+remain in private storage. The focused journey is never dependent on an
+evictable board file.
+
+The prediction formula and location/home/ride evidence rules below also bind
+Android. `tools/fixtures/conformance/prediction.json` contains generated web
+outputs tested by both clients. Native schedule and realtime provenance have
+separate lifetimes as defined in [native-data.md](native-data.md).
 
 ## localStorage schema
 

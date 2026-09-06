@@ -1,11 +1,18 @@
 # Production deployment
 
-The app ships as one multi-architecture image containing the Go server and
-`web/`. The infra repository at `../projects` runs that image from
+The app ships as one multi-architecture image containing the Go server,
+`web/`, the native timetable bootstrap and its compiler. Build the signed
+Android APK first with `tools/build-android.sh --release` to include the
+phone download under `/downloads/`. The infra repository at `../projects` runs that image from
 `stacks/ilovetrains/` behind the shared Caddy edge proxy on `syd1`.
 
 Source pushes do not deploy production. Build, push and deployment originate
 from this machine.
+
+The `timetables` volume at `/data` contains public schedules and source caches,
+never personal client state. The image initializes that directory for its
+unprivileged runtime user. A failed upstream refresh retains the validated
+generation; the bundled bootstrap serves a new volume immediately.
 
 ## Before deploying
 

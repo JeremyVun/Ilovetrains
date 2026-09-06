@@ -1,0 +1,9 @@
+<resources>
+    <style name="Theme.ILoveTrains" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">#0A0B0D</item>
+        <item name="android:colorAccent">#F4F5F7</item>
+    </style>
+</resources>

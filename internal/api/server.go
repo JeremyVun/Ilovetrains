@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"trains/internal/cache"
+	"trains/internal/native"
 	"trains/internal/stations"
 	"trains/internal/tfnsw"
 )
@@ -95,16 +96,23 @@ type Server struct {
 	webDir         string
 	loc            *time.Location
 	now            func() time.Time
+	native         *native.Service
+}
+
+type Option func(*Server)
+
+func WithNative(service *native.Service) Option {
+	return func(server *Server) { server.native = service }
 }
 
 // New returns a server serving the API plus, if webDir exists, the static
 // client at /.
-func New(upstream Upstream, webDir string) *Server {
+func New(upstream Upstream, webDir string, options ...Option) *Server {
 	loc, err := time.LoadLocation(tfnsw.TimeZone)
 	if err != nil {
 		panic(err)
 	}
-	return &Server{
+	server := &Server{
 		upstream:       upstream,
 		departures:     cache.New[*tfnsw.DeparturesResponse](departuresTTL, departuresStaleWindow),
 		departuresPast: cache.New[*tfnsw.DeparturesResponse](departuresPastTTL, departuresPastStaleWindow),
@@ -112,6 +120,10 @@ func New(upstream Upstream, webDir string) *Server {
 		loc:            loc,
 		now:            time.Now,
 	}
+	for _, option := range options {
+		option(server)
+	}
+	return server
 }
 
 // Handler returns the routed, CORS-wrapped handler for the whole service.
@@ -119,6 +131,11 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/departures", s.handleDepartures)
 	mux.HandleFunc("GET /api/v1/stops", s.handleStops)
+	if s.native != nil {
+		mux.HandleFunc("GET /api/v1/timetable/manifest", s.handleTimetableManifest)
+		mux.HandleFunc("GET /api/v1/timetable/packages/{package}", s.handleTimetablePackage)
+		mux.HandleFunc("GET /api/v1/realtime/{source}", s.handleRealtime)
+	}
 	mux.HandleFunc("GET /healthz", handleHealthz)
 	// Unmatched API paths answer in the error envelope rather than falling
 	// through to the static file server.
@@ -132,6 +149,7 @@ func (s *Server) staticHandler() http.Handler {
 	// it as text/plain and the install prompt never appears. Registering the
 	// type is idempotent.
 	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
+	_ = mime.AddExtensionType(".apk", "application/vnd.android.package-archive")
 
 	if info, err := os.Stat(s.webDir); err != nil || !info.IsDir() {
 		// The client is built in a later phase; until then / is simply empty.

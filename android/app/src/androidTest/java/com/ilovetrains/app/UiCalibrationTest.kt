@@ -1,0 +1,225 @@
+package com.ilovetrains.app
+
+import android.graphics.Bitmap
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import org.json.JSONObject
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import java.io.File
+import java.io.FileOutputStream
+
+@RunWith(AndroidJUnit4::class)
+class UiCalibrationTest {
+    @get:Rule val compose = createComposeRule()
+    private var viewportMetrics = ""
+
+    @Test fun captureCanonicalScreens() {
+        val fixture = Fixtures()
+        val state = mutableStateOf(fixture.home)
+        compose.setContent {
+            val density = LocalDensity.current
+            val configuration = LocalConfiguration.current
+            val layoutDirection = LocalLayoutDirection.current
+            val safe = WindowInsets.safeDrawing
+            SideEffect {
+                val left = safe.getLeft(density, layoutDirection) / density.density
+                val right = safe.getRight(density, layoutDirection) / density.density
+                val top = safe.getTop(density) / density.density
+                val bottom = safe.getBottom(density) / density.density
+                viewportMetrics = "root=${configuration.screenWidthDp}x${configuration.screenHeightDp}dp\n" +
+                    "safeDrawing=${left.toInt()},${top.toInt()},${right.toInt()},${bottom.toInt()}dp\n" +
+                    "content=${(configuration.screenWidthDp - left - right).toInt()}x${(configuration.screenHeightDp - top - bottom).toInt()}dp\n"
+            }
+            TrainApp(state.value, NoActions)
+        }
+        capture("home")
+        compose.runOnIdle { state.value = fixture.boardState }
+        capture("board")
+        compose.onRoot().performTouchInput { swipeUp() }
+        compose.onRoot().performTouchInput { swipeUp() }
+        capture("board-end")
+        compose.runOnIdle { state.value = fixture.detailState }
+        capture("detail")
+        compose.runOnIdle { state.value = fixture.setupState }
+        capture("setup")
+        compose.runOnIdle { state.value = fixture.settingsState }
+        capture("settings")
+        compose.runOnIdle { state.value = fixture.delayedState }
+        capture("board-delayed")
+        compose.runOnIdle { state.value = fixture.cancelledState }
+        capture("detail-cancelled")
+        compose.runOnIdle { state.value = fixture.twoChangesState }
+        capture("detail-two-changes")
+        compose.runOnIdle { state.value = fixture.activePinnedState }
+        capture("home-active-pinned")
+        compose.runOnIdle { state.value = fixture.activeInferredState }
+        capture("home-active-inferred")
+        compose.runOnIdle { state.value = fixture.completedState }
+        capture("home-completed")
+        compose.runOnIdle { state.value = fixture.longNamesState }
+        capture("home-long-names")
+        compose.runOnIdle { state.value = fixture.home.copy(appearance = Appearance.Light) }
+        capture("home-light")
+        compose.runOnIdle { state.value = fixture.boardState.copy(appearance = Appearance.Light) }
+        capture("board-light")
+        compose.runOnIdle { state.value = fixture.settingsState.copy(appearance = Appearance.Light) }
+        capture("settings-light")
+        compose.runOnIdle { state.value = fixture.ferryState }
+        capture("detail-f1-manly")
+        compose.runOnIdle { state.value = fixture.pyrmontTransferState }
+        capture("detail-pyrmont-double-bay")
+    }
+
+    @Test fun pagesEarlierAfterPastRowsArrive() {
+        val fixture = Fixtures()
+        val original = fixture.boardState
+        val board = checkNotNull(original.board)
+        val state = mutableStateOf(original.copy(board = board.copy(journeys = board.journeys.take(3))))
+        val actions = object : UiActions by NoActions {
+            var earlierCalls = 0
+            override fun earlier() { earlierCalls++ }
+        }
+        compose.setContent { TrainApp(state.value, actions) }
+        compose.waitForIdle()
+
+        val offset = -10 * 60_000L
+        val past = Journey(board.journeys.first().legs.map { leg ->
+            leg.copy(
+                departure = leg.departure + offset,
+                arrival = leg.arrival + offset,
+                estimatedDeparture = leg.estimatedDeparture?.plus(offset),
+                estimatedArrival = leg.estimatedArrival?.plus(offset),
+            )
+        })
+        compose.runOnIdle { state.value = original.copy(board = board.copy(journeys = listOf(past) + board.journeys)) }
+        compose.onRoot().performTouchInput { swipeDown() }
+        compose.waitUntil(2_000) { actions.earlierCalls > 0 }
+    }
+
+    private fun capture(name: String) {
+        compose.waitForIdle()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val directory = File(context.getExternalFilesDir(null), "calibration").also { it.mkdirs() }
+        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
+        if (name == "home") File(directory, "metrics.txt").writeText(viewportMetrics + "capture=${bitmap.width}x${bitmap.height}px\n")
+        FileOutputStream(File(directory, "$name.png")).use {
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
+        bitmap.recycle()
+    }
+}
+
+private class Fixtures {
+    private val context = InstrumentationRegistry.getInstrumentation().context
+    private val calibration = JSONObject(context.assets.open("conformance/calibration.json").bufferedReader().use { it.readText() })
+    private fun board(name: String): BoardData {
+        val body = calibration.getJSONObject(name).getJSONObject("body")
+        return Wire.board(body, api = true).also {
+            check(it.journeys.size == body.getJSONArray("journeys").length()) { "$name fixture lost journeys in Wire.board" }
+        }
+    }
+    private fun now(name: String): Long = calibration.getJSONObject(name).getLong("now")
+
+    private val centralNow = now("central")
+    private val centralBoard = board("central")
+    private val transferNow = now("transfer")
+    private val transferDepartedNow = calibration.getJSONObject("transfer").getLong("departedNow")
+    private val transferBoard = board("transfer")
+    private val threeLegBoard = board("threeLeg")
+    private val ferryNow = now("ferry")
+    private val ferryBoard = board("ferry")
+    private val pyrmontBoardSource = Wire.board(JSONObject(
+        context.assets.open("departures_pyrmont_doublebay.json").bufferedReader().use { it.readText() }), api = true)
+    private val pyrmontNow = pyrmontBoardSource.journeys.first().effectiveDeparture - 5 * 60_000
+    private val pyrmontBoard = pyrmontBoardSource.copy(generatedAt = pyrmontNow)
+
+    private val centralTrip = SavedTrip("central-parramatta", centralBoard.from, centralBoard.to, lines = listOf("T1"))
+    private fun state(now: Long = centralNow, board: BoardData = centralBoard) = AppState(
+        ready = true, screen = Screen.Home, trips = listOf(centralTrip), totalTrips = 1,
+        selectedTripId = centralTrip.id, board = board, homeBoard = board, now = now,
+        appearance = Appearance.Dark, enabledModes = AllModes, locationGranted = true,
+    )
+
+    val home = state()
+    val boardState = home.copy(screen = Screen.Board)
+    val detailState = state(transferNow, transferBoard).copy(
+        screen = Screen.Detail, detail = transferBoard.journeys.first())
+    val setupState = home.copy(
+        screen = Screen.Setup, setupFrom = centralBoard.from, setupTo = null,
+        stations = listOf(centralBoard.to, transferBoard.from, transferBoard.to, ferryBoard.from, ferryBoard.to),
+        recentTo = listOf(centralBoard.to),
+    )
+    val settingsState = home.copy(
+        screen = Screen.Settings, home = centralBoard.from, automaticHome = centralBoard.from,
+        timetableStatus = "5 Sep – 4 Oct 2026", version = "1.0.0", appearance = Appearance.System,
+    )
+
+    // Stress delta: the real first Central service runs six minutes late.
+    private val delayedJourney = centralBoard.journeys.first().let { journey ->
+        Journey(journey.legs.map { leg -> leg.copy(
+            estimatedDeparture = leg.departure + 6 * 60_000,
+            estimatedArrival = leg.arrival + 6 * 60_000,
+        ) })
+    }
+    val delayedState = boardState.copy(board = centralBoard.copy(
+        journeys = listOf(delayedJourney) + centralBoard.journeys.drop(1)))
+
+    // Stress delta: the real first T9 leg is cancelled, preserving its transfer.
+    private val cancelledJourney = transferBoard.journeys.first().let { journey ->
+        Journey(journey.legs.mapIndexed { index, leg -> leg.copy(cancelled = index == 0) })
+    }
+    val cancelledState = state(transferNow, transferBoard).copy(
+        screen = Screen.Detail, detail = cancelledJourney,
+        board = transferBoard.copy(journeys = listOf(cancelledJourney)),
+    )
+    val twoChangesState = state(now("threeLeg"), threeLegBoard).copy(
+        screen = Screen.Detail, detail = threeLegBoard.journeys.first())
+
+    private val activeBoard = transferBoard.copy(generatedAt = transferDepartedNow)
+    private val activeJourney = activeBoard.journeys.first()
+    val activePinnedState = state(transferDepartedNow, activeBoard).copy(
+        trips = listOf(SavedTrip("rhodes-bondi", activeBoard.from, activeBoard.to, lines = listOf("T9", "T4"))),
+        selectedTripId = "rhodes-bondi",
+        focus = FocusedJourney("rhodes-bondi", false, activeJourney, activeBoard, pinned = true),
+    )
+    val activeInferredState = activePinnedState.copy(
+        focus = activePinnedState.focus?.copy(pinned = false))
+    val completedState = activePinnedState.copy(focusComplete = true)
+
+    val longNamesState = state(pyrmontNow, pyrmontBoard).copy(
+        trips = listOf(SavedTrip("pyrmont-double-bay", pyrmontBoard.from, pyrmontBoard.to, lines = listOf("F4", "F7"))),
+        totalTrips = 1, selectedTripId = "pyrmont-double-bay",
+        tripMetadata = mapOf("pyrmont-double-bay" to "6.8 km away · Last ridden Wednesday"),
+    )
+    val ferryState = state(ferryNow, ferryBoard).copy(
+        screen = Screen.Detail, detail = ferryBoard.journeys.first { it.legs.first().line == "F1" })
+    val pyrmontTransferState = state(pyrmontNow, pyrmontBoard).copy(
+        screen = Screen.Detail, detail = pyrmontBoard.journeys.first())
+}
+private object NoActions : UiActions {
+    override fun back() {} ; override fun openTrip(id: String, reverse: Boolean) {} ; override fun reverseTrip() {}
+    override fun openJourney(journey: Journey) {} ; override fun pinJourney(journey: Journey) {} ; override fun unpinJourney() {}
+    override fun showReturn() {} ; override fun newTrip() {} ; override fun chooseSetupFrom(station: Station) {}
+    override fun clearSetupFrom() {} ; override fun chooseSetupTo(station: Station) {} ; override fun clearSetupTo() {}
+    override fun saveTrip(from: Station, to: Station) {} ; override fun deleteTrip(id: String) {} ; override fun openSettings() {}
+    override fun setAppearance(value: Appearance) {} ; override fun setMode(mode: String, enabled: Boolean) {}
+    override fun setUseLocation(enabled: Boolean) {} ; override fun requestLocation() {} ; override fun chooseHome() {}
+    override fun setHome(station: Station?) {} ; override fun refresh() {} ; override fun earlier() {}
+    override fun updateTimetable() {} ; override fun feedback(text: String, category: String) {} ; override fun dismissMessage() {}
+}

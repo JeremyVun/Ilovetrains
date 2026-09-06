@@ -17,8 +17,9 @@ Invariants:
 - In-memory cache + single-flight per cache key upstream of TfNSW, so a CDN
   miss storm costs at most one upstream request per key per TTL. TfNSW quota
   is a hard budget (see `docs/references/tfnsw-open-data.md`).
-- Timestamps are ISO 8601 with offset (e.g. `2026-08-31T17:42:00+10:00`),
-  always in `Australia/Sydney` local offset.
+- Journey timestamps use the `Australia/Sydney` offset (for example,
+  `2026-08-31T17:42:00+10:00`). Shared timetable and realtime source
+  timestamps are RFC 3339 instants and may use `Z`.
 
 ## GET /api/v1/departures?from={stopId}&to={stopId}&limit={n}&at={t}&modes={modes}
 
@@ -217,9 +218,10 @@ the binary. No upstream call is made and no request can fail on TfNSW.
   four static GTFS bundles (Sydney Trains, NSW TrainLink, Metro and Sydney
   Ferries; see `tools/README.md` for the bundle URLs and
   `docs/references/tfnsw-open-data.md` for how a station is selected). It is
-  committed to the repository in two byte-identical copies,
-  `internal/stations/stations.json` for this endpoint and `web/stations.json`
-  for the client; a Go test keeps them equal. Rebuilding it is a deliberate,
+  committed to the repository in three byte-identical copies:
+  `internal/stations/stations.json`, `web/stations.json` and
+  `android/app/src/main/assets/stations.json`; a Go test keeps them equal.
+  Rebuilding it is a deliberate,
   committed act, not something that happens at runtime.
 - `q`: search text, min 2 chars. It is normalised — trimmed, inner whitespace
   collapsed to single spaces, lower-cased — before it is matched, so `Central`
@@ -264,6 +266,109 @@ any nearest-station comparison outright. It powers the client-side
 geolocation term in trip prediction — the server never receives a user
 location, only publishes where stations are.
 
+## GET /api/v1/timetable/manifest
+
+Publishes the current native timetable generation. Dates use `YYYYMMDD`, and
+the response names one aggregate network package so routing can transfer
+across the five sources. `expiresAt` is the end of usable schedule coverage;
+clients never plan beyond it.
+
+```json
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-05T15:33:58Z",
+  "expiresAt": "2026-10-04T23:59:59+11:00",
+  "serviceDateFrom": "20260905",
+  "serviceDateTo": "20261004",
+  "packages": [{
+    "source": "network",
+    "schemaVersion": 1,
+    "sha256": "b17e6a598c92913e6cc53510f96b78998907f0f480cbe5091a643e47d3d8fadd",
+    "url": "/api/v1/timetable/packages/b17e6a598c92913e6cc53510f96b78998907f0f480cbe5091a643e47d3d8fadd.zip",
+    "bytes": 20784888,
+    "serviceDateFrom": "20260905",
+    "serviceDateTo": "20261004"
+  }]
+}
+```
+
+Cache: `s-maxage=300, stale-while-revalidate=86400`, with a strong `ETag` and
+`304` support. The server downloads all five schedules with conditional HTTP
+requests, compiles once per day, verifies the new package, and atomically
+publishes the manifest. The previous generation remains active throughout a
+failed or incomplete refresh.
+
+## GET /api/v1/timetable/packages/{sha256}.zip
+
+An immutable ZIP containing exactly `timetable.sqlite3`. The filename is the
+lowercase SHA-256 of the complete ZIP bytes and `Content-Type` is
+`application/zip`. Cache: `max-age=31536000, immutable`, with a strong `ETag`
+and `304` support. Unknown hashes return `404`; path fragments and arbitrary
+filenames never select filesystem content. The SQLite contract is in
+[native-data.md](native-data.md).
+
+## GET /api/v1/realtime/{source}
+
+Publishes a complete replacement snapshot for `sydneytrains`, `nswtrains`,
+`metro`, `ferries`, or `mff`. The backend fetches these five public feeds on a
+shared cadence independent of rider queries, uses upstream `ETag` and
+`Last-Modified` validators, and accepts only GTFS-Realtime `FULL_DATASET`
+messages with a source header timestamp. Cache:
+`max-age=0, s-maxage=15, stale-while-revalidate=30`, with strong `ETag`, `304`
+and gzip support.
+
+```json
+{
+  "schemaVersion": 1,
+  "source": "metro",
+  "headerTimestamp": "2026-09-06T01:02:03Z",
+  "generatedAt": "2026-09-06T01:02:11Z",
+  "expiresAt": "2026-09-06T01:03:33Z",
+  "updates": [{
+    "tripId": "1234",
+    "serviceDate": "20260906",
+    "routeId": "M1",
+    "startTime": "11:20:00",
+    "directionId": 0,
+    "status": "scheduled",
+    "timestamp": "2026-09-06T01:02:02Z",
+    "delaySeconds": 60,
+    "stopUpdates": [{
+      "stopId": "200060",
+      "stopSequence": 4,
+      "assignedStopId": "200060:1",
+      "arrivalMs": 1788656700000,
+      "departureMs": 1788656760000,
+      "arrivalDelaySeconds": 60,
+      "departureDelaySeconds": 60,
+      "scheduleRelationship": "scheduled"
+    }]
+  }]
+}
+```
+
+`serviceDate` is required. Updates with a missing or invalid identity, or a
+duplicate `(tripId, serviceDate)`, are omitted. Clients join only the exact
+`(source, tripId, serviceDate)` tuple; names, lines and times are never
+identity fallbacks. Trip `status` is `scheduled`, `added`, `unscheduled`,
+`cancelled`, or `replacement`. Stop `scheduleRelationship` is `scheduled`,
+`skipped`, `noData`, or `unscheduled`. Unknown enum values are omitted.
+`assignedStopId` is a GTFS stop reassignment, never a guessed display platform.
+
+Expiry is the upstream header timestamp plus 90 seconds, independent of when
+the proxy received or served it. A failed refresh may leave an expired
+snapshot available with `X-Data-Stale: true`; native clients ignore its
+realtime fields and fall back to the local schedule. Missing static matches
+and added services stay unmatched locally and trigger the native client's
+online Trip Planner fallback.
+
+An update carrying its own timestamp is omitted when that observation is more
+than 90 seconds behind the feed header or more than five seconds ahead of it.
+An update without its own timestamp inherits the header freshness only when it
+has the explicit service date required above. A repeated byte-identical
+upstream body preserves the previous `generatedAt` and ETag even if the
+upstream answers `200` instead of `304`.
+
 ## GET /healthz
 
 `200 {"ok": true}`. `Cache-Control: no-store`. For deploy checks only, not
@@ -279,6 +384,8 @@ routed through the CDN cache.
 - `404 not_found` — no such endpoint under `/api/`. Cacheable (`s-maxage=60`).
 - `502 upstream_unavailable` — TfNSW down/erroring after retry. `no-store`.
 - `504 upstream_timeout` — TfNSW too slow. `no-store`.
+- `503 data_unavailable` — no verified native timetable or snapshot is
+  available. `no-store`.
 
 Error `message` is our own text; upstream error text is never echoed back.
 

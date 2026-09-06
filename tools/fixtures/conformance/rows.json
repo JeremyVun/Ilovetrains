@@ -1,0 +1,1153 @@
+[
+  {
+    "name": "scheduled next service",
+    "sourceFixture": "departures_pyrmont_doublebay.json journey 0",
+    "syntheticDelta": {
+      "name": "scheduled next service",
+      "offset": 5,
+      "realtime": false
+    },
+    "now": 1788739200000,
+    "body": {
+      "from": {
+        "id": "2000260",
+        "name": "Pyrmont Bay Wharf"
+      },
+      "to": {
+        "id": "202823",
+        "name": "Double Bay Wharf"
+      },
+      "generatedAt": "2026-09-07T00:00:00.000Z",
+      "at": null,
+      "journeys": [
+        {
+          "departure": {
+            "scheduled": "2026-09-07T00:05:00.000Z",
+            "estimated": null,
+            "platform": "Pyrmont Bay Wharf"
+          },
+          "arrival": {
+            "scheduled": "2026-09-07T01:08:00.000Z",
+            "estimated": null
+          },
+          "line": {
+            "name": "F4",
+            "mode": "ferry"
+          },
+          "destinationHeadsign": "Circular Quay",
+          "stopsAway": null,
+          "cancelled": false,
+          "legs": 2,
+          "legDetail": [
+            {
+              "line": {
+                "name": "F4",
+                "mode": "ferry"
+              },
+              "headsign": "Circular Quay",
+              "from": {
+                "id": "2000260",
+                "name": "Pyrmont Bay Wharf",
+                "platform": "Pyrmont Bay Wharf"
+              },
+              "to": {
+                "id": "200020",
+                "name": "Circular Quay",
+                "platform": "Wharf 4, Side B"
+              },
+              "departure": {
+                "scheduled": "2026-09-07T00:05:00.000Z",
+                "estimated": null
+              },
+              "arrival": {
+                "scheduled": "2026-09-07T00:31:00.000Z",
+                "estimated": null
+              },
+              "cancelled": false
+            },
+            {
+              "line": {
+                "name": "F7",
+                "mode": "ferry"
+              },
+              "headsign": "Double Bay",
+              "from": {
+                "id": "200020",
+                "name": "Circular Quay",
+                "platform": "Wharf 4, Side B"
+              },
+              "to": {
+                "id": "202823",
+                "name": "Double Bay Wharf",
+                "platform": "Double Bay Wharf"
+              },
+              "departure": {
+                "scheduled": "2026-09-07T00:51:00.000Z",
+                "estimated": null
+              },
+              "arrival": {
+                "scheduled": "2026-09-07T01:08:00.000Z",
+                "estimated": null
+              },
+              "cancelled": false
+            }
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "figure": "5",
+      "provenance": "SCHEDULED",
+      "depTime": "10:05",
+      "arrTime": "11:08",
+      "past": false
+    }
+  },
+  {
+    "name": "fresh realtime next service",
+    "sourceFixture": "departures_pyrmont_doublebay.json journey 0",
+    "syntheticDelta": {
+      "name": "fresh realtime next service",
+      "offset": 5,
+      "realtime": true
+    },
+    "now": 1788739200000,
+    "body": {
+      "from": {
+        "id": "2000260",
+        "name": "Pyrmont Bay Wharf"
+      },
+      "to": {
+        "id": "202823",
+        "name": "Double Bay Wharf"
+      },
+      "generatedAt": "2026-09-07T00:00:00.000Z",
+      "at": null,
+      "journeys": [
+        {
+          "departure": {
+            "scheduled": "2026-09-07T00:05:00.000Z",
+            "estimated": "2026-09-07T00:05:00.000Z",
+            "platform": "Pyrmont Bay Wharf"
+          },
+          "arrival": {
+            "scheduled": "2026-09-07T01:08:00.000Z",
+            "estimated": "2026-09-07T01:08:00.000Z"
+          },
+          "line": {
+            "name": "F4",
+            "mode": "ferry"
+          },
+          "destinationHeadsign": "Circular Quay",
+          "stopsAway": null,
+          "cancelled": false,
+          "legs": 2,
+          "legDetail": [
+            {
+              "line": {
+                "name": "F4",
+                "mode": "ferry"
+              },
+              "headsign": "Circular Quay",
+              "from": {
+                "id": "2000260",
+                "name": "Pyrmont Bay Wharf",
+                "platform": "Pyrmont Bay Wharf"
+              },
+              "to": {
+                "id": "200020",
+                "name": "Circular Quay",
+                "platform": "Wharf 4, Side B"
+              },
+              "departure": {
+                "scheduled": "2026-09-07T00:05:00.000Z",
+                "estimated": "2026-09-07T00:05:00.000Z"
+              },
+              "arrival": {
+                "scheduled": "2026-09-07T00:31:00.000Z",
+                "estimated": "2026-09-07T00:31:00.000Z"
+              },
+              "cancelled": false
+            },
+            {
+              "line": {
+                "name": "F7",
+                "mode": "ferry"
+              },
+              "headsign": "Double Bay",
+              "from": {
+                "id": "200020",
+                "name": "Circular Quay",
+                "platform": "Wharf 4, Side B"
+              },
+              "to": {
+                "id": "202823",
+                "name": "Double Bay Wharf",
+                "platform": "Double Bay Wharf"
+              },
+              "departure": {
+                "scheduled": "2026-09-07T00:51:00.000Z",
+                "estimated": "2026-09-07T00:51:00.000Z"
+              },
+              "arrival": {
+                "scheduled": "2026-09-07T01:08:00.000Z",
+                "estimated": "2026-09-07T01:08:00.000Z"
+              },
+              "cancelled": false
+            }
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "figure": "5",
+      "provenance": "",
+      "depTime": "10:05",
+      "arrTime": "11:08",
+      "past": false
+    }
+  },
+  {
+    "name": "delayed service",
+    "sourceFixture": "departures_pyrmont_doublebay.json journey 0",
+    "syntheticDelta": {
+      "name": "delayed service",
+      "offset": 5,
+      "realtime": true,
+      "delay": 6
+    },
+    "now": 1788739200000,
+    "body": {
+      "from": {
+        "id": "2000260",
+        "name": "Pyrmont Bay Wharf"
+      },
+      "to": {
+        "id": "202823",
+        "name": "Double Bay Wharf"
+      },
+      "generatedAt": "2026-09-07T00:00:00.000Z",
+      "at": null,
+      "journeys": [
+        {
+          "departure": {
+            "scheduled": "2026-09-07T00:05:00.000Z",
+            "estimated": "2026-09-07T00:11:00.000Z",
+            "platform": "Pyrmont Bay Wharf"
+          },
+          "arrival": {
+            "scheduled": "2026-09-07T01:08:00.000Z",
+            "estimated": "2026-09-07T01:14:00.000Z"
+          },
+          "line": {
+            "name": "F4",
+            "mode": "ferry"
+          },
+          "destinationHeadsign": "Circular Quay",
+          "stopsAway": null,
+          "cancelled": false,
+          "legs": 2,
+          "legDetail": [
+            {
+              "line": {
+                "name": "F4",
+                "mode": "ferry"
+              },
+              "headsign": "Circular Quay",
+              "from": {
+                "id": "2000260",
+                "name": "Pyrmont Bay Wharf",
+                "platform": "Pyrmont Bay Wharf"
+              },
+              "to": {
+                "id": "200020",
+                "name": "Circular Quay",
+                "platform": "Wharf 4, Side B"
+              },
+              "departure": {
+                "scheduled": "2026-09-07T00:05:00.000Z",
+                "estimated": "2026-09-07T00:11:00.000Z"
+              },
+              "arrival": {
+                "scheduled": "2026-09-07T00:31:00.000Z",
+                "estimated": "2026-09-07T00:37:00.000Z"
+              },
+              "cancelled": false
+            },
+            {
+              "line": {
+                "name": "F7",
+                "mode": "ferry"
+              },
+              "headsign": "Double Bay",
+              "from": {
+                "id": "200020",
+                "name": "Circular Quay",
+                "platform": "Wharf 4, Side B"
+              },
+              "to": {
+                "id": "202823",
+                "name": "Double Bay Wharf",
+                "platform": "Double Bay Wharf"
+              },
+              "departure": {
+                "scheduled": "2026-09-07T00:51:00.000Z",
+                "estimated": "2026-09-07T00:57:00.000Z"
+              },
+              "arrival": {
+                "scheduled": "2026-09-07T01:08:00.000Z",
+                "estimated": "2026-09-07T01:14:00.000Z"
+              },
+              "cancelled": false
+            }
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "figure": "11",
+      "provenance": "6 MIN LATE",
+      "depTime": "10:11",
+      "arrTime": "11:14",
+      "past": false
+    }
+  },
+  {
+    "name": "cancelled service",
+    "sourceFixture": "departures_pyrmont_doublebay.json journey 0",
+    "syntheticDelta": {
+      "name": "cancelled service",
+      "offset": 5,
+      "realtime": true,
+      "cancelled": true
+    },
+    "now": 1788739200000,
+    "body": {
+      "from": {
+        "id": "2000260",
+        "name": "Pyrmont Bay Wharf"
+      },
+      "to": {
+        "id": "202823",
+        "name": "Double Bay Wharf"
+      },
+      "generatedAt": "2026-09-07T00:00:00.000Z",
+      "at": null,
+      "journeys": [
+        {
+          "departure": {
+            "scheduled": "2026-09-07T00:05:00.000Z",
+            "estimated": "2026-09-07T00:05:00.000Z",
+            "platform": "Pyrmont Bay Wharf"
+          },
+          "arrival": {
+            "scheduled": "2026-09-07T01:08:00.000Z",
+            "estimated": "2026-09-07T01:08:00.000Z"
+          },
+          "line": {
+            "name": "F4",
+            "mode": "ferry"
+          },
+          "destinationHeadsign": "Circular Quay",
+          "stopsAway": null,
+          "cancelled": true,
+          "legs": 2,
+          "legDetail": [
+            {
+              "line": {
+                "name": "F4",
+                "mode": "ferry"
+              },
+              "headsign": "Circular Quay",
+              "from": {
+                "id": "2000260",
+                "name": "Pyrmont Bay Wharf",
+                "platform": "Pyrmont Bay Wharf"
+              },
+              "to": {
+                "id": "200020",
+                "name": "Circular Quay",
+                "platform": "Wharf 4, Side B"
+              },
+              "departure": {
+                "scheduled": "2026-09-07T00:05:00.000Z",
+                "estimated": "2026-09-07T00:05:00.000Z"
+              },
+              "arrival": {
+                "scheduled": "2026-09-07T00:31:00.000Z",
+                "estimated": "2026-09-07T00:31:00.000Z"
+              },
+              "cancelled": true
+            },
+            {
+              "line": {
+                "name": "F7",
+                "mode": "ferry"
+              },
+              "headsign": "Double Bay",
+              "from": {
+                "id": "200020",
+                "name": "Circular Quay",
+                "platform": "Wharf 4, Side B"
+              },
+              "to": {
+                "id": "202823",
+                "name": "Double Bay Wharf",
+                "platform": "Double Bay Wharf"
+              },
+              "departure": {
+                "scheduled": "2026-09-07T00:51:00.000Z",
+                "estimated": "2026-09-07T00:51:00.000Z"
+              },
+              "arrival": {
+                "scheduled": "2026-09-07T01:08:00.000Z",
+                "estimated": "2026-09-07T01:08:00.000Z"
+              },
+              "cancelled": true
+            }
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "figure": "—",
+      "provenance": "CANCELLED",
+      "depTime": "10:05",
+      "arrTime": "11:08",
+      "past": false
+    }
+  },
+  {
+    "name": "departing realtime service",
+    "sourceFixture": "departures_pyrmont_doublebay.json journey 0",
+    "syntheticDelta": {
+      "name": "departing realtime service",
+      "offset": 0,
+      "realtime": true
+    },
+    "now": 1788739200000,
+    "body": {
+      "from": {
+        "id": "2000260",
+        "name": "Pyrmont Bay Wharf"
+      },
+      "to": {
+        "id": "202823",
+        "name": "Double Bay Wharf"
+      },
+      "generatedAt": "2026-09-07T00:00:00.000Z",
+      "at": null,
+      "journeys": [
+        {
+          "departure": {
+            "scheduled": "2026-09-07T00:00:00.000Z",
+            "estimated": "2026-09-07T00:00:00.000Z",
+            "platform": "Pyrmont Bay Wharf"
+          },
+          "arrival": {
+            "scheduled": "2026-09-07T01:03:00.000Z",
+            "estimated": "2026-09-07T01:03:00.000Z"
+          },
+          "line": {
+            "name": "F4",
+            "mode": "ferry"
+          },
+          "destinationHeadsign": "Circular Quay",
+          "stopsAway": null,
+          "cancelled": false,
+          "legs": 2,
+          "legDetail": [
+            {
+              "line": {
+                "name": "F4",
+                "mode": "ferry"
+              },
+              "headsign": "Circular Quay",
+              "from": {
+                "id": "2000260",
+                "name": "Pyrmont Bay Wharf",
+                "platform": "Pyrmont Bay Wharf"
+              },
+              "to": {
+                "id": "200020",
+                "name": "Circular Quay",
+                "platform": "Wharf 4, Side B"
+              },
+              "departure": {
+                "scheduled": "2026-09-07T00:00:00.000Z",
+                "estimated": "2026-09-07T00:00:00.000Z"
+              },
+              "arrival": {
+                "scheduled": "2026-09-07T00:26:00.000Z",
+                "estimated": "2026-09-07T00:26:00.000Z"
+              },
+              "cancelled": false
+            },
+            {
+              "line": {
+                "name": "F7",
+                "mode": "ferry"
+              },
+              "headsign": "Double Bay",
+              "from": {
+                "id": "200020",
+                "name": "Circular Quay",
+                "platform": "Wharf 4, Side B"
+              },
+              "to": {
+                "id": "202823",
+                "name": "Double Bay Wharf",
+                "platform": "Double Bay Wharf"
+              },
+              "departure": {
+                "scheduled": "2026-09-07T00:46:00.000Z",
+                "estimated": "2026-09-07T00:46:00.000Z"
+              },
+              "arrival": {
+                "scheduled": "2026-09-07T01:03:00.000Z",
+                "estimated": "2026-09-07T01:03:00.000Z"
+              },
+              "cancelled": false
+            }
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "figure": "Now",
+      "provenance": "DEPARTING",
+      "depTime": "10:00",
+      "arrTime": "11:03",
+      "past": false
+    }
+  },
+  {
+    "name": "departing scheduled service",
+    "sourceFixture": "departures_pyrmont_doublebay.json journey 0",
+    "syntheticDelta": {
+      "name": "departing scheduled service",
+      "offset": 0,
+      "realtime": false
+    },
+    "now": 1788739200000,
+    "body": {
+      "from": {
+        "id": "2000260",
+        "name": "Pyrmont Bay Wharf"
+      },
+      "to": {
+        "id": "202823",
+        "name": "Double Bay Wharf"
+      },
+      "generatedAt": "2026-09-07T00:00:00.000Z",
+      "at": null,
+      "journeys": [
+        {
+          "departure": {
+            "scheduled": "2026-09-07T00:00:00.000Z",
+            "estimated": null,
+            "platform": "Pyrmont Bay Wharf"
+          },
+          "arrival": {
+            "scheduled": "2026-09-07T01:03:00.000Z",
+            "estimated": null
+          },
+          "line": {
+            "name": "F4",
+            "mode": "ferry"
+          },
+          "destinationHeadsign": "Circular Quay",
+          "stopsAway": null,
+          "cancelled": false,
+          "legs": 2,
+          "legDetail": [
+            {
+              "line": {
+                "name": "F4",
+                "mode": "ferry"
+              },
+              "headsign": "Circular Quay",
+              "from": {
+                "id": "2000260",
+                "name": "Pyrmont Bay Wharf",
+                "platform": "Pyrmont Bay Wharf"
+              },
+              "to": {
+                "id": "200020",
+                "name": "Circular Quay",
+                "platform": "Wharf 4, Side B"
+              },
+              "departure": {
+                "scheduled": "2026-09-07T00:00:00.000Z",
+                "estimated": null
+              },
+              "arrival": {
+                "scheduled": "2026-09-07T00:26:00.000Z",
+                "estimated": null
+              },
+              "cancelled": false
+            },
+            {
+              "line": {
+                "name": "F7",
+                "mode": "ferry"
+              },
+              "headsign": "Double Bay",
+              "from": {
+                "id": "200020",
+                "name": "Circular Quay",
+                "platform": "Wharf 4, Side B"
+              },
+              "to": {
+                "id": "202823",
+                "name": "Double Bay Wharf",
+                "platform": "Double Bay Wharf"
+              },
+              "departure": {
+                "scheduled": "2026-09-07T00:46:00.000Z",
+                "estimated": null
+              },
+              "arrival": {
+                "scheduled": "2026-09-07T01:03:00.000Z",
+                "estimated": null
+              },
+              "cancelled": false
+            }
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "figure": "Now",
+      "provenance": "SCHEDULED",
+      "depTime": "10:00",
+      "arrTime": "11:03",
+      "past": false
+    }
+  },
+  {
+    "name": "rounded hour figure",
+    "sourceFixture": "departures_pyrmont_doublebay.json journey 0",
+    "syntheticDelta": {
+      "name": "rounded hour figure",
+      "offset": 100,
+      "realtime": true
+    },
+    "now": 1788739200000,
+    "body": {
+      "from": {
+        "id": "2000260",
+        "name": "Pyrmont Bay Wharf"
+      },
+      "to": {
+        "id": "202823",
+        "name": "Double Bay Wharf"
+      },
+      "generatedAt": "2026-09-07T00:00:00.000Z",
+      "at": null,
+      "journeys": [
+        {
+          "departure": {
+            "scheduled": "2026-09-07T01:40:00.000Z",
+            "estimated": "2026-09-07T01:40:00.000Z",
+            "platform": "Pyrmont Bay Wharf"
+          },
+          "arrival": {
+            "scheduled": "2026-09-07T02:43:00.000Z",
+            "estimated": "2026-09-07T02:43:00.000Z"
+          },
+          "line": {
+            "name": "F4",
+            "mode": "ferry"
+          },
+          "destinationHeadsign": "Circular Quay",
+          "stopsAway": null,
+          "cancelled": false,
+          "legs": 2,
+          "legDetail": [
+            {
+              "line": {
+                "name": "F4",
+                "mode": "ferry"
+              },
+              "headsign": "Circular Quay",
+              "from": {
+                "id": "2000260",
+                "name": "Pyrmont Bay Wharf",
+                "platform": "Pyrmont Bay Wharf"
+              },
+              "to": {
+                "id": "200020",
+                "name": "Circular Quay",
+                "platform": "Wharf 4, Side B"
+              },
+              "departure": {
+                "scheduled": "2026-09-07T01:40:00.000Z",
+                "estimated": "2026-09-07T01:40:00.000Z"
+              },
+              "arrival": {
+                "scheduled": "2026-09-07T02:06:00.000Z",
+                "estimated": "2026-09-07T02:06:00.000Z"
+              },
+              "cancelled": false
+            },
+            {
+              "line": {
+                "name": "F7",
+                "mode": "ferry"
+              },
+              "headsign": "Double Bay",
+              "from": {
+                "id": "200020",
+                "name": "Circular Quay",
+                "platform": "Wharf 4, Side B"
+              },
+              "to": {
+                "id": "202823",
+                "name": "Double Bay Wharf",
+                "platform": "Double Bay Wharf"
+              },
+              "departure": {
+                "scheduled": "2026-09-07T02:26:00.000Z",
+                "estimated": "2026-09-07T02:26:00.000Z"
+              },
+              "arrival": {
+                "scheduled": "2026-09-07T02:43:00.000Z",
+                "estimated": "2026-09-07T02:43:00.000Z"
+              },
+              "cancelled": false
+            }
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "figure": "2H",
+      "provenance": "",
+      "depTime": "11:40",
+      "arrTime": "12:43",
+      "past": false
+    }
+  },
+  {
+    "name": "expired realtime shows absolute clocks",
+    "sourceFixture": "departures_pyrmont_doublebay.json journey 0",
+    "syntheticDelta": {
+      "name": "expired realtime shows absolute clocks",
+      "offset": 5,
+      "realtime": true,
+      "age": 91
+    },
+    "now": 1788739200000,
+    "body": {
+      "from": {
+        "id": "2000260",
+        "name": "Pyrmont Bay Wharf"
+      },
+      "to": {
+        "id": "202823",
+        "name": "Double Bay Wharf"
+      },
+      "generatedAt": "2026-09-06T23:58:29.000Z",
+      "at": null,
+      "journeys": [
+        {
+          "departure": {
+            "scheduled": "2026-09-07T00:05:00.000Z",
+            "estimated": "2026-09-07T00:05:00.000Z",
+            "platform": "Pyrmont Bay Wharf"
+          },
+          "arrival": {
+            "scheduled": "2026-09-07T01:08:00.000Z",
+            "estimated": "2026-09-07T01:08:00.000Z"
+          },
+          "line": {
+            "name": "F4",
+            "mode": "ferry"
+          },
+          "destinationHeadsign": "Circular Quay",
+          "stopsAway": null,
+          "cancelled": false,
+          "legs": 2,
+          "legDetail": [
+            {
+              "line": {
+                "name": "F4",
+                "mode": "ferry"
+              },
+              "headsign": "Circular Quay",
+              "from": {
+                "id": "2000260",
+                "name": "Pyrmont Bay Wharf",
+                "platform": "Pyrmont Bay Wharf"
+              },
+              "to": {
+                "id": "200020",
+                "name": "Circular Quay",
+                "platform": "Wharf 4, Side B"
+              },
+              "departure": {
+                "scheduled": "2026-09-07T00:05:00.000Z",
+                "estimated": "2026-09-07T00:05:00.000Z"
+              },
+              "arrival": {
+                "scheduled": "2026-09-07T00:31:00.000Z",
+                "estimated": "2026-09-07T00:31:00.000Z"
+              },
+              "cancelled": false
+            },
+            {
+              "line": {
+                "name": "F7",
+                "mode": "ferry"
+              },
+              "headsign": "Double Bay",
+              "from": {
+                "id": "200020",
+                "name": "Circular Quay",
+                "platform": "Wharf 4, Side B"
+              },
+              "to": {
+                "id": "202823",
+                "name": "Double Bay Wharf",
+                "platform": "Double Bay Wharf"
+              },
+              "departure": {
+                "scheduled": "2026-09-07T00:51:00.000Z",
+                "estimated": "2026-09-07T00:51:00.000Z"
+              },
+              "arrival": {
+                "scheduled": "2026-09-07T01:08:00.000Z",
+                "estimated": "2026-09-07T01:08:00.000Z"
+              },
+              "cancelled": false
+            }
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "figure": "",
+      "provenance": "SCHEDULED",
+      "depTime": "10:05",
+      "arrTime": "11:08",
+      "past": false
+    }
+  },
+  {
+    "name": "network failure suppresses countdown",
+    "sourceFixture": "departures_pyrmont_doublebay.json journey 0",
+    "syntheticDelta": {
+      "name": "network failure suppresses countdown",
+      "offset": 5,
+      "realtime": true,
+      "offline": true
+    },
+    "now": 1788739200000,
+    "body": {
+      "from": {
+        "id": "2000260",
+        "name": "Pyrmont Bay Wharf"
+      },
+      "to": {
+        "id": "202823",
+        "name": "Double Bay Wharf"
+      },
+      "generatedAt": "2026-09-07T00:00:00.000Z",
+      "at": null,
+      "journeys": [
+        {
+          "departure": {
+            "scheduled": "2026-09-07T00:05:00.000Z",
+            "estimated": "2026-09-07T00:05:00.000Z",
+            "platform": "Pyrmont Bay Wharf"
+          },
+          "arrival": {
+            "scheduled": "2026-09-07T01:08:00.000Z",
+            "estimated": "2026-09-07T01:08:00.000Z"
+          },
+          "line": {
+            "name": "F4",
+            "mode": "ferry"
+          },
+          "destinationHeadsign": "Circular Quay",
+          "stopsAway": null,
+          "cancelled": false,
+          "legs": 2,
+          "legDetail": [
+            {
+              "line": {
+                "name": "F4",
+                "mode": "ferry"
+              },
+              "headsign": "Circular Quay",
+              "from": {
+                "id": "2000260",
+                "name": "Pyrmont Bay Wharf",
+                "platform": "Pyrmont Bay Wharf"
+              },
+              "to": {
+                "id": "200020",
+                "name": "Circular Quay",
+                "platform": "Wharf 4, Side B"
+              },
+              "departure": {
+                "scheduled": "2026-09-07T00:05:00.000Z",
+                "estimated": "2026-09-07T00:05:00.000Z"
+              },
+              "arrival": {
+                "scheduled": "2026-09-07T00:31:00.000Z",
+                "estimated": "2026-09-07T00:31:00.000Z"
+              },
+              "cancelled": false
+            },
+            {
+              "line": {
+                "name": "F7",
+                "mode": "ferry"
+              },
+              "headsign": "Double Bay",
+              "from": {
+                "id": "200020",
+                "name": "Circular Quay",
+                "platform": "Wharf 4, Side B"
+              },
+              "to": {
+                "id": "202823",
+                "name": "Double Bay Wharf",
+                "platform": "Double Bay Wharf"
+              },
+              "departure": {
+                "scheduled": "2026-09-07T00:51:00.000Z",
+                "estimated": "2026-09-07T00:51:00.000Z"
+              },
+              "arrival": {
+                "scheduled": "2026-09-07T01:08:00.000Z",
+                "estimated": "2026-09-07T01:08:00.000Z"
+              },
+              "cancelled": false
+            }
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "figure": "",
+      "provenance": "SCHEDULED",
+      "depTime": "10:05",
+      "arrTime": "11:08",
+      "past": false
+    }
+  },
+  {
+    "name": "scheduled past register",
+    "sourceFixture": "departures_pyrmont_doublebay.json journey 0",
+    "syntheticDelta": {
+      "name": "scheduled past register",
+      "offset": -12,
+      "realtime": false,
+      "past": true
+    },
+    "now": 1788739200000,
+    "body": {
+      "from": {
+        "id": "2000260",
+        "name": "Pyrmont Bay Wharf"
+      },
+      "to": {
+        "id": "202823",
+        "name": "Double Bay Wharf"
+      },
+      "generatedAt": "2026-09-07T00:00:00.000Z",
+      "at": null,
+      "journeys": [
+        {
+          "departure": {
+            "scheduled": "2026-09-06T23:48:00.000Z",
+            "estimated": null,
+            "platform": "Pyrmont Bay Wharf"
+          },
+          "arrival": {
+            "scheduled": "2026-09-07T00:51:00.000Z",
+            "estimated": null
+          },
+          "line": {
+            "name": "F4",
+            "mode": "ferry"
+          },
+          "destinationHeadsign": "Circular Quay",
+          "stopsAway": null,
+          "cancelled": false,
+          "legs": 2,
+          "legDetail": [
+            {
+              "line": {
+                "name": "F4",
+                "mode": "ferry"
+              },
+              "headsign": "Circular Quay",
+              "from": {
+                "id": "2000260",
+                "name": "Pyrmont Bay Wharf",
+                "platform": "Pyrmont Bay Wharf"
+              },
+              "to": {
+                "id": "200020",
+                "name": "Circular Quay",
+                "platform": "Wharf 4, Side B"
+              },
+              "departure": {
+                "scheduled": "2026-09-06T23:48:00.000Z",
+                "estimated": null
+              },
+              "arrival": {
+                "scheduled": "2026-09-07T00:14:00.000Z",
+                "estimated": null
+              },
+              "cancelled": false
+            },
+            {
+              "line": {
+                "name": "F7",
+                "mode": "ferry"
+              },
+              "headsign": "Double Bay",
+              "from": {
+                "id": "200020",
+                "name": "Circular Quay",
+                "platform": "Wharf 4, Side B"
+              },
+              "to": {
+                "id": "202823",
+                "name": "Double Bay Wharf",
+                "platform": "Double Bay Wharf"
+              },
+              "departure": {
+                "scheduled": "2026-09-07T00:34:00.000Z",
+                "estimated": null
+              },
+              "arrival": {
+                "scheduled": "2026-09-07T00:51:00.000Z",
+                "estimated": null
+              },
+              "cancelled": false
+            }
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "figure": "12",
+      "provenance": "AGO",
+      "depTime": "09:48",
+      "arrTime": "10:51",
+      "past": true
+    }
+  },
+  {
+    "name": "cancelled past service",
+    "sourceFixture": "departures_pyrmont_doublebay.json journey 0",
+    "syntheticDelta": {
+      "name": "cancelled past service",
+      "offset": -12,
+      "realtime": true,
+      "cancelled": true,
+      "past": true
+    },
+    "now": 1788739200000,
+    "body": {
+      "from": {
+        "id": "2000260",
+        "name": "Pyrmont Bay Wharf"
+      },
+      "to": {
+        "id": "202823",
+        "name": "Double Bay Wharf"
+      },
+      "generatedAt": "2026-09-07T00:00:00.000Z",
+      "at": null,
+      "journeys": [
+        {
+          "departure": {
+            "scheduled": "2026-09-06T23:48:00.000Z",
+            "estimated": "2026-09-06T23:48:00.000Z",
+            "platform": "Pyrmont Bay Wharf"
+          },
+          "arrival": {
+            "scheduled": "2026-09-07T00:51:00.000Z",
+            "estimated": "2026-09-07T00:51:00.000Z"
+          },
+          "line": {
+            "name": "F4",
+            "mode": "ferry"
+          },
+          "destinationHeadsign": "Circular Quay",
+          "stopsAway": null,
+          "cancelled": true,
+          "legs": 2,
+          "legDetail": [
+            {
+              "line": {
+                "name": "F4",
+                "mode": "ferry"
+              },
+              "headsign": "Circular Quay",
+              "from": {
+                "id": "2000260",
+                "name": "Pyrmont Bay Wharf",
+                "platform": "Pyrmont Bay Wharf"
+              },
+              "to": {
+                "id": "200020",
+                "name": "Circular Quay",
+                "platform": "Wharf 4, Side B"
+              },
+              "departure": {
+                "scheduled": "2026-09-06T23:48:00.000Z",
+                "estimated": "2026-09-06T23:48:00.000Z"
+              },
+              "arrival": {
+                "scheduled": "2026-09-07T00:14:00.000Z",
+                "estimated": "2026-09-07T00:14:00.000Z"
+              },
+              "cancelled": true
+            },
+            {
+              "line": {
+                "name": "F7",
+                "mode": "ferry"
+              },
+              "headsign": "Double Bay",
+              "from": {
+                "id": "200020",
+                "name": "Circular Quay",
+                "platform": "Wharf 4, Side B"
+              },
+              "to": {
+                "id": "202823",
+                "name": "Double Bay Wharf",
+                "platform": "Double Bay Wharf"
+              },
+              "departure": {
+                "scheduled": "2026-09-07T00:34:00.000Z",
+                "estimated": "2026-09-07T00:34:00.000Z"
+              },
+              "arrival": {
+                "scheduled": "2026-09-07T00:51:00.000Z",
+                "estimated": "2026-09-07T00:51:00.000Z"
+              },
+              "cancelled": true
+            }
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "figure": "—",
+      "provenance": "CANCELLED",
+      "depTime": "09:48",
+      "arrTime": "10:51",
+      "past": true
+    }
+  }
+]

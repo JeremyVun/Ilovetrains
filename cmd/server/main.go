@@ -7,6 +7,10 @@
 //	PORT            listen port, default 8080
 //	WEB_DIR         static client directory, default ./web (optional)
 //	TFNSW_BASE_URL  upstream base, default the TfNSW gateway
+//	TFNSW_FEED_BASE_URL schedule/realtime gateway, default TfNSW
+//	NATIVE_DATA_DIR writable compiled timetable state, default ./native-data/runtime
+//	NATIVE_BOOTSTRAP_DIR packaged initial timetable, default ./native-data/bootstrap
+//	TIMETABLE_COMPILER compiler script, default ./tools/compile-timetable.py
 //	MIN_CONNECTION_TIME minimum planned transfer, default 3m (Go duration)
 //	MAX_CONNECTION_TIME longest planned transfer offered while a later
 //	                    departure arrives sooner than that wait ends,
@@ -25,6 +29,7 @@ import (
 	"time"
 
 	"trains/internal/api"
+	"trains/internal/native"
 	"trains/internal/tfnsw"
 )
 
@@ -72,10 +77,27 @@ func run() error {
 
 	webDir := envOr("WEB_DIR", "./web")
 	addr := net.JoinHostPort("", envOr("PORT", "8080"))
+	feedClient, err := native.NewHTTPFeedClient(apiKey, os.Getenv("TFNSW_FEED_BASE_URL"), nil)
+	if err != nil {
+		return err
+	}
+	nativeService, err := native.NewService(native.Config{
+		Fetcher:      feedClient,
+		DataDir:      envOr("NATIVE_DATA_DIR", "./native-data/runtime"),
+		BootstrapDir: envOr("NATIVE_BOOTSTRAP_DIR", "./native-data/bootstrap"),
+		CompilerPath: envOr("TIMETABLE_COMPILER", "./tools/compile-timetable.py"),
+		Logf:         log.Printf,
+	})
+	if err != nil {
+		return err
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	go nativeService.Run(ctx)
 
 	server := &http.Server{
 		Addr:              addr,
-		Handler:           withAccessLog(api.New(client, webDir).Handler()),
+		Handler:           withAccessLog(api.New(client, webDir, api.WithNative(nativeService)).Handler()),
 		ReadHeaderTimeout: readHeaderTimeout,
 		WriteTimeout:      writeTimeout,
 		IdleTimeout:       idleTimeout,
@@ -89,9 +111,6 @@ func run() error {
 		}
 		close(listenErr)
 	}()
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	select {
 	case err := <-listenErr:

@@ -1,9 +1,17 @@
 **
 !Dockerfile
 !go.mod
+!go.sum
 !cmd/
 !cmd/**
 !internal/
 !internal/**
 !web/
 !web/**
+!native-data/
+!native-data/bootstrap/
+!native-data/bootstrap/**
+!tools/
+!tools/compile-timetable.py
+!tools/fixtures/
+!tools/fixtures/ferry_stop_mapping.json
