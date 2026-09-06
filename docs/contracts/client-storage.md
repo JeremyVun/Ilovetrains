@@ -1,8 +1,10 @@
 # Contract: Client-side storage & trip prediction
 
-All personal state lives in `localStorage` on the device. Nothing here is
-ever sent to the server. This is a product guarantee, not an implementation
-detail — see PROJECT.md principles.
+All personal state lives in `localStorage` on the device and the document is
+never uploaded. A departures request carries only its station pair and current
+mode allow-list; that request is stateless and creates no server-side profile.
+This is a product guarantee, not an implementation detail — see PROJECT.md
+principles.
 
 ## localStorage schema
 
@@ -54,6 +56,13 @@ read/write atomic and migration simple):
   "lastViewed": {"tripId": "uuid", "direction": "forward"},
   "locationAsk": {"declinedAt": "2026-09-01T09:21:00+10:00"},
   "telemetry": {"opens": 12, "bucket": 37},
+  "preferences": {
+    "appearance": "system",
+    "useLocation": true,
+    "homeOverride": {"id": "213820", "name": "Rhodes",
+                     "location": {"lat": -33.8308, "lon": 151.0879}},
+    "enabledModes": ["train", "metro", "ferry"]
+  },
   "cache": {
     "<from>-<to>": {"fetchedAt": "...", "body": {"…": "last departures response"}}
   }
@@ -69,8 +78,28 @@ read/write atomic and migration simple):
 - `trips` is capped at 10. Adding an eleventh evicts the least recently viewed
   saved trip (creation time breaks a never-viewed tie). This is the web
   management policy; deletion becomes swipe-to-delete in the native app.
-- `cache` holds the last successful departures response per pair, used for
-  instant first paint and offline; capped at saved pairs only.
+- `preferences` is optional. Omitted fields preserve the existing behaviour:
+  System appearance, location enabled, no manual home and all served modes
+  enabled. `appearance` accepts only `system`, `light` and `dark`;
+  `useLocation` accepts only a boolean; a malformed `homeOverride` drops; and
+  `enabledModes` keeps only `train`, `metro` and `ferry` in that stable order.
+  Missing or non-array modes means all three, while an explicit `[]` remains
+  all-off. The schema stays version 1. The preference document never leaves
+  the device; the selected mode allow-list is sent only with the stateless
+  departures query that it shapes.
+- `cache` holds the last successful raw departures response per saved directed
+  pair and served-mode set, used for instant first paint and offline. All three
+  modes retain the legacy `<from>-<to>` key; each subset has the canonical
+  `|train,metro` suffix and all-off is `|`. There are at most eight mode sets
+  per directed saved pair. Deleting a trip removes every one of its variants.
+  Filtering creates a display copy and never rewrites the raw cached body.
+  Cache entries optionally retain `serverStale: true` from `X-Data-Stale` so
+  navigation cannot promote a degraded response to live. Missing means false.
+- A displayed journey is eligible only when every service leg is enabled. Read
+  `legDetail[].line.mode` when available and otherwise the top-level line;
+  walking does not count. A train+ferry journey therefore needs both modes.
+  A saved pair has no inherent service mode: an old ferry result never proves
+  that the pair lacks a train alternative.
 - `searches.from` and `searches.to` each hold the three most recently selected
   stations for that field, newest first and deduplicated by stop id. They store
   useful station answers, not raw keystrokes. Add-trip shows them before a
@@ -82,7 +111,9 @@ read/write atomic and migration simple):
 - `lastOpen` is the header's previous unfocused answer: when, which station the
   phone was at (tier 1 only, or null), which trip and direction, and a verbatim
   snapshot of the lead journey. It is what makes inferred travel mode possible
-  after the service has left the live board. Deleting the trip deletes it.
+  after the service has left the live board. Preference-caused recomputation
+  does not rewrite it; the next independent refresh resumes normal recording.
+  Deleting the trip deletes it.
 - `locationAsk` is optional and holds only the time the user last declined the
   location panel. Absence means never declined; a malformed value is dropped,
   not repaired.
@@ -176,11 +207,18 @@ The document may contain an optional `focus` field — "I'm on this train":
   delays keep flowing). This distinguishes routes sharing the same first
   train but connecting to different ferries. Unmatched (departed)
   keeps the last snapshot.
+- Service preferences never stop the followed journey's refresh. Its separate
+  all-mode request uses the followed pair; after departure it asks for the
+  departure window so upstream can still match the service. Focus freshness
+  comes from a matching response for that pair (or its matching raw cache),
+  never from an unrelated suggestion request. No matching source means stale
+  directions. An eligible cancellation replacement uses its own source's age
+  and degradation state, and still respects the current service allow-list.
 - At most one focused journey. Focusing another replaces it.
 - Deleting the trip deletes its focus, like its history and its cache: nothing
   outlives the trip it describes.
 - The auto-clear is a WRITE, so it happens where writes happen — on the next
-  successful refresh, not during a render. An expired focus stops being drawn
+  refresh, not during a render. An expired focus stops being drawn
   immediately either way; rendering never touches storage, because the client
   paints once with the real clock before anything can pin it.
 
@@ -344,6 +382,12 @@ silent fix when home opens, without a prompt. Wherever trips are
 listed (switcher, trip management), they are ordered by current score with the
 predicted one visually highlighted at the top.
 
+`preferences.useLocation: false` suppresses every browser fix and permission
+prompt, even when permission was previously granted. Pure prediction and
+location-first selection ignore a supplied fix in that state. Permission status
+may still be read for the Settings row, but no coordinate is obtained; turning
+the preference off clears only the in-memory fix.
+
 ## Home, from the daily first-open votes
 
 Each day, the first home open with a valid fix and a `here` casts one vote for
@@ -354,6 +398,11 @@ that station into `homeVotes`. Home is then, on every read:
 - otherwise the first saved trip's origin at confidence 0, which claims
   nothing;
 - otherwise nothing at all, when no trip is saved either.
+
+`homeOverride`, when valid, takes precedence for home selection and returns
+`{station, confidence: 0, source: "manual"}`. It does not stop daily vote
+calculation: `automaticHomeOf(doc)` remains the vote/fallback result Settings
+shows as Automatic, and removing the override immediately restores it.
 
 Seven days of votes is the whole memory, so home re-infers itself silently when
 someone moves: no offer, no confirmation, no stored copy to go stale. The

@@ -125,6 +125,26 @@ test('cache holds saved pairs only, in both directions', () => {
   assert.deepEqual(Object.keys(pruned.cache), ['200070-215020']);
 });
 
+test('cache variants use a canonical mode suffix and leave with their saved pair', () => {
+  const pair = ['200060', '215020'];
+  assert.equal(cacheKey(...pair), '200060-215020');
+  assert.equal(cacheKey(...pair, ['ferry', 'train']), '200060-215020|train,ferry');
+  assert.equal(cacheKey(...pair, []), '200060-215020|');
+
+  let doc = docWithTrips();
+  for (let mask = 0; mask < 8; mask++) {
+    const modes = ['train', 'metro', 'ferry'].filter((_, index) => mask & (1 << index));
+    doc = putCache(doc, cacheKey(...pair, modes), { mask }, Date.now());
+  }
+  doc = putCache(doc, cacheKey('999', '888', ['train']), { stray: true }, Date.now());
+  assert.equal(Object.keys(doc.cache).length, 8, 'all and only the eight known combinations survive');
+
+  const withOtherPair = putCache(doc, cacheKey('200070', '215020', ['metro']), { other: true }, Date.now());
+  withOtherPair.cache['200060-215020|ferry,train'] = { fetchedAt: new Date().toISOString(), body: {} };
+  const after = removeTrip(withOtherPair, 't1');
+  assert.deepEqual(Object.keys(after.cache), ['200070-215020|metro']);
+});
+
 test('reverse means to→from', () => {
   assert.deepEqual(leg(T1, 'forward'), { from: CENTRAL, to: PARRA });
   assert.deepEqual(leg(T1, 'reverse'), { from: PARRA, to: CENTRAL });
@@ -363,4 +383,14 @@ test('deleting a trip takes the previous open that described it', () => {
 
   assert.equal(removeTrip(doc, 't1').lastOpen, null);
   assert.deepEqual(removeTrip(doc, 't2').lastOpen, doc.lastOpen);
+});
+
+test('cached source-stale provenance survives storage and clears only on a fresh response', () => {
+  const doc = { ...emptyDoc(), trips: [{ id: 't', from: { id: 'a', name: 'A' }, to: { id: 'b', name: 'B' } }] };
+  const key = cacheKey('a', 'b', ['train']);
+  const body = { generatedAt: '2026-09-06T09:00:00Z', journeys: [] };
+  const degraded = putCache(doc, key, body, Date.now(), { serverStale: true });
+  assert.equal(parseDoc(serializeDoc(degraded)).cache[key].serverStale, true);
+  const recovered = putCache(degraded, key, body, Date.now());
+  assert.equal(recovered.cache[key].serverStale, undefined);
 });

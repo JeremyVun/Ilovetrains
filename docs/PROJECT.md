@@ -126,8 +126,9 @@ moves through are binding in `docs/contracts/ui.md`.
   trip and direction, from-station above departure time, to-station above
   arrival time, the journey bar, the receipt) above the saved-trip rows
   (stacked line colours + `T` badges, device-only facts such as distance and
-  last ridden, never a live fetch per row). The only management affordance
-  is `+ New trip`; the web list is a ten-trip LRU.
+  last ridden, never a live fetch per row). The footer pairs `+ New trip`
+  with cog + `Settings`; the web list is a ten-trip LRU. Settings groups
+  location, home, services, appearance, feedback and release version.
 - **Board** (`#/board`) is a now-anchored timeline for one trip and
   direction. It lands at now, scrolls up into the past (past rows are future
   rows, dimmed, counting up with `AGO`), rows rank by departure and carry
@@ -159,7 +160,7 @@ The measured geometry that resulted is recorded as invariants in
 
 `docs/contracts/ui.md` is authoritative for current UI behavior. The
 authoritative comps are always at `assets/comps/latest/`: the current
-calibration exemplars for the board, home and directions header. Build
+calibration exemplars for the board, home, directions header and Settings. Build
 against those images and judge every affected screen side-by-side with them.
 
 It is authoritative, not final: it should be iterated on wherever an
@@ -246,7 +247,8 @@ Browser (localStorage: trips, history, rides, focus, home, searches, cache)
   baked in.
 - **Personalisation is client-side only.** The load-bearing decision:
   because the server holds no user state, every API response is keyed only
-  by station pair (and time bucket) and is CDN-cacheable across all users.
+  by station pair, served-mode set and time bucket, and is CDN-cacheable
+  across all users.
   Adding server-side user state needs an owner ruling.
 - **Home is the open state, the smart header is the answer** (2026-09-01,
   superseding "the departure board is the screen"). The board is one tap

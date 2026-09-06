@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"trains/internal/tfnsw"
 )
 
 // stopIDPattern matches TfNSW global stop IDs: "200060" (Central), "2155384"
@@ -36,6 +38,30 @@ func journeyLimit(value string) (int, error) {
 		return 0, badRequest(fmt.Sprintf("limit must be between 1 and %d", maxLimit))
 	}
 	return limit, nil
+}
+
+func journeyModes(values []string) ([]tfnsw.Mode, error) {
+	if values == nil {
+		return tfnsw.AllModes(), nil
+	}
+	if len(values) == 1 && strings.TrimSpace(values[0]) == "" {
+		return []tfnsw.Mode{}, nil
+	}
+	var modes []tfnsw.Mode
+	for _, value := range values {
+		for _, part := range strings.Split(value, ",") {
+			mode := strings.TrimSpace(part)
+			if mode == "" {
+				return nil, badRequest("modes must be a comma-separated subset of train, metro, ferry")
+			}
+			modes = append(modes, tfnsw.Mode(mode))
+		}
+	}
+	canonical, err := tfnsw.CanonicalModes(modes)
+	if err != nil {
+		return nil, badRequest("modes must be a comma-separated subset of train, metro, ferry")
+	}
+	return canonical, nil
 }
 
 // departAt parses the optional `at` parameter into the bucket it falls in. A

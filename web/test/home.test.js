@@ -190,6 +190,51 @@ test('a focused journey cancelled before it leaves shows the next train', () => 
   assert.ok(html.includes('data-row-status'));
 });
 
+test('a focused cancellation can take an eligible replacement from its independent source', () => {
+  const journeys = transferJourneys();
+  cancelLeg(journeys[0], 0);
+  const model = homeModel(homeDoc(journeys[0]), HOME_SELECTION,
+    transferBody({ journeys: [] }), at('09:21'), {
+      focusBody: transferBody({ journeys }),
+      candidateSource: { stale: false, freshness: 'Live', dot: 'live' },
+      focusSource: { stale: false, freshness: 'Updated 8s ago', dot: 'stale' }
+    });
+
+  assert.equal(model.directions.depTime, '09:39');
+  assert.equal(model.freshness, 'Updated 8s ago');
+  assert.equal(model.dot, 'stale');
+});
+
+test('a focus-source replacement still obeys the enabled service modes', () => {
+  const journeys = transferJourneys();
+  cancelLeg(journeys[0], 0);
+  for (const leg of journeys[1].legDetail) leg.line.mode = 'ferry';
+  journeys[1].line.mode = 'ferry';
+  const doc = homeDoc(journeys[0]);
+  doc.preferences = { appearance: 'system', useLocation: true, enabledModes: ['train'] };
+  const model = homeModel(doc, HOME_SELECTION, transferBody({ journeys: [] }), at('09:21'), {
+    focusBody: transferBody({ journeys: journeys.slice(0, 2) }),
+    focusSource: { stale: false, freshness: 'Live', dot: 'live' }
+  });
+
+  assert.equal(model.directions.depTime, '09:24');
+});
+
+test('a stale candidate replacement does not inherit fresh focus provenance', () => {
+  const journeys = transferJourneys();
+  cancelLeg(journeys[0], 0);
+  const model = homeModel(homeDoc(journeys[0]), HOME_SELECTION,
+    transferBody({ journeys }), at('09:21'), {
+      candidateSource: { stale: true, freshness: 'Offline', dot: 'stale' },
+      focusBody: transferBody({ journeys: [journeys[0]] }),
+      focusSource: { stale: false, freshness: 'Live', dot: 'live' }
+    });
+
+  assert.equal(model.directions.depTime, '09:39');
+  assert.equal(model.directions.figure, '');
+  assert.deepEqual([model.freshness, model.dot], ['Offline', 'stale']);
+});
+
 test('a focused cancellation with nothing left to offer keeps its own journey', () => {
   const journeys = transferJourneys();
   cancelLeg(journeys[0], 1);

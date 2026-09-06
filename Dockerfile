@@ -11,12 +11,18 @@ COPY internal ./internal
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/trainsd ./cmd/server
 
 FROM alpine:3.22 AS runtime
+ARG GIT_REVISION=dev
 # tzdata: the server renders Australia/Sydney offsets (time.LoadLocation).
 # ca-certificates: TLS to api.transport.nsw.gov.au. wget (busybox) serves the
 # compose healthcheck.
 RUN apk add --no-cache tzdata ca-certificates
 COPY --from=build /out/trainsd /usr/local/bin/trainsd
 COPY web /app/web
+RUN case "$GIT_REVISION" in \
+      dev) ;; \
+      *) printf '%s\n' "$GIT_REVISION" | grep -Eq '^[0-9a-f]{7,40}$' || exit 1 ;; \
+    esac \
+    && printf "export const VERSION = '%s';\n" "$GIT_REVISION" > /app/web/js/version.js
 ENV WEB_DIR=/app/web
 USER nobody
 ENTRYPOINT ["trainsd"]

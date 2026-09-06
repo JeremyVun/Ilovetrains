@@ -44,15 +44,18 @@ type fakeUpstream struct {
 	departureCalls atomic.Int32
 	lastLimit      atomic.Int32
 
-	mu     sync.Mutex
-	lastAt time.Time
+	mu        sync.Mutex
+	lastAt    time.Time
+	lastModes []tfnsw.Mode
 }
 
-func (f *fakeUpstream) Departures(_ context.Context, from, to string, limit int, at time.Time) (*tfnsw.DeparturesResponse, error) {
+func (f *fakeUpstream) DeparturesWithOptions(_ context.Context, from, to string, limit int, at time.Time,
+	options tfnsw.DeparturesOptions) (*tfnsw.DeparturesResponse, error) {
 	call := f.departureCalls.Add(1)
 	f.lastLimit.Store(int32(limit))
 	f.mu.Lock()
 	f.lastAt = at
+	f.lastModes = append(f.lastModes[:0], options.Modes...)
 	f.mu.Unlock()
 	if f.err != nil {
 		return nil, f.err
@@ -75,6 +78,12 @@ func (f *fakeUpstream) at() time.Time {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.lastAt
+}
+
+func (f *fakeUpstream) modes() []tfnsw.Mode {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]tfnsw.Mode(nil), f.lastModes...)
 }
 
 func sampleDepartures() *tfnsw.DeparturesResponse {
@@ -218,6 +227,57 @@ func TestDeparturesRepeatQueryHitsCache(t *testing.T) {
 	}
 }
 
+func TestDeparturesModesDefaultToAllAndShareCanonicalCacheKey(t *testing.T) {
+	upstream := &fakeUpstream{departures: sampleDepartures()}
+	handler := newTestServer(t, upstream)
+	for _, target := range []string{
+		"/api/v1/departures?from=200060&to=215020",
+		"/api/v1/departures?from=200060&to=215020&modes=train,metro,ferry",
+		"/api/v1/departures?from=200060&to=215020&modes=metro,train,metro,ferry",
+	} {
+		if got := get(t, handler, target); got.Code != http.StatusOK {
+			t.Fatalf("%s: status = %d, want 200: %s", target, got.Code, got.Body)
+		}
+	}
+	if calls := upstream.departureCalls.Load(); calls != 1 {
+		t.Errorf("upstream calls = %d, want 1 for the canonical all-modes key", calls)
+	}
+	if got := fmt.Sprint(upstream.modes()); got != "[train metro ferry]" {
+		t.Errorf("modes = %s, want [train metro ferry]", got)
+	}
+
+	get(t, handler, "/api/v1/departures?from=200060&to=215020&modes=train")
+	if calls := upstream.departureCalls.Load(); calls != 2 {
+		t.Errorf("upstream calls = %d, want a separate train-only cache entry", calls)
+	}
+	if got := fmt.Sprint(upstream.modes()); got != "[train]" {
+		t.Errorf("modes = %s, want [train]", got)
+	}
+}
+
+func TestDeparturesModesAllOffSkipsUpstream(t *testing.T) {
+	upstream := &fakeUpstream{departures: sampleDepartures()}
+	_, handler := pinnedServer(t, upstream)
+
+	got := get(t, handler, "/api/v1/departures?from=200060&to=215020&modes=")
+	if got.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", got.Code, got.Body)
+	}
+	if calls := upstream.departureCalls.Load(); calls != 0 {
+		t.Errorf("upstream calls = %d, want 0", calls)
+	}
+	var body tfnsw.DeparturesResponse
+	if err := json.Unmarshal(got.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decoding body: %v", err)
+	}
+	if body.From.ID != "200060" || body.To.ID != "215020" || len(body.Journeys) != 0 {
+		t.Errorf("all-off response = %+v", body)
+	}
+	if body.GeneratedAt != "2026-09-01T17:52:00+10:00" {
+		t.Errorf("generatedAt = %q, want the locally generated answer time", body.GeneratedAt)
+	}
+}
+
 func TestDeparturesBadRequests(t *testing.T) {
 	handler := newTestServer(t, &fakeUpstream{departures: sampleDepartures()})
 	cases := []struct{ name, target string }{
@@ -229,6 +289,9 @@ func TestDeparturesBadRequests(t *testing.T) {
 		{"limit not a number", "/api/v1/departures?from=200060&to=215020&limit=lots"},
 		{"limit too large", "/api/v1/departures?from=200060&to=215020&limit=11"},
 		{"limit zero", "/api/v1/departures?from=200060&to=215020&limit=0"},
+		{"invalid mode", "/api/v1/departures?from=200060&to=215020&modes=bus"},
+		{"mixed invalid modes", "/api/v1/departures?from=200060&to=215020&modes=train,bus"},
+		{"empty mode inside list", "/api/v1/departures?from=200060&to=215020&modes=train,"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

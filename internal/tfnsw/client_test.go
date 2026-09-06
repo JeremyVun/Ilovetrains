@@ -81,6 +81,58 @@ func TestClientSendsAuthAndRequiredTripParams(t *testing.T) {
 	}
 }
 
+func TestClientModeExclusions(t *testing.T) {
+	cases := []struct {
+		name     string
+		modes    []Mode
+		excluded map[string]bool
+	}{
+		{"all", nil, map[string]bool{"4": true, "5": true, "7": true, "10": true, "11": true}},
+		{"train", []Mode{ModeTrain}, map[string]bool{"2": true, "4": true, "5": true, "7": true, "9": true, "10": true, "11": true}},
+		{"metro", []Mode{ModeMetro}, map[string]bool{"1": true, "4": true, "5": true, "7": true, "9": true, "10": true, "11": true}},
+		{"ferry", []Mode{ModeFerry}, map[string]bool{"1": true, "2": true, "4": true, "5": true, "7": true, "10": true, "11": true}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var got url.Values
+			client, _ := testClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				got = r.URL.Query()
+				_, _ = w.Write([]byte(`{"journeys":[]}`))
+			}))
+			if _, err := client.DeparturesWithOptions(context.Background(), "200060", "215020", 6, time.Time{},
+				DeparturesOptions{Modes: tc.modes}); err != nil {
+				t.Fatalf("DeparturesWithOptions: %v", err)
+			}
+			for _, class := range []string{"1", "2", "4", "5", "7", "9", "10", "11"} {
+				if gotExcluded := got.Get("exclMOT_"+class) == "1"; gotExcluded != tc.excluded[class] {
+					t.Errorf("exclMOT_%s = %t, want %t", class, gotExcluded, tc.excluded[class])
+				}
+			}
+		})
+	}
+}
+
+func TestClientAllOffSkipsTripPlanner(t *testing.T) {
+	var calls atomic.Int32
+	client, _ := testClient(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		_, _ = w.Write([]byte(`{"journeys":[]}`))
+	}))
+	client.now = func() time.Time { return mustParse(t, "2026-09-01T07:52:00Z") }
+
+	resp, err := client.DeparturesWithOptions(context.Background(), "200060", "215020", 6, time.Time{},
+		DeparturesOptions{Modes: []Mode{}})
+	if err != nil {
+		t.Fatalf("DeparturesWithOptions: %v", err)
+	}
+	if calls.Load() != 0 {
+		t.Errorf("upstream calls = %d, want 0", calls.Load())
+	}
+	if len(resp.Journeys) != 0 || resp.GeneratedAt != "2026-09-01T17:52:00+10:00" {
+		t.Errorf("all-off response = %+v", resp)
+	}
+}
+
 func TestClientAsksUpstreamForThePastWindow(t *testing.T) {
 	// `at` must reach upstream as itdDate/itdTime — a past window that silently
 	// queried now would return the live board and look plausible while being

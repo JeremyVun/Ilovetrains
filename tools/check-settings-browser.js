@@ -1,0 +1,586 @@
+#!/usr/bin/env node
+
+/*
+ * Usage: node tools/check-settings-browser.js --url http://localhost:8197
+ *        [--frames assets/comps/latest]
+ *
+ * Drives the built settings UI through a private Chromium/CDP port. All
+ * departures and feedback requests are replaced in the page; this never sends
+ * feedback or depends on TfNSW.
+ */
+
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const argv = process.argv.slice(2);
+const value = (flag, fallback = null) => {
+  const at = argv.indexOf(flag);
+  return at >= 0 ? argv[at + 1] : fallback;
+};
+const baseURL = new URL(value('--url', 'http://localhost:8197'));
+const framesDir = value('--frames');
+const firstPort = Number.parseInt(process.env.CDP_PORT || '9571', 10);
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'trains-settings-'));
+
+if (!['localhost', '127.0.0.1'].includes(baseURL.hostname)) {
+  throw new Error('--url must use a private localhost server');
+}
+
+const from = { id: '213820', name: 'Rhodes Station', location: { lat: -33.830834, lon: 151.087868 } };
+const to = { id: '202210', name: 'Bondi Junction Station', location: { lat: -33.891819, lon: 151.247455 } };
+const longHome = {
+  id: '10101100',
+  name: 'International Airport Station',
+  modes: ['train'],
+  location: { lat: -33.934968, lon: 151.165958 }
+};
+const nowMs = Date.now();
+
+function journey(id, mode = 'train', delayMinutes = 0) {
+  const scheduled = new Date(nowMs + 20 * 60_000).toISOString();
+  const estimated = new Date(nowMs + (20 + delayMinutes) * 60_000).toISOString();
+  const arrival = new Date(nowMs + (55 + delayMinutes) * 60_000).toISOString();
+  const lineName = mode === 'metro' ? 'M1' : mode === 'ferry' ? 'F3' : id;
+  return {
+    id,
+    departure: { scheduled, estimated },
+    arrival: { scheduled: new Date(nowMs + 55 * 60_000).toISOString(), estimated: arrival },
+    line: { name: lineName, mode },
+    legDetail: [{
+      from: { ...from, platform: mode === 'ferry' ? 'B' : '1' },
+      to: { ...to, platform: mode === 'ferry' ? 'A' : '2' },
+      departure: { scheduled, estimated },
+      arrival: { scheduled: new Date(nowMs + 55 * 60_000).toISOString(), estimated: arrival },
+      line: { name: lineName, mode }
+    }]
+  };
+}
+
+const train = journey('T9');
+const metro = journey('metro', 'metro');
+const ferry = journey('ferry', 'ferry');
+const body = { generatedAt: new Date(nowMs).toISOString(), journeys: [train, metro, ferry] };
+
+function seed(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    trips: [{ id: 't1', from, to, createdAt: new Date(nowMs - 86_400_000).toISOString() }],
+    history: [], rides: [], searches: { from: [], to: [] },
+    homeVotes: [
+      { day: '2026-09-01', station: from },
+      { day: '2026-09-02', station: from },
+      { day: '2026-09-03', station: from }
+    ],
+    lastOpen: null, lastViewed: { tripId: 't1', direction: 'forward' },
+    cache: { [`${from.id}-${to.id}`]: { fetchedAt: body.generatedAt, body } },
+    ...overrides
+  };
+}
+
+function browserPrelude() {
+  return `
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const assert = (value, message) => { if (!value) throw new Error(message); };
+    const waitFor = async (read, message) => {
+      for (let i = 0; i < 80; i += 1) { const answer = read(); if (answer) return answer; await sleep(25); }
+      throw new Error(message);
+    };
+    const t = window.__trains;
+  `;
+}
+
+function geometryScript(extra = '') {
+  return `(async () => {
+    ${browserPrelude()}
+    history.replaceState(null, '', '#/settings');
+    t.route();
+    await waitFor(() => document.querySelector('.st-service-set'), 'settings did not render');
+    await sleep(80);
+    const labels = [...document.querySelectorAll('.st-mode')].map((el) => el.textContent.trim());
+    assert(labels.length === 4, 'expected four service buttons');
+    assert(document.querySelectorAll('.st-theme[role="radio"]').length === 3, 'expected three appearance radios');
+    assert(document.querySelector('.st-mode[data-mode="bus"]').disabled, 'buses must be disabled');
+    for (const el of document.querySelectorAll('button,input,textarea')) {
+      const rect = el.getBoundingClientRect();
+      assert(rect.height >= 44, 'short target ' + (el.dataset.act || el.tagName) + ': ' + rect.height);
+      assert(rect.left >= -0.5 && rect.right <= document.documentElement.clientWidth + 0.5,
+        'target outside viewport: ' + (el.dataset.act || el.tagName));
+    }
+    const scroller = document.querySelector('[data-scroller]');
+    scroller.scrollTop = scroller.scrollHeight;
+    await sleep(30);
+    const version = [...document.querySelectorAll('.st-secondary-row')].find((el) => el.textContent.includes('Version'));
+    const versionBottom = version && version.getBoundingClientRect().bottom;
+    const scrollerBottom = scroller.getBoundingClientRect().bottom;
+    assert(version && versionBottom <= scrollerBottom + 1,
+      'version cannot be reached in the settings scroller: ' + JSON.stringify({
+        versionBottom, scrollerBottom, scrollTop: scroller.scrollTop,
+        scrollHeight: scroller.scrollHeight, clientHeight: scroller.clientHeight
+      }));
+    scroller.scrollTop = 0;
+    ${extra}
+  })()`;
+}
+
+function raceScript() {
+  const stale = { generatedAt: new Date(nowMs + 1_000).toISOString(), journeys: [journey('STALE')] };
+  const current = { generatedAt: new Date(nowMs + 2_000).toISOString(), journeys: [journey('CURRENT')] };
+  const focusJourney = journey('T9', 'train', 7);
+  focusJourney.id = 'FOCUS';
+  return `(async () => {
+    ${browserPrelude()}
+    const pending = [];
+    window.fetch = (input, init = {}) => {
+      const url = String(input);
+      if (!url.startsWith('/api/v1/departures?')) return Promise.reject(new Error('unexpected request ' + url));
+      return new Promise((resolve, reject) => pending.push({ url, init, resolve, reject }));
+    };
+    history.replaceState(null, '', '#/settings');
+    t.route();
+    await waitFor(() => document.querySelector('.st-service-set'), 'settings did not render');
+    pending.length = 0;
+
+    t.setPreferences({ enabledModes: ['train'] });
+    await waitFor(() => pending.length === 1, 'first train request did not start');
+    t.setPreferences({ enabledModes: [] });
+    await sleep(30);
+    assert(pending.length === 1, 'all-off made a suggestion request');
+    t.setPreferences({ enabledModes: ['train'] });
+    await waitFor(() => pending.length === 2, 'replacement train request did not start');
+    pending[0].resolve(new Response(${JSON.stringify(JSON.stringify(stale))}, { status: 200 }));
+    await sleep(30);
+    assert(!(t.state.body.journeys || []).some((item) => item.id === 'STALE'),
+      'late same-mode success replaced the current generation');
+    pending[1].resolve(new Response(${JSON.stringify(JSON.stringify(current))}, { status: 200 }));
+    await waitFor(() => (t.state.body.journeys || []).some((item) => item.id === 'CURRENT'),
+      'current replacement did not paint');
+
+    t.setPreferences({ enabledModes: ['metro'] });
+    await waitFor(() => pending.length === 3, 'metro request did not start');
+    t.setPreferences({ enabledModes: ['train'] });
+    await waitFor(() => pending.length === 4, 'new train request did not start');
+    pending[3].resolve(new Response(${JSON.stringify(JSON.stringify(current))}, { status: 200 }));
+    await waitFor(() => (t.state.body.journeys || []).some((item) => item.id === 'CURRENT'),
+      'new train response did not settle');
+    pending[2].reject(new Error('late old failure'));
+    await sleep(40);
+    assert(t.state.offline === false, 'late failure marked current data offline');
+
+    const legacy = ${JSON.stringify(body)};
+    t.state.doc.cache[${JSON.stringify(`${from.id}-${to.id}`)}] = { fetchedAt: legacy.generatedAt, body: legacy };
+    t.setPreferences({ enabledModes: ['train'] });
+    t.state.body = legacy;
+    t.setPreferences({ enabledModes: ['metro'] });
+    assert(!(t.state.body.journeys || []).some((item) => item.line.mode !== 'metro'),
+      'excluded cached fallback remained visible');
+    const oldRequest = pending[pending.length - 1];
+    oldRequest.reject(new Error('replacement unavailable'));
+    await sleep(40);
+    assert(!(t.state.body.journeys || []).some((item) => item.line.mode !== 'metro'),
+      'failed replacement restored an excluded cached journey');
+
+    t.state.doc.focus = {
+      tripId: 't1', direction: 'forward', focusedAt: ${JSON.stringify(train.departure.scheduled)},
+      by: 'focus', journey: ${JSON.stringify(train)}
+    };
+    pending.length = 0;
+    t.setPreferences({ enabledModes: [] });
+    await waitFor(() => pending.some((item) => new URL(item.url, location.href).searchParams.get('modes') === 'train,metro,ferry'),
+      'all-off did not independently refresh the followed journey');
+    assert(!pending.some((item) => new URL(item.url, location.href).searchParams.get('modes') === ''),
+      'all-off issued a suggestion request');
+    const focusRequest = pending.find((item) => new URL(item.url, location.href).searchParams.get('modes') === 'train,metro,ferry');
+    const focusBody = { generatedAt: new Date().toISOString(), journeys: [${JSON.stringify(focusJourney)}] };
+    focusRequest.resolve(new Response(JSON.stringify(focusBody), { status: 200 }));
+    await sleep(40);
+    history.replaceState(null, '', '#/');
+    t.route();
+    await sleep(40);
+    assert(t.state.doc.focus && t.state.doc.focus.journey.id === 'FOCUS',
+      'followed snapshot did not survive settings and return home');
+  })()`;
+}
+
+function focusFreshnessScript() {
+  const suggestionOnly = { generatedAt: new Date(nowMs + 3_000).toISOString(), journeys: [metro] };
+  const refreshedFocus = journey('T9', 'train', 5);
+  refreshedFocus.id = 'FOCUS-FRESH';
+  const focused = { generatedAt: new Date(nowMs + 4_000).toISOString(), journeys: [refreshedFocus] };
+  return `(async () => {
+    ${browserPrelude()}
+    const pending = [];
+    window.fetch = (input, init = {}) => new Promise((resolve, reject) => {
+      pending.push({ url: String(input), init, resolve, reject });
+    });
+    t.state.doc.focus = {
+      tripId: 't1', direction: 'forward', focusedAt: ${JSON.stringify(train.departure.scheduled)},
+      by: 'focus', journey: ${JSON.stringify(train)}
+    };
+    history.replaceState(null, '', '#/');
+    t.route();
+    await waitFor(() => pending.length === 2, 'focus and suggestion requests did not both start');
+    pending[0].reject(new Error('focus offline'));
+    pending[1].resolve(new Response(${JSON.stringify(JSON.stringify(suggestionOnly))}, { status: 200 }));
+    await sleep(120);
+    assert(document.querySelector('.hm-fresh .lbl')?.textContent === 'Offline',
+      'successful suggestions mislabeled a failed focused source as live: ' + JSON.stringify({
+        freshness: document.querySelector('.hm-fresh .lbl')?.textContent,
+        focusOffline: t.state.focusOffline,
+        offline: t.state.offline,
+        body: (t.state.body?.journeys || []).map((item) => item.id),
+        focusBody: (t.state.focusBody?.journeys || []).map((item) => item.id),
+        focusIdentity: t.state.focusIdentity,
+        focus: t.state.doc.focus && { id: t.state.doc.focus.journey?.id, by: t.state.doc.focus.by },
+        selection: t.state.selection,
+        view: t.state.view
+      }));
+
+    t.refresh();
+    await waitFor(() => pending.length === 4, 'second focus and suggestion requests did not both start');
+    pending[2].resolve(new Response(${JSON.stringify(JSON.stringify(focused))}, { status: 200 }));
+    pending[3].reject(new Error('suggestions offline'));
+    await waitFor(() => document.querySelector('.hm-fresh .lbl')?.textContent === 'Live',
+      'failed suggestions mislabeled a successful focused source as offline');
+    assert(t.state.doc.focus.journey.id === 'FOCUS-FRESH', 'focused snapshot did not refresh from its own source');
+  })()`;
+}
+
+function ferryUnavailableScript() {
+  return `(async () => {
+    ${browserPrelude()}
+    await waitFor(() => Array.isArray(t.state.stations), 'station index did not load');
+    history.replaceState(null, '', '#/');
+    t.route();
+    const row = await waitFor(() => document.querySelector('[data-act="enable-ferries"]'),
+      'ferry-only saved trip did not remain visible while ferries were off');
+    assert(row.dataset.id === 'ferry-trip' && row.dataset.direction === 'forward',
+      'ferry enable action lost its saved-trip identity');
+    assert(row.textContent.includes('Ferries are off') && row.textContent.includes('Turn on ferries'),
+      'ferry-disabled row did not explain its one-tap action');
+    row.click();
+    await waitFor(() => t.state.doc.preferences.enabledModes.includes('ferry'), 'one-tap ferry action did not enable ferries');
+    await waitFor(() => location.hash === '#/board', 'enabled ferry trip did not open its departures');
+    assert(t.state.selection?.tripId === 'ferry-trip' && t.state.selection?.direction === 'forward',
+      'ferry enable action lost selection while opening departures');
+  })()`;
+}
+
+function cacheAndAttributionScript() {
+  const trainBody = { generatedAt: new Date(nowMs + 5_000).toISOString(), journeys: [train] };
+  return `(async () => {
+    ${browserPrelude()}
+    const pending = [];
+    window.fetch = (input, init = {}) => new Promise((resolve, reject) => {
+      pending.push({ url: String(input), init, resolve, reject });
+    });
+    history.replaceState(null, '', '#/settings');
+    t.route();
+    await waitFor(() => document.querySelector('.st-service-set'), 'settings did not render');
+    pending.length = 0;
+
+    t.setPreferences({ enabledModes: ['train'] });
+    await waitFor(() => pending.length === 1, 'train replacement did not start');
+    assert((t.state.body?.journeys || []).every((item) => item.line.mode === 'train'),
+      'mode change did not filter the raw cache before fetch');
+    pending[0].reject(new Error('train replacement failed'));
+    await sleep(40);
+    t.setPreferences({ enabledModes: [] });
+    assert((t.state.body?.journeys || []).length === 0, 'all-off did not clear suggestions');
+    t.setPreferences({ enabledModes: ['train'] });
+    await waitFor(() => pending.length === 2, 're-enabled train replacement did not start');
+    assert((t.state.body?.journeys || []).some((item) => item.id === 'T9'),
+      'off then on did not restore eligible raw cached data immediately');
+    pending[1].reject(new Error('re-enabled replacement failed'));
+    await sleep(40);
+    assert((t.state.body?.journeys || []).some((item) => item.id === 'T9'),
+      'failed re-enabled request removed the restored cached journey');
+
+    const trainKey = ${JSON.stringify(`${from.id}-${to.id}|train`)};
+    t.state.doc.cache[trainKey] = {
+      fetchedAt: ${JSON.stringify(trainBody.generatedAt)}, body: ${JSON.stringify(trainBody)}, serverStale: true
+    };
+    t.setPreferences({ enabledModes: ['metro'] });
+    t.setPreferences({ enabledModes: ['train'] });
+    assert(t.state.serverStale === true, 'cached server-stale provenance was not restored with the mode cache');
+    t.state.doc.lastOpen = null;
+    history.replaceState(null, '', '#/');
+    t.route();
+    await waitFor(() => document.querySelector('.hm-fresh .pulse.stale'), 'cached server-stale source lost its neutral dot');
+    assert(document.querySelector('.hm-fresh .lbl').textContent !== 'Live', 'cached server-stale source was labeled Live');
+    const firstHome = pending.at(-1);
+    firstHome.resolve(new Response(${JSON.stringify(JSON.stringify(trainBody))}, { status: 200 }));
+    await sleep(50);
+    assert(t.state.doc.lastOpen === null, 'preference-caused refresh wrote lastOpen attribution');
+    t.refresh();
+    await waitFor(() => pending.at(-1) !== firstHome, 'independent refresh did not start');
+    pending.at(-1).resolve(new Response(${JSON.stringify(JSON.stringify(trainBody))}, { status: 200 }));
+    await waitFor(() => t.state.doc.lastOpen, 'independent refresh did not resume lastOpen attribution');
+  })()`;
+}
+
+function locationScript() {
+  return `(async () => {
+    ${browserPrelude()}
+    let fixes = 0;
+    let watches = 0;
+    let late = null;
+    Object.defineProperty(navigator.geolocation, 'getCurrentPosition', {
+      configurable: true, value: (success) => { fixes += 1; late = success; }
+    });
+    Object.defineProperty(navigator.geolocation, 'watchPosition', {
+      configurable: true, value: () => { watches += 1; return 1; }
+    });
+    t.setPreferences({ useLocation: false });
+    t.state.fix = null;
+    history.replaceState(null, '', '#/');
+    t.route();
+    await sleep(80);
+    assert(fixes === 0 && watches === 0, 'location-off touched geolocation');
+    history.replaceState(null, '', '#/settings');
+    t.route();
+    const toggle = await waitFor(() => document.querySelector('[data-act="toggle-location"]'), 'location toggle missing');
+    assert(toggle.getAttribute('aria-pressed') === 'false', 'location did not start off');
+    toggle.click();
+    await waitFor(() => fixes === 1 && late, 'turning location on did not start a fix');
+    const onToggle = document.querySelector('[data-act="toggle-location"]');
+    assert(onToggle.getAttribute('aria-pressed') === 'true', 'location did not paint on before the fix resolved');
+    onToggle.click();
+    await waitFor(() => document.querySelector('[data-act="toggle-location"]')?.getAttribute('aria-pressed') === 'false',
+      'location did not turn off while its fix was pending');
+    late({ timestamp: Date.now(), coords: { latitude: ${from.location.lat}, longitude: ${from.location.lon}, speed: null } });
+    await sleep(40);
+    assert(t.state.fix === null, 'pending location callback mutated state after location was turned off');
+  })()`;
+}
+
+function homeScript() {
+  return `(async () => {
+    ${browserPrelude()}
+    const before = JSON.stringify(t.state.doc.homeVotes);
+    history.replaceState(null, '', '#/settings/home');
+    t.route();
+    const input = await waitFor(() => document.querySelector('[data-role="home-query"]'), 'home search did not open');
+    input.value = 'International Airport';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    const result = await waitFor(() => document.querySelector('[data-act="pick-home"]'), 'home match did not render');
+    result.click();
+    await waitFor(() => document.querySelector('[data-act="automatic-home"]'), 'home override did not render');
+    assert(t.state.doc.preferences.homeOverride.name === ${JSON.stringify(longHome.name)}, 'home override was not saved');
+    document.querySelector('[data-act="automatic-home"]').click();
+    await sleep(30);
+    assert(!t.state.doc.preferences.homeOverride, 'automatic home did not remove the override');
+    assert(JSON.stringify(t.state.doc.homeVotes) === before, 'automatic home changed learned votes');
+  })()`;
+}
+
+function feedbackScript() {
+  return `(async () => {
+    ${browserPrelude()}
+    const storageBefore = localStorage.getItem('trains.v1');
+    const requests = [];
+    let outcome = 'reject';
+    window.fetch = async (input, init = {}) => {
+      assert(String(input) === 'https://analytics.jeremyvun.com/feedback', 'feedback used the wrong endpoint');
+      requests.push({ input: String(input), init });
+      if (outcome === 'reject') throw new TypeError('offline');
+      return new Response('', { status: outcome });
+    };
+    history.replaceState(null, '', '#/settings/feedback');
+    t.route();
+    const textarea = await waitFor(() => document.querySelector('[data-role="feedback-message"]'), 'feedback form did not render');
+    textarea.value = 'The platform changed after I opened the app.';
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    history.replaceState(null, '', '#/settings');
+    t.route();
+    history.replaceState(null, '', '#/settings/feedback');
+    t.route();
+    await waitFor(() => document.querySelector('[data-role="feedback-message"]')?.value.includes('platform changed'),
+      'feedback draft did not survive navigation');
+    document.querySelector('[data-act="submit-feedback"]').click();
+    await waitFor(() => document.querySelector('.st-error'), 'offline feedback did not show retry copy');
+    assert(document.querySelector('[data-role="feedback-message"]').value.includes('platform changed'),
+      'failure cleared the feedback draft');
+    outcome = 429;
+    document.querySelector('[data-act="submit-feedback"]').click();
+    await waitFor(() => document.querySelector('.st-error')?.textContent.includes('Wait'), 'rate-limit copy did not render');
+    outcome = 201;
+    document.querySelector('[data-act="submit-feedback"]').click();
+    await waitFor(() => document.querySelector('.st-success'), 'feedback success did not render');
+    assert(document.querySelector('[data-role="feedback-message"]').value === '', '201 did not clear the feedback draft');
+    assert(localStorage.getItem('trains.v1') === storageBefore, 'feedback draft or result touched storage');
+    assert(requests.every(({ init }) => init.method === 'POST' && init.credentials === 'omit'
+      && init.referrerPolicy === 'no-referrer'), 'feedback request privacy options changed');
+    const payload = JSON.parse(requests.at(-1).init.body);
+    assert(Object.keys(payload).sort().join(',') === 'category,feedback,project', 'feedback payload has extra fields');
+    assert(!localStorage.getItem('trains.analytics.v1'), 'feedback created an analytics queue on localhost');
+
+    const message = document.querySelector('[data-role="feedback-message"]');
+    message.value = '🙂'.repeat(2049);
+    message.dispatchEvent(new Event('input', { bubbles: true }));
+    const sent = requests.length;
+    document.querySelector('[data-act="submit-feedback"]').click();
+    await waitFor(() => document.querySelector('.st-error')?.textContent.includes('too long'), 'UTF-8 byte limit did not render');
+    assert(requests.length === sent, 'oversized feedback reached the transport');
+  })()`;
+}
+
+function feedbackFrameScript() {
+  return `(async () => {
+    ${browserPrelude()}
+    history.replaceState(null, '', '#/settings/feedback');
+    t.route();
+    const textarea = await waitFor(() => document.querySelector('[data-role="feedback-message"]'), 'feedback form did not render');
+    textarea.value = 'The platform changed after I opened the app.';
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`;
+}
+
+function themeScript() {
+  return `(async () => {
+    ${browserPrelude()}
+    history.replaceState(null, '', '#/settings');
+    t.route();
+    await waitFor(() => document.querySelector('.st-theme[data-appearance="system"]'), 'appearance choices missing');
+    await sleep(80);
+    const selected = document.querySelector('.st-theme[data-appearance="system"]');
+    selected.focus();
+    selected.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await sleep(30);
+    assert(document.documentElement.dataset.appearance === 'light', 'radio arrow did not apply Light: ' + JSON.stringify({
+      appearance: document.documentElement.dataset.appearance,
+      systemChecked: document.querySelector('.st-theme[data-appearance="system"]')?.getAttribute('aria-checked'),
+      lightChecked: document.querySelector('.st-theme[data-appearance="light"]')?.getAttribute('aria-checked'),
+      active: document.activeElement?.dataset.appearance,
+      stored: JSON.parse(localStorage.getItem('trains.v1')).preferences
+    }));
+    assert(document.activeElement?.dataset.appearance === 'light', 'radio arrow did not move focus');
+    document.querySelector('.st-theme[data-appearance="dark"]').click();
+    assert(document.documentElement.dataset.theme === 'dark', 'manual Dark did not apply immediately');
+    const stored = JSON.parse(localStorage.getItem('trains.v1'));
+    assert(stored.preferences.appearance === 'dark', 'manual theme was not persisted');
+  })()`;
+}
+
+async function run(name, doc, script, port, options = {}) {
+  const seedPath = path.join(tmp, `${name}.json`);
+  fs.writeFileSync(seedPath, JSON.stringify(doc));
+  const out = options.out || path.join(tmp, `${name}.png`);
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  const target = new URL(baseURL);
+  target.hash = options.hash || '';
+  const args = [
+    path.join(ROOT, 'tools/screenshot.js'), target.href, out,
+    '--seed', seedPath, '--wait', String(options.wait || 250), '--size', options.size || '390x844',
+    '--quiet', '--eval', script
+  ];
+  if (options.media) args.push('--media', options.media);
+  if (options.permission) args.push('--geo-permission', options.permission);
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, args, {
+      cwd: ROOT,
+      env: { ...process.env, CDP_PORT: String(port), TZ: 'Australia/Sydney' },
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    let output = '';
+    child.stdout.on('data', (chunk) => { output += chunk; });
+    child.stderr.on('data', (chunk) => { output += chunk; });
+    child.on('error', reject);
+    child.on('exit', (code) => code === 0 ? resolve(output.trim()) : reject(new Error(`${name}: ${output.trim()}`)));
+  });
+}
+
+function frame(name) {
+  return framesDir ? path.resolve(ROOT, framesDir, name) : null;
+}
+
+try {
+  const marker = await fetch(new URL('/js/settings.js', baseURL)).then((response) => response.text());
+  if (!marker.includes('export async function renderSettings')) {
+    throw new Error(`${baseURL.origin} is not serving this worktree's settings module`);
+  }
+
+  const visualSeed = seed();
+  const longSeed = seed({ preferences: { homeOverride: longHome, enabledModes: ['train', 'metro', 'ferry'] } });
+  const allOffSeed = seed({ preferences: { useLocation: false, enabledModes: [] } });
+  const ferryFrom = { id: '2000260', name: 'Pyrmont Bay Wharf', location: { lat: -33.868482, lon: 151.198818 } };
+  const ferryTo = { id: '202823', name: 'Double Bay Wharf', location: { lat: -33.873707, lon: 151.242443 } };
+  const ferryOnlySeed = seed({
+    trips: [{ id: 'ferry-trip', from: ferryFrom, to: ferryTo, createdAt: new Date(nowMs - 86_400_000).toISOString() }],
+    lastViewed: { tripId: 'ferry-trip', direction: 'forward' },
+    preferences: { enabledModes: ['train', 'metro'] },
+    cache: {}
+  });
+
+  const only = value('--only');
+  if (only === 'focus-freshness') {
+    await run('focus-freshness', visualSeed, focusFreshnessScript(), firstPort);
+    console.log('settings focus-freshness browser check passed');
+    fs.rmSync(tmp, { recursive: true, force: true });
+    process.exit(0);
+  }
+  if (only === 'controller-races') {
+    await run('controller-races', visualSeed, raceScript(), firstPort);
+    console.log('settings controller-races browser check passed');
+    fs.rmSync(tmp, { recursive: true, force: true });
+    process.exit(0);
+  }
+  if (only === 'cache-attribution') {
+    await run('cache-attribution', visualSeed, cacheAndAttributionScript(), firstPort);
+    console.log('settings cache-attribution browser check passed');
+    fs.rmSync(tmp, { recursive: true, force: true });
+    process.exit(0);
+  }
+  const checks = [
+    run('settings-dark-390', visualSeed, geometryScript(), firstPort, {
+      permission: 'granted', out: frame('settings-390x844.png') || undefined
+    }),
+    run('settings-light-390', visualSeed, geometryScript(), firstPort + 1, {
+      permission: 'granted', media: 'prefers-color-scheme:light', out: frame('settings-390x844-light.png') || undefined
+    }),
+    run('settings-dark-412', visualSeed, geometryScript(), firstPort + 2, {
+      permission: 'granted', size: '412x732', out: frame('settings-412x732.png') || undefined
+    }),
+    run('settings-light-412', visualSeed, geometryScript(), firstPort + 3, {
+      permission: 'granted', size: '412x732', media: 'prefers-color-scheme:light',
+      out: frame('settings-412x732-light.png') || undefined
+    })
+  ];
+  await Promise.all(checks);
+
+  await run('long-home', longSeed, geometryScript(), firstPort, {
+    permission: 'granted', out: frame('settings-390x844-long-home.png') || undefined
+  });
+  await run('all-off', allOffSeed, geometryScript(`
+    assert(document.querySelector('.st-service-empty'), 'all-off explanation missing');
+    assert([...document.querySelectorAll('.st-mode:not([disabled])')].every((el) => el.getAttribute('aria-pressed') === 'false'),
+      'all-off did not leave every served mode off');
+  `), firstPort, { out: frame('settings-390x844-all-off.png') || undefined });
+  await run('feedback-frame', visualSeed, feedbackFrameScript(), firstPort, {
+    out: frame('settings-390x844-feedback.png') || undefined
+  });
+  await run('permission-prompt', visualSeed, geometryScript(`
+    assert(document.body.textContent.includes('Permission not decided'), 'prompt state not explained');
+    assert(document.querySelector('[data-act="request-location"]'), 'prompt state has no explicit request action');
+  `), firstPort, { permission: 'prompt' });
+  await run('permission-denied', visualSeed, geometryScript(`
+    assert(document.body.textContent.includes('Blocked in browser'), 'denied state not explained');
+  `), firstPort, { permission: 'denied' });
+  await run('location-off', allOffSeed, locationScript(), firstPort, { permission: 'granted' });
+  await run('home-override', seed({ homeVotes: [
+    { day: '2026-09-01', station: from }, { day: '2026-09-02', station: from }, { day: '2026-09-03', station: from }
+  ] }), homeScript(), firstPort);
+  await run('feedback', visualSeed, feedbackScript(), firstPort);
+  await run('theme-keyboard', visualSeed, themeScript(), firstPort);
+  await run('controller-races', visualSeed, raceScript(), firstPort);
+  await run('focus-freshness', visualSeed, focusFreshnessScript(), firstPort);
+  await run('ferry-unavailable', ferryOnlySeed, ferryUnavailableScript(), firstPort);
+  await run('cache-attribution', visualSeed, cacheAndAttributionScript(), firstPort);
+
+  console.log(`settings browser checks passed${framesDir ? `; frames written to ${path.resolve(ROOT, framesDir)}` : ''}`);
+} finally {
+  fs.rmSync(tmp, { recursive: true, force: true });
+}

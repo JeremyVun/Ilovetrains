@@ -56,6 +56,11 @@ type Client struct {
 	now    func() time.Time
 }
 
+// DeparturesOptions controls which services may appear in a journey.
+type DeparturesOptions struct {
+	Modes []Mode
+}
+
 // NewClient returns a client for the given API key, loading the Sydney
 // timezone up front so a broken tzdata fails at startup, not per request.
 func NewClient(apiKey string) (*Client, error) {
@@ -92,7 +97,20 @@ func (c *Client) Location() *time.Location { return c.loc }
 // monitored, `estimated` goes null instead of echoing the timetable back as if
 // it were live.
 func (c *Client) Departures(ctx context.Context, from, to string, limit int, at time.Time) (*DeparturesResponse, error) {
+	return c.DeparturesWithOptions(ctx, from, to, limit, at, DeparturesOptions{})
+}
+
+// DeparturesWithOptions returns journeys whose every service leg is allowed.
+func (c *Client) DeparturesWithOptions(ctx context.Context, from, to string, limit int, at time.Time,
+	options DeparturesOptions) (*DeparturesResponse, error) {
+	modes, err := CanonicalModes(options.Modes)
+	if err != nil {
+		return nil, fmt.Errorf("tfnsw: modes: %w", err)
+	}
 	now := c.now()
+	if len(modes) == 0 {
+		return emptyDepartures(from, to, at, now, c.loc), nil
+	}
 	window := at
 	if window.IsZero() {
 		window = now
@@ -117,16 +135,8 @@ func (c *Client) Departures(ctx context.Context, from, to string, limit int, at 
 	}
 	q.Set("calcNumberOfTrips", strconv.Itoa(upstreamLimit))
 	q.Set("TfNSWTR", "true")
-	// Keep train (1), metro (2) and ferry (9); exclude light rail (4), bus (5),
-	// coach (7), On Demand (10) and school bus (11). exclMOT_10 was added
-	// 2026-09-01 after On Demand buses were seen routing Rhodes → Bondi
-	// Junction; ferries joined the served modes on 2026-09-05.
-	// mapTrip still drops any journey carrying a class we do not serve, so a
-	// future leak degrades to fewer journeys rather than an untakeable one.
 	q.Set("excludedMeans", "checkbox")
-	for _, mot := range []string{"4", "5", "7", "10", "11"} {
-		q.Set("exclMOT_"+mot, "1")
-	}
+	addModeExclusions(q, modes)
 
 	body, err := c.get(ctx, "/trip", q)
 	if err != nil {
@@ -136,12 +146,37 @@ func (c *Client) Departures(ctx context.Context, from, to string, limit int, at 
 	// able to compute how old the data it is showing is, including for a past
 	// window whose rows are hours older than the response.
 	policy := connectionPolicy{Minimum: c.MinimumConnectionTime, Maximum: c.MaximumConnectionTime}
-	resp, err := mapTripWithPolicy(body, from, to, limit, now, c.loc, policy)
+	resp, err := mapTripWithPolicyModes(body, from, to, limit, now, c.loc, policy, modes)
 	if err != nil {
 		return nil, err
 	}
 	resp.At = formatTimePtr(at, c.loc)
 	return resp, nil
+}
+
+func addModeExclusions(q url.Values, modes []Mode) {
+	excluded := []int{4, 5, 7, 10, 11}
+	for mode, class := range map[Mode]int{
+		ModeTrain: classTrain,
+		ModeMetro: classMetro,
+		ModeFerry: classFerry,
+	} {
+		if !containsMode(modes, mode) {
+			excluded = append(excluded, class)
+		}
+	}
+	for _, class := range excluded {
+		q.Set("exclMOT_"+strconv.Itoa(class), "1")
+	}
+}
+
+func containsMode(modes []Mode, want Mode) bool {
+	for _, mode := range modes {
+		if mode == want {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Client) get(ctx context.Context, path string, query url.Values) ([]byte, error) {

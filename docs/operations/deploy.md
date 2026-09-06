@@ -19,10 +19,12 @@ from this machine.
 1. Build and push the multi-architecture image to the self-hosted registry:
 
    ```sh
-   docker buildx bake --push
+   GIT_REVISION="$(git rev-parse --short=12 HEAD)" docker buildx bake --push
    ```
 
-   `docker-bake.hcl` publishes `registry.jeremyvun.com/ilovetrains`.
+   `docker-bake.hcl` publishes `registry.jeremyvun.com/ilovetrains`. Build from
+   the committed release so Settings reports its source revision. The image
+   generates `web/js/version.js`; the checked-in development value stays `dev`.
 
 2. If deployment configuration changed, edit
    `../projects/stacks/ilovetrains/`, then commit and push the infra repository.

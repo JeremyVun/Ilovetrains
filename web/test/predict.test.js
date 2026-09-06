@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 import {
   predict, scoreCandidate, scoreAll, dayTypeMatch, hourProximity, recencyDecay,
-  distanceKm, locationFactor, rankTrips, homeOf, locate, PREDICT_FLOOR, HOME_VOTES_NEEDED
+  distanceKm, locationFactor, rankTrips, automaticHomeOf, homeOf, locate, PREDICT_FLOOR, HOME_VOTES_NEEDED
 } from '../js/predict.js';
 import { emptyDoc, addTrip, recordView } from '../js/storage.js';
 import { INDEX, STATIONS, tripBetween } from './fixture.js';
@@ -212,6 +212,13 @@ test('one real view outweighs the floor even from the wrong end of the line', ()
   assert.deepEqual(predict(d, MON_0800, { fix: AT_PARRA }), { tripId: 'home', direction: 'forward' });
 });
 
+test('location-off prediction ignores a supplied fix', () => {
+  const d = { ...locatedDoc(), preferences: { useLocation: false } };
+  assert.deepEqual(scoreAll(d, MON_0800, { fix: AT_PARRA }).map((candidate) => candidate.score),
+    [PREDICT_FLOOR, PREDICT_FLOOR]);
+  assert.deepEqual(predict(d, MON_0800, { fix: AT_PARRA }), { tripId: 'home', direction: 'forward' });
+});
+
 
 /* ---- home from the daily votes (design.md 3) ---------------------------- */
 
@@ -245,6 +252,22 @@ test('a tie goes to the station of the most recent vote among the tied', () => {
 
   const other = { ...emptyDoc(), homeVotes: votes(['burwood', 'rhodes', 'burwood', 'rhodes', 'burwood', 'rhodes']) };
   assert.deepEqual(homeOf(other), { station: STATIONS.rhodes, confidence: 3 });
+});
+
+test('a manual home overrides but never replaces the automatic vote result', () => {
+  const d = {
+    ...emptyDoc(),
+    homeVotes: votes(['rhodes', 'rhodes', 'rhodes']),
+    preferences: { homeOverride: STATIONS.burwood }
+  };
+  assert.deepEqual(automaticHomeOf(d), { station: STATIONS.rhodes, confidence: HOME_VOTES_NEEDED });
+  assert.deepEqual(homeOf(d), {
+    station: { id: STATIONS.burwood.id, name: STATIONS.burwood.name, location: STATIONS.burwood.location },
+    confidence: 0,
+    source: 'manual'
+  });
+  assert.deepEqual(homeOf({ ...d, preferences: {} }),
+    { station: STATIONS.rhodes, confidence: HOME_VOTES_NEEDED });
 });
 
 

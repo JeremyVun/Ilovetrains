@@ -922,6 +922,13 @@ func service(t *testing.T, line, from, dep, to, arr string) leg {
 	}
 }
 
+func serviceClass(t *testing.T, class int, line, from, dep, to, arr string) leg {
+	t.Helper()
+	leg := service(t, line, from, dep, to, arr)
+	leg.Transportation.Product.Class = class
+	return leg
+}
+
 func tripBody(t *testing.T, journeys ...[]leg) []byte {
 	t.Helper()
 	var raw tripResponse
@@ -933,6 +940,52 @@ func tripBody(t *testing.T, journeys ...[]leg) []byte {
 		t.Fatalf("marshal: %v", err)
 	}
 	return body
+}
+
+func TestMapTripModeFilterIsConjunctiveBeforeLimit(t *testing.T) {
+	body := tripBody(t,
+		[]leg{serviceClass(t, classFerry, "F1", "A", "2026-09-01 08:55", "B", "2026-09-01 09:10")},
+		[]leg{serviceClass(t, classTrain, "T1", "A", "2026-09-01 09:00", "B", "2026-09-01 09:15")},
+		[]leg{
+			serviceClass(t, classTrain, "T2", "A", "2026-09-01 09:01", "C", "2026-09-01 09:11"),
+			serviceClass(t, classMetro, "M1", "C", "2026-09-01 09:15", "B", "2026-09-01 09:25"),
+		},
+		[]leg{serviceClass(t, classMetro, "M2", "A", "2026-09-01 09:02", "B", "2026-09-01 09:17")},
+	)
+	generatedAt := mustParse(t, "2026-08-31T22:00:00Z")
+	policy := connectionPolicy{Minimum: DefaultMinimumConnectionTime, Maximum: DefaultMaximumConnectionTime}
+
+	trainMetro, err := mapTripWithPolicyModes(body, "A", "B", 2, generatedAt, sydney(t), policy,
+		[]Mode{ModeMetro, ModeTrain})
+	if err != nil {
+		t.Fatalf("mapTripWithPolicyModes: %v", err)
+	}
+	if len(trainMetro.Journeys) != 2 || trainMetro.Journeys[0].Legs != 1 || trainMetro.Journeys[1].Legs != 2 {
+		t.Fatalf("train+metro journeys = %+v, want direct train then mixed journey", trainMetro.Journeys)
+	}
+	for _, journey := range trainMetro.Journeys {
+		for _, leg := range journey.LegDetail {
+			if leg.Line.Mode != string(ModeTrain) && leg.Line.Mode != string(ModeMetro) {
+				t.Errorf("train+metro journey includes %q", leg.Line.Mode)
+			}
+		}
+	}
+
+	trainOnly, err := mapTripWithPolicyModes(body, "A", "B", 2, generatedAt, sydney(t), policy, []Mode{ModeTrain})
+	if err != nil {
+		t.Fatalf("mapTripWithPolicyModes: %v", err)
+	}
+	if len(trainOnly.Journeys) != 1 || trainOnly.Journeys[0].Legs != 1 || trainOnly.Journeys[0].Line.Mode != string(ModeTrain) {
+		t.Errorf("train-only journeys = %+v, want the direct train only", trainOnly.Journeys)
+	}
+
+	allOff, err := mapTripWithPolicyModes(body, "A", "B", 2, generatedAt, sydney(t), policy, []Mode{})
+	if err != nil {
+		t.Fatalf("mapTripWithPolicyModes: %v", err)
+	}
+	if len(allOff.Journeys) != 0 {
+		t.Errorf("all-off journeys = %+v, want none", allOff.Journeys)
+	}
 }
 
 // The T4 Bondi Junction branch closed for the night at 21:32 on 2026-09-03.

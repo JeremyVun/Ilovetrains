@@ -24,6 +24,10 @@
 - `build-stations.js` — rebuild the baked station index both clients search.
 - `check-controller-lifecycle.js` — browser-check repeated home fixes and
   durable arrival completion against a locally served client.
+- `check-settings-browser.js` — drive Settings in real Chromium at both phone
+  sizes and schemes; assert permissions, home restore, feedback, keyboard,
+  mode-request races, focus refresh and target/reachability contracts. Its
+  feedback and departures transports are page-local fixtures.
 
 Run the controller check on a private local server; it supplies synthetic
 journeys and CDP geolocation and makes no API request:
@@ -31,6 +35,20 @@ journeys and CDP geolocation and makes no API request:
 ```
 node tools/check-controller-lifecycle.js --url http://localhost:<port>
 ```
+
+Run the Settings check against a private static server and private CDP range.
+The optional frames argument writes the reviewed built-client calibration set:
+
+```
+python3 -m http.server 8197 --bind 127.0.0.1 --directory web
+CDP_PORT=9571 node tools/check-settings-browser.js \
+  --url http://127.0.0.1:8197 --frames assets/comps/latest
+```
+
+The checker first fetches `/js/settings.js` and refuses to run if that server
+is not serving the Settings module. Keep the server alive for the whole run;
+the four initial browser drives run in parallel on `CDP_PORT` through
+`CDP_PORT+3`, and later drives reuse the first port sequentially.
 
 ## comps/
 
@@ -288,8 +306,8 @@ change the produced filename, not the state, so rename by an explicit table and
 then **read every frame**: a stale `OFFLINE` board or a withheld figure is a
 convincing shot of the wrong screen, and so is the wrong route.
 
-The table, all forty-five frames. `default` means no flags: the state carries its
-own size and the dark scheme is unsuffixed.
+The table covers the forty-five board, home and detail frames. `default` means
+no flags: the state carries its own size and the dark scheme is unsuffixed.
 
 | Exemplar | State | Invocation |
 | --- | --- | --- |
@@ -348,8 +366,9 @@ Wharf` and uses `5B` to `5A`. `ferry-side-only-control` proves that a supplied
 Circular Quay departure from `Wharf 4, Side B` so the full initial label is
 calibrated separately from compact transfer markers.
 
-`docs/contracts/ui.md` lists the set; the directory holds it and nothing else,
-so a frame no state can produce is removed rather than left to rot.
+`docs/contracts/ui.md` lists these frames and the Settings frames produced
+by `check-settings-browser.js`; the directory holds only current calibration
+images. A frame neither instrument can produce is removed.
 
 The `short-*` states shoot the board at **412x732** — a 412px Android with its
 browser chrome on screen, which is the frame the owner's phone actually gets and

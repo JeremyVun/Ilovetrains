@@ -1,5 +1,47 @@
 package tfnsw
 
+import "fmt"
+
+// Mode is a service type the departures board can include.
+type Mode string
+
+const (
+	ModeTrain Mode = "train"
+	ModeMetro Mode = "metro"
+	ModeFerry Mode = "ferry"
+)
+
+var servedModes = []Mode{ModeTrain, ModeMetro, ModeFerry}
+
+// AllModes returns a new canonical allow-list for the existing board.
+func AllModes() []Mode {
+	return append([]Mode(nil), servedModes...)
+}
+
+// CanonicalModes validates, de-duplicates and orders a mode allow-list.
+// A nil list preserves the existing all-modes behavior; an empty one is all-off.
+func CanonicalModes(modes []Mode) ([]Mode, error) {
+	if modes == nil {
+		return AllModes(), nil
+	}
+	seen := make(map[Mode]bool, len(modes))
+	for _, mode := range modes {
+		switch mode {
+		case ModeTrain, ModeMetro, ModeFerry:
+			seen[mode] = true
+		default:
+			return nil, fmt.Errorf("unsupported mode %q", mode)
+		}
+	}
+	canonical := make([]Mode, 0, len(seen))
+	for _, mode := range servedModes {
+		if seen[mode] {
+			canonical = append(canonical, mode)
+		}
+	}
+	return canonical, nil
+}
+
 // The types in this file are the wire shapes served by our own API. They are
 // defined by docs/contracts/api.md; changing a JSON tag here is a contract
 // change. Pointer fields are deliberately not `omitempty`: the contract says

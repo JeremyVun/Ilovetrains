@@ -3,6 +3,7 @@
 
 import { esc, mount, onAction, shortName } from './dom.js';
 import { getStops } from './api.js';
+import { preferencesOf } from './preferences.js';
 import { newTripId, recordSearch } from './storage.js';
 import { here, loadStations, nearest, NEAR_STATION_KM } from './stations.js';
 import { MIN_QUERY, createSearcher, hintFor, queryKey, rankStops, fuzzyScore, topPick } from './search.js';
@@ -12,10 +13,11 @@ const searcher = createSearcher((query, opts) => getStops(query, opts));
 
 export async function renderSetup(root, ctx, { origin, redirect } = {}) {
   const isCurrent = () => root.isConnected && document.getElementById('app') === root;
+  const useLocation = preferencesOf(ctx.doc).useLocation;
   let initialPermission = null;
   let initialStations = null;
   let initialFix = null;
-  if (!origin && !ctx.doc.trips.length) {
+  if (useLocation && !origin && !ctx.doc.trips.length) {
     initialPermission = await ctx.permission();
     if (!isCurrent()) return;
     if (initialPermission === 'granted') {
@@ -27,7 +29,7 @@ export async function renderSetup(root, ctx, { origin, redirect } = {}) {
       if (spot) origin = spot.station;
     }
   }
-  let fromSource = origin ? 'location' : 'search';
+  let fromSource = origin && useLocation ? 'location' : 'search';
   const picked = { from: null, to: null };
   let active = 'from';
   let results = [];
@@ -53,7 +55,7 @@ export async function renderSetup(root, ctx, { origin, redirect } = {}) {
     </div>
     <div class="hm-bar save"><button data-act="save" data-t="save" disabled>Choose where you start</button></div>
   </div>`);
-  ctx.shownSetup(origin ? 'location' : 'empty');
+  ctx.shownSetup(origin && useLocation ? 'location' : 'empty');
 
   const inputs = {
     from: root.querySelector('[data-role="from"]'),
@@ -91,7 +93,7 @@ export async function renderSetup(root, ctx, { origin, redirect } = {}) {
   function leadHtml() {
     if (active !== 'from' || inputs.from.value.trim()) return '';
     if (nearby) return `<div class="hm-grp">Nearest station</div>${rowsHtml([nearby], 'pick-near')}`;
-    if (!askable || fix) return '';
+    if (!useLocation || !askable || fix) return '';
     if (!askedLocation) {
       askedLocation = true;
       ctx.track('asked_setup');
@@ -220,7 +222,8 @@ export async function renderSetup(root, ctx, { origin, redirect } = {}) {
     });
   });
 
-  async function useLocation() {
+  async function requestLocation() {
+    if (!useLocation) return;
     const generation = ++locationGeneration;
     fix = await ctx.fix();
     if (!isCurrent() || generation !== locationGeneration) return;
@@ -267,7 +270,7 @@ export async function renderSetup(root, ctx, { origin, redirect } = {}) {
       return;
     }
     if (action === 'use-location') {
-      useLocation();
+      requestLocation();
       return;
     }
     if (action === 'save' && !saveEl.disabled) {
@@ -282,10 +285,12 @@ export async function renderSetup(root, ctx, { origin, redirect } = {}) {
 
   if (origin) {
     active = 'from';
-    pick(origin, 'location');
+    pick(origin, useLocation ? 'location' : 'search');
   } else {
     inputs.from.focus();
   }
+
+  if (!useLocation) return;
 
   if (initialPermission !== null) {
     if (stations) settleLocation();

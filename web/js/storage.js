@@ -1,3 +1,5 @@
+import { SUPPORTED_MODES, normalizeModes, preferencesOf } from './preferences.js';
+
 /* localStorage document per docs/contracts/client-storage.md.
    Everything above the load/save pair is pure: document in, new document out.
    Nothing here is ever sent to the server — that is a product guarantee. */
@@ -150,10 +152,14 @@ export function parseDoc(raw) {
       && Number.isInteger(tel.bucket) && tel.bucket >= 0 && tel.bucket <= 99) {
     doc.telemetry = { opens: tel.opens, bucket: tel.bucket };
   }
+  if (v.preferences && typeof v.preferences === 'object' && !Array.isArray(v.preferences)) {
+    doc.preferences = preferencesOf({ preferences: v.preferences });
+  }
   if (v.cache && typeof v.cache === 'object') {
     for (const [k, entry] of Object.entries(v.cache)) {
       if (entry && typeof entry.fetchedAt === 'string' && entry.body && typeof entry.body === 'object') {
         doc.cache[k] = { fetchedAt: entry.fetchedAt, body: entry.body };
+        if (entry.serverStale === true) doc.cache[k].serverStale = true;
       }
     }
   }
@@ -175,6 +181,7 @@ export function serializeDoc(doc) {
   if (doc.focus) out.focus = doc.focus;
   if (doc.locationAsk) out.locationAsk = doc.locationAsk;
   if (doc.telemetry) out.telemetry = doc.telemetry;
+  if (doc.preferences) out.preferences = preferencesOf(doc);
   return JSON.stringify(out);
 }
 
@@ -219,8 +226,25 @@ function localDay(ms) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-export function cacheKey(fromId, toId) {
-  return fromId + '-' + toId;
+export function cacheKey(fromId, toId, modes = SUPPORTED_MODES) {
+  const selected = normalizeModes(modes);
+  const pair = fromId + '-' + toId;
+  return selected.length === SUPPORTED_MODES.length ? pair : `${pair}|${selected.join(',')}`;
+}
+
+function cacheKeysForPair(fromId, toId) {
+  const keys = [];
+  for (let mask = 0; mask < 2 ** SUPPORTED_MODES.length; mask++) {
+    keys.push(cacheKey(fromId, toId, SUPPORTED_MODES.filter((_, index) => mask & (1 << index))));
+  }
+  return keys;
+}
+
+function removeCachePairVariants(cache, fromId, toId) {
+  const pair = fromId + '-' + toId;
+  for (const key of Object.keys(cache)) {
+    if (key === pair || key.startsWith(pair + '|')) delete cache[key];
+  }
 }
 
 /** The (from, to) actually queried for a trip in a direction. */
@@ -266,8 +290,8 @@ export function removeTrip(doc, tripId) {
     cache: { ...doc.cache }
   };
   if (trip) {
-    delete next.cache[cacheKey(trip.from.id, trip.to.id)];
-    delete next.cache[cacheKey(trip.to.id, trip.from.id)];
+    removeCachePairVariants(next.cache, trip.from.id, trip.to.id);
+    removeCachePairVariants(next.cache, trip.to.id, trip.from.id);
   }
   if (next.focus && next.focus.tripId === tripId) delete next.focus;
   return next;
@@ -362,16 +386,19 @@ export function recordLastOpen(doc, { station, tripId, direction, journey }, now
   };
 }
 
-/** Cache is capped to saved pairs only: one entry per trip per direction. */
-export function putCache(doc, key, body, atMs) {
+/** Cache is capped to saved pairs and their eight possible mode combinations. */
+export function putCache(doc, key, body, atMs, { serverStale = false } = {}) {
   const allowed = new Set();
   for (const t of doc.trips) {
-    allowed.add(cacheKey(t.from.id, t.to.id));
-    allowed.add(cacheKey(t.to.id, t.from.id));
+    for (const cacheKey of cacheKeysForPair(t.from.id, t.to.id)) allowed.add(cacheKey);
+    for (const cacheKey of cacheKeysForPair(t.to.id, t.from.id)) allowed.add(cacheKey);
   }
   const cache = {};
   for (const [k, v] of Object.entries(doc.cache)) if (allowed.has(k)) cache[k] = v;
-  if (allowed.has(key)) cache[key] = { fetchedAt: new Date(atMs).toISOString(), body };
+  if (allowed.has(key)) {
+    cache[key] = { fetchedAt: new Date(atMs).toISOString(), body };
+    if (serverStale) cache[key].serverStale = true;
+  }
   return { ...doc, cache };
 }
 

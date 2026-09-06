@@ -152,8 +152,9 @@ verification commands live in [tools/README.md](../../tools/README.md).
 
 Settings sends user-authored feedback directly to
 `https://analytics.jeremyvun.com/feedback` using POST JSON with exactly
-`{project: "ilovetrains", category, feedback}`. Category is Problem, Suggestion
-or Other; category and message are required after trimming. NUL is rejected;
+`{project: "ilovetrains", category, feedback}`. The labels Problem, Suggestion
+and Other send `problem`, `suggestion` and `other`; category and message are
+required after trimming. NUL is rejected;
 message is limited to 8,192 UTF-8 bytes and encoded JSON to 10,240 bytes.
 Requests omit credentials and referrer. No message enters `/e`, the train API,
 localStorage, logs or the service-worker cache. This deliberate submission is

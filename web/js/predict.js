@@ -12,6 +12,7 @@
    their commute share one. ageInDays is fractional, so decay is continuous. */
 
 import { DIRECTIONS } from './storage.js';
+import { preferencesOf } from './preferences.js';
 import { distanceKm, here } from './stations.js';
 
 export { distanceKm };
@@ -71,6 +72,7 @@ export const PREDICT_FLOOR = 0.01;
 
 /** All (trip, direction) candidates with their scores, board order preserved. */
 export function scoreAll(doc, nowMs, opts = {}) {
+  const fix = preferencesOf(doc).useLocation ? opts.fix : null;
   const out = [];
   for (const trip of doc.trips) {
     for (const direction of DIRECTIONS) {
@@ -80,8 +82,8 @@ export function scoreAll(doc, nowMs, opts = {}) {
         tripId: trip.id,
         direction,
         baseScore,
-        score: (baseScore + PREDICT_FLOOR) * locationFactor(opts.fix, origin),
-        distanceKm: distanceKm(opts.fix, origin && origin.location)
+        score: (baseScore + PREDICT_FLOOR) * locationFactor(fix, origin),
+        distanceKm: distanceKm(fix, origin && origin.location)
       });
     }
   }
@@ -126,8 +128,7 @@ export function rankTrips(doc, nowMs, opts = {}) {
   }).sort((a, b) => Number(b.selected) - Number(a.selected) || b.score - a.score || a.index - b.index);
 }
 
-/* Derived on every read, so no stale copy of home can exist. */
-export function homeOf(doc) {
+export function automaticHomeOf(doc) {
   const tally = new Map();
   ((doc && doc.homeVotes) || []).forEach((vote, index) => {
     const entry = tally.get(vote.station.id) || { count: 0 };
@@ -139,6 +140,13 @@ export function homeOf(doc) {
   }
   const first = (doc && doc.trips && doc.trips[0]) || null;
   return first ? { station: first.from, confidence: 0 } : null;
+}
+
+/* Derived on every read, so no stale copy of home can exist. */
+export function homeOf(doc) {
+  const override = preferencesOf(doc).homeOverride;
+  if (override) return { station: override, confidence: 0, source: 'manual' };
+  return automaticHomeOf(doc);
 }
 
 function fromHere(doc, station, nowMs) {
@@ -164,10 +172,12 @@ const chosen = (candidate, leap) =>
 
 /* Three shapes, one per answer the header can give: see client-storage.md. */
 export function locate(doc, nowMs, opts = {}) {
-  const spot = here(doc, opts.stations, opts.fix);
+  const fix = preferencesOf(doc).useLocation ? opts.fix : null;
+  const locationOpts = { ...opts, fix };
+  const spot = here(doc, opts.stations, fix);
   const trips = doc.trips || [];
   const predicted = () => {
-    const answer = predict(doc, nowMs, opts);
+    const answer = predict(doc, nowMs, locationOpts);
     return { kind: 'trip', tripId: answer.tripId, direction: answer.direction, leap: 'usual' };
   };
   if (!spot) return trips.length ? predicted() : { kind: 'setup', from: null };

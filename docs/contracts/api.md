@@ -20,7 +20,7 @@ Invariants:
 - Timestamps are ISO 8601 with offset (e.g. `2026-08-31T17:42:00+10:00`),
   always in `Australia/Sydney` local offset.
 
-## GET /api/v1/departures?from={stopId}&to={stopId}&limit={n}&at={t}
+## GET /api/v1/departures?from={stopId}&to={stopId}&limit={n}&at={t}&modes={modes}
 
 `at` is an optional ISO 8601 time with an offset
 (`2026-09-01T17:30:00+10:00` or the same instant as `...Z`). Absent means now
@@ -74,6 +74,12 @@ services that actually reach the destination).
 - `limit`: max journeys, default 6, max 10. Non-numeric or outside 1–10 is a
   `400`, not silently clamped.
 - `at`: optional departure window, as above.
+- `modes`: optional comma-separated service allow-list. Omitted is
+  `train,metro,ferry`; supplied values accept only those three names and are
+  de-duplicated and ordered as `train,metro,ferry` for the in-memory cache
+  key, so equivalent orderings share a response. `modes=` deliberately means
+  no enabled modes and returns an empty journey list without a TfNSW request.
+  An unknown name or empty element is a `400`.
 - Cache: `s-maxage=30, stale-while-revalidate=60`, except for a settled past
   `at` window — see the `at` paragraph above.
 
@@ -161,6 +167,11 @@ Semantics:
   fills with up to `limit` takeable journeys. The upstream request excludes
   classes 4, 5, 7, 10 and 11; the server-side drop guards against any excluded
   class that upstream still returns.
+- A `modes` subset excludes its disabled service classes in the upstream
+  request and applies the same allow-list again while mapping. Every service
+  leg of a journey must be enabled; walking legs do not count. Thus a
+  train+metro journey needs both modes, and filtering happens before `limit`
+  so eligible replacements can fill the board.
 - Cancelled services are included with `cancelled: true` (clients render
   struck-through), never silently dropped. Detection is deliberately loose
   (any upstream realtime status containing "cancel"): the exact upstream shape
@@ -194,6 +205,8 @@ Semantics:
   request for this morning answers with journeys hours old and a `generatedAt`
   of minutes ago. `at` says which window the journeys are from; `generatedAt`
   says how fresh the answer about it is.
+  An explicit all-off `modes=` response makes no TfNSW request, so its
+  `generatedAt` is when the proxy formed that empty answer.
 
 ## GET /api/v1/stops?q={text}
 

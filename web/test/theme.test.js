@@ -13,12 +13,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
 
 import { COLOURS, colourKey, lineColour, lineFill } from '../js/lines.js';
 import { chipInk } from '../js/journeybar.js';
 
 const css = readFileSync(fileURLToPath(new URL('../app.css', import.meta.url)), 'utf8')
   .replace(/\/\*[\s\S]*?\*\//g, ' ');
+const appearanceSource = readFileSync(fileURLToPath(new URL('../js/appearance.js', import.meta.url)), 'utf8');
+const indexSource = readFileSync(fileURLToPath(new URL('../index.html', import.meta.url)), 'utf8');
 
 /** The two `:root` blocks, in source order: the dark scheme, then the light
     one inside `@media (prefers-color-scheme: light)`. */
@@ -39,6 +42,50 @@ function schemes() {
 }
 
 const [dark, light] = schemes();
+
+function runAppearance(stored, systemLight = false) {
+  const listeners = {};
+  const media = {
+    matches: systemLight,
+    addEventListener(name, listener) { listeners[name] = listener; }
+  };
+  const theme = { content: '' };
+  const document = {
+    documentElement: { dataset: {}, style: {} },
+    querySelector: () => theme
+  };
+  const window = {
+    localStorage: { getItem: () => stored },
+    matchMedia: () => media
+  };
+  window.window = window;
+  vm.runInNewContext(appearanceSource, { window, document });
+  return { window, document, media, theme, listeners };
+}
+
+test('appearance bootstrap runs before CSS and safely applies a stored manual theme', () => {
+  assert.ok(indexSource.indexOf('/js/appearance.js') < indexSource.indexOf('/app.css'));
+  assert.equal((indexSource.match(/name="theme-color"/g) || []).length, 1);
+  const env = runAppearance(JSON.stringify({ preferences: { appearance: 'light' } }), false);
+  assert.equal(env.document.documentElement.dataset.appearance, 'light');
+  assert.equal(env.document.documentElement.dataset.theme, 'light');
+  assert.equal(env.theme.content, '#FAF9F5');
+});
+
+test('system appearance follows media changes while a manual choice wins', () => {
+  const env = runAppearance('{broken', false);
+  assert.equal(env.document.documentElement.dataset.appearance, 'system');
+  assert.equal(env.document.documentElement.dataset.theme, 'dark');
+  env.media.matches = true;
+  env.listeners.change();
+  assert.equal(env.document.documentElement.dataset.theme, 'light');
+  env.window.trainsAppearance.apply('dark');
+  env.media.matches = true;
+  env.listeners.change();
+  assert.equal(env.document.documentElement.dataset.theme, 'dark');
+  assert.match(css, /html\[data-theme="dark"\]\s*\{/);
+  assert.match(css, /html\[data-theme="light"\]\s*\{/);
+});
 
 test('ferry colour follows mode while the visible operator code stays independent', () => {
   assert.equal(colourKey({ name: 'F1', mode: 'ferry' }), 'FERRY');

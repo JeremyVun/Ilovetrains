@@ -35,14 +35,14 @@ var cancelPattern = regexp.MustCompile(`(?i)cancel`)
 
 var boardingSuffix = regexp.MustCompile(`,\s*(?:Platform|Wharf|Side)\s.*$`)
 
-func modeName(class int) (string, bool) {
+func modeName(class int) (Mode, bool) {
 	switch class {
 	case classTrain:
-		return "train", true
+		return ModeTrain, true
 	case classMetro:
-		return "metro", true
+		return ModeMetro, true
 	case classFerry:
-		return "ferry", true
+		return ModeFerry, true
 	}
 	return "", false
 }
@@ -82,6 +82,19 @@ type servicePath struct {
 
 func mapTripWithPolicy(body []byte, fromID, toID string, limit int, generatedAt time.Time,
 	loc *time.Location, policy connectionPolicy) (*DeparturesResponse, error) {
+	return mapTripWithPolicyModes(body, fromID, toID, limit, generatedAt, loc, policy, AllModes())
+}
+
+func mapTripWithPolicyModes(body []byte, fromID, toID string, limit int, generatedAt time.Time,
+	loc *time.Location, policy connectionPolicy, modes []Mode) (*DeparturesResponse, error) {
+	modes, err := CanonicalModes(modes)
+	if err != nil {
+		return nil, fmt.Errorf("tfnsw: modes: %w", err)
+	}
+	allowed := make(map[Mode]bool, len(modes))
+	for _, mode := range modes {
+		allowed[mode] = true
+	}
 	var raw tripResponse
 	if err := json.Unmarshal(body, &raw); err != nil {
 		return nil, fmt.Errorf("%w: decoding trip: %v", ErrUpstream, err)
@@ -97,7 +110,7 @@ func mapTripWithPolicy(body []byte, fromID, toID string, limit int, generatedAt 
 	var rows []plannedJourney
 
 	for _, j := range raw.Journeys {
-		path, serveable := serviceLegs(j)
+		path, serveable := serviceLegsWithModes(j, allowed)
 		// Dropped here, before the limit below, so the client still receives up
 		// to `limit` journeys it can actually take.
 		if !serveable || len(path.legs) == 0 {
@@ -135,7 +148,7 @@ func mapTripWithPolicy(body []byte, fromID, toID string, limit int, generatedAt 
 				},
 				Line: Line{
 					Name: lineName(first.Transportation),
-					Mode: mode,
+					Mode: string(mode),
 				},
 				DestinationHeadsign: headsign(first.Transportation),
 				// stopsAway needs live vehicle position data the Trip Planner
@@ -294,6 +307,14 @@ func laterArrivesWithin(later []plannedJourney, row plannedJourney) bool {
 // so the caller drops the whole journey rather than pretending the bus leg
 // away and offering a trip that starts at the wrong station.
 func serviceLegs(j journey) (path servicePath, serveable bool) {
+	all := make(map[Mode]bool, len(servedModes))
+	for _, mode := range servedModes {
+		all[mode] = true
+	}
+	return serviceLegsWithModes(j, all)
+}
+
+func serviceLegsWithModes(j journey, allowed map[Mode]bool) (path servicePath, serveable bool) {
 	var pendingWalks []leg
 	for _, l := range j.Legs {
 		if l.Transportation == nil {
@@ -301,6 +322,10 @@ func serviceLegs(j journey) (path servicePath, serveable bool) {
 		}
 		switch l.Transportation.Product.Class {
 		case classTrain, classMetro, classFerry:
+			mode, _ := modeName(l.Transportation.Product.Class)
+			if !allowed[mode] {
+				return servicePath{}, false
+			}
 			if len(path.legs) > 0 {
 				path.walks = append(path.walks, pendingWalks)
 			}
@@ -327,7 +352,7 @@ func legDetail(legs []leg, loc *time.Location) []Leg {
 		schedDep, _ := parseTime(l.Origin.DepartureTimePlanned)
 		schedArr, _ := parseTime(l.Destination.ArrivalTimePlanned)
 		out = append(out, Leg{
-			Line:     Line{Name: lineName(l.Transportation), Mode: mode},
+			Line:     Line{Name: lineName(l.Transportation), Mode: string(mode)},
 			Headsign: headsign(l.Transportation),
 			From:     legPlace(l.Origin),
 			To:       legPlace(l.Destination),
@@ -477,4 +502,14 @@ func formatTimePtr(t time.Time, loc *time.Location) *string {
 	}
 	s := formatTime(t, loc)
 	return &s
+}
+
+func emptyDepartures(from, to string, at, generatedAt time.Time, loc *time.Location) *DeparturesResponse {
+	return &DeparturesResponse{
+		From:        Place{ID: from},
+		To:          Place{ID: to},
+		GeneratedAt: formatTime(generatedAt, loc),
+		At:          formatTimePtr(at, loc),
+		Journeys:    []Journey{},
+	}
 }

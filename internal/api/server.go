@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"trains/internal/cache"
@@ -19,7 +20,8 @@ import (
 // Upstream is the part of the TfNSW client the handlers need. Handler tests
 // substitute a fake so no test touches the network.
 type Upstream interface {
-	Departures(ctx context.Context, from, to string, limit int, at time.Time) (*tfnsw.DeparturesResponse, error)
+	DeparturesWithOptions(ctx context.Context, from, to string, limit int, at time.Time,
+		options tfnsw.DeparturesOptions) (*tfnsw.DeparturesResponse, error)
 }
 
 // Cache lifetimes. The in-memory TTLs mirror the s-maxage the contract
@@ -91,17 +93,23 @@ type Server struct {
 	departures     *cache.Cache[*tfnsw.DeparturesResponse]
 	departuresPast *cache.Cache[*tfnsw.DeparturesResponse]
 	webDir         string
+	loc            *time.Location
 	now            func() time.Time
 }
 
 // New returns a server serving the API plus, if webDir exists, the static
 // client at /.
 func New(upstream Upstream, webDir string) *Server {
+	loc, err := time.LoadLocation(tfnsw.TimeZone)
+	if err != nil {
+		panic(err)
+	}
 	return &Server{
 		upstream:       upstream,
 		departures:     cache.New[*tfnsw.DeparturesResponse](departuresTTL, departuresStaleWindow),
 		departuresPast: cache.New[*tfnsw.DeparturesResponse](departuresPastTTL, departuresPastStaleWindow),
 		webDir:         webDir,
+		loc:            loc,
 		now:            time.Now,
 	}
 }
@@ -167,26 +175,56 @@ func (s *Server) handleDepartures(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
+	modes, err := journeyModes(query["modes"])
+	if err != nil {
+		writeError(w, err)
+		return
+	}
 
 	// The bucket is part of the key, so a past page and the live board never
 	// share an entry, and asking for the current bucket explicitly is a
 	// different answer (it echoes `at`) from asking for now.
-	key := from + "|" + to + "|" + strconv.Itoa(limit) + "|" + bucketKey(at)
+	key := from + "|" + to + "|" + strconv.Itoa(limit) + "|" + bucketKey(at) + "|" + modesKey(modes)
 	store, cacheControl := s.departures, departuresCacheControl
 	if settled(at, now) {
 		store, cacheControl = s.departuresPast, departuresPastCacheControl
 	}
 
 	result, err := store.Do(r.Context(), key, func(ctx context.Context) (*tfnsw.DeparturesResponse, error) {
+		if len(modes) == 0 {
+			return s.emptyDepartures(from, to, at, now), nil
+		}
 		ctx, cancel := fetchContext(ctx)
 		defer cancel()
-		return s.upstream.Departures(ctx, from, to, limit, at)
+		return s.upstream.DeparturesWithOptions(ctx, from, to, limit, at, tfnsw.DeparturesOptions{Modes: modes})
 	})
 	if err != nil {
 		writeError(w, err)
 		return
 	}
 	writeData(w, cacheControl, result.Stale, result.Value)
+}
+
+func (s *Server) emptyDepartures(from, to string, at, generatedAt time.Time) *tfnsw.DeparturesResponse {
+	response := &tfnsw.DeparturesResponse{
+		From:        tfnsw.Place{ID: from},
+		To:          tfnsw.Place{ID: to},
+		GeneratedAt: generatedAt.In(s.loc).Format(time.RFC3339),
+		Journeys:    []tfnsw.Journey{},
+	}
+	if !at.IsZero() {
+		echoed := at.In(s.loc).Format(time.RFC3339)
+		response.At = &echoed
+	}
+	return response
+}
+
+func modesKey(modes []tfnsw.Mode) string {
+	parts := make([]string, len(modes))
+	for i, mode := range modes {
+		parts[i] = string(mode)
+	}
+	return strings.Join(parts, ",")
 }
 
 // settled reports whether a window is far enough in the past that every journey

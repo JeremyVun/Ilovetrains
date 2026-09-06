@@ -100,6 +100,26 @@ test('setup reports whether From was empty or prefilled', async (t) => {
   filled.root.isConnected = false;
 });
 
+test('location-off setup neither checks permission nor offers a location row', async (t) => {
+  const priorDocument = globalThis.document;
+  t.after(() => { globalThis.document = priorDocument; });
+  const view = screen();
+  globalThis.document = { getElementById: () => view.root };
+  let permissionCalls = 0;
+  let fixCalls = 0;
+  const ctx = context({ ...emptyDoc(), preferences: { useLocation: false } }, {
+    permission: async () => { permissionCalls++; return 'prompt'; },
+    fix: async () => { fixCalls++; return null; }
+  });
+
+  await renderSetup(view.root, ctx);
+  assert.equal(permissionCalls, 0);
+  assert.equal(fixCalls, 0);
+  assert.ok(!/Use my location/.test(view.results.innerHTML));
+  assert.ok(!ctx.events.some((event) => event.t === 'asked_setup'));
+  view.root.isConnected = false;
+});
+
 test('a superseded setup location request emits only the current outcome', async (t) => {
   const priorDocument = globalThis.document;
   const priorFetch = globalThis.fetch;

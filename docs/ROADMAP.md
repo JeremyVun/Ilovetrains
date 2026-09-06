@@ -63,6 +63,12 @@ Decide after living with M3 on real commutes. The owner's playtest notes
 are the spec for the next round, verbatim, as they were for board v2.
 Suggested order, each its own backlog folder:
 
+### Settings — implementation complete, release verification in progress
+The [Settings](backlog/settings/design.md) C1 page includes local preferences,
+web API mode replacements and an in-memory feedback draft. Local verification
+passes; rollout awaits authenticated feedback retrieval. Native offline routing
+remains separate.
+
 ### M4 — Smart header accuracy
 The number one metric. A nearby station sets the origin, view history sets
 the destination before daily home votes, and movement can infer travel on
