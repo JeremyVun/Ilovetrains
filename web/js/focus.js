@@ -1,4 +1,4 @@
-/* "I'm on this train" — the focused journey, per
+/* The pinned or inferred service, per
    docs/contracts/client-storage.md. Pure: a storage document, a journey and
    `now` in, a new document or render-ready directions model out.
 

@@ -19,15 +19,17 @@ and API semantics live in `client-storage.md` and `api.md`.
   the user chose carries one control below the heavy rule. While the
   `strip-placement` experiment runs, variant A2 places that same control in
   the receipt slot. An empty answer caused by service preferences also links
-  to Settings. Other header content remains read-only.
+  to Settings. Before departure, a separate 44px next-service rail opens the
+  following journey's detail. Other header content remains read-only.
 - Tapping a saved-trip row opens that trip's departure board. It records the
   explicit selection and never changes the focused journey; browsing therefore
   never replaces the focused train.
 - Tapping a board row opens the journey detail view, whose back control reads
   `← <departure station> departures` and returns to that board.
-- `Take this train` on journey detail is the only control that focuses a
-  journey. It returns home and turns the smart header into directions. There is
-  no manual unfocus anywhere, and the board never shows a separate focus strip.
+- `Pin this train` on journey detail is the only control that focuses a
+  journey. It returns home and pins that service in the smart header;
+  directions begin when it departs. There is no manual unfocus anywhere,
+  and the board never shows a separate focus strip.
 - Journey detail for a journey that is cancelled, or already focused, carries no
   action rail at all; the back control is the way out.
 - When a focused journey is over, home may offer the opposite direction. The
@@ -97,8 +99,12 @@ substitutes for going back.
   persisted, and it never leaves the device.
 - When a journey is focused, that line is its status instead: `RUNNING`,
   `RUNNING LATE`, `CANCELLED` or `TRIP OVER`. The same string appears in the
-  focused saved-trip row. The status describes the train; no copy claims the
-  rider is aboard it.
+  focused saved-trip row. An explicitly pinned service adds a pin icon and
+  `PINNED` in the header, and `PINNED` in the row. Before departure, an ordinary
+  `RUNNING` status is replaced by `PINNED`; late, cancelled and completed
+  statuses retain their words. Inferred travel never gets a pin indicator.
+  A cancellation replacement is not labelled as the pinned service.
+  The pin indicator is read-only; no copy claims the rider is aboard.
 - `RUNNING LATE` requires all three of: fresh data, neither stale nor offline;
   a realtime estimated departure on the relevant leg; and a positive difference
   between the printed clock minutes of that estimate and its schedule. The
@@ -127,6 +133,20 @@ substitutes for going back.
   departure, and becomes `Tight change · <n> min · Platform <n>` only once the
   journey is under way, with the receipt `Printed change was <n> min.` when the
   window has shrunk below what was printed.
+- Before departure, a 44px rail below the main answer and above the heavy rule
+  shows the next distinct service: countdown, departure time, arrival time and
+  a detail chevron. Its label uses the first leg's mode: `Next train`,
+  `Next metro`, `Next ferry`, or `Next service` if unknown. The arrival time
+  matters because a later departure need not arrive equally late.
+- The next-service candidate is the earliest later effective departure on the
+  displayed pair and direction, with every leg enabled and none cancelled.
+  Exclude alternate itineraries sharing the lead's first line and scheduled
+  departure. Use the candidate's own pair/source freshness; stale data shows
+  absolute clocks without a countdown. No candidate means no rail, not a claim
+  that no later service exists. The rail disappears once the lead departs.
+  Opening its detail never pins it; the detail action performs the pin.
+  The detail's first paint retains the tapped rail's response and freshness;
+  an older cache must not replace that source during navigation.
 - The header may fetch live data only for the selected trip. Saved-trip rows
   use device-held facts such as line identity, distance and last ride; opening
   home must not fan out one upstream request per saved trip.
@@ -138,8 +158,8 @@ substitutes for going back.
 - During `strip-placement`, A2 moves that same question and CHANGE action
   into the receipt slot and removes the line below the rule. The question
   stays on one line, ellipsising only if necessary; CHANGE keeps its full
-  44px tap target. At 390×844 the heavy rule is 258px from the top, compared
-  with A3's 214px. Copy and action behavior are identical in both variants.
+  44px tap target. The receipt adds height to the content-sized header.
+  Copy and action behavior are identical in both variants.
 - Saved-trip rows are 72px with a `DEPARTURES ›` cue at the right, which the
   sub line reserves 106px for. Names use 19px type; an overflowing paired
   name fits down in 0.25px steps to a 16px floor. If the complete pair still
@@ -177,12 +197,12 @@ substitutes for going back.
   around now.`), never that they ride it. Only a persisted ride supports the
   reverse-direction receipt.
 - `Train` is the generic word for any service, metro included (`Next train`,
-  `Take this train`, `Getting the next trains…`). The word `metro` appears only
+  `Pin this train`, `Getting the next trains…`). The word `metro` appears only
   where the distinction changes what the rider does: the setup sheet's mode
-  label under a station, and a change between modes in journey detail. Line
-  colour and headsign carry the rest (owner ruling 2026-09-05).
+  label under a station, the next-service rail, and a change between modes
+  in journey detail. Line colour and headsign carry the rest.
 - Ferry-first journeys use `ferry` where journey-specific copy uses `train`:
-  `Next ferry`, `Take this ferry`, and `<time> cancelled · next ferry`.
+  `Next ferry`, `Pin this ferry`, and `<time> cancelled · next ferry`.
   Loading and no-journey states remain generic: `Getting the next trains…`.
   Train and metro legs call their boarding place `Platform`; ferry legs call
   it `Wharf`. A transfer uses the word for the leg being boarded. The client
@@ -275,20 +295,20 @@ substitutes for going back.
   scheduled time 13px, the arrival 16px in secondary ink at the right. Beneath
   them sit the 22px journey line — boarding cap, time axis, platform pins — and
   the 13px headsign line.
-- Row height is fixed. The board uses the dynamic viewport, its rows scroll
-  when the frame is too short for them, and its footer keeps a separate line
+- Direct rows retain their 96px minimum. Transfer rows grow to reserve a
+  separate station-label band and at least 6px before the headsign. The board
+  uses the dynamic viewport, its rows scroll when the frame is too short for
+  them, and its footer keeps a separate line
   outside the scroller. A sparse board leaves the space under its last row
   empty rather than distributing rows through it. When six services are
   returned, all six remain whole and reachable at 390×844 and 412×732.
-- Every change on a journey names the station it happens at beneath the
-  platform pin the rider boards from, so where to change and which platform to
-  go to are both readable without opening detail. On a two-change row the
-  second station label left-aligns and the second change's alighting pin is
-  hidden.
-- Ferry changes and transfers between different stops give the transfer name
-  its own band above the headsign, within the same 96px row. A platform pin
-  clamped against the boarding cap has a 2px ground-colour outline so the two
-  labels remain distinct.
+- Every change names its station beneath the midpoint of its transfer interval,
+  shared by the alighting and boarding platform markers. Names have their own
+  band on Home, results and detail; they never overlap a headsign or instruction.
+  Long names clamp to the device width and wrap; intersecting change names use
+  separate lines and expand the row. The second change's alighting pin remains
+  hidden on two-change results. Platform labels retain a 3px ground-colour
+  separator even where a short first leg puts the boarding cap beside a pin.
 - A tight change paints the dwell segment of the journey axis in the warning
   colour, and nothing else: never a ride segment, and never on a cancelled row.
   The row does not name the window; journey detail does.
@@ -400,7 +420,7 @@ substitutes for going back.
 - The screen closes with a heavy rule and the tail — effective arrival time,
   destination and arrival platform — or `JOURNEY CANCELLED` in the warning
   colour with the time struck. Beneath the tail is the freshness line, and
-  beneath that the 66px action rail `Take this train` or `Take this ferry`,
+  beneath that the 66px action rail `Pin this train` or `Pin this ferry`,
   chosen from the first leg, which shares its geometry with home's `New trip`
   rail.
 - Once the journey has departed, the promoted row's figure and provenance are
@@ -426,8 +446,12 @@ substitutes for going back.
   `<place>` is `Platform` for train and metro, and `Wharf` for ferry. The clause
   is omitted when upstream gives none. The boarding-place cap disappears after
   boarding.
-- The progress marker moves continuously from timetable and live estimates. It
-  is an inference from time, never a claim of continuous location tracking.
+- The progress marker moves continuously from timetable and live estimates only
+  during a ride or change. It is hidden before departure, even when pinned, and
+  after completion. The centered station label's small grey stem follows the
+  same active phases. Keep at least 6px between the station text and the
+  instruction below it. Progress is a time inference, never a claim of
+  continuous location tracking.
 
 ## Visual language
 
@@ -513,7 +537,7 @@ is a shot of the built client from `tools/shoot-states.js` or
 `tools/check-settings-browser.js`. A frame no instrument can reproduce is
 removed rather than left to rot.
 
-The existing board, home and detail set contains forty-five frames.
+The board, home and detail calibration frames are listed below.
 `tools/check-settings-browser.js --frames assets/comps/latest` adds seven
 Settings frames and two filtered-Home frames:
 
@@ -547,6 +571,13 @@ Settings frames and two filtered-Home frames:
   unfocused cancelled lead, `focused-cxl` a focused journey cancelled before it
   departs, `late` the `RUNNING LATE` treatment, and `back` the return direction
   with its real transfer platforms after the offer is accepted.
+- Pinned and next service: `home-390x844-mascot-before.png`,
+  `home-390x844-mascot-pinned.png` and `home-390x844-mascot-active.png`, with
+  `-light` variants and the same six frames at `412x732`. These reproduce the
+  approved short Mascot–Central leg: centered Central, separated platform
+  labels, the 44px next-service rail, explicit pin indication and at least
+  6px to the instruction. The source screenshot's overnight services are
+  scheduled-only; the active frame advances the clock to show travel state.
 - Ferry smart home: `home-390x844-ferry-pyrmont-focused.png` calibrates the
   generic `Wharf` origin with the compact `5B` to `4B` transfer;
   `home-390x844-ferry-numeric-focused.png` calibrates the full initial
@@ -563,12 +594,11 @@ Settings frames and two filtered-Home frames:
 
 Measurements these frames carry deliberately, so nothing above reads as drift:
 the two header clocks share a baseline to within 1px, which is the tolerance
-the instrument allows; the header's heavy rule sits 214px from the frame top
-at 390×844 with no receipt, which is what the content-sized block measures;
-a focused journey still shows its boarding cap and pre-departure progress
-marker before it leaves, so `home-390x844-focused-cxl` carries both;
+the instrument allows. Header height follows its transfer-label band, receipt
+and optional next-service rail. A future pinned journey keeps its boarding cap
+but has no progress marker or station stem;
 `home-390x844-inferred` carries the inferred line at 49px with its 48px action;
-its A2 variant has a 44px action and the rule at 258.25px;
+its A2 variant has a 44px action;
 `home-390x844-just-added` carries the 63px mark inside the sub line's 212px track;
 `detail-*-tight` shoots a change shortened by a late first leg,
 so its promoted row reads `5 MIN LATE`.

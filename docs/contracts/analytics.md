@@ -89,6 +89,8 @@ the header's answer adds a new exposure; A → B → A is three exposures.
 Only the first home row tap is classified, and setup is excluded from
 hit/miss attribution. Detail focus
 on another trip emits nothing. Silent location fixes emit no ask outcome.
+The next-service rail opens detail without a hit/miss event. Pinning that
+service uses the existing detail-focus rule for the last shown pair/direction.
 
 The setup save source follows how From was chosen: location row or prefill,
 nearest-station row, or search/recent choice. Editing and replacing From

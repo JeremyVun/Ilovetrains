@@ -175,9 +175,9 @@ block (the status string its top line must read, whether journey detail may
 carry an action rail), so the assertion lives beside the seed that causes it.
 What is checked, with the comp probes the numbers come from:
 
-- three full lines per board row, and a 96px row (at least 100px in detail)
-  with its rule drawn edge to edge of a row that is itself edge to edge of the
-  region holding it;
+- three full lines per board row, with a 96px base (at least 100px in detail)
+  that expands for a transfer-name band, and its rule drawn edge to edge of a
+  row that is itself edge to edge of the region holding it;
 - one figure column per view: detail uses 69px, the phone board uses 72px;
   each row figure and detail step time ends at `--sy-pad` + `--sy-fig`;
 - the figure fits that column, and our own copy is never ellipsised — an
@@ -198,7 +198,7 @@ What is checked, with the comp probes the numbers come from:
   segment and never on a cancelled row;
 - journey detail: steps 72px (change steps 82px), 18px between the summary and
   the heavy rule, a 66px action rail flush with the frame, and no rail at all
-  when the journey is cancelled or already followed;
+  when the journey is cancelled or already pinned;
 - home: the endpoint names share a top edge and the clocks share a *baseline*
   (measured with a zero-height inline-block probe, because the two clocks are
   different sizes and a shared box top is not the shared baseline ui.md binds),
@@ -232,6 +232,13 @@ The transfer states (`detail-hero`, `detail-tight`, `detail-cancelled`,
 `board-focused-scrolled`, `board-focused-departed`, `board-tight`,
 `board-cancelled-tight`, `board-two-change`) run on the transfer corridor from
 `web/test/fixture.js`; `detail-direct` runs on the Central → Parramatta board.
+The `mascot-*` states transcribe the owner's 2026-09-06 Mascot → Kellyville
+screenshot into a declared synthetic timetable: 04:38 → 05:46 via Central,
+then 04:53 → 05:56. They keep the short first leg that crowds platforms 1 and
+21, assert the transfer name at the dwell midpoint, the 3px ground separator,
+and marker/stem visibility by journey phase. `mascot-next-focus-source-handoff`
+also proves that a following service from a fresh focused source survives the
+first detail paint and becomes stale only after its refresh fails.
 Every `detail-*` state reaches the view by CLICKING a board row, so each one is
 also proof that the whole row is the tap target. Output defaults to the system
 temporary directory; use `--out` only for a deliberate comparison set:
@@ -306,7 +313,7 @@ change the produced filename, not the state, so rename by an explicit table and
 then **read every frame**: a stale `OFFLINE` board or a withheld figure is a
 convincing shot of the wrong screen, and so is the wrong route.
 
-The table covers the forty-five board, home and detail frames. `default` means
+The table covers the board, home and detail frames. `default` means
 no flags: the state carries its own size and the dark scheme is unsuffixed.
 
 | Exemplar | State | Invocation |
@@ -338,6 +345,18 @@ no flags: the state carries its own size and the dark scheme is unsuffixed.
 | `detail-390x844-ferry-pyrmont.png` | `ferry-pyrmont-detail` | default |
 | `detail-390x844-ferry-numeric.png` | `ferry-numeric-detail` | default |
 | `home-390x844-before.png` | `home-before` | default |
+| `home-390x844-mascot-before.png` | `mascot-before` | default |
+| `home-390x844-mascot-before-light.png` | `mascot-before` | `--media prefers-color-scheme:light` |
+| `home-412x732-mascot-before.png` | `mascot-before` | `--size 412x732` |
+| `home-412x732-mascot-before-light.png` | `mascot-before` | `--size 412x732 --media prefers-color-scheme:light` |
+| `home-390x844-mascot-pinned.png` | `mascot-pinned-before` | default |
+| `home-390x844-mascot-pinned-light.png` | `mascot-pinned-before` | `--media prefers-color-scheme:light` |
+| `home-412x732-mascot-pinned.png` | `mascot-pinned-before` | `--size 412x732` |
+| `home-412x732-mascot-pinned-light.png` | `mascot-pinned-before` | `--size 412x732 --media prefers-color-scheme:light` |
+| `home-390x844-mascot-active.png` | `mascot-active` | default |
+| `home-390x844-mascot-active-light.png` | `mascot-active` | `--media prefers-color-scheme:light` |
+| `home-412x732-mascot-active.png` | `mascot-active` | `--size 412x732` |
+| `home-412x732-mascot-active-light.png` | `mascot-active` | `--size 412x732 --media prefers-color-scheme:light` |
 | `home-390x844-change.png` | `home-change` | default |
 | `home-390x844-final.png` | `home-final` | default |
 | `home-390x844-tight.png` | `home-delayed` | default |
@@ -372,14 +391,13 @@ images. A frame neither instrument can produce is removed.
 
 The `short-*` states shoot the board at **412x732** — a 412px Android with its
 browser chrome on screen, which is the frame the owner's phone actually gets and
-the one six three-line rows do not fit. Each is shot twice, before and after a
+the one six rows do not fit. Rows without transfer names retain the 96px base;
+transfer-name bands expand their rows so the name, headsign and divider remain
+separate. Each short state is shot twice, before and after a
 driven scroll to the end, because "the sixth service is reachable" is a claim
 about a gesture and not about a still image. The scroll-reachability invariant
 above is the one that would have caught the defect they exist for: run it
-against `overflow: hidden` and it reports `21px of board is cut off with no way
-to scroll to it` at 412x732. At 390x844 it reports nothing any more — six 96px
-rows fit that frame, which is exactly why the 412 states are the ones that
-matter.
+against `overflow: hidden` and reports the unreachable pixels at 412x732.
 
 ## measure-open.js and make-icons.sh
 

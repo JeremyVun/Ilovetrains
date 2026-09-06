@@ -9,10 +9,11 @@ function journeyGeometryProblems(root = document) {
   function hasSeparator(element) {
     const style = getComputedStyle(element);
     const ground = getComputedStyle(document.body).backgroundColor;
+    const border = parseFloat(style.borderLeftWidth) >= 1 && style.borderLeftColor === ground;
     const shadow = style.boxShadow;
     const lengths = shadow.replace(/rgba?\([^)]*\)/g, '').trim().split(/\s+/).map(parseFloat);
-    return shadow.includes(ground) && lengths[0] === 0 && lengths[1] === 0
-      && lengths[2] === 0 && lengths[3] >= 1;
+    return border || (shadow.includes(ground) && lengths[0] === 0 && lengths[1] === 0
+      && lengths[2] === 0 && lengths[3] >= 1);
   }
   function textRects(element, clip = false) {
     if (!element) return [];
@@ -72,7 +73,7 @@ function journeyGeometryProblems(root = document) {
         }
         const cap = [devices[i], devices[j]].find(({ element }) => element.classList.contains('sy-cap'));
         const pin = [devices[i], devices[j]].find(({ element }) =>
-          element.matches('.sy-p[data-clamped="1"]') || element.closest('.sy-p[data-clamped="1"]'));
+          element.matches('.sy-p') || element.closest('.sy-p'));
         if (cap && pin && Math.abs(cap.box.right - pin.box.left) <= 1
           && Math.min(cap.box.bottom, pin.box.bottom) > Math.max(cap.box.top, pin.box.top)
           && !hasSeparator(pin.element)) {

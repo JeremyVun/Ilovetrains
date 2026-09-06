@@ -65,6 +65,7 @@ const state = {
   root: null,
   view: null,
   journey: null,
+  detailHandoff: null,
   initialBoardLanding: true,
   loadingPast: false,
   pastExhausted: false,
@@ -876,6 +877,14 @@ function wireTimeline() {
 
 function homeAction(action, element) {
   if (action === 'settings') return ctx.go('#/settings');
+  if (action === 'next-service') {
+    const next = lastHome?.following;
+    if (!next || next.key !== element.dataset.match) return;
+    state.selection = { ...lastHome.selected };
+    state.journey = next.journey;
+    state.detailHandoff = { key: currentKey(), journeyKey: next.key, ...next.source };
+    return ctx.go('#/journey');
+  }
   suppressPreferenceEvents = false;
   if (action === 'new-trip') return ctx.go('#/trips/new');
   if (action === 'open-trip') {
@@ -988,6 +997,13 @@ function showDetail(root) {
   }
   state.view = 'detail';
   loadSelectedCache();
+  const handoff = state.detailHandoff;
+  state.detailHandoff = null;
+  if (handoff?.key === currentKey() && handoff.journeyKey === journeyKey(state.journey)) {
+    state.body = filterBody(handoff.body, enabledModes());
+    state.offline = handoff.offline;
+    state.serverStale = handoff.serverStale;
+  }
   renderDetail();
   onAction(root, detailAction);
   startTimers(false);

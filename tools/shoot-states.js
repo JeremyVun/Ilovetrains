@@ -90,6 +90,14 @@ const TRIP_TRANSFER = {
   to: { id: '202210', name: 'Bondi Junction Station' },
   createdAt: '2026-08-01T08:00:00+10:00'
 };
+/* Owner screenshot transcription, 2026-09-06: the short T8 leg and Central
+   transfer that exposed platform crowding in both the header and board. */
+const TRIP_MASCOT = {
+  id: 'trip-mascot-kellyville',
+  from: { id: '202010', name: 'Mascot Station' },
+  to: { id: '2155382', name: 'Kellyville Station' },
+  createdAt: '2026-09-06T20:53:00+10:00'
+};
 /* The same corridor with the station coordinates the distance line needs; the
    ids are unchanged, so the seeded cache still matches. */
 const TRIP_TRANSFER_LOCATED = {
@@ -286,6 +294,68 @@ async function states() {
   });
 
   const TRANSFER_AT = '2026-09-01T09:21:00+10:00';
+
+  /* S1 — owner screenshot transcription. The capture supplies the endpoints,
+     clocks, platforms, lines and headsign. The unprinted segment times use the
+     comp's declared 11 / 7 / 50 minute lead axis; the following service keeps
+     the capture's 04:53 → 05:56 clocks with the same 11 / 7 shape. */
+  const mascotAt = (hhmm, day = 7) => `2026-09-0${day}T${hhmm}:00+10:00`;
+  const mascotTimes = (hhmm, day = 7) => ({
+    scheduled: mascotAt(hhmm, day), estimated: null
+  });
+  const mascotJourney = ({ dep, centralIn, centralOut, arr }) => {
+    const legDetail = [{
+      line: { name: 'T8', mode: 'train' }, headsign: 'City Circle via Museum',
+      from: { id: '202010', name: 'Mascot Station', platform: 'Platform 1' },
+      to: { id: '200060', name: 'Central Station', platform: 'Platform 21' },
+      departure: mascotTimes(dep), arrival: mascotTimes(centralIn), cancelled: false
+    }, {
+      line: { name: 'M1', mode: 'metro' }, headsign: 'Tallawong',
+      from: { id: '200060', name: 'Central Station', platform: 'Platform 26' },
+      to: { id: '2155382', name: 'Kellyville Station', platform: 'Platform 2' },
+      departure: mascotTimes(centralOut), arrival: mascotTimes(arr), cancelled: false
+    }];
+    return {
+      departure: { ...legDetail[0].departure, platform: 'Platform 1' },
+      arrival: { ...legDetail[1].arrival }, line: { name: 'T8', mode: 'train' },
+      destinationHeadsign: 'City Circle via Museum', stopsAway: null,
+      cancelled: false, legs: 2, legDetail
+    };
+  };
+  const mascotJourneys = () => [
+    mascotJourney({ dep: '04:38', centralIn: '04:49', centralOut: '04:56', arr: '05:46' }),
+    mascotJourney({ dep: '04:53', centralIn: '05:04', centralOut: '05:11', arr: '05:56' })
+  ];
+  const mascotBody = (generatedAt = '2026-09-06T20:53:00+10:00') => ({
+    from: { ...TRIP_MASCOT.from }, to: { ...TRIP_MASCOT.to }, generatedAt,
+    journeys: mascotJourneys()
+  });
+  const mascot = (name, opts = {}) => {
+    const generatedAt = opts.generatedAt || '2026-09-06T20:53:00+10:00';
+    const body = mascotBody(generatedAt);
+    const seed = doc({
+      trips: [TRIP_MASCOT], body, hist: [], fetchedAt: opts.fetchedAt || generatedAt,
+      focus: opts.focus ? body.journeys[opts.focusIndex || 0] : null
+    });
+    if (seed.focus) seed.focus.by = opts.focusBy || 'focus';
+    return {
+      name, seed, now: opts.now, body, route: '#/',
+      events: opts.events || [opts.focus ? (opts.focusBy === 'inferred' ? 'shown_inferred' : 'shown_focus') : 'shown_predicted'],
+      after: opts.after, expect: opts.expect
+    };
+  };
+
+  const metroBody = () => {
+    const one = (dep, arr) => ({
+      departure: { ...mascotTimes(dep), platform: 'Platform 1' },
+      arrival: mascotTimes(arr), line: { name: 'M1', mode: 'metro' },
+      destinationHeadsign: 'Chatswood', stopsAway: null, cancelled: false, legs: 1
+    });
+    return {
+      from: { ...TRIP_METRO.from }, to: { ...TRIP_METRO.to },
+      generatedAt: '2026-09-07T04:33:00+10:00', journeys: [one('04:38', '05:05'), one('04:53', '05:20')]
+    };
+  };
 
   /* A board (and optionally a focus) on the transfer corridor. */
   const transfer = (name, journeys, opts = {}) => {
@@ -595,7 +665,7 @@ async function states() {
     now: Date.parse('2026-09-01T09:40:00+10:00'),
     generatedAt: '2026-09-01T09:40:00+10:00',
     geo: IX.strathfield.location,
-    expect: { status: 'Running', strip: true, receipt: null, ruleTop: 214.3 }
+    expect: { status: 'Running', strip: true, receipt: null, ruleTop: 222.3 }
   });
 
   const inferredLong = () => {
@@ -675,8 +745,135 @@ async function states() {
   const save = document.querySelector('[data-act="save"]');
   save.click();
   save.click();
-  await sleep(160);`
+      await sleep(160);`
     },
+    mascot('mascot-before', {
+      now: Date.parse('2026-09-06T20:53:00+10:00'),
+      expect: {
+        next: ['Next train', '8H', '04:53', '05:56'], pinned: false,
+        marker: false, transferStem: false, transferStation: 'Central',
+        transferMidpoint: true, platformSeparator: true, sideBySideSpines: true
+      }
+    }),
+    mascot('mascot-pinned-before', {
+      now: Date.parse('2026-09-06T20:53:00+10:00'), focus: true,
+      expect: {
+        status: 'Pinned', next: ['Next train', '8H', '04:53', '05:56'], pinned: true,
+        marker: false, transferStem: false, transferStation: 'Central',
+        transferMidpoint: true, platformSeparator: true, sideBySideSpines: true
+      }
+    }),
+    mascot('mascot-active', {
+      now: Date.parse('2026-09-07T04:44:00+10:00'),
+      generatedAt: '2026-09-07T04:44:00+10:00', focus: true,
+      expect: {
+        status: 'Running · Pinned', next: null, pinned: true,
+        marker: true, transferStem: true, transferStation: 'Central',
+        transferMidpoint: true, transferInstructionGap: 6,
+        platformSeparator: true, sideBySideSpines: true
+      }
+    }),
+    mascot('mascot-inferred-active', {
+      now: Date.parse('2026-09-07T04:44:00+10:00'),
+      generatedAt: '2026-09-07T04:44:00+10:00', focus: true, focusBy: 'inferred',
+      expect: {
+        status: 'Running', next: null, pinned: false, marker: true,
+        transferStem: true, transferStation: 'Central', transferMidpoint: true,
+        transferInstructionGap: 6, platformSeparator: true, sideBySideSpines: true
+      }
+    }),
+    mascot('mascot-stale-before', {
+      now: Date.parse('2026-09-07T04:33:00+10:00'),
+      generatedAt: '2026-09-07T00:33:00+10:00',
+      expect: {
+        next: ['Next train', '', '04:53', '05:56'], pinned: false,
+        marker: false, transferStem: false, transferStation: 'Central'
+      }
+    }),
+    mascot('mascot-next-pin-flow', {
+      now: Date.parse('2026-09-07T04:33:00+10:00'),
+      generatedAt: '2026-09-07T04:33:00+10:00',
+      events: ['shown_predicted', 'hit_predicted', 'shown_focus'],
+      after: `
+  document.querySelector('[data-next-service]').click();
+  await sleep(140);
+  {
+    const row = document.querySelector('.detail-scroll [data-t="row"]');
+    if (!row || !row.textContent.includes('04:53')) console.error('next service did not open its 04:53 journey detail');
+    const action = document.querySelector('[data-act="focus"]');
+    if (!action || action.textContent.trim() !== 'Pin this train') console.error('next journey detail does not offer Pin this train');
+    action.click();
+    await sleep(160);
+  }`,
+      expect: {
+        status: 'Pinned', pinned: true, marker: false, transferStem: false,
+        departure: '04:53', next: null
+      }
+    }),
+    (() => {
+      const fresh = mascotBody('2026-09-07T04:33:00+10:00');
+      const seed = doc({
+        trips: [TRIP_MASCOT], body: null, fetchedAt: fresh.generatedAt,
+        hist: [], focus: fresh.journeys[0]
+      });
+      seed.focus.by = 'focus';
+      return {
+        name: 'mascot-next-focus-source-handoff', seed,
+        now: Date.parse('2026-09-07T04:33:00+10:00'), body: null, route: '#/',
+        events: ['shown_focus'],
+        after: `
+  {
+    const { departureKey } = await import('/js/journey.js');
+    const sourceBody = ${JSON.stringify(fresh)};
+    t.state.body = null;
+    t.state.focusBody = sourceBody;
+    t.state.focusIdentity = t.state.doc.focus.tripId + ':' + t.state.doc.focus.direction + ':'
+      + departureKey(t.state.doc.focus.journey);
+    t.state.focusOffline = false;
+    t.state.focusServerStale = false;
+    t.rerender();
+    await sleep(60);
+    const next = document.querySelector('[data-next-service]');
+    if (!next || !next.textContent.includes('04:53') || !next.textContent.includes('05:56')) {
+      console.error('fresh focus source did not supply the following service');
+    }
+    if (!next) throw new Error('fresh focus source following service is unavailable');
+    let failRefresh;
+    window.fetch = () => new Promise((resolve, reject) => { failRefresh = reject; });
+    next.click();
+    await sleep(50);
+    const first = document.querySelector('.detail-scroll [data-t="row"]');
+    const firstFooter = document.querySelector('[data-t="footer"]');
+    if (!first || !first.textContent.includes('04:53') || !first.textContent.includes('05:56')
+        || !first.textContent.replace(/\\s+/g, '').includes('20min')) {
+      console.error('next-service handoff lost its fresh clocks or countdown on first detail paint');
+    }
+    if (!firstFooter || !firstFooter.textContent.includes('Updated')
+        || firstFooter.textContent.includes('Offline')) {
+      console.error('next-service handoff did not preserve fresh provenance on first detail paint');
+    }
+    failRefresh(new TypeError('offline'));
+    await sleep(180);
+    const stale = document.querySelector('.detail-scroll [data-t="row"]');
+    const staleFooter = document.querySelector('[data-t="footer"]');
+    if (!stale || !stale.textContent.includes('04:53') || !stale.textContent.includes('05:56')) {
+      console.error('failed detail refresh discarded the handed-off journey');
+    }
+    if (!staleFooter || !staleFooter.textContent.includes('Offline')) {
+      console.error('failed detail refresh did not mark the handed-off journey stale');
+    }
+  }`,
+        expect: { copy: ['04:53', '05:56', 'Pin this train'] }
+      };
+    })(),
+    (() => {
+      const body = metroBody();
+      return {
+        name: 'metro-next', seed: doc({ trips: [TRIP_METRO], body, hist: [], fetchedAt: body.generatedAt }),
+        now: Date.parse('2026-09-07T04:33:00+10:00'), body, route: '#/', events: ['shown_predicted'],
+        expect: { next: ['Next metro', '20min', '04:53', '05:20'], pinned: false, marker: false }
+      };
+    })(),
     home('home-before', transferJourneys(), { expect: { status: 'Next train' } }),
     home('home-delayed', tighten(transferJourneys()), { expect: { status: 'Next train' } }),
     home('home-cancelled', (() => {
@@ -689,13 +886,13 @@ async function states() {
       now: Date.parse('2026-09-01T09:53:00+10:00'),
       generatedAt: '2026-09-01T09:53:00+10:00',
       focus: transferJourneys()[0],
-      expect: { status: 'Running' }
+      expect: { status: 'Running · Pinned' }
     }),
     home('home-final', transferJourneys(), {
       now: Date.parse('2026-09-01T10:01:00+10:00'),
       generatedAt: '2026-09-01T10:01:00+10:00',
       focus: transferJourneys()[0],
-      expect: { status: 'Running' }
+      expect: { status: 'Running · Pinned' }
     }),
 
     /* --- the smart home's own states ------------------------------------ */
@@ -721,14 +918,14 @@ async function states() {
       now: Date.parse('2026-09-01T09:53:00+10:00'),
       generatedAt: '2026-09-01T09:53:00+10:00',
       focus: lateSecond()[0],
-      expect: { status: 'Running late' }
+      expect: { status: 'Running late · Pinned' }
     }),
     // The first leg late, read while riding it.
     home('home-late-first', lateFirst(), {
       now: Date.parse('2026-09-01T09:33:00+10:00'),
       generatedAt: '2026-09-01T09:33:00+10:00',
       focus: lateFirst()[0],
-      expect: { status: 'Running late' }
+      expect: { status: 'Running late · Pinned' }
     }),
     // A four-hour-old snapshot carrying a stored nine-minute delay still says
     // RUNNING: a stale delta is not evidence of lateness.
@@ -736,14 +933,14 @@ async function states() {
       now: Date.parse('2026-09-01T09:53:00+10:00'),
       generatedAt: '2026-09-01T05:53:00+10:00',
       focus: staleLate()[0],
-      expect: { status: 'Running' }
+      expect: { status: 'Running · Pinned' }
     }),
     // No realtime control on either leg: nothing to be late against.
     home('home-scheduled-focused', scheduledOnly(), {
       now: Date.parse('2026-09-01T09:53:00+10:00'),
       generatedAt: '2026-09-01T09:53:00+10:00',
       focus: scheduledOnly()[0],
-      expect: { status: 'Running' }
+      expect: { status: 'Running · Pinned' }
     }),
     // Cancelled before it departs, the header hands over to the next running
     // service while the status still reads CANCELLED.
@@ -758,13 +955,13 @@ async function states() {
       now: Date.parse('2026-09-01T10:11:00+10:00'),
       generatedAt: '2026-09-01T10:11:00+10:00',
       focus: transferJourneys()[0],
-      expect: { status: 'Trip over' }
+      expect: { status: 'Trip over · Pinned' }
     }),
     home('home-five-trips', transferJourneys(), {
       trips: [TRIP_TRANSFER_LOCATED, TRIP_CENTRAL_LOCATED, TRIP_METRO, TRIP_MEADOWBANK, TRIP_EPPING],
       focus: transferJourneys()[0],
       cache: { '200060-215020': departuresBody() },
-      expect: { status: 'Running' }
+      expect: { status: 'Running · Pinned' }
     }),
     /* The corridor's real four-minute change, read before its train has left:
        the gap is already painted and the instruction is still the headsign. */
@@ -772,7 +969,7 @@ async function states() {
       now: Date.parse('2026-09-01T10:30:00+10:00'),
       generatedAt: '2026-09-01T10:30:00+10:00',
       focus: transferJourneys()[5],
-      expect: { status: 'Running' },
+      expect: { status: 'Pinned' },
       after: `
   {
     const gap = document.querySelector('.hm-hd [data-tight-gap="true"]');
@@ -838,12 +1035,12 @@ async function states() {
     smart('home-inferred-a2', {
       ...inferred(), telemetry: { opens: 5, bucket: 37 }, variant: 'a2',
       events: ['shown_predicted', 'entered_inferred', 'shown_inferred'],
-      expect: { status: 'Running', strip: true, stripSlot: 'receipt', ruleTop: 258.3 }
+      expect: { status: 'Running', strip: true, stripSlot: 'receipt', ruleTop: 266.3 }
     }),
     smart('home-inferred-a2-long', {
       ...inferredLong(), telemetry: { opens: 5, bucket: 37 }, variant: 'a2',
       events: ['shown_predicted', 'entered_inferred', 'shown_inferred'],
-      expect: { status: 'Running', strip: true, stripSlot: 'receipt', ruleTop: 258.3 }
+      expect: { status: 'Running', strip: true, stripSlot: 'receipt', ruleTop: 266.3 }
     }),
     // ...and the one control that mode has, which opens the familiar sheet on
     // the departure station it already knows.
@@ -1045,7 +1242,7 @@ async function states() {
     transfer('focus-returns-home', transferJourneys(), {
       after: `${OPEN_ROW(0)} document.querySelector('[data-act="focus"]').click(); await sleep(160);`,
       events: ['shown_focus'],
-      expect: { status: 'Running' }
+      expect: { status: 'Running · Pinned' }
     }),
 
     home('reverse-real-platforms', transferJourneys(), {
@@ -1149,7 +1346,7 @@ async function states() {
       now: Date.parse(pyrmontDoubleBayBody.generatedAt),
       focus: pyrmontDoubleBayBody.journeys[1],
       expect: {
-        status: 'Running',
+        status: 'Pinned',
         caps: ['Wharf'],
         ferryLocations: [
           loc('origin', 'Pyrmont Bay Wharf', 'Pyrmont Bay Wharf', 'Wharf'), ...pyrmontRows[1]
@@ -1174,7 +1371,7 @@ async function states() {
       now: Date.parse(circularQuayManlyBody.generatedAt),
       focus: circularQuayManlyBody.journeys[1],
       expect: {
-        status: 'Running',
+        status: 'Pinned',
         caps: ['Wharf 4, Side B'],
         ferryLocations: [loc('origin', 'Circular Quay', 'Wharf 4, Side B')],
         ferryCodes: ['F1']
@@ -1199,7 +1396,7 @@ async function states() {
       now: Date.parse(doubleBayPyrmontBody.generatedAt),
       focus: doubleBayPyrmontBody.journeys[0],
       expect: {
-        status: 'Running',
+        status: 'Pinned',
         caps: ['Wharf'],
         ferryLocations: [
           loc('origin', 'Double Bay Wharf', 'Double Bay Wharf', 'Wharf'), ...doubleBayRows[0]
@@ -1223,7 +1420,7 @@ async function states() {
           loc('arrival', 'Double Bay Wharf', 'Double Bay Wharf', '—')
         ],
         boardingLocations: ['Wharf 4, Side B'],
-        copy: ['Pyrmont Bay Wharf', 'Double Bay Wharf', 'Take this ferry'],
+        copy: ['Pyrmont Bay Wharf', 'Double Bay Wharf', 'Pin this ferry'],
         accessibleCopy: ['Pyrmont Bay Wharf'],
         ferryCodes: ['F4', 'F7']
       }
@@ -1244,7 +1441,7 @@ async function states() {
           loc('arrival', 'Pyrmont Bay Wharf', 'Pyrmont Bay Wharf', '—')
         ],
         boardingLocations: ['Wharf 5, Side A'],
-        copy: ['Double Bay Wharf', 'Pyrmont Bay Wharf', 'Take this ferry'],
+        copy: ['Double Bay Wharf', 'Pyrmont Bay Wharf', 'Pin this ferry'],
         ferryCodes: ['F7', 'F4']
       }
     }),
@@ -1260,28 +1457,28 @@ async function states() {
           loc('origin', 'Circular Quay', 'Wharf 4, Side B'),
           loc('arrival', 'Manly Wharf', 'Wharf 1', '1')
         ],
-        copy: ['Circular Quay', 'Manly Wharf', 'Take this ferry'],
+        copy: ['Circular Quay', 'Manly Wharf', 'Pin this ferry'],
         ferryCodes: ['F1']
       }
     }),
 
     ferry('ferry-home', ferryBody(), {
       route: '#/',
-      expect: { status: 'Next ferry', ferryCodes: ['MFF'] }
+      expect: { status: 'Next ferry', nextLabel: 'Next ferry', ferryCodes: ['MFF'] }
     }),
     ferry('ferry-board', ferryBody(), {
       expect: { copy: ['Wharf 2, Side A', 'Wharf 3, Side A'], ferryCodes: ['MFF', 'F1'] }
     }),
     ferry('ferry-detail', ferryBody(), {
       after: OPEN_ROW(1),
-      expect: { rail: true, copy: ['Take this ferry', 'Wharf 3, Side A'], ferryCodes: ['F1'] }
+      expect: { rail: true, copy: ['Pin this ferry', 'Wharf 3, Side A'], ferryCodes: ['F1'] }
     }),
     ferry('ferry-focus-before', ferryBody({ generatedAt: '2026-09-05T15:43:00+10:00' }), {
       route: '#/',
       now: Date.parse('2026-09-05T15:43:00+10:00'),
       focus: ferryJourneys()[1],
       after: FIX(-33.861351, 151.210813, Date.parse('2026-09-05T15:43:00+10:00')),
-      expect: { status: 'Running', copy: ['Leave now for Wharf 3, Side A'], ferryCodes: ['F1'] }
+      expect: { status: 'Pinned', copy: ['Leave now for Wharf 3, Side A'], ferryCodes: ['F1'] }
     }),
     ferry('ferry-distinct-stop-board', balmainEastBody(), {
       trip: TRIP_BALMAIN_EAST,
@@ -1292,7 +1489,7 @@ async function states() {
       after: OPEN_ROW(1),
       expect: {
         rail: true,
-        copy: ['Wynyard → Barangaroo', 'Board F4 · Balmain East', 'Wharf 2, Side B', 'Take this train'],
+        copy: ['Wynyard → Barangaroo', 'Board F4 · Balmain East', 'Wharf 2, Side B', 'Pin this train'],
         aria: ['Wharf 2, Side B · F4'],
         ferryCodes: ['F4']
       }
@@ -1303,7 +1500,7 @@ async function states() {
       expect: {
         rail: true,
         compactPromoted: true,
-        copy: ['Side A', 'Balmain Wharf', 'Take this ferry'],
+        copy: ['Side A', 'Balmain Wharf', 'Pin this ferry'],
         notCopy: ['Wharf Side A', 'Wharf Balmain Wharf'],
         detailChips: ['Wharf 1, Side B', 'A', 'A', '—'],
         ferryLocations: [
@@ -1340,7 +1537,7 @@ async function states() {
       expect: {
         rail: true,
         compactPromoted: true,
-        copy: ['arrives 16:07', 'Board F1 · Manly', 'Wharf 3, Side A', 'Take this train'],
+        copy: ['arrives 16:07', 'Board F1 · Manly', 'Wharf 3, Side A', 'Pin this train'],
         aria: ['Wharf 3, Side A · F1'],
         ferryLocations: [
           loc('board', 'Circular Quay', 'Wharf 3, Side A', '3A'),
@@ -1357,7 +1554,7 @@ async function states() {
       after: OPEN_ROW(0),
       expect: {
         rail: true,
-        copy: ['arrives 16:00', 'Board MFF · Manly', 'Wharf 2, Side A', 'Take this train'],
+        copy: ['arrives 16:00', 'Board MFF · Manly', 'Wharf 2, Side A', 'Pin this train'],
         aria: ['Wharf 2, Side A · MFF'],
         ferryCodes: ['MFF']
       }
@@ -1530,6 +1727,11 @@ function pageScript(state) {
   t.state.fix = null;
   t.state.geoPermission = null;
   t.state.body = null;
+  t.state.focusBody = null;
+  t.state.focusIdentity = null;
+  t.state.focusOffline = false;
+  t.state.focusServerStale = false;
+  t.state.detailHandoff = null;
   t.state.journey = null;
   t.state.offline = false;
   t.route();
@@ -1592,9 +1794,13 @@ function pageScript(state) {
       const lines = ['.sy-t', '.sy-j', '.sy-sign'].map((s) => row.querySelector(s));
       if (lines.some((el) => !el || !el.textContent.trim())) problems.push('row is not three full lines');
 
-      // Long transfer instructions may expand a promoted row.
+      // Transfer-name bands are part of the row. They may make an ordinary
+      // board row taller than the 96px base, and must remain reachable rather
+      // than being clipped back into the old fixed slot.
       const height = promoted ? 100 : 96;
-      const canGrow = promoted && row.classList.contains('change') && !expect.compactPromoted;
+      const transferBand = Boolean(row.querySelector('.sy-j.has-changes'));
+      const canGrow = transferBand
+        || (promoted && row.classList.contains('change') && !expect.compactPromoted);
       if (canGrow ? box.height < height - 0.5 : !near(box.height, height)) {
         problems.push('the row is ' + round(box.height) + 'px, not the ledger’s ' + height);
       }
@@ -1822,6 +2028,99 @@ function pageScript(state) {
     if (expect.status !== undefined) {
       const said = topStatus ? topStatus.textContent.trim() : null;
       if (said !== expect.status) problems.push('the top line reads "' + said + '", not "' + expect.status + '"');
+    }
+
+    const nextService = document.querySelector('[data-next-service]');
+    if (expect.next === null && nextService) problems.push('the next service is shown when it should be hidden');
+    if (Array.isArray(expect.next)) {
+      if (!nextService) {
+        problems.push('the next service is missing');
+      } else {
+        const times = [...nextService.querySelectorAll('time')].map((node) => node.textContent.trim());
+        const actual = [
+          nextService.querySelector('.hm-next-label')?.textContent.trim() || '',
+          (nextService.querySelector('.hm-next-count')?.textContent || '').replace(/\s+/g, ''),
+          times[0] || '', times[1] || ''
+        ];
+        if (actual.join('/') !== expect.next.join('/')) {
+          problems.push('the next service reads ' + actual.join('/') + ', not ' + expect.next.join('/'));
+        }
+      }
+    }
+    if (expect.nextLabel !== undefined) {
+      const label = nextService?.querySelector('.hm-next-label')?.textContent.trim() || null;
+      if (label !== expect.nextLabel) problems.push('the next service label is ' + label + ', not ' + expect.nextLabel);
+    }
+    const pinned = Boolean(document.querySelector('[data-pinned]'));
+    if (expect.pinned !== undefined && pinned !== expect.pinned) {
+      problems.push('the pinned indication is ' + (pinned ? 'shown' : 'missing'));
+    }
+    const homeMarker = Boolean(document.querySelector('.hm-hd .sy-mk'));
+    if (expect.marker !== undefined && homeMarker !== expect.marker) {
+      problems.push('the progress marker is ' + (homeMarker ? 'shown' : 'missing'));
+    }
+    const transferLabel = document.querySelector('.hm-hd [data-transfer-station]');
+    if (expect.transferStation !== undefined) {
+      const said = transferLabel ? transferLabel.textContent.trim() : null;
+      if (said !== expect.transferStation) {
+        problems.push('the transfer station reads ' + JSON.stringify(said) + ', not ' + JSON.stringify(expect.transferStation));
+      }
+    }
+    if (transferLabel) {
+      const stem = getComputedStyle(transferLabel, '::before');
+      const hasStem = transferLabel.classList.contains('travelling') && stem.content !== 'none'
+        && px(stem.height) > 0 && px(stem.width) > 0;
+      if (expect.transferStem !== undefined && hasStem !== expect.transferStem) {
+        problems.push('the transfer stem is ' + (hasStem ? 'shown' : 'missing'));
+      }
+      if (expect.transferMidpoint) {
+        const bar = transferLabel.closest('.sy-bar');
+        const labelBox = transferLabel.getBoundingClientRect();
+        const barBox = bar && bar.getBoundingClientRect();
+        const midpoint = Number(transferLabel.dataset.midpoint);
+        const expectedX = barBox && Number.isFinite(midpoint) ? barBox.left + barBox.width * midpoint / 100 : null;
+        if (expectedX === null || !near(labelBox.left + labelBox.width / 2, expectedX, 0.75)) {
+          problems.push('the transfer station is not centred on its dwell midpoint');
+        }
+      }
+      if (expect.transferInstructionGap !== undefined) {
+        const instruction = document.querySelector('.hm-hd .hm-sign');
+        const labelRange = document.createRange();
+        labelRange.selectNodeContents(transferLabel);
+        const labelText = [...labelRange.getClientRects()].at(-1);
+        const gap = instruction && labelText ? instruction.getBoundingClientRect().top - labelText.bottom : null;
+        if (gap === null || gap < expect.transferInstructionGap - 0.5) {
+          problems.push('the transfer station/instruction gap is ' + (gap === null ? 'unmeasurable' : round(gap))
+            + 'px, under ' + expect.transferInstructionGap + 'px');
+        }
+      }
+    } else if (expect.transferStem === true || expect.transferMidpoint || expect.transferInstructionGap !== undefined) {
+      problems.push('the transfer station needed for geometry checks is missing');
+    }
+    if (expect.platformSeparator) {
+      const pins = [...document.querySelectorAll('.hm-hd .sy-p')];
+      const ground = getComputedStyle(document.body).backgroundColor;
+      if (!pins.length || pins.some((pin) => px(getComputedStyle(pin).borderLeftWidth) < 3
+          || getComputedStyle(pin).borderLeftColor !== ground)) {
+        problems.push('a transfer platform lacks the 3px ground-colour separator');
+      }
+    }
+    if (expect.sideBySideSpines) {
+      const lines = [...document.querySelectorAll('[data-t="trip-list"] .tripr .hm-spine i')];
+      if (lines.length < 2) {
+        problems.push('the saved-trip service spines are missing');
+      } else {
+        const first = lines[0].getBoundingClientRect();
+        const second = lines[1].getBoundingClientRect();
+        const verticalOverlap = Math.min(first.bottom, second.bottom) - Math.max(first.top, second.top);
+        if (second.left <= first.right || verticalOverlap <= 1) {
+          problems.push('the saved-trip service spines are stacked instead of side by side');
+        }
+      }
+    }
+    if (expect.departure !== undefined) {
+      const said = document.querySelector('.hm-e.from .hm-t')?.textContent.trim() || null;
+      if (said !== expect.departure) problems.push('the lead departure is ' + said + ', not ' + expect.departure);
     }
     if (Array.isArray(expect.boardHeader)) {
       const endpoints = [...document.querySelectorAll('.sy-h1 > b')];
@@ -2139,9 +2438,26 @@ function pageScript(state) {
     const futureRows = timeline ? [...timeline.querySelectorAll('.sy-fwd > .sy-row')] : [];
     if (timeline && futureRows.length === 6 && !timeline.querySelector(':scope > .sy-row')) {
       const heights = futureRows.map((row) => row.getBoundingClientRect().height);
-      if (heights.some((height) => !near(height, 96))
-          || Math.max(...heights) - Math.min(...heights) > 0.2) {
-        problems.push('six future services are not six whole equal slots');
+      if (heights.some((height) => height < 95.5)) {
+        problems.push('a future service is shorter than its 96px base slot');
+      }
+      const signatures = new Map();
+      futureRows.forEach((row, index) => {
+        const rowTop = row.getBoundingClientRect().top;
+        const labels = [...row.querySelectorAll('[data-transfer-station]')];
+        const lines = labels.map((label) => {
+          const box = label.getBoundingClientRect();
+          return round(box.top - rowTop) + 'x' + round(box.height);
+        }).join(',');
+        const signature = labels.length + ':' + lines;
+        const previous = signatures.get(signature);
+        if (previous !== undefined && !near(heights[index], previous, 0.2)) {
+          problems.push('equivalent future services do not use equal whole slots');
+        }
+        signatures.set(signature, heights[index]);
+      });
+      if (futureRows.some((row) => row.scrollHeight > row.clientHeight + 1)) {
+        problems.push('a future service clips content inside its expanded slot');
       }
     }
     if (${JSON.stringify(state.name)} === 'past-register' && timeline) {

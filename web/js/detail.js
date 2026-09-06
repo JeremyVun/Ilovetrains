@@ -85,5 +85,5 @@ function tailHtml(arrival) {
    unfocus; the back control is the way out. */
 function railHtml(model) {
   if (model.cancelled || model.focused) return '';
-  return `<div class="hm-bar detail-rail" data-footer-rail><button data-act="focus">Take this ${esc(model.vehicle)}</button></div>`;
+  return `<div class="hm-bar detail-rail" data-footer-rail><button data-act="focus">Pin this ${esc(model.vehicle)}</button></div>`;
 }

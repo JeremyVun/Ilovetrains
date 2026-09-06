@@ -73,7 +73,7 @@ test('ferry detail keeps a full origin and compact transfer chip with full direc
 
   assert.match(html, /data-ferry-location="Wharf 3, Side A" data-role="origin" data-stop="Circular Quay"[^>]*aria-label="Wharf 3, Side A · F1"[^>]*>Wharf 3, Side A<\/b>/);
   assert.match(html, /<span class="lbl p">Wharf 1<\/span>/);
-  assert.match(html, />Take this ferry<\/button>/);
+  assert.match(html, />Pin this ferry<\/button>/);
 
   const mixed = mixedJourneys()[1];
   const mixedHtml = detailHtml({
@@ -110,7 +110,7 @@ test('a cancelled journey warns in the summary, strikes its steps and offers no 
   assert.match(html, /Arrive · Journey cancelled/);
   assert.match(html, /<div class="detail-tail cx">/);
   assert.match(html, /<span class="lbl p warn">Journey cancelled<\/span>/);
-  assert.doesNotMatch(html, /data-footer-rail|Take this train/);
+  assert.doesNotMatch(html, /data-footer-rail|Pin this train/);
 });
 
 /* The journey already being followed has the same shape as the cancelled one.
@@ -118,8 +118,8 @@ test('a cancelled journey warns in the summary, strikes its steps and offers no 
 test('the journey already being followed has no action rail either', () => {
   const journey = transferJourneys()[0];
 
-  assert.match(render(journey), /<div class="hm-bar detail-rail" data-footer-rail><button data-act="focus">Take this train<\/button><\/div>/);
-  assert.doesNotMatch(render(journey, { focused: true }), /data-footer-rail|Take this train/);
+  assert.match(render(journey), /<div class="hm-bar detail-rail" data-footer-rail><button data-act="focus">Pin this train<\/button><\/div>/);
+  assert.doesNotMatch(render(journey, { focused: true }), /data-footer-rail|Pin this train/);
   assert.doesNotMatch(render(journey, { focused: true }), /Unfocus/);
 });
 
@@ -140,7 +140,7 @@ test('a step behind the rider is quiet, not struck', () => {
   assert.doesNotMatch(html, /dstep[^"]*cancelled/);
 });
 
-/* client-storage.md, Focused journey: `Take this train` is the only writer of
+/* client-storage.md, Focused journey: `Pin this train` is the only writer of
    focus on this screen, and detail never clears it. */
 test('the detail view writes focus once and never clears it', () => {
   const main = readFileSync(fileURLToPath(new URL('../js/main.js', import.meta.url)), 'utf8');

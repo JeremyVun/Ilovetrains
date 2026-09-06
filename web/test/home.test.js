@@ -7,7 +7,7 @@ import { join } from 'node:path';
 
 import { directionsModel } from '../js/focus.js';
 import { fitStationNames } from '../js/dom.js';
-import { fitTripNames, homeHtml, homeModel, tripIsOver } from '../js/home.js';
+import { fitTripNames, homeHtml, homeModel, nextService, tripIsOver } from '../js/home.js';
 import { emptyDoc } from '../js/storage.js';
 import { departureMs, departureKey } from '../js/journey.js';
 import {
@@ -15,6 +15,92 @@ import {
 } from './fixture.js';
 
 const at = (time) => Date.parse(`2026-09-01T${time}:00+10:00`);
+
+test('next service skips the same first train and cancellations, ordered by effective departure', () => {
+  const [lead, cancelled, next, later] = transferJourneys();
+  cancelLeg(cancelled, 1);
+  const alternateConnection = structuredClone(lead);
+  alternateConnection.legDetail[1].departure.scheduled = later.legDetail[1].departure.scheduled;
+  alternateConnection.legDetail[0].departure.estimated = '2026-09-01T09:40:00+10:00';
+  const result = nextService([later, alternateConnection, cancelled, next], lead, at('09:21'));
+  assert.equal(result.journey, next);
+  assert.deepEqual([result.label, result.figure, result.depTime, result.arrTime],
+    ['Next train', '33', '09:54', '10:42']);
+  assert.equal(nextService([lead, alternateConnection, cancelled], lead, at('09:21')), null);
+  assert.equal(nextService([next], lead, at('09:33')), null);
+  assert.equal(nextService([next], null, at('09:21')), null);
+});
+
+test('next service mode and stale times describe the second service itself', () => {
+  const [lead, next] = transferJourneys();
+  for (const mode of ['train', 'metro', 'ferry', '']) {
+    next.legDetail[0].line.mode = mode;
+    const result = nextService([next], lead, at('09:21'), true);
+    assert.equal(result.label, `Next ${mode || 'service'}`);
+    assert.equal(result.figure, '');
+    assert.deepEqual([result.depTime, result.arrTime], ['09:39', '10:22']);
+  }
+});
+
+test('a pinned header takes its next service and freshness from its own pair', () => {
+  const journeys = transferJourneys();
+  const doc = homeDoc(journeys[0]);
+  doc.trips.push({ ...HOME_TRIP, id: 'other', to: { id: 'other-stop', name: 'Elsewhere' } });
+  const model = homeModel(doc, { tripId: 'other', direction: 'forward' },
+    transferBody({ journeys: [journeys[2]] }), at('09:21'), {
+      focusBody: transferBody({ journeys: [journeys[0], journeys[1]] }),
+      candidateSource: { stale: false, freshness: 'Live', dot: 'live' },
+      focusSource: { stale: true, freshness: 'Offline', dot: 'stale' }
+    });
+  assert.equal(model.following.journey, journeys[1]);
+  assert.equal(model.following.figure, '');
+  assert.deepEqual(model.selected, HOME_SELECTION);
+  const html = homeHtml(model);
+  assert.match(html, /data-next-service/);
+  assert.match(html, /data-act="next-service"/);
+  assert.match(html, /data-transfer-station[^>]*>Town Hall</);
+});
+
+test('pinning is visible only for explicit choice and preserves travel and exception status', () => {
+  const journey = transferJourneys()[0];
+  for (const by of ['focus', undefined, 'inferred']) {
+    const doc = homeDoc(journey);
+    doc.focus.by = by;
+    const model = homeModel(doc, HOME_SELECTION, transferBody(), at('09:21'));
+    assert.equal(model.pinned, by !== 'inferred');
+    assert.equal(homeHtml(model).includes('data-pinned'), by !== 'inferred');
+    assert.doesNotMatch(homeHtml(model), /sy-mk|sy-pstn travelling/);
+    if (by !== 'inferred') assert.doesNotMatch(homeHtml(model), />Running</);
+  }
+  const doc = homeDoc(journey);
+  const active = homeModel(doc, HOME_SELECTION, transferBody(), at('09:33'));
+  assert.equal(active.following, null);
+  assert.match(homeHtml(active), /Running/);
+  assert.match(homeHtml(active), /data-pinned/);
+  assert.match(homeHtml(active), /sy-pstn travelling/);
+  cancelLeg(journey, 0);
+  const cancelled = homeModel(doc, HOME_SELECTION, transferBody({ journeys: [journey] }), at('09:21'));
+  assert.match(homeHtml(cancelled), /Cancelled/);
+  assert.match(homeHtml(cancelled), /data-pinned/);
+});
+
+test('a focused cancellation replacement and its next service use the same live source', () => {
+  const journeys = transferJourneys();
+  cancelLeg(journeys[0], 0);
+  const sourceBody = transferBody({ journeys });
+  const model = homeModel(homeDoc(journeys[0]), HOME_SELECTION,
+    transferBody({ journeys: [] }), at('09:21'), {
+      focusBody: sourceBody,
+      candidateSource: { stale: true, freshness: 'Offline', dot: 'stale' },
+      focusSource: { stale: false, freshness: 'Live', dot: 'live' }
+    });
+  assert.equal(model.directions.journey, journeys[1]);
+  assert.equal(model.following.journey, journeys[2]);
+  assert.equal(model.following.figure, '33');
+  assert.equal(model.following.source.body, sourceBody);
+  assert.equal(model.following.source.offline, false);
+  assert.equal(model.pinned, false, 'the replacement service has not been pinned');
+});
 
 test('directions follows the closed state ladder on one journey', () => {
   const journey = transferJourneys()[0];

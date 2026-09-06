@@ -33,8 +33,8 @@ What "reading the user's mind" means in practice:
 - Opening the app later that day shows the way home: the reverse trip and
   the train to take. The user only ever has to teach the app A→B; the app
   suggests B→A itself, every time.
-- When a trip is focused ("I'm on this train"), the header becomes
-  turn-by-turn directions: where you are on the journey, what to do next,
+- When a service is pinned, the header follows that choice before departure
+  and gives directions once it leaves: where you are on the journey, what to do next,
   which platform, how many minutes. A person just follows what it says.
 
 Three rules govern how the header earns that trust:

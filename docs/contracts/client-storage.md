@@ -200,7 +200,7 @@ chosen.
 
 ## Focused journey
 
-The document may contain an optional `focus` field — "I'm on this train":
+The document may contain an optional `focus` field for a pinned or inferred service:
 
 ```json
 "focus": {
@@ -212,10 +212,10 @@ The document may contain an optional `focus` field — "I'm on this train":
 }
 ```
 
-- `by` is `"focus"` when the user tapped `Take this train` and `"inferred"`
+- `by` is `"focus"` when the user tapped `Pin this train` and `"inferred"`
   when the app entered travel mode from a fix. A focus written before `by`
   shipped reads as `"focus"`; any other value drops the focus.
-- Written by `Take this train` (`Take this ferry` for a ferry-first journey) on journey detail and by inferred entry below;
+- Written by `Pin this train` (`Pin this ferry` for a ferry-first journey) on journey detail and by inferred entry below;
   nothing else writes it. There is no unfocus control: it clears itself once
   now > the journey's effective arrival + 30 min, and accepting the return
   offer that a finished focus produces clears it too.
@@ -253,8 +253,9 @@ The document may contain an optional `focus` field — "I'm on this train":
 ### Travel mode
 
 Travel mode IS the focused journey, whichever way it was entered. Every rule
-above applies to both kinds: the header is directions, the status line
-describes the train, browsing another trip never replaces it, refresh
+above applies to both kinds: the header follows the service, with directions
+once it departs. Explicit choice is labelled `Pinned`; inference is not.
+The status describes the service, browsing another trip never replaces it, refresh
 re-matches the snapshot, expiry is effective arrival + 30 min, and the way-back
 offer follows a finished journey.
 
@@ -300,7 +301,7 @@ matches the first service’s line name and scheduled departure, and opens
 that pair's board when none does. `departureKey` owns this identity, independently
 of the full-journey key used for refreshes and board rows. Browsing another trip
 never exits travel mode, and there is no "not on it" control: a wrong entry
-that is not a redirect ends by expiry or by `Take this train`.
+that is not a redirect ends by expiry or by `Pin this train`.
 
 ## Where the header starts: `locate`
 

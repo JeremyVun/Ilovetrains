@@ -79,20 +79,21 @@ test('a tight change colours its own dwell and no other', () => {
   assert.deepEqual(gaps.map((m) => Boolean(m[2])), [true, false]);
 });
 
-test('the station a change happens at hangs off the platform it is boarded from', () => {
+test('transfer labels sit at the dwell midpoint, independently of the boarding chip', () => {
   const journey = transferJourneys()[0];
   const changes = [{ tight: false, station: 'Town Hall' }];
   const attached = journeyDeviceHtml(journey, { caps: true, changes, stations: true });
-
-  assert.match(attached.html,
-    /class="sy-p b"[^>]*data-transfer-index="0"[^>]*><span class="sy-pv">5<\/span><span class="sy-pstn" data-transfer-station data-transfer-index="0">Town Hall</);
-
-  // The smart header's own call, unchanged: no station labels, one tight flag.
-  const header = journeyDeviceHtml(journey, {
-    caps: true, progress: { at: 0.2, phase: 'ride' }, tight: true, showBoardingPlatform: true
-  });
-  assert.doesNotMatch(header.html, /sy-pstn/);
-  assert.match(header.html, /class="sy-g0 warn"/);
+  const midpoint = (27 + 7 / 2) / 44 * 100;
+  const actual = Number(/data-midpoint="([^"]+)"/.exec(attached.html)[1]);
+  assert.ok(Math.abs(actual - midpoint) < 1e-10);
+  assert.match(attached.html, /<span class="sy-pv">5<\/span><\/span><span class="sy-pstn"/);
+  for (const phase of ['pre', 'done', 'ride', 'dwell', 'ride2']) {
+    const html = journeyDeviceHtml(journey, { caps: true, changes, stations: true,
+      progress: { at: phase === 'pre' ? 0 : 0.5, phase } }).html;
+    const active = ['ride', 'dwell', 'ride2'].includes(phase);
+    assert.equal(html.includes('sy-mk'), active, phase);
+    assert.equal(html.includes('sy-pstn travelling'), active, phase);
+  }
 });
 
 test('ferry devices keep a full origin and compact transfer side', () => {
@@ -113,7 +114,7 @@ test('a transfer prints each known location when its counterpart is missing', ()
     caps: true, changes: [{ station: 'Circular Quay' }], stations: true
   });
   assert.match(alight.html,
-    /data-pin="a"[^>]*aria-label="Platform 2 · T8"[^>]*>2<span class="sy-pstn"[^>]*>Circular Quay<\/span>/);
+    /data-pin="a"[^>]*aria-label="Platform 2 · T8"[^>]*>2<\/span>[\s\S]*<span class="sy-pstn"[^>]*>Circular Quay<\/span>/);
   assert.doesNotMatch(alight.html, /data-pin="b"/);
 
   const missingAlight = structuredClone(mixedJourneys()[1]);
@@ -132,7 +133,7 @@ test('a transfer prints each known location when its counterpart is missing', ()
   });
   assert.doesNotMatch(neither.html, /data-ferry-location/);
   assert.match(neither.html,
-    /data-pin="b"[^>]*aria-label="— · F1"[^>]*><span class="sy-pv">—<\/span><span class="sy-pstn"[^>]*>Circular Quay<\/span>/);
+    /data-pin="b"[^>]*aria-label="— · F1"[^>]*><span class="sy-pv">—<\/span><\/span><span class="sy-pstn"[^>]*>Circular Quay<\/span>/);
 
   const rail = structuredClone(transferJourneys()[0]);
   rail.legDetail[1].from.platform = null;

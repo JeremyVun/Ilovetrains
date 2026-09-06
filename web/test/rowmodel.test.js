@@ -635,8 +635,8 @@ test('a two-change row hides one alighting numeral and nothing else', () => {
   const html = resultRowHtml(m.rows[0]);
 
   assert.match(html, /class="sy-row change two /);
-  assert.match(html, /data-transfer-station data-transfer-index="0">Town Hall</);
-  assert.match(html, /data-transfer-station data-transfer-index="1">Central</);
+  assert.match(html, /data-transfer-station data-transfer-index="0"[^>]*>Town Hall</);
+  assert.match(html, /data-transfer-station data-transfer-index="1"[^>]*>Central</);
   assert.match(html, /data-pin="b"[^>]*data-transfer-index="1"/);
   assert.match(html, /data-pin="a"[^>]*data-transfer-index="1"/, 'still rendered; the stylesheet hides it');
 });

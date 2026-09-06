@@ -5,9 +5,9 @@ import { esc, figureHtml, shortName, fitStationNames } from './dom.js';
 import {
   visibleFocus, directionsModel, focusStatus, journeyCancelled
 } from './focus.js';
-import { arrivalMs, departureMs, departureKey, legsOf, modeWords } from './journey.js';
+import { arrivalMs, departureMs, departureKey, journeyKey, journeyDetail, legsOf, modeWords } from './journey.js';
 import { colourKey, lineFill } from './lines.js';
-import { clock } from './time.js';
+import { clock, countdownFigure, minutesUntil } from './time.js';
 import { journeyDeviceHtml, clampJourneyBars, chipInk } from './journeybar.js';
 import { cacheKey, leg } from './storage.js';
 import { AT_STATION_KM, distanceKm } from './stations.js';
@@ -15,6 +15,24 @@ import { dayTypeMatch, homeOf, HOME_VOTES_NEEDED, hourProximity, isWeekend, rank
 import { journeyAllowed, preferencesOf, tripsForModes, SUPPORTED_MODES } from './preferences.js';
 
 const RECEIPT_EVIDENCE = 3;
+
+/** Another itinerary on the same first service is not another departure. */
+export function nextService(journeys, lead, nowMs, stale = false) {
+  const departure = departureMs(lead);
+  if (departure === null || departure <= nowMs) return null;
+  const candidate = journeys.filter((item) => !journeyCancelled(item)
+    && departureKey(item) !== departureKey(lead) && departureMs(item) > departure)
+    .sort((a, b) => departureMs(a) - departureMs(b))[0];
+  if (!candidate) return null;
+  const mode = String(legsOf(candidate)[0]?.line?.mode || '').toLowerCase();
+  const vehicle = ['train', 'metro', 'ferry'].includes(mode) ? mode : 'service';
+  const arrival = arrivalMs(candidate);
+  return {
+    journey: candidate, key: journeyKey(candidate), label: `Next ${vehicle}`,
+    figure: stale ? '' : countdownFigure(minutesUntil(departureMs(candidate), nowMs)),
+    depTime: clock(departureMs(candidate)), arrTime: arrival === null ? '—' : clock(arrival), stale
+  };
+}
 
 export function tripIsOver(focus, nowMs) {
   if (!focus) return false;
@@ -197,6 +215,16 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     journeyKey: departureKey(activeFocus.journey),
     slot: opts.stripVariant === 'a2' ? 'receipt' : 'below'
   } : null;
+  const useFocusSource = Boolean(activeFocus && !candidateReplacement
+    && (opts.focusBody || !sameFocusedPair));
+  const followingSource = useFocusSource ? opts.focusSource : opts.candidateSource;
+  const followingBody = useFocusSource ? opts.focusBody : body;
+  const followingStale = followingSource ? Boolean(followingSource.stale) : displayStale;
+  const following = directions.phase === 'pre' && !over
+    ? nextService(useFocusSource ? focusJourneys : journeys, journey, nowMs, followingStale) : null;
+  if (following) following.source = {
+    body: followingBody, offline: followingStale, serverStale: followingSource?.dot === 'stale'
+  };
   return {
     selected,
     trip: selectedTrip,
@@ -206,6 +234,11 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     strip,
     focus: activeFocus,
     status,
+    pinned: Boolean(activeFocus && activeFocus.by !== 'inferred' && !replacement),
+    following,
+    changes: journey ? journeyDetail(journey, nowMs).changes.map((change) => ({
+      ...change, tight: change.tight && !journeyCancelled(journey)
+    })) : [],
     top: status ? null : topLine(shortName(selectedEnds.from.name),
       distanceKm(opts.fix, selectedEnds.from.location),
       modeWords(firstJourneyLeg.line && firstJourneyLeg.line.mode).vehicle),
@@ -237,6 +270,8 @@ export function homeHtml(model) {
     caps: true,
     progress: d.progress,
     tight: d.tight,
+    changes: model.changes,
+    stations: true,
     showBoardingPlatform: d.showBoardingPlatform,
     originName: d.from
   }) : { html: '<span class="sy-j"><span class="sy-bar"></span></span>', vars: '' };
@@ -261,6 +296,7 @@ export function homeHtml(model) {
         ? stripHtml('receipt')
         : d.receipt ? `<span class="hm-rec">${esc(d.receipt)}</span>` : ''}
     </section>
+    ${nextServiceHtml(model.following)}
     ${offerHtml(model)}
     <div class="hm-rule"></div>
     ${model.strip && model.strip.slot === 'below' ? stripHtml('below') : ''}
@@ -275,6 +311,27 @@ export function homeHtml(model) {
 
 function footerHtml() {
   return `<div class="hm-bar split" data-footer-rail><button data-act="new-trip" data-tap><span class="g">+</span>New trip</button><button data-act="settings" data-action="settings" data-tap>${settingsIcon()}Settings</button></div>`;
+}
+
+function nextServiceHtml(next) {
+  if (!next) return '';
+  return `<button class="hm-next" data-act="next-service" data-tap data-next-service data-match="${esc(next.key)}" aria-label="${esc(`${next.label}, departs ${next.depTime}, arrives ${next.arrTime}`)}">
+    <span class="hm-next-label">${esc(next.label)}</span>
+    <span class="hm-next-count">${figureHtml(next.figure, 'hm-next-unit')}</span>
+    <span class="hm-next-times"><time>${esc(next.depTime)}</time><span aria-hidden="true">→</span><time>${esc(next.arrTime)}</time></span>
+    <span class="hm-next-go" aria-hidden="true">›</span>
+  </button>`;
+}
+
+function pinHtml(icon = true) {
+  return `<span class="pin-status" data-pinned>${icon ? '<svg class="pin-icon" aria-hidden="true" viewBox="0 0 16 16"><path d="M5 1h6v1l-1 1v3l3 3v1H9v5H7v-5H3V9l3-3V3L5 2z"/></svg>' : ''}Pinned</span>`;
+}
+
+function selectedStatusHtml(model, icon = false) {
+  const status = model.status;
+  const onlyPin = model.pinned && model.directions.phase === 'pre' && status.kind === 'ordinary';
+  if (onlyPin) return pinHtml(icon);
+  return statusHtml(status) + (model.pinned ? `<span class="pin-separator"> · </span>${pinHtml(icon)}` : '');
 }
 
 export function emptyServicesHtml(modes) {
@@ -306,7 +363,7 @@ function statusHtml(status) {
 function topHtml(model) {
   const status = model.status;
   if (status) {
-    return `<span class="answer-kind${statusClass(status)}" data-focus-status data-late="${status.late}"><span class="answer-line">${statusHtml(status)}</span></span>`;
+    return `<span class="answer-kind${statusClass(status)}" data-focus-status data-late="${status.late}"><span class="answer-line">${selectedStatusHtml(model, true)}</span></span>`;
   }
   const top = model.top;
   const name = top.name
@@ -320,7 +377,7 @@ function badge(line) {
 
 function subHtml(entry, model) {
   if (entry.selected && model.status) {
-    return `<b class="${statusClass(model.status).trim()}" data-row-status data-late="${model.status.late}">${statusHtml(model.status)}</b>`;
+    return `<b class="${statusClass(model.status).trim()}" data-row-status data-late="${model.status.late}">${selectedStatusHtml(model)}</b>`;
   }
   if (entry.justAdded) {
     return `<i class="hm-new">Just added</i>${entry.distance ? ` · ${esc(entry.distance)}` : ''}`;
