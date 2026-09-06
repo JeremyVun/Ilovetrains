@@ -763,6 +763,123 @@ async function states() {
         transferMidpoint: true, platformSeparator: true, sideBySideSpines: true
       }
     }),
+    (() => {
+      const state = mascot('mascot-home-unpin', {
+        now: Date.parse('2026-09-07T04:33:00+10:00'),
+        generatedAt: '2026-09-07T04:33:00+10:00', focus: true,
+        events: ['shown_focus', 'shown_predicted'],
+        expect: {
+          status: 'Next train', next: ['Next train', '20min', '04:53', '05:56'], pinned: false,
+          marker: false, transferStem: false, transferStation: 'Central', departure: '04:38'
+        }
+      });
+      state.seed.lastOpen = {
+        at: '2026-09-07T04:34:00+10:00',
+        station: { id: TRIP_MASCOT.from.id, name: TRIP_MASCOT.from.name },
+        tripId: TRIP_MASCOT.id, direction: 'forward', journey: state.seed.focus.journey
+      };
+      state.after = `
+  {
+    const pin = document.querySelector('.hm-top [data-act="unpin"]');
+    const beforeFigure = document.querySelector('.hm-fig')?.getBoundingClientRect().top;
+    if (!pin || pin.textContent.trim() !== 'Pinned') console.error('home has no Pinned unpin control');
+    if (pin) {
+      const box = pin.getBoundingClientRect();
+      if (box.height < 43.5 || box.top < -0.5 || box.bottom > innerHeight + 0.5) {
+        console.error('home Pinned control is not a fully reachable 44px target');
+      }
+      pin.click();
+    }
+    await sleep(180);
+    const afterFigure = document.querySelector('.hm-fig')?.getBoundingClientRect().top;
+    if (beforeFigure === undefined || afterFigure === undefined || Math.abs(beforeFigure - afterFigure) > 0.1) {
+      console.error('unpin shifts the smart-header figure from ' + beforeFigure + ' to ' + afterFigure);
+    }
+    let persisted = JSON.parse(localStorage.getItem('trains.v1'));
+    if (persisted.focus) console.error('home unpin did not clear persisted focus');
+    if (persisted.lastOpen) console.error('home unpin did not clear persisted lastOpen evidence');
+    if (t.state.previousOpen) console.error('home unpin did not clear in-memory previousOpen evidence');
+    if (document.querySelector('[data-pinned]')) console.error('home unpin left a pinned indication');
+    if (document.querySelector('.hm-e.from .hm-t')?.textContent.trim() !== '04:38') {
+      console.error('home unpin did not restore the earliest service');
+    }
+    // Rebuild controller state from the stored document, as a returning open
+    // does. The granted origin fix must not recreate the released focus.
+    t.state.doc = structuredClone(persisted);
+    t.state.selection = null;
+    t.state.previousOpen = t.state.doc.lastOpen || null;
+    t.route();
+    await sleep(500);
+    persisted = JSON.parse(localStorage.getItem('trains.v1'));
+    if (persisted.focus || document.querySelector('[data-pinned]')) {
+      console.error('released focus re-entered after the returning route with location granted');
+    }
+  }`;
+      return state;
+    })(),
+    (() => {
+      const now = Date.now();
+      const at = (offset) => ({ scheduled: new Date(now + offset * 60000).toISOString(), estimated: null });
+      const journey = (offset) => {
+        const legDetail = [{
+          line: { name: 'T8', mode: 'train' }, headsign: 'City Circle via Museum',
+          from: { id: '202010', name: 'Mascot Station', platform: 'Platform 1' },
+          to: { id: '200060', name: 'Central Station', platform: 'Platform 21' },
+          departure: at(offset), arrival: at(offset + 11), cancelled: false
+        }, {
+          line: { name: 'M1', mode: 'metro' }, headsign: 'Tallawong',
+          from: { id: '200060', name: 'Central Station', platform: 'Platform 26' },
+          to: { id: '2155382', name: 'Kellyville Station', platform: 'Platform 2' },
+          departure: at(offset + 18), arrival: at(offset + 68), cancelled: false
+        }];
+        return {
+          departure: { ...legDetail[0].departure, platform: 'Platform 1' },
+          arrival: { ...legDetail[1].arrival }, line: { name: 'T8', mode: 'train' },
+          destinationHeadsign: 'City Circle via Museum', stopsAway: null,
+          cancelled: false, legs: 2, legDetail
+        };
+      };
+      const lead = journey(-5);
+      const body = {
+        from: { ...TRIP_MASCOT.from }, to: { ...TRIP_MASCOT.to },
+        generatedAt: new Date(now).toISOString(), journeys: [lead, journey(10)]
+      };
+      const seed = doc({
+        trips: [TRIP_MASCOT], body, fetchedAt: body.generatedAt, hist: [], focus: lead
+      });
+      seed.focus.by = 'focus';
+      seed.lastOpen = {
+        at: new Date(now - 10 * 60000).toISOString(),
+        station: { id: TRIP_MASCOT.from.id, name: TRIP_MASCOT.from.name },
+        tripId: TRIP_MASCOT.id, direction: 'forward', journey: lead
+      };
+      return {
+        name: 'mascot-active-unpin-location', seed, now, body, route: '#/',
+        geo: { lat: -33.87181, lon: 151.094427, speed: 12 }, permission: 'granted',
+        events: ['shown_focus', 'shown_predicted', 'shown_pair'],
+        after: `
+  {
+    const action = document.querySelector('.hm-top [data-act="unpin"]');
+    if (!t.state.fix) console.error('granted moving-location unpin state has no fix');
+    if (!action) console.error('active explicit focus has no Pinned unpin control');
+    else action.click();
+    await sleep(180);
+    const stored = JSON.parse(localStorage.getItem('trains.v1'));
+    if (stored.focus || stored.lastOpen || t.state.previousOpen) {
+      console.error('active unpin retained focus or inference evidence');
+    }
+    t.state.doc = structuredClone(stored);
+    t.state.selection = null;
+    t.state.previousOpen = t.state.doc.lastOpen || null;
+    t.route();
+    await sleep(700);
+    if (t.state.doc.focus || document.querySelector('[data-pinned]')) {
+      console.error('released active journey re-entered from a granted moving fix');
+    }
+  }`,
+        expect: { pinned: false }
+      };
+    })(),
     mascot('mascot-active', {
       now: Date.parse('2026-09-07T04:44:00+10:00'),
       generatedAt: '2026-09-07T04:44:00+10:00', focus: true,
@@ -1215,8 +1332,35 @@ async function states() {
 
     // The journey already being followed has no positive action left.
     transfer('detail-focused', transferJourneys(), {
-      focus: transferJourneys()[0], after: OPEN_ROW(0), expect: { rail: false }
+      focus: transferJourneys()[0], after: OPEN_ROW(0),
+      expect: { rail: true, copy: ['Unpin this train'] }
     }),
+    transfer('detail-unpin-flow', transferJourneys(), {
+      focus: transferJourneys()[0],
+      after: `${OPEN_ROW(0)}
+  {
+    const action = document.querySelector('.detail-rail [data-act="unpin"]');
+    if (!action || action.textContent.trim() !== 'Unpin this train') {
+      console.error('explicitly pinned detail has no train unpin action');
+    } else {
+      action.click();
+      await sleep(180);
+    }
+    const persisted = JSON.parse(localStorage.getItem('trains.v1'));
+    if (persisted.focus || persisted.lastOpen?.station || document.querySelector('[data-pinned]')) {
+      console.error('detail unpin did not fully release the journey');
+    }
+  }`,
+      expect: { status: 'Next train', pinned: false }
+    }),
+    (() => {
+      const state = transfer('detail-inferred', transferJourneys(), {
+        focus: transferJourneys()[0], after: OPEN_ROW(0),
+        expect: { rail: false, notCopy: ['Unpin this train', 'Pin this train'] }
+      });
+      state.seed.focus.by = 'inferred';
+      return state;
+    })(),
 
     // The first leg five minutes late, so the printed 7-minute change is
     // really 2. Two times, two windows, and no claim about whether you make it.
@@ -1952,6 +2096,12 @@ function pageScript(state) {
       if (rect.width > 0 && rect.height > 0 && rect.height < 43.5) {
         problems.push('tap target under 44px: ' + (target.className || target.textContent.trim())
           + ' (' + round(rect.height) + 'px)');
+      }
+      const visibleHeight = Math.min(innerHeight, rect.bottom) - Math.max(0, rect.top);
+      if (rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight
+          && visibleHeight < 43.5) {
+        problems.push('visible tap target is clipped by the viewport: '
+          + (target.className || target.textContent.trim()) + ' (' + round(visibleHeight) + 'px reachable)');
       }
     }
 

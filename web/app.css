@@ -427,13 +427,13 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
   --figtrack: 104px; --fign: 64px; --fign-wide: 50px; --stn: 16px;
   --dept: 25px; --arrt: 20px; --jh: 42px; --caph: 24px; --capf: 15px;
   --cappad: 10px; --barh: 14px; --mkgap: 3px; --signf: 15px;
-  --hdpad-t: 20px; --hdpad-b: 12px; --hdgap: 12px;
+  --hdpad-t: 14px; --hdpad-b: 12px; --hdgap: 12px;
 }
 /* The band is the notch clearance: nothing else in the stylesheet reads the
    top inset, and the app installs standalone. */
 .hm-top {
   flex: none; display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; padding: max(14px, env(safe-area-inset-top, 0px)) 22px 0; min-height: 22px;
+  gap: 12px; padding: max(15px, env(safe-area-inset-top, 0px)) 22px 0; min-height: 22px;
 }
 /* Clips rather than ellipsises: only a station name grows this line, and
    fitStationNames shortens one by rule instead. */
@@ -442,10 +442,12 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
   font-size: 11px; font-weight: 600; letter-spacing: .15em;
   text-transform: uppercase; color: var(--ink-2);
 }
-.answer-line { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: clip; }
-.pin-status { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.answer-line { line-height: 14px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+.pin-status { position: relative; padding: 0; text-transform: inherit; letter-spacing: inherit; line-height: 14px; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.answer-line:has(button) { display: flex; align-items: center; overflow: visible; }
+button.pin-status { height: 44px; margin: -15px 0; }
 .pin-icon { width: 12px; height: 12px; fill: currentColor; flex: none; }
-.pin-separator { color: var(--ink-3); }
+.pin-separator { margin: 0 .4em; color: var(--ink-3); }
 .answer-kind.status-late, .answer-kind.status-exception { color: var(--warn); }
 .status-copy { white-space: nowrap; }
 .status-late-word { margin-left: .42em; }

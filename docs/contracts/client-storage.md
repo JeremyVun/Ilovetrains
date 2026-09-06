@@ -216,7 +216,11 @@ The document may contain an optional `focus` field for a pinned or inferred serv
   when the app entered travel mode from a fix. A focus written before `by`
   shipped reads as `"focus"`; any other value drops the focus.
 - Written by `Pin this train` (`Pin this ferry` for a ferry-first journey) on journey detail and by inferred entry below;
-  nothing else writes it. There is no unfocus control: it clears itself once
+  nothing else writes it. `Pinned` on home and `Unpin this train` (or ferry)
+  in detail remove an explicit focus without deleting the saved trip. They
+  clear the in-memory followed source and persisted `lastOpen` evidence so
+  a subsequent fix cannot immediately restore the released journey. No schema
+  change or new persistent state is needed. Focus also clears itself once
   now > the journey's effective arrival + 30 min, and accepting the return
   offer that a finished focus produces clears it too.
 - `journey` is a full snapshot so directions and detail stay viewable after
@@ -462,7 +466,7 @@ other than expiry that clears a focus; it then fetches a real return journey.
 Transfer platforms therefore come from that return response; they are never
 produced by reversing the outbound snapshot. Focusing a journey is the user's
 consent to directions mode, and focusing another is the correction — there is
-no separate “I’m not on this” state and no manual unfocus.
+no separate “I’m not on this” state. Explicit pins can be removed manually.
 
 Invariants:
 - Deterministic given (storage document, current time) — testable.

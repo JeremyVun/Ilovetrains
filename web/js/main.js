@@ -876,6 +876,7 @@ function wireTimeline() {
 }
 
 function homeAction(action, element) {
+  if (action === 'unpin' && lastHome?.pinned) return unpinService();
   if (action === 'settings') return ctx.go('#/settings');
   if (action === 'next-service') {
     const next = lastHome?.following;
@@ -1021,6 +1022,7 @@ function detailModel() {
     ...model,
     row: detailRow(model, opts),
     focused: isFocused(state.doc, state.journey),
+    pinned: isFocused(state.doc, state.journey) && focusOf(state.doc)?.by !== 'inferred',
     footer: board.footer
   };
 }
@@ -1055,7 +1057,29 @@ function renderDetail() {
   patchFresh(state.root.querySelector('[data-t="footer"]'), freshness);
 }
 
+function unpinService() {
+  if (!focusOf(state.doc) || focusOf(state.doc).by === 'inferred') return;
+  const released = clearFocus(recordCompletedFocus(state.doc));
+  delete released.lastOpen;
+  ctx.update(released);
+  if (focusInflight) focusInflight.abort();
+  focusInflight = null;
+  state.focusBody = null;
+  state.focusIdentity = null;
+  state.focusOffline = false;
+  state.focusServerStale = false;
+  // A subsequent location fix must not immediately infer the released ride.
+  state.previousOpen = null;
+  state.headerKind = null;
+  if (state.view !== 'home') return ctx.go('#/');
+  reconcileSuggestionSelection();
+  if (state.selection) loadSelectedCache();
+  renderHome();
+  fetchLive();
+}
+
 function detailAction(action) {
+  if (action === 'unpin' && isFocused(state.doc, state.journey)) return unpinService();
   if (action === 'board') return ctx.go('#/board');
   if (action === 'focus') {
     if (state.headerKind && state.headerKind !== 'setup'

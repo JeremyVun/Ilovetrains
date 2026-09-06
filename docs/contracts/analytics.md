@@ -168,3 +168,5 @@ there is no automatic retry because a lost response may follow a committed
 record. Submission errors never display upstream response text. Operator
 listing, export and deletion stay behind the analytics service's existing
 Authelia gate; no operator credential is shipped to the browser.
+
+Unpinning a service emits no prediction hit or miss and no new event.

@@ -777,3 +777,14 @@ test('a restored cancelled focus cannot borrow a replacement from another select
   assert.equal(model.directions.depTime, '09:24');
   assert.equal(model.freshness, 'Offline');
 });
+
+
+test('only an explicit header pin offers unpin; the saved-row label stays read-only', () => {
+  const journey = transferJourneys()[0];
+  const doc = homeDoc(journey);
+  const html = homeHtml(homeModel(doc, HOME_SELECTION, transferBody(), at('09:21'), {}));
+  assert.equal((html.match(/data-act="unpin"/g) || []).length, 1);
+  assert.match(html, /<button[^>]*aria-label="Unpin this service"/);
+  doc.focus.by = 'inferred';
+  assert.doesNotMatch(homeHtml(homeModel(doc, HOME_SELECTION, transferBody(), at('09:33'), {})), /data-act="unpin"/);
+});

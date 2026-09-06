@@ -13,14 +13,15 @@ and API semantics live in `client-storage.md` and `api.md`.
 - Home is the open state. Its smart header is the zero-tap answer for the
   predicted or focused trip; saved trips sit immediately below it under the
   `MY TRIPS` anchor.
-- The smart header is read-only. It is a section, not a tap target: the
+- The smart header is a section, not a single tap target: the
   saved-trip row is the affordance, and the header's own trip carries the same
   `DEPARTURES ›` cue as every other row. A journey the app inferred rather than
   the user chose carries one control below the heavy rule. While the
   `strip-placement` experiment runs, variant A2 places that same control in
   the receipt slot. An empty answer caused by service preferences also links
   to Settings. Before departure, a separate 44px next-service rail opens the
-  following journey's detail. Other header content remains read-only.
+  following journey's detail. The `Pinned` label is a 44px-high button that
+  unpins the service; other header content remains read-only.
 - Tapping a saved-trip row opens that trip's departure board. It records the
   explicit selection and never changes the focused journey; browsing therefore
   never replaces the focused train.
@@ -28,10 +29,12 @@ and API semantics live in `client-storage.md` and `api.md`.
   `← <departure station> departures` and returns to that board.
 - `Pin this train` on journey detail is the only control that focuses a
   journey. It returns home and pins that service in the smart header;
-  directions begin when it departs. There is no manual unfocus anywhere,
-  and the board never shows a separate focus strip.
-- Journey detail for a journey that is cancelled, or already focused, carries no
-  action rail at all; the back control is the way out.
+  directions begin when it departs. Tapping `Pinned` on home or `Unpin this
+  train` in detail clears the explicit pin and returns to the ordinary home
+  answer for that trip. The board never shows a separate focus strip.
+- An explicitly pinned journey has an `Unpin this train` (or ferry) action
+  rail, including when cancelled. Other cancelled or inferred journeys carry
+  no action rail; the back control is the way out.
 - When a focused journey is over, home may offer the opposite direction. The
   client fetches a real return journey and never reverses the outbound snapshot
   or invents transfer platforms.
@@ -104,7 +107,10 @@ substitutes for going back.
   `RUNNING` status is replaced by `PINNED`; late, cancelled and completed
   statuses retain their words. Inferred travel never gets a pin indicator.
   A cancellation replacement is not labelled as the pinned service.
-  The pin indicator is read-only; no copy claims the rider is aboard.
+  The header pin indicator releases the pin when tapped; the saved-row label
+  is read-only. No copy claims the rider is aboard. The status line keeps
+  identical height with and without the icon; the trip grid starts 14px below
+  the status band.
 - `RUNNING LATE` requires all three of: fresh data, neither stale nor offline;
   a realtime estimated departure on the relevant leg; and a positive difference
   between the printed clock minutes of that estimate and its schedule. The
@@ -421,7 +427,7 @@ substitutes for going back.
   destination and arrival platform — or `JOURNEY CANCELLED` in the warning
   colour with the time struck. Beneath the tail is the freshness line, and
   beneath that the 66px action rail `Pin this train` or `Pin this ferry`,
-  chosen from the first leg, which shares its geometry with home's `New trip`
+  chosen from the first leg (`Unpin this train` or ferry when pinned), which shares its geometry with home's `New trip`
   rail.
 - Once the journey has departed, the promoted row's figure and provenance are
   the directions ladder's, `TO CHANGE` or `TO GO`, and the steps the rider is
@@ -560,7 +566,7 @@ Settings frames and two filtered-Home frames:
   `direct`, `long`, `departed`, `focused` and `hero-light` variants, and
   `detail-412x732-hero.png` with its `tight`, `cancelled` and `long` variants.
   `departed` is the post-departure promoted row under `TO CHANGE`; `focused` is
-  the already-focused journey, which carries no action rail.
+  the explicitly pinned journey, which carries an unpin action rail.
 - Ferry detail: `detail-390x844-ferry-pyrmont.png` carries the generic `Wharf`
   origin cap, the compact `5B` to `4B` transfer and its full secondary
   boarding instruction. `detail-390x844-ferry-numeric.png` preserves the full

@@ -80,10 +80,9 @@ function tailHtml(arrival) {
 </div>`;
 }
 
-/* A cancelled journey and the one already being followed have no positive
-   action, so the rail is absent rather than disabled. There is no manual
-   unfocus; the back control is the way out. */
+/* A manually pinned service always offers a way to release it. */
 function railHtml(model) {
+  if (model.pinned) return `<div class="hm-bar detail-rail" data-footer-rail><button data-act="unpin">Unpin this ${esc(model.vehicle)}</button></div>`;
   if (model.cancelled || model.focused) return '';
   return `<div class="hm-bar detail-rail" data-footer-rail><button data-act="focus">Pin this ${esc(model.vehicle)}</button></div>`;
 }

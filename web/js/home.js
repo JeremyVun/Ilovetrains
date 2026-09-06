@@ -324,7 +324,9 @@ function nextServiceHtml(next) {
 }
 
 function pinHtml(icon = true) {
-  return `<span class="pin-status" data-pinned>${icon ? '<svg class="pin-icon" aria-hidden="true" viewBox="0 0 16 16"><path d="M5 1h6v1l-1 1v3l3 3v1H9v5H7v-5H3V9l3-3V3L5 2z"/></svg>' : ''}Pinned</span>`;
+  const tag = icon ? 'button' : 'span';
+  const action = icon ? ' data-act="unpin" aria-label="Unpin this service" title="Unpin this service"' : '';
+  return `<${tag}${action} class="pin-status" data-pinned>${icon ? '<svg class="pin-icon" aria-hidden="true" viewBox="0 0 16 16"><path d="M5 1h6v1l-1 1v3l3 3v1H9v5H7v-5H3V9l3-3V3L5 2z"/></svg>' : ''}Pinned</${tag}>`;
 }
 
 function selectedStatusHtml(model, icon = false) {

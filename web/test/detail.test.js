@@ -15,12 +15,12 @@ import {
 
 const ENDS = { fromName: 'Rhodes Station', toName: 'Bondi Junction Station' };
 
-function render(journey, { now = TRANSFER_NOW, focused = false } = {}) {
+function render(journey, { now = TRANSFER_NOW, focused = false, pinned = false } = {}) {
   const model = journeyDetail(journey, now, ENDS);
   return detailHtml({
     ...model,
     row: promotedRow(journey, now, { ...ENDS, fallbackHeadsign: ENDS.toName }),
-    focused,
+    focused, pinned,
     footer: { dot: 'live', text: 'Updated 0s ago' }
   });
 }
@@ -113,14 +113,15 @@ test('a cancelled journey warns in the summary, strikes its steps and offers no 
   assert.doesNotMatch(html, /data-footer-rail|Pin this train/);
 });
 
-/* The journey already being followed has the same shape as the cancelled one.
-   There is no manual unfocus anywhere. */
+/* Inferred travel has no pin to release; explicit pins do. */
 test('the journey already being followed has no action rail either', () => {
   const journey = transferJourneys()[0];
 
   assert.match(render(journey), /<div class="hm-bar detail-rail" data-footer-rail><button data-act="focus">Pin this train<\/button><\/div>/);
   assert.doesNotMatch(render(journey, { focused: true }), /data-footer-rail|Pin this train/);
   assert.doesNotMatch(render(journey, { focused: true }), /Unfocus/);
+  assert.match(render(journey, { focused: true, pinned: true }), /data-act="unpin">Unpin this train/);
+  assert.match(render({ ...journey, cancelled: true }, { focused: true, pinned: true }), /data-act="unpin">Unpin this train/);
 });
 
 test('the tail owns the destination, its time and its platform', () => {

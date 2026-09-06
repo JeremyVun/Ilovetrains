@@ -239,6 +239,12 @@ then 04:53 → 05:56. They keep the short first leg that crowds platforms 1 and
 and marker/stem visibility by journey phase. `mascot-next-focus-source-handoff`
 also proves that a following service from a fresh focused source survives the
 first detail paint and becomes stale only after its refresh fails.
+`mascot-home-unpin` proves that releasing a future service restores the earliest
+answer without shifting the header; `mascot-active-unpin-location` uses the real
+clock and a granted moving fix to prove stale `lastOpen` evidence cannot infer
+the released ride again. `detail-unpin-flow` exercises the matching detail
+action, while `detail-inferred` proves an inferred journey offers neither a pin
+nor an unpin action.
 Every `detail-*` state reaches the view by CLICKING a board row, so each one is
 also proof that the whole row is the tap target. Output defaults to the system
 temporary directory; use `--out` only for a deliberate comparison set:
