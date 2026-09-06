@@ -129,6 +129,9 @@ substitutes for going back.
   leg that was lost rather than the one that left —
   `<HH:MM> FROM <STATION> CANCELLED`, its departure clock time and its
   boarding station.
+- The smart header omits `SCHEDULED` and realtime-source labels. Its status
+  row collapses completely when empty; meaningful delay and travel labels
+  (`N MIN LATE`, `TO CHANGE`, `TO GO`, `AGO`) keep their existing spacing.
 - While the first board loads the header prints no provenance. The slot is
   empty rather than carrying a claim about data that has not arrived; the
   instruction line says `Getting the next trains…`, or

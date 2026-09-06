@@ -468,6 +468,7 @@ button.pin-status { height: 44px; margin: -15px 0; }
   display: block; margin-top: 7px; min-height: 13px; white-space: nowrap;
   font-size: 10px; font-weight: 600; letter-spacing: .13em; text-transform: uppercase; color: var(--ink-3);
 }
+.hm-st:empty { display: none; }
 .hm-st.warn { color: var(--warn); }
 .hm-hd.late .hm-n, .hm-hd.late .hm-e.from .hm-t { color: var(--warn); }
 /* Lateness colours the figure for the next action too. */

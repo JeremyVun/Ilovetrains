@@ -277,13 +277,14 @@ export function homeHtml(model) {
   }) : { html: '<span class="sy-j"><span class="sy-bar"></span></span>', vars: '' };
   const status = model.status;
   const late = Boolean(status && status.late);
+  const provenance = d.provenance === 'SCHEDULED' ? '' : d.provenance;
   return `<div class="hm-c home-screen" data-phase="${esc(d.phase || 'pre')}" data-focused="${Boolean(status)}" data-relevant-leg="${status ? status.leg : -1}" data-active-delay="${status ? status.delay : 0}" data-freshness="${esc(model.freshness.toLowerCase())}">
     <div class="hm-top">
       ${topHtml(model)}
       <span class="hm-fresh"><span class="pulse ${esc(model.dot)}"></span><span class="lbl">${esc(model.freshness)}</span></span>
     </div>
     <section class="hm-hd${String(d.figure).length > 2 ? ' wide' : ''}${d.provenanceWarn ? ' late' : ''}${late ? ' active-late' : ''}" style="${device.vars}" data-active-late="${late}">
-      <span class="hm-fig"><span class="hm-n">${figureHtml(d.figure, 'hm-u')}</span><span class="hm-st${d.warn || d.provenanceWarn ? ' warn' : ''}">${esc(d.provenance || '')}</span></span>
+      <span class="hm-fig"><span class="hm-n">${figureHtml(d.figure, 'hm-u')}</span><span class="hm-st${d.warn || d.provenanceWarn ? ' warn' : ''}">${esc(provenance || '')}</span></span>
       <span class="hm-ends">
         <span class="hm-e from"><span class="hm-stn" data-fit-box data-fit-name="${esc(d.from)}">${esc(d.from)}</span><span class="hm-t">${esc(d.depTime)}</span></span>
         <span class="hm-e to"><span class="hm-stn" data-fit-box data-fit-name="${esc(d.to)}">${esc(d.to)}</span><span class="hm-t">${esc(d.arrTime)}</span></span>
