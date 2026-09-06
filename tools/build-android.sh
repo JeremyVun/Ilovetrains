@@ -32,6 +32,7 @@ cp app/build/outputs/apk/release/app-release.apk releases/ilovetrains-1.0.0.apk
 "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify releases/ilovetrains-1.0.0.apk
 shasum -a 256 releases/ilovetrains-1.0.0.apk > releases/ilovetrains-1.0.0.apk.sha256
 mkdir -p "$project_dir/web/downloads"
+chmod 755 "$project_dir/web/downloads"
 cp releases/ilovetrains-1.0.0.apk "$project_dir/web/downloads/ilovetrains-1.0.0.apk"
 chmod 644 releases/ilovetrains-1.0.0.apk releases/ilovetrains-1.0.0.apk.sha256 \
   "$project_dir/web/downloads/ilovetrains-1.0.0.apk"
