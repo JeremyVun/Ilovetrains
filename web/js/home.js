@@ -12,7 +12,7 @@ import { journeyDeviceHtml, clampJourneyBars, chipInk } from './journeybar.js';
 import { cacheKey, leg } from './storage.js';
 import { AT_STATION_KM, distanceKm } from './stations.js';
 import { dayTypeMatch, homeOf, HOME_VOTES_NEEDED, hourProximity, isWeekend, rankTrips } from './predict.js';
-import { journeyAllowed, preferencesOf, SUPPORTED_MODES } from './preferences.js';
+import { journeyAllowed, preferencesOf, tripsForModes, SUPPORTED_MODES } from './preferences.js';
 
 const RECEIPT_EVIDENCE = 3;
 
@@ -49,7 +49,7 @@ function lastRidden(doc, tripId, nowMs) {
   return `Last ridden ${new Date(latest.arrivedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}`;
 }
 
-function cachedJourney(doc, trip, direction, modes, allowExcluded = false) {
+function cachedJourney(doc, trip, direction, modes) {
   const ends = leg(trip, direction);
   const keys = [cacheKey(ends.from.id, ends.to.id, modes)];
   const allKey = cacheKey(ends.from.id, ends.to.id, SUPPORTED_MODES);
@@ -61,32 +61,16 @@ function cachedJourney(doc, trip, direction, modes, allowExcluded = false) {
     const eligible = journeys.find((journey) => journeyAllowed(journey, modes));
     if (eligible) return eligible;
   }
-  if (allowExcluded) {
-    const entry = doc.cache && doc.cache[allKey];
-    const journeys = entry && entry.body && Array.isArray(entry.body.journeys)
-      ? entry.body.journeys : [];
-    return journeys[0] || null;
-  }
   return null;
 }
 
-function journeyLines(doc, trip, direction, currentJourney, modes, allowExcluded = false) {
-  const journey = currentJourney || cachedJourney(doc, trip, direction, modes, allowExcluded)
-    || cachedJourney(doc, trip, direction === 'forward' ? 'reverse' : 'forward', modes, allowExcluded);
+function journeyLines(doc, trip, direction, currentJourney, modes) {
+  const journey = currentJourney || cachedJourney(doc, trip, direction, modes)
+    || cachedJourney(doc, trip, direction === 'forward' ? 'reverse' : 'forward', modes);
   return legsOf(journey).map((item) => ({
     code: (item.line && item.line.name) || '',
     colourKey: colourKey(item.line)
   })).filter((item) => item.code);
-}
-
-function ferryOnlyEndpoint(trip, direction, stations) {
-  if (!Array.isArray(stations)) return false;
-  const indexed = new Map(stations.map((station) => [station.id, station]));
-  const ends = leg(trip, direction);
-  return [ends.from, ends.to].some((stop) => {
-    const modes = indexed.get(stop.id)?.modes;
-    return Array.isArray(modes) && modes.length === 1 && modes[0] === 'ferry';
-  });
 }
 
 /* The mark is a fact about this open: the trip did not exist when the page
@@ -183,19 +167,20 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     settingsAction: !enabledModes.length || Boolean(body && modeSubset && !opts.offline && !opts.stale),
     allServicesOff: !enabledModes.length
   };
-  const ranked = rankTrips(doc, nowMs, { fix: opts.fix, selection: selected }).map((entry) => {
+  const visibleDoc = tripsForModes(doc, opts.stations);
+  if (activeFocus && !visibleDoc.trips.some((item) => item.id === activeFocus.tripId)) {
+    visibleDoc.trips = [selectedTrip, ...visibleDoc.trips];
+  }
+  const ranked = rankTrips(visibleDoc, nowMs, { fix: opts.fix, selection: selected }).map((entry) => {
     const entryEnds = leg(entry.trip, entry.direction);
-    const unavailableFerry = !enabledModes.includes('ferry') && !activeFocus
-      && ferryOnlyEndpoint(entry.trip, entry.direction, opts.stations);
     return {
       ...entry,
       from: shortName(entryEnds.from.name),
       to: shortName(entryEnds.to.name),
       lines: journeyLines(doc, entry.trip, entry.direction,
-        entry.trip.id === selectedTrip.id ? journey : null, enabledModes, unavailableFerry),
+        entry.trip.id === selectedTrip.id ? journey : null, enabledModes),
       distance: formatDistance(entry.distanceKm),
       ridden: lastRidden(doc, entry.trip.id, nowMs),
-      unavailableFerry,
       justAdded: entry.trip.id === selectedTrip.id && !activeFocus
         && Boolean(opts.predicted) && savedThisOpen(entry.trip, opts.loadedAt)
     };
@@ -286,8 +271,22 @@ export function homeHtml(model) {
       ${model.ranked.map((entry) => tripRowHtml(entry, model)).join('')}
       <div class="hm-end">— That’s everything on this phone</div>
     </div>
-    ${model.askLocation ? locationAskHtml() : `<div class="hm-bar split" data-footer-rail><button data-act="new-trip" data-tap><span class="g">+</span>New trip</button><button data-act="settings" data-action="settings" data-tap>${settingsIcon()}Settings</button></div>`}
+    ${model.askLocation ? locationAskHtml() : footerHtml()}
   </div>`;
+}
+
+function footerHtml() {
+  return `<div class="hm-bar split" data-footer-rail><button data-act="new-trip" data-tap><span class="g">+</span>New trip</button><button data-act="settings" data-action="settings" data-tap>${settingsIcon()}Settings</button></div>`;
+}
+
+export function emptyServicesHtml(modes) {
+  const message = modes.length ? 'No saved trips with these services.' : 'Turn on a service to see your trips.';
+  return `<div class="hm-c home-screen" data-filtered-empty>
+    <div class="hm-ix tl" data-t="trip-list" data-scroller>
+      <div class="hm-anchor"><div class="l">My trips</div></div>
+      <div class="hm-filtered-empty"><p>${message}</p>
+        <button class="hm-empty-settings" data-act="settings" data-action="settings">Change settings</button></div>
+    </div>${footerHtml()}</div>`;
 }
 
 function settingsIcon() {
@@ -322,7 +321,6 @@ function badge(line) {
 }
 
 function subHtml(entry, model) {
-  if (entry.unavailableFerry) return '<b class="warn">Ferries are off</b>';
   if (entry.selected && model.status) {
     return `<b class="${statusClass(model.status).trim()}" data-row-status data-late="${model.status.late}">${statusHtml(model.status)}</b>`;
   }
@@ -344,12 +342,10 @@ function tripRowHtml(entry, model) {
     : lines.length === 1
       ? `<span class="hm-route">${badge(lines[0])}${esc(entry.from)}</span> <span class="hm-route"><em>→</em> ${esc(entry.to)}</span>`
       : `<span class="hm-route">${esc(entry.from)}</span> <span class="hm-route"><em>→</em> ${esc(entry.to)}</span>`;
-  const state = entry.unavailableFerry ? ' unavailable'
-    : entry.selected ? model.status ? ' focused' : ' shown' : '';
-  const action = entry.unavailableFerry ? 'enable-ferries' : 'open-trip';
-  const label = entry.unavailableFerry ? `Turn on ferries for ${entry.from} to ${entry.to}`
-    : `Open ${entry.from} to ${entry.to} departures`;
-  const cue = entry.unavailableFerry ? 'Turn on ferries' : 'Departures<span class="arrow">›</span>';
+  const state = entry.selected ? model.status ? ' focused' : ' shown' : '';
+  const action = 'open-trip';
+  const label = `Open ${entry.from} to ${entry.to} departures`;
+  const cue = 'Departures<span class="arrow">›</span>';
   return `<button class="tripr${state}" data-svc data-tap data-act="${action}" data-id="${esc(entry.trip.id)}" data-direction="${esc(entry.direction)}" aria-label="${esc(label)}">
     <span class="hm-in">${spine}<span class="hm-bd"><span class="hm-nm" data-fit-trip>${name}</span><span class="hm-sub">${subHtml(entry, model)}</span></span><span class="route-cue">${cue}</span></span>
   </button>`;

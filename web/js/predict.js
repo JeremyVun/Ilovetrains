@@ -182,7 +182,8 @@ export function locate(doc, nowMs, opts = {}) {
   };
   if (!spot) return trips.length ? predicted() : { kind: 'setup', from: null };
 
-  const home = homeOf(doc);
+  // Candidate filtering must not change the automatic first-saved-trip home.
+  const home = opts.home === undefined ? homeOf(doc) : opts.home;
   const away = Boolean(home) && home.station.id !== spot.station.id;
   const candidates = fromHere(doc, spot.station, nowMs);
 

@@ -174,7 +174,7 @@ function services(enabledModes) {
   const enabled = new Set(enabledModes);
   const allOff = enabled.size === 0;
   const note = allOff ? '<p class="st-service-empty">No services selected. Turn one on to see trips.</p>'
-    : `<p class="st-service-note${enabled.has('ferry') ? '' : ' warn'}">${enabled.has('ferry') ? 'Buses are not available yet.' : 'Trips with ferry legs won’t be shown.'}</p>`;
+    : '<p class="st-service-note">Only trips using your selected services are shown.</p>';
   return `<section class="st-group">${section('Services')}<div class="st-choice-set st-service-set" role="group" aria-label="Services">
     ${serviceButton('train', 'Trains', enabled.has('train'))}${serviceButton('metro', 'Metro', enabled.has('metro'))}${serviceButton('ferry', 'Ferries', enabled.has('ferry'))}${serviceButton('bus', 'Buses', false, true)}
   </div>${note}</section>`;

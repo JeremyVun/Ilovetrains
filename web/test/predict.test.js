@@ -348,3 +348,18 @@ test('candidates from here that tie fall back to lastViewed, then to saved order
   assert.deepEqual(locate({ ...doc, lastViewed: { tripId: 't2', direction: 'forward' } }, MON_0800, opts),
     { kind: 'trip', tripId: 't2', direction: 'forward', leap: 'usual' });
 });
+
+
+test('filtered candidates retain automatic home from the full saved document', () => {
+  const original = { ...emptyDoc(), trips: [
+    tripBetween('hidden', 'rhodes', 'townhall'),
+    tripBetween('visible', 'central', 'parramatta')
+  ] };
+  const filtered = { ...original, trips: original.trips.slice(1) };
+  const answer = locate(filtered, MON_0800, {
+    fix: AT('burwood'), stations: INDEX, home: homeOf(original)
+  });
+  assert.equal(answer.kind, 'pair');
+  assert.equal(answer.to.id, STATIONS.rhodes.id);
+  assert.equal(homeOf(original).station.id, STATIONS.rhodes.id);
+});

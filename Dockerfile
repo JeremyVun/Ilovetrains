@@ -18,11 +18,7 @@ ARG GIT_REVISION=dev
 RUN apk add --no-cache tzdata ca-certificates
 COPY --from=build /out/trainsd /usr/local/bin/trainsd
 COPY web /app/web
-RUN case "$GIT_REVISION" in \
-      dev) ;; \
-      *) printf '%s\n' "$GIT_REVISION" | grep -Eq '^[0-9a-f]{7,40}$' || exit 1 ;; \
-    esac \
-    && printf "export const VERSION = '%s';\n" "$GIT_REVISION" > /app/web/js/version.js
+LABEL org.opencontainers.image.revision="$GIT_REVISION"
 ENV WEB_DIR=/app/web
 USER nobody
 ENTRYPOINT ["trainsd"]

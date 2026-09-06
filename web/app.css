@@ -593,8 +593,6 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
 .tripr.shown:not(.focused) .hm-sub b { color: var(--ink-2); }
 .tripr.focused .hm-sub b.status-late,
 .tripr.focused .hm-sub b.status-exception { color: var(--warn); }
-.tripr.unavailable .hm-nm { color:var(--ink-2); }
-.tripr.unavailable .hm-sub b { color:var(--warn); }
 .hm-end {
   flex: none; padding: 14px 0 6px; white-space: nowrap; font-size: 10px;
   font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3);
@@ -816,7 +814,7 @@ html[data-theme="light"] .dchip { color:var(--bg) !important; }
 .hm-bar.split button { width:50%; }
 .hm-bar.split button:last-child { justify-content:flex-end; text-align:right; }
 .hm-bar .settings-icon { width:19px; height:19px; color:var(--ink-2); }
-.hm-sign .hm-empty-settings { min-height:44px; margin-left:8px; color:var(--ink); font-size:11px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; }
+.hm-empty-settings { min-height:44px; margin-left:8px; color:var(--ink); font-size:11px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; }
 
 @media (max-width:375px) {
   .st-top,.st-mast,.st-scroll,.st-rail { padding-left:18px; padding-right:18px; }
@@ -826,3 +824,7 @@ html[data-theme="light"] .dchip { color:var(--bg) !important; }
   #app > .st-screen { max-width:940px; margin:0 auto; }
   .st-top,.st-mast,.st-scroll,.st-rail { padding-left:64px; padding-right:64px; }
 }
+
+.hm-filtered-empty { padding: 28px 0; color: var(--ink-2); }
+.hm-filtered-empty p { margin: 0 0 16px; font-size: 20px; line-height: 1.4; }
+.hm-filtered-empty .hm-empty-settings { margin-left: 0; }

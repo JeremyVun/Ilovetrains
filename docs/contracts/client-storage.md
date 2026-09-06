@@ -97,9 +97,10 @@ read/write atomic and migration simple):
   navigation cannot promote a degraded response to live. Missing means false.
 - A service change immediately invalidates and aborts outstanding suggestion
   and past-page requests, then fetches the selected pair with the new mode set.
-  All-off skips that suggestion request. Both success and failure handlers check request generation as well as cache
-  key, including an off/on cycle that returns to the same set. A narrower
-  response is not a complete search for a wider set. Load the new set's raw
+  All-off skips that suggestion request. Both success and failure handlers
+  check request generation as well as cache key, including an off/on cycle
+  that returns to the same set. A narrower response is not a complete search
+  for a wider set. Load the new set's raw
   cache when available and retain only eligible fallback results while fetching.
   Preference repaint preserves selection provenance and source freshness;
   failed retrieval remains distinct from a successful empty result.
@@ -108,6 +109,15 @@ read/write atomic and migration simple):
   walking does not count. A train+ferry journey therefore needs both modes.
   A saved pair has no inherent service mode: an old ferry result never proves
   that the pair lacks a train alternative.
+- Home and its predictor use a filtered copy of the saved-trip document. If
+  either indexed endpoint has no enabled mode, exclude the pair consistently
+  for train, metro and ferry. Mixed-mode endpoints need at least one enabled
+  option; unknown endpoints remain eligible. Do not infer incompatibility from
+  an old cached itinerary or a failed request. Filtering never deletes data.
+  A mode change or late station-index load replaces an incompatible selection
+  before the next Home paint; all-hidden keeps Home open without a selection.
+  Location-driven pairing also excludes incompatible stations and home
+  overrides, while deriving automatic home from the full saved document. The active focused journey remains exempt, including its row.
 - `searches.from` and `searches.to` each hold the three most recently selected
   stations for that field, newest first and deduplicated by stop id. They store
   useful station answers, not raw keystrokes. Add-trip shows them before a
@@ -284,7 +294,9 @@ that is not a redirect ends by expiry or by `Take this train`.
 
 ## Where the header starts: `locate`
 
-Outside travel mode the header starts where the user is. `locate(doc, now,
+Outside travel mode the header starts where the user is. The controller passes
+only compatible trips and stations to `locate`; if all saved trips are hidden,
+it shows the filtered empty Home instead of opening setup. `locate(doc, now,
 {fix, stations})` is pure and returns one of three answers:
 
 - `{kind: "trip", tripId, direction, leap}` — a saved trip, `leap` being

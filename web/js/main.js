@@ -5,7 +5,7 @@ import {
   recordRide, recordHomeVote, recordLastOpen, updateStop, declineLocation, newTripId,
   recordOpen, milestone, LOCATION_ASK_QUIET_MS
 } from './storage.js';
-import { distanceKm, locate, predict } from './predict.js';
+import { distanceKm, homeOf, locate, predict } from './predict.js';
 import { here, loadStations } from './stations.js';
 import { boardModel, promotedRow } from './rowmodel.js';
 import { journeyDetail, journeyKey, departureKey, legsOf, arrivalMs, departureMs } from './journey.js';
@@ -21,7 +21,10 @@ import { renderSetup } from './setup.js';
 import { getDepartures, getStops } from './api.js';
 import { onAction } from './dom.js';
 import { renderSettings } from './settings.js';
-import { SUPPORTED_MODES, preferencesOf, setPreferences, journeyAllowed, filterBody } from './preferences.js';
+import {
+  tripAllowed, tripsForModes, stationAllowed, SUPPORTED_MODES,
+  preferencesOf, setPreferences, journeyAllowed, filterBody
+} from './preferences.js';
 import {
   createAnalytics, install as installAnalytics, isEnabled, variant, EXPERIMENTS
 } from './analytics.js';
@@ -188,11 +191,21 @@ const ctx = {
     }
     if (before.enabledModes.join(',') !== after.enabledModes.join(',')) {
       invalidateSuggestions();
+      const previousSelection = state.selection;
       const previousBody = filterBody(state.body, after.enabledModes);
       const previousStale = state.serverStale;
-      state.body = previousBody;
+      if (!focusSelection() && !suggestionAllowed(state.selection)) {
+        state.selection = null;
+        state.predicted = true;
+        state.selection = locateSelection();
+      }
+      const samePair = previousSelection && state.selection
+        && previousSelection.tripId === state.selection.tripId
+        && previousSelection.direction === state.selection.direction;
+      state.body = { journeys: [] };
+      state.serverStale = false;
       if (state.selection) loadSelectedCache();
-      if (!state.body || (!(state.body.journeys || []).length && previousBody.journeys.length)) {
+      if (samePair && (!state.body || (!(state.body.journeys || []).length && previousBody.journeys.length))) {
         state.body = previousBody;
         state.serverStale = previousStale;
       }
@@ -332,36 +345,61 @@ function savedSelection() {
   return state.selection && findTrip(state.doc, state.selection.tripId) ? state.selection : null;
 }
 
+function suggestionAllowed(selection) {
+  return selection && tripAllowed(findTrip(state.doc, selection.tripId), enabledModes(), state.stations);
+}
+
 /* Home leads with the focused journey; the board answers the tap that opened
    it (client-storage.md, Trip selection). */
 function chooseSelection() {
-  if (preserveSelection && savedSelection()) return state.selection;
-  const chosen = focusSelection() || savedSelection();
+  if (preserveSelection && suggestionAllowed(savedSelection())) return state.selection;
+  const chosen = focusSelection() || (suggestionAllowed(savedSelection()) ? savedSelection() : null);
   state.predicted = !chosen;
   if (chosen) { state.leap = null; return chosen; }
   return locateSelection();
 }
 
-/* `locate` may answer with a pair no saved trip covers, which is saved on the
-   spot, or with nothing saved at all, which leaves home for the sheet. */
+/* Filters apply before ranking and location-driven pairing. Stored trips and
+   home votes remain intact, including when every saved trip is hidden. */
 function locateSelection() {
-  if (!enabledModes().length) return savedSelection() || predict(state.doc, now());
-  const hasHere = Boolean(here(state.doc, state.stations, validFix()));
-  const answer = locate(state.doc, now(), { fix: validFix(), stations: state.stations });
+  const doc = tripsForModes(state.doc, state.stations);
+  if (!doc.trips.length) { state.leap = null; return null; }
+  const stations = state.stations?.filter((station) => stationAllowed(station, enabledModes()));
+  const hasHere = Boolean(here(doc, stations, validFix()));
+  const answer = locate(doc, now(), { fix: validFix(), stations, home: homeOf(state.doc) });
   state.leap = answer.kind === 'pair' ? 'pair' : hasHere ? answer.leap || null : null;
   if (answer.kind === 'trip') return { tripId: answer.tripId, direction: answer.direction };
-  if (answer.kind === 'pair') {
+  if (answer.kind === 'pair' && tripAllowed(answer, enabledModes(), state.stations)) {
     return savePair({
       id: newTripId(), from: answer.from, to: answer.to, createdAt: new Date().toISOString()
     });
   }
-  state.prefill = answer.from ? { origin: answer.from } : null;
-  ctx.go('#/trips/new');
-  return null;
+  state.leap = null;
+  return predict(doc, now(), { fix: validFix() });
 }
 
 function explicitSelection() {
-  return savedSelection() || focusSelection() || predict(state.doc, now(), { fix: validFix() });
+  return (suggestionAllowed(savedSelection()) ? savedSelection() : null)
+    || focusSelection() || predict(tripsForModes(state.doc, state.stations), now(), { fix: validFix() });
+}
+
+/* Ending the focus exemption must not leave its incompatible pair as the
+   next prediction. This changes controller state only; saved data is intact. */
+function reconcileSuggestionSelection() {
+  if (focusSelection() || suggestionAllowed(state.selection)) return false;
+  const next = predict(tripsForModes(state.doc, state.stations), now(), { fix: validFix() });
+  if (!state.selection && !next) return false;
+  invalidateSuggestions();
+  state.selection = next;
+  state.predicted = true;
+  state.leap = null;
+  state.body = null;
+  state.journey = null;
+  state.pastBodies = [];
+  state.seenLive = new Map();
+  state.seenKey = null;
+  if (next) loadSelectedCache();
+  return true;
 }
 
 function validFix() {
@@ -382,8 +420,8 @@ function showHome(root) {
   state.fix = null;
   state.previousOpen = state.doc.lastOpen || null;
   state.selection = chooseSelection();
-  if (!state.selection) return;
-  loadSelectedCache();
+  if (state.selection) loadSelectedCache();
+  else state.body = null;
   renderHome();
   onAction(root, homeAction);
   startTimers(false);
@@ -405,7 +443,21 @@ function loadIndex() {
 function indexReady(list) {
   if (!list) return;
   state.stations = list;
+  if (state.view === 'board' && !focusSelection() && !suggestionAllowed(state.selection)) {
+    state.selection = null;
+    ctx.go('#/board');
+    return;
+  }
   if (state.view === 'home') {
+    if (!focusSelection() && !suggestionAllowed(state.selection)) {
+      invalidateSuggestions();
+      state.selection = null;
+      state.predicted = true;
+      state.selection = locateSelection();
+      state.body = null;
+      if (state.selection) loadSelectedCache();
+      fetchLive();
+    }
     if (validFix()) useFix();
     else renderHome();
   }
@@ -536,8 +588,8 @@ function useFix() {
     analytics.track('entered_inferred');
   } else if (state.predicted) {
     const answer = locateSelection();
-    if (!answer) return;
     state.selection = answer;
+    if (!answer) { state.body = null; renderHome(); return; }
   }
   const completed = recordCompletedFocus(state.doc);
   if (completed !== state.doc) ctx.update(completed);
@@ -615,6 +667,12 @@ function homeFreshness(model, serverStale = false) {
 
 function renderHome() {
   if (state.view !== 'home') return;
+  if (!state.selection) {
+    const html = Home.emptyServicesHtml(enabledModes());
+    if (html !== painted.home) { state.root.innerHTML = html; painted.home = html; }
+    lastHome = null;
+    return;
+  }
   const candidateModel = currentModel();
   const focused = Boolean(focusSelection());
   const followed = focused ? focusSource() : null;
@@ -721,6 +779,7 @@ function leaveDistance() {
 function showBoard(root) {
   state.view = 'board';
   state.selection = explicitSelection();
+  if (!state.selection) { ctx.go('#/'); return; }
   state.viewRecorded = false;
   state.pastBodies = [];
   state.seenLive = new Map();
@@ -734,6 +793,7 @@ function showBoard(root) {
   startTimers(true);
   fetchLive();
   fetchPast(true);
+  loadIndex();
 }
 
 function renderBoard({ addedAbove = false, fade = true } = {}) {
@@ -805,10 +865,6 @@ function wireTimeline() {
 
 function homeAction(action, element) {
   if (action === 'settings') return ctx.go('#/settings');
-  if (action === 'enable-ferries') {
-    ctx.setPreferences({ enabledModes: [...enabledModes(), 'ferry'] });
-    return homeAction('open-trip', element);
-  }
   suppressPreferenceEvents = false;
   if (action === 'new-trip') return ctx.go('#/trips/new');
   if (action === 'open-trip') {
@@ -837,7 +893,8 @@ function homeAction(action, element) {
     };
     ctx.update(state.doc);
     state.offerDismissed = false;
-    loadSelectedCache();
+    reconcileSuggestionSelection();
+    if (state.selection) loadSelectedCache();
     renderHome();
     fetchLive();
     return;
@@ -989,6 +1046,7 @@ async function refreshFollowed() {
     ctx.update(clearFocus(recordCompletedFocus(state.doc)));
     state.focusBody = null;
     state.focusIdentity = null;
+    if (state.view === 'home' || state.view === 'settings') reconcileSuggestionSelection();
     return;
   }
   const trip = focus && findTrip(state.doc, focus.tripId);
@@ -1127,7 +1185,10 @@ async function fetchPast(initial) {
 }
 
 function renderCurrent() {
-  if (state.view === 'home') renderHome();
+  if (state.view === 'home') {
+    if (reconcileSuggestionSelection()) fetchLive();
+    renderHome();
+  }
   else if (state.view === 'board') renderBoard();
   else if (state.view === 'detail') renderDetail();
 }

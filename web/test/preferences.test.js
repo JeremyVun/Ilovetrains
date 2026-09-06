@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  SUPPORTED_MODES, filterBody, journeyAllowed, preferencesOf, setPreferences
+  SUPPORTED_MODES, filterBody, journeyAllowed, preferencesOf, setPreferences, tripAllowed, tripsForModes
 } from '../js/preferences.js';
 import { emptyDoc, parseDoc, serializeDoc } from '../js/storage.js';
 
@@ -76,4 +76,37 @@ test('journeys require every service leg and filtering leaves the raw response u
   assert.notEqual(filtered, body);
   assert.deepEqual(filtered.journeys, [railOnly]);
   assert.deepEqual(body.journeys, [trainThenFerry, railOnly]);
+});
+
+
+test('trip compatibility treats train, metro and ferry endpoints consistently', () => {
+  const stops = [
+    { id: 'rail', modes: ['train'] }, { id: 'metro', modes: ['metro'] },
+    { id: 'wharf', modes: ['ferry'] }, { id: 'mixed', modes: ['train', 'metro'] }
+  ];
+  for (const mode of SUPPORTED_MODES) {
+    for (const stop of stops) {
+      const trip = { from: { id: stop.id }, to: { id: stop.id } };
+      assert.equal(tripAllowed(trip, [mode], stops), stop.modes.includes(mode));
+    }
+  }
+  assert.equal(tripAllowed({ from: { id: 'rail' }, to: { id: 'metro' } }, ['train'], stops), false);
+  assert.equal(tripAllowed({ from: { id: 'mixed' }, to: { id: 'rail' } }, ['train'], stops), true);
+  assert.equal(tripAllowed({ from: { id: 'unknown' }, to: { id: 'rail' } }, ['train'], stops), true);
+  assert.equal(tripAllowed({ from: { id: 'unknown' }, to: { id: 'unknown' } }, [], stops), false);
+});
+
+test('filtering candidates preserves saved trips and restores them on re-enable', async () => {
+  const { predict } = await import('../js/predict.js');
+  const rail = { id: 'rail', name: 'Rail', modes: ['train'] };
+  const metro = { id: 'metro', name: 'Metro', modes: ['metro'] };
+  const trips = [{ id: 'm', from: metro, to: metro }, { id: 't', from: rail, to: rail }];
+  const doc = { ...emptyDoc(), trips, lastViewed: { tripId: 'm', direction: 'forward' },
+    preferences: { enabledModes: ['train'] } };
+  const original = structuredClone(doc);
+  const visible = tripsForModes(doc, [rail, metro]);
+  assert.deepEqual(visible.trips.map((trip) => trip.id), ['t']);
+  assert.equal(predict(visible, Date.now()).tripId, 't');
+  assert.deepEqual(doc, original);
+  assert.deepEqual(tripsForModes(setPreferences(doc, { enabledModes: SUPPORTED_MODES }), [rail, metro]).trips, trips);
 });

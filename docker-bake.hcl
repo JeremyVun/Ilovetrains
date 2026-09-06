@@ -1,7 +1,7 @@
 # Buildx bake target for ilovetrains. Mirrors the mortgage-calc/analytics
 # layout in the infra repo's app repos.
 #
-#   GIT_REVISION="$(git rev-parse --short=12 HEAD)" docker buildx bake --push
+#   See docs/operations/deploy.md for the numbered release command.
 #   docker buildx bake --set ilovetrains.platform=linux/amd64 --load     # local single-arch
 variable "REGISTRY"            { default = "registry.jeremyvun.com" }
 variable "ILOVETRAINS_VERSION" { default = "latest" }

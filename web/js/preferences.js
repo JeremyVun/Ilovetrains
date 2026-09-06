@@ -94,3 +94,23 @@ export function filterBody(body, modes) {
   const journeys = Array.isArray(source.journeys) ? source.journeys : [];
   return { ...source, journeys: journeys.filter((journey) => journeyAllowed(journey, modes)) };
 }
+
+/* Endpoint compatibility is known from the station index, not from one old
+   journey. Unknown stops remain candidates for the planner to resolve. */
+export function stationAllowed(stop, modes, stations = []) {
+  const enabled = normalizeModes(modes);
+  if (!enabled.length) return false;
+  const known = stations?.find((station) => station.id === stop?.id) || stop;
+  const served = known?.modes;
+  return !Array.isArray(served) || !served.length
+    || served.some((mode) => enabled.includes(mode));
+}
+
+export function tripAllowed(trip, modes, stations = []) {
+  return Boolean(trip) && [trip.from, trip.to].every((stop) => stationAllowed(stop, modes, stations));
+}
+
+export function tripsForModes(doc, stations = []) {
+  const modes = preferencesOf(doc).enabledModes;
+  return { ...doc, trips: doc.trips.filter((trip) => tripAllowed(trip, modes, stations)) };
+}

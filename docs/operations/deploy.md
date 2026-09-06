@@ -10,6 +10,10 @@ from this machine.
 ## Before deploying
 
 - Run the relevant test and real-client verification gates.
+- `web/js/version.js` is the canonical app version, starting at `1.0.0`.
+  Bump patch for fixes, minor for compatible features, major for breaking
+  product changes. Keep major/minor/patch numeric; reset lower components when
+  bumping a higher one. Commit the version with its release changes.
 - If any file in `web/sw.js`'s `SHELL` array changed, bump its `VERSION`.
 - Never read or source `.env` or the infra stack's `secrets.env` without
   explicit user permission. Never print or commit `TFNSW_API_KEY`.
@@ -19,12 +23,14 @@ from this machine.
 1. Build and push the multi-architecture image to the self-hosted registry:
 
    ```sh
-   GIT_REVISION="$(git rev-parse --short=12 HEAD)" docker buildx bake --push
+   ILOVETRAINS_VERSION="$(node --input-type=module -e 'import { VERSION } from "./web/js/version.js"; process.stdout.write(VERSION)')" \
+     GIT_REVISION="$(git rev-parse --short=12 HEAD)" docker buildx bake --push
    ```
 
-   `docker-bake.hcl` publishes `registry.jeremyvun.com/ilovetrains`. Build from
-   the committed release so Settings reports its source revision. The image
-   generates `web/js/version.js`; the checked-in development value stays `dev`.
+   `docker-bake.hcl` publishes the numbered version and `latest` to
+   `registry.jeremyvun.com/ilovetrains`. Build from the committed release;
+   Settings displays its canonical version. The Git revision is retained in
+   the image's `org.opencontainers.image.revision` label for diagnostics.
 
 2. If deployment configuration changed, edit
    `../projects/stacks/ilovetrains/`, then commit and push the infra repository.

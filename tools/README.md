@@ -366,7 +366,7 @@ Wharf` and uses `5B` to `5A`. `ferry-side-only-control` proves that a supplied
 Circular Quay departure from `Wharf 4, Side B` so the full initial label is
 calibrated separately from compact transfer markers.
 
-`docs/contracts/ui.md` lists these frames and the Settings frames produced
+`docs/contracts/ui.md` lists these frames and the Settings/filtering frames produced
 by `check-settings-browser.js`; the directory holds only current calibration
 images. A frame neither instrument can produce is removed.
 

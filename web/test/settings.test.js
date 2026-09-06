@@ -137,7 +137,7 @@ test('home never revives an excluded or superseded cached journey', () => {
   assert.equal(completedEmpty.directions.journey, null, 'a successful empty search wins over old cache');
 });
 
-test('only the station index can mark a saved ferry-only trip unavailable', () => {
+test('known incompatible endpoints hide saved trips while unknown endpoints remain eligible', () => {
   const wharf = { id: '2000260', name: 'Pyrmont Bay Wharf' };
   const ferryTrip = { ...trip, from: wharf };
   const doc = {
@@ -149,8 +149,8 @@ test('only the station index can mark a saved ferry-only trip unavailable', () =
   const indexed = homeHtml(homeModel(doc, selection, null, now, {
     stations: [{ ...wharf, modes: ['ferry'] }, { ...BONDI, modes: ['train'] }]
   }));
-  assert.match(indexed, /data-act="enable-ferries" data-id="t1" data-direction="forward"/);
-  assert.match(indexed, />Turn on ferries<\/span>/);
+  assert.doesNotMatch(indexed, /data-act="enable-ferries"/);
+  assert.doesNotMatch(indexed, /Ferries are off/);
   assert.doesNotMatch(indexed, /data-act="open-trip"/);
 });
 
