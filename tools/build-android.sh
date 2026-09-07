@@ -37,4 +37,7 @@ mkdir -p "$project_dir/web/downloads"
 chmod 755 "$project_dir/web/downloads"
 cp "releases/$apk_name" "$project_dir/web/downloads/$apk_name"
 chmod 644 "releases/$apk_name" "releases/$apk_name.sha256" "$project_dir/web/downloads/$apk_name"
+apk_sha="$(cut -d' ' -f1 "releases/$apk_name.sha256")"
+sed -e "s/{APK}/$apk_name/g" -e "s/{VERSION}/$app_version/g" -e "s/{SHA256}/$apk_sha/g" \
+  "$project_dir/web/downloads/index.template.html" > "$project_dir/web/downloads/index.html"
 printf 'Installable APK: %s/android/releases/%s\n' "$project_dir" "$apk_name"

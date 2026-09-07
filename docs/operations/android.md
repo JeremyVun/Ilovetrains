@@ -26,8 +26,9 @@ key. `ILOVETRAINS_SIGNING_DIR` can select an existing signing directory.
 Signing files and release outputs are excluded from git.
 
 Release output is `android/releases/ilovetrains-<version>.apk`, with a SHA-256
-sidecar. The helper also stages that APK in `web/downloads/` for the normal
-server-image deployment. Build the APK before the Docker image to include
+sidecar. The helper also stages that APK in `web/downloads/` and renders
+`web/downloads/index.html` from `index.template.html` with the version and
+checksum, so `/downloads/` is the phone download page in the server image. Build the APK before the Docker image to include
 the phone download. The PWA service worker does not cache the APK.
 Android's display version and filename read the canonical `web/js/version.js`;
 increment Android `versionCode` for each installable update. Building the APK
