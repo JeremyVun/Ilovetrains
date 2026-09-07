@@ -350,6 +350,25 @@ export function recordRide(doc, selection, journey, from, to) {
   return { ...doc, rides };
 }
 
+/** A ride recorded while its journey was still live follows later evidence: it
+    takes a refreshed arrival, and is withdrawn when that arrival has not
+    happened yet (client-storage.md, Completed rides). */
+export function correctRide(doc, selection, journey, nowMs) {
+  if (!selection || !journey) return doc;
+  const departedAt = (journey.departure || {}).estimated || (journey.departure || {}).scheduled;
+  const scheduledDeparture = (journey.departure || {}).scheduled || departedAt;
+  const arrivedAt = (journey.arrival || {}).estimated || (journey.arrival || {}).scheduled;
+  const rides = doc.rides || [];
+  const index = rides.findIndex((ride) => ride.tripId === selection.tripId
+    && ride.direction === selection.direction
+    && (ride.scheduledDeparture || ride.departedAt) === scheduledDeparture);
+  const moved = Date.parse(arrivedAt || '');
+  if (index < 0 || !Number.isFinite(moved) || moved <= Date.parse(rides[index].arrivedAt)) return doc;
+  return moved > nowMs
+    ? { ...doc, rides: rides.filter((_, i) => i !== index) }
+    : { ...doc, rides: rides.map((ride, i) => (i === index ? { ...ride, arrivedAt } : ride)) };
+}
+
 export function updateStop(doc, stop) {
   if (!isStop(stop) || !locationOf(stop)) return doc;
   const trips = doc.trips.map((trip) => ({

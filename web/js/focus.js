@@ -16,7 +16,7 @@ import {
 } from './journey.js';
 import { shortName } from './dom.js';
 import { distanceKm } from './stations.js';
-import { findTrip, leg } from './storage.js';
+import { correctRide, findTrip, leg, recordRide } from './storage.js';
 import { journeyAllowed, preferencesOf, tripAllowed } from './preferences.js';
 
 /* Half an hour past arrival the journey is over and directions are clutter
@@ -140,20 +140,51 @@ export function matchJourney(journeys, snapshot) {
   return (Array.isArray(journeys) ? journeys : []).find((j) => journeyKey(j) === key) || null;
 }
 
+/** The snapshot the focus carries, replaced from a board that has this journey
+    on it. An unmatched journey keeps the snapshot it has — that is what makes
+    directions survive the journey's own departure. */
+export function applyFocusSnapshot(doc, selection, body) {
+  const focus = focusOf(doc);
+  if (!focus || !selection || selection.tripId !== focus.tripId || selection.direction !== focus.direction) return doc;
+  const match = matchJourney(body && body.journeys, focus.journey);
+  return match ? { ...doc, focus: { ...focus, journey: match } } : doc;
+}
+
 /**
  * Called on every successful refresh: expire the focus if the journey is long
  * over, otherwise refresh its snapshot from the new data when this board is
- * the one carrying it. An unmatched journey keeps the snapshot it has — that
- * is what makes directions survive the journey's own departure.
+ * the one carrying it.
  */
 export function refreshFocus(doc, selection, body, nowMs) {
   const focus = focusOf(doc);
   if (!focus) return doc;
-  if (focusExpired(focus, nowMs)) return clearFocus(doc);
-  if (!selection || selection.tripId !== focus.tripId || selection.direction !== focus.direction) return doc;
-  const match = matchJourney(body && body.journeys, focus.journey);
-  if (!match) return doc;
-  return { ...doc, focus: { ...focus, journey: match } };
+  return focusExpired(focus, nowMs) ? clearFocus(doc) : applyFocusSnapshot(doc, selection, body);
+}
+
+/**
+ * The ride ledger for the focused journey, judged from the arrival the last
+ * refresh left in the snapshot. A ride recorded from an arrival that has since
+ * moved takes the new one, and one that has not happened yet is withdrawn:
+ * an expected finish is not evidence of arrival (client-storage.md).
+ */
+export function settleRide(doc, nowMs, fix = null) {
+  const focus = focusOf(doc);
+  const trip = focus && findTrip(doc, focus.tripId);
+  const arrival = focus ? arrivalMs(focus.journey) : null;
+  if (!focus || !trip || arrival === null) return doc;
+  const selection = { tripId: focus.tripId, direction: focus.direction };
+  const ends = leg(trip, focus.direction);
+  const corrected = correctRide(doc, selection, focus.journey, nowMs);
+  return nowMs < arrival && !arrived(focus, ends.to, fix, nowMs) ? corrected
+    : recordRide(corrected, selection, focus.journey, ends.from, ends.to);
+}
+
+/** Completion is decided after the arrival evidence has had its chance to move:
+    the fresh journey is applied, the ride is settled against it, and only then
+    may the focus expire (client-storage.md, Completed rides). */
+export function settleRefreshedFocus(doc, selection, body, nowMs, fix = null) {
+  const applied = applyFocusSnapshot(doc, selection, body);
+  return refreshFocus(settleRide(applied, nowMs, fix), selection, body, nowMs);
 }
 
 /** A cancelled leg cancels the journey (api.md). */

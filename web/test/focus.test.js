@@ -5,8 +5,10 @@ import assert from 'node:assert/strict';
 
 import {
   setFocus, visibleFocus, clearFocus, isFocused, focusExpired, matchJourney, refreshFocus,
+  settleRide, settleRefreshedFocus,
   directionsModel, focusStatus, inferTravel, arrived, FOCUS_CLEAR_MS
 } from '../js/focus.js';
+import { arrivalMs } from '../js/journey.js';
 import { parseDoc, serializeDoc, emptyDoc, recordLastOpen, removeTrip } from '../js/storage.js';
 import {
   TRANSFER_NOW, TRANSFER_DEPARTED_NOW, transferBody, transferJourneys, delayLeg, cancelLeg,
@@ -353,4 +355,38 @@ test('focus visibility treats trains, metro and ferries identically', () => {
     doc.preferences.enabledModes = ['train', 'metro', 'ferry'].filter((item) => item !== mode);
     assert.equal(visibleFocus(doc, TRANSFER_NOW), null);
   }
+});
+
+/* The stale-arrival defect: the client used to record the ride from the journey
+   it already had, then apply the board that moved the arrival. */
+const ARRIVAL = Date.parse('2026-09-01T10:08:00+10:00');
+const JUST_AFTER = ARRIVAL + 2 * 60_000;
+
+function laterBody(minutes) {
+  const journeys = transferJourneys();
+  delayLeg(journeys[0], 1, minutes);
+  return transferBody({ journeys });
+}
+
+test('completion is judged from the refreshed arrival, not the snapshot it started with', () => {
+  const doc = docWithFocus();
+
+  assert.equal(settleRide(doc, JUST_AFTER).rides.length, 1, 'the stored arrival alone would record it');
+
+  const settled = settleRefreshedFocus(doc, SELECTION, laterBody(7), JUST_AFTER, null);
+  assert.deepEqual(settled.rides || [], [], 'the train is still running, so there is no ride');
+  assert.equal(arrivalMs(settled.focus.journey), ARRIVAL + 7 * 60_000);
+});
+
+test('a ride recorded from an arrival that moves takes the new one, or is withdrawn', () => {
+  const recorded = settleRide(docWithFocus(), JUST_AFTER);
+  assert.equal(Date.parse(recorded.rides[0].arrivedAt), ARRIVAL);
+
+  const corrected = settleRefreshedFocus(recorded, SELECTION, laterBody(1), JUST_AFTER, null);
+  assert.equal(corrected.rides.length, 1);
+  assert.equal(Date.parse(corrected.rides[0].arrivedAt), ARRIVAL + 60_000);
+
+  const withdrawn = settleRefreshedFocus(recorded, SELECTION, laterBody(7), JUST_AFTER, null);
+  assert.deepEqual(withdrawn.rides, [], 'an arrival still ahead is not a completed ride');
+  assert.notEqual(directionsModel(withdrawn.focus, JUST_AFTER).phase, 'done', 'and the trip is not over');
 });

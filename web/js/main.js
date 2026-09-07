@@ -2,7 +2,7 @@
 
 import {
   loadDoc, saveDoc, addTrip, findTrip, leg, cacheKey, putCache, getCache, recordView,
-  recordRide, recordHomeVote, recordLastOpen, updateStop, declineLocation, newTripId,
+  recordHomeVote, recordLastOpen, updateStop, declineLocation, newTripId,
   recordOpen, milestone, LOCATION_ASK_QUIET_MS
 } from './storage.js';
 import { distanceKm, homeOf, locate, predict } from './predict.js';
@@ -10,7 +10,8 @@ import { here, loadStations } from './stations.js';
 import { boardModel, promotedRow } from './rowmodel.js';
 import { journeyDetail, journeyKey, departureKey, legsOf, arrivalMs, departureMs } from './journey.js';
 import {
-  focusOf, visibleFocus, setFocus, clearFocus, isFocused, focusExpired, matchJourney, refreshFocus,
+  focusOf, visibleFocus, setFocus, clearFocus, isFocused, focusExpired, matchJourney,
+  settleRefreshedFocus, settleRide,
   directionsModel, inferTravel, arrived, journeyCancelled, TRAVEL_LATE_MS
 } from './focus.js';
 import * as Board from './board.js';
@@ -603,7 +604,7 @@ function useFix() {
     state.selection = answer;
     if (!answer) { state.body = null; renderHome(); return; }
   }
-  const completed = recordCompletedFocus(state.doc);
+  const completed = settleFocusRide(state.doc);
   if (completed !== state.doc) ctx.update(completed);
   loadSelectedCache();
   renderHome();
@@ -907,7 +908,7 @@ function homeAction(action, element) {
       analytics.track('back_' + state.headerKind);
     }
     state.headerKind = null;
-    state.doc = clearFocus(recordCompletedFocus(state.doc));
+    state.doc = clearFocus(settleFocusRide(state.doc));
     state.selection = {
       tripId: state.selection.tripId,
       direction: state.selection.direction === 'reverse' ? 'forward' : 'reverse'
@@ -1059,7 +1060,7 @@ function renderDetail() {
 
 function unpinService() {
   if (!focusOf(state.doc) || focusOf(state.doc).by === 'inferred') return;
-  const released = clearFocus(recordCompletedFocus(state.doc));
+  const released = clearFocus(settleFocusRide(state.doc));
   delete released.lastOpen;
   ctx.update(released);
   if (focusInflight) focusInflight.abort();
@@ -1096,7 +1097,7 @@ function detailAction(action) {
 async function refreshFollowed() {
   const focus = focusOf(state.doc);
   if (focus && focusExpired(focus, now())) {
-    ctx.update(clearFocus(recordCompletedFocus(state.doc)));
+    ctx.update(clearFocus(settleFocusRide(state.doc)));
     state.focusBody = null;
     state.focusIdentity = null;
     if (state.view === 'home' || state.view === 'settings') reconcileSuggestionSelection();
@@ -1118,7 +1119,7 @@ async function refreshFollowed() {
     const current = focusOf(state.doc);
     if (controller.signal.aborted || !current
       || identityOfFocus(current) !== identity) return;
-    ctx.update(refreshFocus(recordCompletedFocus(state.doc), focus, body, now()));
+    ctx.update(settleRefreshedFocus(state.doc, focus, body, now(), validFix()));
     state.focusOffline = false;
     if (matchJourney(body.journeys, current.journey)) {
       state.focusBody = body;
@@ -1166,7 +1167,7 @@ async function fetchLive({ independent = false } = {}) {
     state.body = eligible;
     state.serverStale = serverStale;
     state.offline = false;
-    ctx.update(recordCompletedFocus(putCache(state.doc, key, body, now(), { serverStale })));
+    ctx.update(settleFocusRide(putCache(state.doc, key, body, now(), { serverStale })));
     noteLastOpen();
     if (state.journey) state.journey = matchJourney(eligible.journeys, state.journey) || state.journey;
   } catch (error) {
@@ -1176,15 +1177,8 @@ async function fetchLive({ independent = false } = {}) {
   renderCurrent();
 }
 
-function recordCompletedFocus(doc) {
-  const focus = focusOf(doc);
-  if (!focus || arrivalMs(focus.journey) === null) return doc;
-  if (now() < arrivalMs(focus.journey) && !arrivedNow(doc)) return doc;
-  const trip = findTrip(doc, focus.tripId);
-  if (!trip) return doc;
-  const ends = leg(trip, focus.direction);
-  return recordRide(doc, { tripId: focus.tripId, direction: focus.direction },
-    focus.journey, ends.from, ends.to);
+function settleFocusRide(doc) {
+  return settleRide(doc, now(), validFix());
 }
 
 function rideRecorded(doc, selection) {
