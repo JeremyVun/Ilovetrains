@@ -161,10 +161,10 @@ read/write atomic and migration simple):
 - `flags` is optional and holds the last `GET /api/v1/flags` answer as
   published name to boolean. Absent, malformed or non-boolean entries read as off, so a
   missing or unreachable backend can only mean the behaviour that shipped
-  before the flag existed. It is fetched after the first paint,
-  never awaited before a board request, and the stored value is what that open
-  draws with. A flag is the backend's decision about this build, never about
-  this device, so it carries no identity and is not a stored preference.
+  before the flag existed. It is fetched after the first paint, never awaited
+  before a board request, and the stored value is what that open draws with.
+  A flag is the backend's decision about this build, never about this device,
+  so it carries no identity and is not a stored preference.
 - The transfer cap is `flags.transferLimit` and `preferences.transferLimit`
   together: capped means the flag is on and the choice is `two`. While capped
   the client hides every journey with more than two changes wherever it applies
@@ -266,9 +266,10 @@ Native clients read the same evaluated public endpoint through their view model,
 independently of timetable loading, when the app opens or resumes and every 30
 seconds while it is foreground. The toy's value stays in memory, defaults off,
 and requires literal JSON `true`; a failed request disables it. Leaving Home or
-backgrounding ends the current animation. Native builds contain no flags SDK key or device
-context. DEBUG iOS calibration can opt in with `--tiny-train`; release builds
-ignore that argument. Toy interactions emit no analytics or API requests.
+backgrounding ends the current animation. Native builds contain no flags SDK
+key or device context. DEBUG iOS calibration can opt in with `--tiny-train`;
+release builds ignore that argument. Toy interactions emit no analytics or API
+requests.
 
 ## Analytics queue
 
