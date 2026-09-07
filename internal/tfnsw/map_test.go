@@ -955,10 +955,10 @@ func TestMapTripModeFilterIsConjunctiveBeforeLimit(t *testing.T) {
 	generatedAt := mustParse(t, "2026-08-31T22:00:00Z")
 	policy := connectionPolicy{Minimum: DefaultMinimumConnectionTime, Maximum: DefaultMaximumConnectionTime}
 
-	trainMetro, err := mapTripWithPolicyModes(body, "A", "B", 2, generatedAt, sydney(t), policy,
-		[]Mode{ModeMetro, ModeTrain})
+	trainMetro, err := mapTripWithOptions(body, "A", "B", 2, generatedAt, sydney(t), policy,
+		DeparturesOptions{Modes: []Mode{ModeMetro, ModeTrain}, TransferLimit: NoTransferLimit})
 	if err != nil {
-		t.Fatalf("mapTripWithPolicyModes: %v", err)
+		t.Fatalf("mapTripWithOptions: %v", err)
 	}
 	if len(trainMetro.Journeys) != 2 || trainMetro.Journeys[0].Legs != 1 || trainMetro.Journeys[1].Legs != 2 {
 		t.Fatalf("train+metro journeys = %+v, want direct train then mixed journey", trainMetro.Journeys)
@@ -971,17 +971,19 @@ func TestMapTripModeFilterIsConjunctiveBeforeLimit(t *testing.T) {
 		}
 	}
 
-	trainOnly, err := mapTripWithPolicyModes(body, "A", "B", 2, generatedAt, sydney(t), policy, []Mode{ModeTrain})
+	trainOnly, err := mapTripWithOptions(body, "A", "B", 2, generatedAt, sydney(t), policy,
+		DeparturesOptions{Modes: []Mode{ModeTrain}, TransferLimit: NoTransferLimit})
 	if err != nil {
-		t.Fatalf("mapTripWithPolicyModes: %v", err)
+		t.Fatalf("mapTripWithOptions: %v", err)
 	}
 	if len(trainOnly.Journeys) != 1 || trainOnly.Journeys[0].Legs != 1 || trainOnly.Journeys[0].Line.Mode != string(ModeTrain) {
 		t.Errorf("train-only journeys = %+v, want the direct train only", trainOnly.Journeys)
 	}
 
-	allOff, err := mapTripWithPolicyModes(body, "A", "B", 2, generatedAt, sydney(t), policy, []Mode{})
+	allOff, err := mapTripWithOptions(body, "A", "B", 2, generatedAt, sydney(t), policy,
+		DeparturesOptions{Modes: []Mode{}, TransferLimit: NoTransferLimit})
 	if err != nil {
-		t.Fatalf("mapTripWithPolicyModes: %v", err)
+		t.Fatalf("mapTripWithOptions: %v", err)
 	}
 	if len(allOff.Journeys) != 0 {
 		t.Errorf("all-off journeys = %+v, want none", allOff.Journeys)
@@ -1126,5 +1128,76 @@ func TestMapTripKeepsAnEarlierArrivalWhenTheWaitEqualsTheGap(t *testing.T) {
 	}
 	if len(got.Journeys) != 2 {
 		t.Fatalf("departures = %v, want both journeys kept", departures(got))
+	}
+}
+
+// No captured fixture holds a three-change journey — across every fixture, 80
+// journeys reach two changes at most — so the cap is exercised against a
+// composed board of three, two and no changes.
+func changeLadder(t *testing.T) []byte {
+	t.Helper()
+	return tripBody(t,
+		[]leg{
+			service(t, "T1", "A", "2026-09-01 09:00", "C", "2026-09-01 09:10"),
+			service(t, "T2", "C", "2026-09-01 09:15", "D", "2026-09-01 09:25"),
+			service(t, "T3", "D", "2026-09-01 09:30", "E", "2026-09-01 09:40"),
+			service(t, "T4", "E", "2026-09-01 09:45", "B", "2026-09-01 09:55"),
+		},
+		[]leg{
+			service(t, "T5", "A", "2026-09-01 09:02", "C", "2026-09-01 09:12"),
+			service(t, "T6", "C", "2026-09-01 09:17", "D", "2026-09-01 09:27"),
+			service(t, "T7", "D", "2026-09-01 09:32", "B", "2026-09-01 09:42"),
+		},
+		[]leg{service(t, "T8", "A", "2026-09-01 09:04", "B", "2026-09-01 09:30")},
+	)
+}
+
+func legCounts(resp *DeparturesResponse) []int {
+	var out []int
+	for _, journey := range resp.Journeys {
+		out = append(out, journey.Legs)
+	}
+	return out
+}
+
+func TestMapTripTransferLimitDropsJourneysWithMoreChanges(t *testing.T) {
+	body := changeLadder(t)
+	generatedAt := mustParse(t, "2026-08-31T22:00:00Z")
+
+	for _, tc := range []struct {
+		name          string
+		transferLimit int
+		want          []int
+	}{
+		{"omitted", NoTransferLimit, []int{4, 3, 1}},
+		{"three changes", 3, []int{4, 3, 1}},
+		{"two changes", 2, []int{3, 1}},
+		{"one change", 1, []int{1}},
+		{"direct only", 0, []int{1}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := mapTripWithOptions(body, "A", "B", 6, generatedAt, sydney(t), defaultConnectionPolicy(),
+				DeparturesOptions{Modes: AllModes(), TransferLimit: tc.transferLimit})
+			if err != nil {
+				t.Fatalf("mapTripWithOptions: %v", err)
+			}
+			if fmt.Sprint(legCounts(got)) != fmt.Sprint(tc.want) {
+				t.Errorf("leg counts = %v, want %v", legCounts(got), tc.want)
+			}
+		})
+	}
+}
+
+func TestMapTripTransferLimitHappensBeforeLimit(t *testing.T) {
+	// The three-change journey departs first, so dropping it after the limit
+	// would answer a board of two with a single row.
+	got, err := mapTripWithOptions(changeLadder(t), "A", "B", 2, mustParse(t, "2026-08-31T22:00:00Z"),
+		sydney(t), defaultConnectionPolicy(), DeparturesOptions{Modes: AllModes(), TransferLimit: 2})
+	if err != nil {
+		t.Fatalf("mapTripWithOptions: %v", err)
+	}
+	want := []string{"09:02", "09:04"}
+	if fmt.Sprint(departures(got)) != fmt.Sprint(want) {
+		t.Fatalf("departures = %v, want a full board of takeable journeys %v", departures(got), want)
 	}
 }

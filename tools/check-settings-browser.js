@@ -170,6 +170,26 @@ function geometryScript(extra = '') {
   })()`;
 }
 
+function transferRowScript(choice) {
+  const words = { two: { value: 'Up to 2', mark: 'No limit' }, any: { value: 'No limit', mark: 'Up to 2' } }[choice];
+  return `
+    const transferRow = document.querySelector('.st-transfer-row');
+    assert(transferRow instanceof HTMLButtonElement, 'transfer limit row is not one button');
+    assert(transferRow.dataset.act === 'transfer-limit', 'transfer limit row has the wrong action: ' + transferRow.dataset.act);
+    assert(transferRow.previousElementSibling?.classList.contains('st-service-note'),
+      'transfer limit row does not sit directly after the services note');
+    assert(transferRow.querySelector('.st-name')?.textContent.trim() === 'Transfer limit',
+      'wrong transfer limit title: ' + transferRow.querySelector('.st-name')?.textContent.trim());
+    assert(transferRow.querySelector('.st-value')?.textContent.trim() === ${JSON.stringify(words.value)},
+      'wrong transfer limit value: ' + transferRow.querySelector('.st-value')?.textContent.trim());
+    assert(transferRow.querySelector('.st-state')?.textContent.trim() === ${JSON.stringify(words.mark)},
+      'wrong transfer limit mark: ' + transferRow.querySelector('.st-state')?.textContent.trim());
+    assert(!transferRow.querySelector('svg'), 'transfer limit row drew a glyph');
+    const transferHeight = transferRow.getBoundingClientRect().height;
+    assert(Math.round(transferHeight) === 56, 'transfer limit row is not 56px: ' + transferHeight);
+  `;
+}
+
 function locationRowScript(finalState = 'on') {
   return `
     let permissionState = 'prompt';
@@ -1169,6 +1189,26 @@ try {
     }),
     run('settings-light-360', visualSeed, geometryScript(locationRowScript('ask')), firstPort + 1, {
       permission: 'prompt', size: '360x780', media: 'prefers-color-scheme:light'
+    })
+  ]);
+
+  const transferSeed = (transferLimit) => seed({
+    preferences: { enabledModes: ['train', 'metro', 'ferry'], transferLimit },
+    flags: { transferLimit: true }
+  });
+  await Promise.all([
+    run('transfer-limit-390', transferSeed('two'), geometryScript(transferRowScript('two')), firstPort, {
+      permission: 'granted', out: frame('settings-390x844-transfer-limit.png') || undefined
+    }),
+    run('transfer-limit-any-390', transferSeed('any'), geometryScript(transferRowScript('any')), firstPort + 1, {
+      permission: 'granted', out: frame('settings-390x844-transfer-limit-any.png') || undefined
+    }),
+    run('transfer-limit-light-390', transferSeed('two'), geometryScript(transferRowScript('two')), firstPort + 2, {
+      permission: 'granted', media: 'prefers-color-scheme:light',
+      out: frame('settings-390x844-transfer-limit-light.png') || undefined
+    }),
+    run('transfer-limit-412', transferSeed('two'), geometryScript(transferRowScript('two')), firstPort + 3, {
+      permission: 'granted', size: '412x732', out: frame('settings-412x732-transfer-limit.png') || undefined
     })
   ]);
 

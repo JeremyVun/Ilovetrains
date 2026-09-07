@@ -379,8 +379,10 @@ When the flag is off, the trip line remains unchanged and does no animation work
   uses the dynamic viewport, its rows scroll when the frame is too short for
   them, and its footer keeps a separate line
   outside the scroller. A sparse board leaves the space under its last row
-  empty rather than distributing rows through it. When six services are
-  returned, all six remain whole and reachable at 390×844 and 412×732.
+  empty rather than distributing rows through it. When six services with at
+  most two changes are returned, all six remain whole and reachable at 390×844
+  and 412×732. A three-change row is taller, so a board of them shows fewer
+  whole services; each row still renders whole and every row stays reachable.
 - Every change names its station beneath the midpoint of its transfer interval,
   shared by the alighting and boarding platform markers. Names have their own
   band on Home, results and detail; they never overlap a headsign or instruction.
@@ -626,18 +628,26 @@ The authoritative comps live at `assets/comps/latest/`. It always holds the
 current calibration exemplars and nothing else; when an owner verdict
 replaces a screen's design, the new exemplar frames replace the old ones in
 the same change as this contract, and git keeps the history. Every frame in it
-is a shot of the built client from `tools/shoot-states.js` or
-`tools/check-settings-browser.js`. A frame no instrument can reproduce is
-removed rather than left to rot.
+is a shot of the built client from `tools/shoot-states.js`,
+`tools/check-settings-browser.js`, `tools/shoot-android.sh` or
+`tools/shoot-ios.sh`. A frame no instrument can reproduce is removed rather
+than left to rot.
 
 The board, home and detail calibration frames are listed below.
-`tools/check-settings-browser.js --frames assets/comps/latest` adds eight
+`tools/check-settings-browser.js --frames assets/comps/latest` adds twelve
 Settings frames and two filtered-Home frames:
 
 - Settings: `settings-390x844.png`, its `light`, `long-home`, `all-off` and
   `feedback` variants, plus `settings-412x732.png` and its `light` variant.
   `settings-390x844-ask.png` is the location-row permission exemplar.
   They preserve the C1 grouping, controls, spacing and reachable final rows.
+- Settings with the `transferLimit` flag on:
+  `settings-390x844-transfer-limit.png` is the capped default,
+  `settings-390x844-transfer-limit-any.png` the uncapped choice,
+  `settings-390x844-transfer-limit-light.png` the light scheme and
+  `settings-412x732-transfer-limit.png` the narrow page that still reaches its
+  last row. `android-settings-390x844-transfer-limit.png` and
+  `ios-settings-transfer-limit.png` and their variants are the native ports.
 - Filtered Home: `home-390x844-services-filtered.png` preserves the eligible
   prediction and rows; `home-390x844-services-empty.png` shows the all-hidden
   recovery without a journey header, blank clocks or Live indicator.
@@ -780,6 +790,30 @@ it is still current. Home shows an eligible suggestion or the filtered empty
 state. A saved pair remains eligible for alternative routes only when its
 endpoints support the enabled modes; focus never bypasses that check.
 Preferences cause no new history or prediction exposure event.
+
+The transfer limit is one row inside Services, directly after the services
+note, and it appears only while the backend publishes the `transferLimit` flag
+as on. With the flag off Settings renders exactly as it did before the row
+existed. The row is the Location row's composition without its icon column,
+because no glyph in the set means a change count: the title `Transfer limit`,
+the current value as the subtitle, and the other value as the action mark in
+the mark's letterspaced caps. It has no heading, no note, no glyph, no journey
+line and no colour, and it is one 56px button read as title, subtitle, then
+action, with the same row height in every state.
+
+| Choice | Subtitle | Mark | Tapping it |
+| --- | --- | --- | --- |
+| Up to two changes (default) | `Up to 2` | `NO LIMIT` | lifts the limit |
+| No limit | `No limit` | `UP TO 2` | caps changes at two |
+
+Tapping swaps the value and takes the service change's path: eligible cached
+rows are kept, replacements are fetched through the departures API, and an
+excluded journey is never restored on failure. While capped, a journey with
+more than two changes is hidden wherever the service allow-list applies, and
+the followed journey's own all-mode refresh stays uncapped. Turning every
+service off changes the note above the row, never the row itself. A flag
+answer that changes the cap mid-session repaints Settings and refetches the
+board exactly as a tap does.
 
 Appearance has radio semantics for System, Light and Dark. Manual choice wins
 before first paint and updates browser chrome; System follows device changes.

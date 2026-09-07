@@ -56,9 +56,14 @@ type Client struct {
 	now    func() time.Time
 }
 
-// DeparturesOptions controls which services may appear in a journey.
+// NoTransferLimit leaves the change count uncapped; the zero value would cap
+// at direct journeys only.
+const NoTransferLimit = -1
+
+// DeparturesOptions controls which journeys may be served.
 type DeparturesOptions struct {
-	Modes []Mode
+	Modes         []Mode
+	TransferLimit int
 }
 
 // NewClient returns a client for the given API key, loading the Sydney
@@ -97,7 +102,7 @@ func (c *Client) Location() *time.Location { return c.loc }
 // monitored, `estimated` goes null instead of echoing the timetable back as if
 // it were live.
 func (c *Client) Departures(ctx context.Context, from, to string, limit int, at time.Time) (*DeparturesResponse, error) {
-	return c.DeparturesWithOptions(ctx, from, to, limit, at, DeparturesOptions{})
+	return c.DeparturesWithOptions(ctx, from, to, limit, at, DeparturesOptions{TransferLimit: NoTransferLimit})
 }
 
 // DeparturesWithOptions returns journeys whose every service leg is allowed.
@@ -146,7 +151,8 @@ func (c *Client) DeparturesWithOptions(ctx context.Context, from, to string, lim
 	// able to compute how old the data it is showing is, including for a past
 	// window whose rows are hours older than the response.
 	policy := connectionPolicy{Minimum: c.MinimumConnectionTime, Maximum: c.MaximumConnectionTime}
-	resp, err := mapTripWithPolicyModes(body, from, to, limit, now, c.loc, policy, modes)
+	resp, err := mapTripWithOptions(body, from, to, limit, now, c.loc, policy,
+		DeparturesOptions{Modes: modes, TransferLimit: options.TransferLimit})
 	if err != nil {
 		return nil, err
 	}

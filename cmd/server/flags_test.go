@@ -73,7 +73,7 @@ func TestPublicFlagsStreamToBrowser(t *testing.T) {
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/flags", nil))
 		var got map[string]bool
-		if w.Code != http.StatusOK || json.Unmarshal(w.Body.Bytes(), &got) != nil || len(got) != 1 || !strings.Contains(w.Header().Get("Cache-Control"), "no-store") {
+		if w.Code != http.StatusOK || json.Unmarshal(w.Body.Bytes(), &got) != nil || len(got) != 2 || !strings.Contains(w.Header().Get("Cache-Control"), "no-store") {
 			t.Fatalf("unexpected public response: %d %s", w.Code, w.Body.String())
 		}
 		return got["tiny_train"] == want

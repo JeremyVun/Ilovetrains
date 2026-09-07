@@ -17,7 +17,7 @@ import {
 import { shortName } from './dom.js';
 import { distanceKm } from './stations.js';
 import { correctRide, findTrip, leg, recordRide } from './storage.js';
-import { journeyAllowed, preferencesOf, tripAllowed } from './preferences.js';
+import { effectiveCap, journeyAllowed, preferencesOf, tripAllowed } from './preferences.js';
 
 /* Half an hour past arrival the journey is over and directions are clutter
    (client-storage.md). Clearing is automatic so nobody has to remember to. */
@@ -46,7 +46,7 @@ export function visibleFocus(doc, nowMs, stations) {
   const modes = preferencesOf(doc).enabledModes;
   const trip = focus && findTrip(doc, focus.tripId);
   return focus && !focusExpired(focus, nowMs)
-    && tripAllowed(trip, modes, stations) && journeyAllowed(focus.journey, modes)
+    && tripAllowed(trip, modes, stations) && journeyAllowed(focus.journey, modes, effectiveCap(doc))
     ? focus : null;
 }
 

@@ -40,6 +40,18 @@ func journeyLimit(value string) (int, error) {
 	return limit, nil
 }
 
+func journeyTransferLimit(value string) (int, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return tfnsw.NoTransferLimit, nil
+	}
+	limit, err := strconv.Atoi(value)
+	if err != nil || limit < 0 || limit > maxTransferLimit {
+		return 0, badRequest(fmt.Sprintf("transferLimit must be a whole number between 0 and %d", maxTransferLimit))
+	}
+	return limit, nil
+}
+
 func journeyModes(values []string) ([]tfnsw.Mode, error) {
 	if values == nil {
 		return tfnsw.AllModes(), nil

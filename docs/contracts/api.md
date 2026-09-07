@@ -21,7 +21,7 @@ Invariants:
   `2026-08-31T17:42:00+10:00`). Shared timetable and realtime source
   timestamps are RFC 3339 instants and may use `Z`.
 
-## GET /api/v1/departures?from={stopId}&to={stopId}&limit={n}&at={t}&modes={modes}
+## GET /api/v1/departures?from={stopId}&to={stopId}&limit={n}&at={t}&modes={modes}&transferLimit={n}
 
 `at` is an optional ISO 8601 time with an offset
 (`2026-09-01T17:30:00+10:00` or the same instant as `...Z`). Absent means now
@@ -90,6 +90,13 @@ services that actually reach the destination).
   key, so equivalent orderings share a response. `modes=` deliberately means
   no enabled modes and returns an empty journey list without a TfNSW request.
   An unknown name or empty element is a `400`.
+- `transferLimit`: optional cap on a journey's changes, a whole number from 0
+  to 9. Omitted means no cap, which is what every client sent before the cap
+  existed. Anything else is a `400`, whether or not the `transferLimit`
+  feature flag is on, so validation never varies with a switch the caller
+  cannot see. The range is small deliberately: it bounds junk, and it bounds
+  how far the parameter can multiply the cache key space. No Sydney journey
+  has nine changes.
 - Cache: `s-maxage=30, stale-while-revalidate=60`, except for a settled past
   `at` window — see the `at` paragraph above.
 
@@ -182,6 +189,14 @@ Semantics:
   leg of a journey must be enabled; walking legs do not count. Thus a
   train+metro journey needs both modes, and filtering happens before `limit`
   so eligible replacements can fill the board.
+- `transferLimit={n}` drops a journey whose `legs - 1` exceeds `n`. The drop
+  happens in the same pass as the mode drop — before the connection floor and
+  ceiling and before `limit` — so eligible replacements fill the board rather
+  than leaving it short. `legs` counts services only, so a walking transfer is
+  never a change. The value joins the in-memory cache key. While the
+  `transferLimit` feature flag is off the server treats the parameter as
+  omitted and it never enters the key, so turning the flag off restores the
+  uncapped board at once, including for clients that keep sending it.
 - Cancelled services are included with `cancelled: true` (clients render
   struck-through), never silently dropped. Detection is deliberately loose
   (any upstream realtime status containing "cancel"): the exact upstream shape
@@ -383,21 +398,35 @@ upstream answers `200` instead of `304`.
 
 ## GET /api/v1/flags
 
-Returns only supported, evaluated public flag values, with `Cache-Control:
-no-store`. The current response is `{"tiny_train":false}` unless a
-configured public-values provider evaluates that boolean to true. Missing,
-private, invalid or uninitialized values leave the feature off. No raw rules,
-targets, rollout configuration, service credentials or unknown flags appear in
-this response. One Go SDK client filters definitions by `public` and evaluates
-against a single snapshot before returning values through `api.WithPublicFlags`.
-It syncs through the internal flagsd stream without blocking server startup.
-After initial sync it keeps the last valid in-memory snapshot through service
-outages; a restarted process defaults off until its first sync.
+The feature flags this backend has already decided for every client, so one
+switch changes the server and all three clients without a release. The body is
+a flat object of published name to evaluated boolean, with `Cache-Control:
+no-store`:
+
+```json
+{"tiny_train": false, "transferLimit": false}
+```
+
+Every published name is always present with a boolean, so a client can tell
+"off" from "this server does not publish it". The published name is the one
+every client reads; flagsd keys are lower snake case, so `transferLimit` is
+stored there as `transfer_limit` and the server holds the translation.
+Missing, private, invalid or uninitialized values leave the feature off. No raw
+rules, targets, rollout configuration, service credentials or unknown flags
+appear in this response. One Go SDK client filters definitions by `public` and
+evaluates against a single snapshot before returning values through
+`api.WithPublicFlags`. It syncs through the internal flagsd stream without
+blocking server startup. After initial sync it keeps the last valid in-memory
+snapshot through service outages; a restarted process defaults off until its
+first sync, so a flag source that is down or absent can only mean today's
+behaviour, never a half-enabled one.
 
 Evaluation is global to the app, with no request identity, saved state,
-location or other personal context. The service worker uses network-only
-delivery, and browsers retain no response across launches. Runtime configuration
-and production provisioning are tracked in [deployment operations](../operations/deploy.md#feature-flags).
+location or other personal context: a flag is on or off for everyone, and
+percentage rollouts are unsupported by design. The service worker uses
+network-only delivery, and browsers retain no response across launches. Runtime
+configuration and production provisioning are tracked in [deployment
+operations](../operations/deploy.md#feature-flags).
 
 ## GET /healthz
 

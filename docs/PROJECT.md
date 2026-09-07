@@ -97,13 +97,16 @@ moves through are binding in `docs/contracts/ui.md`.
      tells the truth (clock times, `OFFLINE · LAST UPDATED X AGO`) rather
      than counting down from an old cache.
 3. **Routes and transfers just work.** Journey planning must be good enough
-   that the user never wants to configure it. No "max transfers" setting, no
-   "prefer fewer changes" toggle. The server applies a tuneable minimum
-   connection time so unreasonably tight trips are never shown; the UI's
-   tight-change treatment fires only for connections that were reasonable
-   when planned and degraded since. Any configuration surface anywhere in
-   the app must be genuinely justified — the default posture is that there
-   is none.
+   that the user never wants to configure it. The one justified exception is
+   the transfer limit, because a journey with more than two changes cannot
+   name its change stations under a journey line this narrow: the board keeps
+   to two changes and Settings carries the single row that lifts the cap.
+   There is still no "prefer fewer changes" toggle and no numeric stepper.
+   The server applies a tuneable minimum connection time so unreasonably
+   tight trips are never shown; the UI's tight-change treatment fires only
+   for connections that were reasonable when planned and degraded since. Any
+   configuration surface anywhere in the app must be genuinely justified —
+   the default posture is that there is none.
 4. **Honest states.** Delays, cancellations, scheduled-only and stale data
    are visually distinct and never buried. The past register is decided by
    the data, never by row age: a punctuality claim appears only where there

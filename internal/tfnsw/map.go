@@ -82,12 +82,13 @@ type servicePath struct {
 
 func mapTripWithPolicy(body []byte, fromID, toID string, limit int, generatedAt time.Time,
 	loc *time.Location, policy connectionPolicy) (*DeparturesResponse, error) {
-	return mapTripWithPolicyModes(body, fromID, toID, limit, generatedAt, loc, policy, AllModes())
+	return mapTripWithOptions(body, fromID, toID, limit, generatedAt, loc, policy,
+		DeparturesOptions{Modes: AllModes(), TransferLimit: NoTransferLimit})
 }
 
-func mapTripWithPolicyModes(body []byte, fromID, toID string, limit int, generatedAt time.Time,
-	loc *time.Location, policy connectionPolicy, modes []Mode) (*DeparturesResponse, error) {
-	modes, err := CanonicalModes(modes)
+func mapTripWithOptions(body []byte, fromID, toID string, limit int, generatedAt time.Time,
+	loc *time.Location, policy connectionPolicy, options DeparturesOptions) (*DeparturesResponse, error) {
+	modes, err := CanonicalModes(options.Modes)
 	if err != nil {
 		return nil, fmt.Errorf("tfnsw: modes: %w", err)
 	}
@@ -114,6 +115,9 @@ func mapTripWithPolicyModes(body []byte, fromID, toID string, limit int, generat
 		// Dropped here, before the limit below, so the client still receives up
 		// to `limit` journeys it can actually take.
 		if !serveable || len(path.legs) == 0 {
+			continue
+		}
+		if options.TransferLimit >= 0 && len(path.legs)-1 > options.TransferLimit {
 			continue
 		}
 		if !connectionFloorMet(path, policy.Minimum) {

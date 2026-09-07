@@ -68,11 +68,11 @@ final class TrainViewModel: ObservableObject {
         state.stations = (try? await store.stations()) ?? []
         if !canNetwork { settleFocus() }
         choosePrediction(); syncPersonal()
-        if let pair = ends(), let cached = await store.cached(from: pair.0, to: pair.1, modes: data.modes) {
+        if let pair = ends(), let cached = await cachedBoard(from: pair.0, to: pair.1) {
             publish(retainedOfflineBoard(cached), request: generation)
         }
         state.ready = true; state.screen = data.trips.isEmpty ? .setup : .home
-        refresh()
+        refresh(); refreshFlags()
         do { try await bootstrap?.value; state.timetableStatus = await planner.coverageDescription }
         catch { state.timetableStatus = "Offline timetable unavailable. Download it in Settings." }
         if active { refreshSharedData(refreshBoard: false); silentLocation() }
@@ -89,7 +89,14 @@ final class TrainViewModel: ObservableObject {
             catch { show("Couldn’t save changes on this phone. Free some storage and try again.") }
         }
     }
-    private func currentFocus() -> FocusedJourney? { visibleFocus(data: data, now: state.now) }
+    private func currentFocus() -> FocusedJourney? {
+        guard let focus = visibleFocus(data: data, now: state.now), data.withinTransferLimit(focus.journey) else { return nil }
+        return focus
+    }
+    private func cachedBoard(from: Station, to: Station) async -> BoardData? {
+        guard let cached = await store.cached(from: from, to: to, modes: data.modes) else { return nil }
+        return data.withinTransferLimit(cached)
+    }
     private func syncPersonal() {
         let focus = currentFocus()
         let first = focus?.tripId ?? state.selectedTripId
@@ -102,6 +109,7 @@ final class TrainViewModel: ObservableObject {
         state.totalTrips = data.trips.count; state.focus = focus
         state.focusComplete = focus.map { f in data.rides.contains { $0.tripId == f.tripId && $0.reverse == f.reverse && $0.departure == f.journey.departure } } ?? false
         state.appearance = data.appearance; state.enabledModes = data.modes; state.useLocation = data.useLocation
+        state.transferLimit = data.transferLimit; state.flags = data.flags
         state.automaticHome = automaticHome(data: data); state.home = data.home ?? state.automaticHome; state.homeIsManual = data.home != nil
         state.recentFrom = data.recentFrom; state.recentTo = data.recentTo
         state.tripMetadata = savedTripMetadata(data: data, fix: fix, selectedTripId: state.selectedTripId, selectedReverse: state.reverse, now: state.now)
@@ -174,13 +182,14 @@ final class TrainViewModel: ObservableObject {
         earlierTask?.cancel(); earlierTask = nil; state.earlierLoading = false
         boardTask?.cancel(); generation += 1
         let request = generation; let modes = data.modes; let now = state.now
+        let transferLimit = data.requestTransferLimit; let bound = data.offlineTransferBound
         guard let pair = ends(), !modes.isEmpty else { state.board = nil; state.refreshing = false; syncPersonal(); refreshFocus(); return }
         let id = state.selectedTripId; let reverse = state.reverse
         let recordLastAnswer = !suppressNextLastAnswer
         suppressNextLastAnswer = false
         state.refreshing = true
         boardTask = Task {
-            let cached = await store.cached(from: pair.0, to: pair.1, modes: modes)
+            let cached = await cachedBoard(from: pair.0, to: pair.1)
             guard request == generation, !Task.isCancelled else { return }
             let previous = state.board.flatMap { board in
                 board.from.id == pair.0.id && board.to.id == pair.1.id ? board : nil
@@ -189,8 +198,8 @@ final class TrainViewModel: ObservableObject {
             var local: BoardData?; var online: BoardData?
             await withTaskGroup(of: (Bool, BoardData?).self) { group in
                 let planner = self.planner, api = self.api, bootstrap = self.bootstrap, network = self.canNetwork
-                group.addTask { do { try await bootstrap?.value; return (false, try await planner.plan(from: pair.0, to: pair.1, at: now - 900_000, modes: modes, limit: 24)) } catch { return (false, nil) } }
-                if network { group.addTask { (true, try? await api.departures(from: pair.0, to: pair.1, modes: modes)) } }
+                group.addTask { do { try await bootstrap?.value; return (false, try await planner.plan(from: pair.0, to: pair.1, at: now - 900_000, modes: modes, limit: 24, maxTransfers: bound)) } catch { return (false, nil) } }
+                if network { group.addTask { (true, try? await api.departures(from: pair.0, to: pair.1, modes: modes, transferLimit: transferLimit)) } }
                 for await (isOnline, result) in group {
                     guard request == generation, !Task.isCancelled else { group.cancelAll(); return }
                     if isOnline { online = result } else { local = result }
@@ -262,7 +271,7 @@ final class TrainViewModel: ObservableObject {
             guard !Task.isCancelled, active, sharedRequest == sharedGeneration else { return }
             if let focus = data.focus, focus.journey.legs.allSatisfy({ $0.identity != nil }) {
                 let update = await planner.refreshFocused(focus.journey)
-                let alternatives = try? await planner.plan(from: focus.board.from, to: focus.board.to, at: state.now - 900_000, modes: allModes, limit: 24)
+                let alternatives = try? await planner.plan(from: focus.board.from, to: focus.board.to, at: state.now - 900_000, modes: allModes, limit: 24, maxTransfers: data.offlineTransferBound)
                 guard !Task.isCancelled, sharedRequest == sharedGeneration, active else { return }
                 if sameFocus(focus) {
                     // The overlay demotes only a focus it still owns; refreshFocus may have handed it to the API.
@@ -521,8 +530,25 @@ final class TrainViewModel: ObservableObject {
     func setMode(mode: String, enabled: Bool) {
         guard allModes.contains(mode) else { return }
         if enabled { data.modes.insert(mode) } else { data.modes.remove(mode) }
+        applyPreferenceChange()
+    }
+    func setTransferLimit(_ value: TransferLimit) {
+        guard data.transferLimit != value else { return }
+        data.transferLimit = value
+        applyPreferenceChange()
+    }
+    private func applyPreferenceChange() {
         suppressNextLastAnswer = true
         persist(); state.board = nil; state.homeBoard = nil; choosePrediction(); syncPersonal(); refresh()
+    }
+    private func refreshFlags() {
+        guard canNetwork else { return }
+        Task {
+            guard let flags = try? await api.flags(), flags != data.flags else { return }
+            let wasCapped = data.capped
+            data.flags = flags
+            if data.capped == wasCapped { persist(); syncPersonal() } else { applyPreferenceChange() }
+        }
     }
     func setUseLocation(_ enabled: Bool) {
         data.useLocation = enabled
@@ -569,6 +595,7 @@ final class TrainViewModel: ObservableObject {
     func earlier() {
         guard earlierTask == nil, let board = state.board else { return }
         let request = generation, modes = data.modes
+        let bound = data.offlineTransferBound, transferLimit = data.requestTransferLimit
         let earliest = board.journeys.map(\.departure).min() ?? state.now
         let at = max(earliest - 3_600_000, state.now - 86_400_000)
         guard earliest > state.now - 86_400_000 else { return }
@@ -577,10 +604,10 @@ final class TrainViewModel: ObservableObject {
             defer {
                 if request == generation { earlierTask = nil; state.earlierLoading = false }
             }
-            async let local: BoardData? = try? planner.plan(from: board.from, to: board.to, at: at, modes: modes, limit: 30)
+            async let local: BoardData? = try? planner.plan(from: board.from, to: board.to, at: at, modes: modes, limit: 30, maxTransfers: bound)
             let online: BoardData?
             if canNetwork {
-                online = try? await api.departures(from: board.from, to: board.to, modes: modes, at: at)
+                online = try? await api.departures(from: board.from, to: board.to, modes: modes, at: at, transferLimit: transferLimit)
             } else {
                 online = nil
             }
@@ -689,6 +716,8 @@ private extension TrainViewModel {
         let trip = SavedTrip(id: "calibration-trip", from: board.from, to: board.to, createdAt: now,
                             lines: board.journeys.first.map(orderedLineCodes) ?? [])
         data.trips = [trip]; data.appearance = name.contains("light") ? .light : .dark
+        if name.contains("transfer-limit") { data.flags = [transferLimitFlagKey: true] }
+        if name.contains("no-limit") { data.transferLimit = .any }
         if name.contains("unknown-line") { data.trips[0].lines = [] }
         data.lastTripId = trip.id
         if ["settings-off", "settings-off-light"].contains(name) { data.useLocation = false }

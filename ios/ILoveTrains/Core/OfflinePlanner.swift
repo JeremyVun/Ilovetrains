@@ -95,7 +95,8 @@ actor OfflinePlanner {
         to: Station,
         at: Millis,
         modes: Set<String>,
-        limit: Int = 24
+        limit: Int = 24,
+        maxTransfers: Int = 2
     ) async throws -> BoardData {
         guard let active = activePackage, let database else { throw OfflineCoreError.notInitialized }
         let date = Self.compactDate(containing: at)
@@ -142,7 +143,8 @@ actor OfflinePlanner {
             to: to,
             at: at,
             connections: try connections(Self.initialHorizonHours),
-            limit: limit
+            limit: limit,
+            maxTransfers: maxTransfers
         )
         if routed.isEmpty || routed.contains(where: Self.hasLongWait) {
             routed = router.route(
@@ -150,7 +152,8 @@ actor OfflinePlanner {
                 to: to,
                 at: at,
                 connections: try connections(Self.maximumHorizonHours),
-                limit: limit
+                limit: limit,
+                maxTransfers: maxTransfers
             )
         }
         var observedAt: Millis?

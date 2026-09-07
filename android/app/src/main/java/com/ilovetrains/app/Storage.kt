@@ -17,10 +17,13 @@ data class UserData(
     val focus: FocusedJourney? = null, val lastAnswer: LastAnswer? = null,
     val appearance: Appearance = Appearance.System, val modes: Set<String> = AllModes,
     val useLocation: Boolean = true, val home: Station? = null,
-    val recentFrom: List<Station> = emptyList(), val recentTo: List<Station> = emptyList()
+    val recentFrom: List<Station> = emptyList(), val recentTo: List<Station> = emptyList(),
+    val transferLimit: TransferLimit = TransferLimit.Two, val flags: Map<String, Boolean> = emptyMap()
 )
 
 internal fun JSONObject.stringOrNull(key: String): String? = if (isNull(key)) null else optString(key).takeIf { it.isNotBlank() }
+internal fun flagsOf(o: JSONObject?): Map<String, Boolean> = o?.keys()?.asSequence()
+    ?.mapNotNull { key -> (o.opt(key) as? Boolean)?.let { key to it } }?.toMap() ?: emptyMap()
 internal fun <T> JSONArray?.readEach(read: (JSONObject) -> T): List<T> = if (this == null) emptyList() else (0 until length()).mapNotNull { i -> runCatching { read(getJSONObject(i)) }.getOrNull() }
 internal fun <T> List<T>.jsonEach(write: (T) -> JSONObject) = JSONArray(map(write))
 
@@ -87,6 +90,7 @@ object Wire {
         .put("lastTripId", d.lastTripId).put("lastReverse", d.lastReverse).put("focus", d.focus?.let(::focus))
         .put("appearance", d.appearance.name).put("modes", JSONArray(d.modes.toList())).put("useLocation", d.useLocation)
         .put("home", d.home?.let(::station)).put("recentFrom", d.recentFrom.jsonEach(::station)).put("recentTo", d.recentTo.jsonEach(::station))
+        .put("transferLimit", d.transferLimit.wire).put("flags", JSONObject(d.flags))
         .put("lastAnswer", d.lastAnswer?.let { JSONObject().put("tripId", it.tripId).put("reverse", it.reverse).put("at", it.at).put("stationId", it.stationId).put("board", board(it.board)).put("journey", journey(it.journey)) })
     fun user(o: JSONObject): UserData {
         require(o.optInt("schemaVersion", 1) == 1)
@@ -100,7 +104,8 @@ object Wire {
             runCatching { Appearance.valueOf(o.optString("appearance")) }.getOrDefault(Appearance.System),
             o.optJSONArray("modes")?.let { a -> (0 until a.length()).map { a.optString(it) }.filter { it in AllModes }.toSet() } ?: AllModes,
             o.optBoolean("useLocation", true), o.optJSONObject("home")?.let { runCatching { station(it) }.getOrNull() },
-            o.optJSONArray("recentFrom").readEach(::station).take(3), o.optJSONArray("recentTo").readEach(::station).take(3))
+            o.optJSONArray("recentFrom").readEach(::station).take(3), o.optJSONArray("recentTo").readEach(::station).take(3),
+            transferLimitOf(o.stringOrNull("transferLimit")), flagsOf(o.optJSONObject("flags")))
     }
 }
 

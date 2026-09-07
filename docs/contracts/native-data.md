@@ -125,12 +125,18 @@ including daylight-saving transitions, rather than adding elapsed seconds to
 midnight.
 
 The connection scan retains up to 72 origin services, keeps Pareto states by
-transfer count and incoming mode within each origin, and allows at most two
-transfers. It starts with six hours of service and extends to 30 hours if it
-finds no viable journey or a long transfer still needs a later-service
-comparison. The result limit is a cap, not a promise to fill a board by reading
-farther into the future. Connections, shared station objects and trip metadata
-are cached for nearby requests. It keeps distinct later departures for the board while
+transfer count and incoming mode within each origin, and allows at most the
+transfer bound its caller passes; the router's own default is two. The planner
+derives that bound from the rider's transfer limit: two while the cap applies,
+two whenever the `transferLimit` flag is off, and four when the flag is on and
+the rider has chosen no limit. Four is what "no limit" can mean offline,
+because the router's label state grows with the bound and no observed Sydney
+journey needs a third change. It starts with six hours of service and extends
+to 30 hours if it finds no viable journey or a long transfer still needs a
+later-service comparison. The
+result limit is a cap, not a promise to fill a board by reading farther into
+the future. Connections, shared station objects and trip metadata are cached
+for nearby requests. It keeps distinct later departures for the board while
 selecting the earliest usable arrival for each origin service. New trips obey
 the enabled mode set. Every leg carries exact
 `TripIdentity(source,tripId,serviceDate,fromStopId,toStopId,fromSequence,
@@ -325,7 +331,8 @@ for this package, not device performance guarantees.
 
 Swift's `OfflinePlanner` actor owns SQLite reads, connection scans and realtime
 state away from the main actor. It uses the same schema, conservative transfer
-floors, 72-origin-service bound and six/30-hour horizon as Android. It validates
+floors, transfer bound, 72-origin-service bound and six/30-hour horizon as
+Android. It validates
 ZIP size/hash, the sole database entry, SQLite integrity/version and coverage
 before activation. Manifest and realtime downloads are bounded before decoding.
 An update retains the active database on failure and keeps the prior generation.

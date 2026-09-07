@@ -1,6 +1,8 @@
 export const SUPPORTED_MODES = ['train', 'metro', 'ferry'];
 
 const APPEARANCES = new Set(['system', 'light', 'dark']);
+const TRANSFER_LIMITS = new Set(['two', 'any']);
+const CAPPED_LEGS = 3;
 const MODE_SET = new Set(SUPPORTED_MODES);
 const TRAIN_LINES = new Set(['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'BMT', 'CCN', 'SCO', 'SHL', 'HUN']);
 const FERRY_LINES = new Set(['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'MFF']);
@@ -37,7 +39,8 @@ export function preferencesOf(doc) {
   const out = {
     appearance: APPEARANCES.has(raw.appearance) ? raw.appearance : 'system',
     useLocation: typeof raw.useLocation === 'boolean' ? raw.useLocation : true,
-    enabledModes: normalizeModes(raw.enabledModes)
+    enabledModes: normalizeModes(raw.enabledModes),
+    transferLimit: TRANSFER_LIMITS.has(raw.transferLimit) ? raw.transferLimit : 'two'
   };
   const homeOverride = homeOverrideOf(raw.homeOverride);
   if (homeOverride) out.homeOverride = homeOverride;
@@ -55,6 +58,9 @@ export function setPreferences(doc, patch = {}) {
       next.useLocation = patch.useLocation;
     }
     if (own(patch, 'enabledModes')) next.enabledModes = normalizeModes(patch.enabledModes);
+    if (own(patch, 'transferLimit') && TRANSFER_LIMITS.has(patch.transferLimit)) {
+      next.transferLimit = patch.transferLimit;
+    }
     if (own(patch, 'homeOverride')) {
       const homeOverride = homeOverrideOf(patch.homeOverride);
       if (homeOverride) next.homeOverride = homeOverride;
@@ -62,6 +68,28 @@ export function setPreferences(doc, patch = {}) {
     }
   }
   return { ...doc, preferences: next };
+}
+
+function normalizeFlags(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const out = {};
+  for (const [key, on] of Object.entries(value)) if (typeof on === 'boolean') out[key] = on;
+  return out;
+}
+
+/** The flags this backend has already decided, as last answered (api.md). */
+export function flagsOf(doc) {
+  return normalizeFlags(doc && doc.flags);
+}
+
+export function setFlags(doc, flags) {
+  return { ...doc, flags: normalizeFlags(flags) };
+}
+
+/** The cap is the flag and the preference together: either one off means the
+    uncapped board this client has always drawn. */
+export function effectiveCap(doc) {
+  return flagsOf(doc).transferLimit === true && preferencesOf(doc).transferLimit === 'two';
 }
 
 function modeOf(line) {
@@ -74,14 +102,20 @@ function modeOf(line) {
   return null;
 }
 
+function legCount(journey) {
+  if (Number.isFinite(journey.legs)) return journey.legs;
+  return Math.max(1, (journey.legDetail || []).length);
+}
+
 function serviceModes(journey) {
   const legs = Array.isArray(journey && journey.legDetail) && journey.legDetail.length
     ? journey.legDetail : [journey];
   return legs.map((leg) => modeOf(leg && leg.line)).filter((mode) => mode !== 'walk');
 }
 
-export function journeyAllowed(journey, modes) {
+export function journeyAllowed(journey, modes, capped = false) {
   if (!journey) return false;
+  if (capped && legCount(journey) > CAPPED_LEGS) return false;
   const enabled = new Set(normalizeModes(modes));
   if (!enabled.size) return false;
   const allServed = enabled.size === SUPPORTED_MODES.length;
@@ -89,10 +123,10 @@ export function journeyAllowed(journey, modes) {
   return services.length > 0 && services.every((mode) => mode ? enabled.has(mode) : allServed);
 }
 
-export function filterBody(body, modes) {
+export function filterBody(body, modes, capped = false) {
   const source = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
   const journeys = Array.isArray(source.journeys) ? source.journeys : [];
-  return { ...source, journeys: journeys.filter((journey) => journeyAllowed(journey, modes)) };
+  return { ...source, journeys: journeys.filter((journey) => journeyAllowed(journey, modes, capped)) };
 }
 
 /* Endpoint compatibility is known from the station index, not from one old

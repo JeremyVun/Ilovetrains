@@ -6,6 +6,13 @@ import java.time.format.DateTimeFormatter
 
 val Sydney: ZoneId = ZoneId.of("Australia/Sydney")
 val AllModes = setOf("train", "metro", "ferry")
+const val TransferLimitFlag = "transferLimit"
+
+enum class TransferLimit(val wire: String, val label: String) {
+    Two("two", "Up to 2"), Any("any", "No limit");
+    val other get() = if (this == Two) Any else Two
+}
+fun transferLimitOf(value: String?): TransferLimit = TransferLimit.entries.find { it.wire == value } ?: TransferLimit.Two
 
 data class Station(val id: String, val name: String, val lat: Double = 0.0, val lon: Double = 0.0, val modes: Set<String> = AllModes) {
     val shortName: String get() = name.removeSuffix(" Station").removeSuffix(" Railway Station")
@@ -42,6 +49,10 @@ data class BoardData(val from: Station, val to: Station, val journeys: List<Jour
     val coverage: String = "", val error: String? = null, val homeJourneyKey: String? = null) {
     fun isLive(now: Long) = source == "live" && !offline && !serverStale && now - generatedAt in 0..90_000
 }
+val UserData.capped get() = flags[TransferLimitFlag] == true && transferLimit == TransferLimit.Two
+val UserData.offlineMaxTransfers get() = if (flags[TransferLimitFlag] == true && transferLimit == TransferLimit.Any) 4 else 2
+fun Journey.withinTransferCap(capped: Boolean) = !capped || legs.size <= 3
+fun BoardData.withinTransferCap(capped: Boolean) = if (capped) copy(journeys = journeys.filter { it.withinTransferCap(true) }) else this
 enum class Screen { Home, Board, Detail, Setup, Settings }
 enum class Appearance { System, Dark, Light }
 data class FocusedJourney(
@@ -63,6 +74,8 @@ data class AppState(
     val homeBoard: BoardData? = null, val detail: Journey? = null, val focus: FocusedJourney? = null,
     val now: Long = System.currentTimeMillis(), val refreshing: Boolean = false,
     val appearance: Appearance = Appearance.System, val enabledModes: Set<String> = AllModes,
+    // Null while the transferLimit flag is off, which is when Settings offers no choice.
+    val transferLimit: TransferLimit? = null,
     val useLocation: Boolean = true, val locationGranted: Boolean = false, val locationDenied: Boolean = false,
     val distanceMetres: Int? = null, val receipt: String? = null, val home: Station? = null, val homeIsManual: Boolean = false,
     val automaticHome: Station? = null, val focusComplete: Boolean = false,
@@ -100,6 +113,7 @@ interface UiActions {
     fun openSettings()
     fun setAppearance(value: Appearance)
     fun setMode(mode: String, enabled: Boolean)
+    fun setTransferLimit(value: TransferLimit)
     fun setUseLocation(enabled: Boolean)
     fun requestLocation()
     fun chooseHome()

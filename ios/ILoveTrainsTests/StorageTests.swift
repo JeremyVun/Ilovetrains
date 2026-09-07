@@ -44,6 +44,57 @@ final class StorageTests: XCTestCase {
         XCTAssertEqual(recovered.trips.map(\.id), ["first"])
     }
 
+    func testTransferLimitAndFlagsSurviveRestart() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = DeviceStore(directory: directory)
+        let data = UserData(transferLimit: .any, flags: ["transferLimit": true, "other": false])
+
+        try await store.save(data)
+        let restored = await store.load()
+
+        XCTAssertEqual(restored.transferLimit, .any)
+        XCTAssertEqual(restored.flags, ["transferLimit": true, "other": false])
+        XCTAssertTrue(restored.flags["transferLimit"] == true)
+        XCTAssertFalse(restored.capped)
+    }
+
+    func testUnknownOrAbsentTransferLimitAndFlagsReadAsTheDefaults() throws {
+        let decode = { (json: String) in try JSONDecoder().decode(UserData.self, from: Data(json.utf8)) }
+
+        let older = try decode(#"{"schemaVersion": 1, "appearance": "dark"}"#)
+        XCTAssertEqual(older.transferLimit, .two)
+        XCTAssertEqual(older.flags, [:])
+        XCTAssertFalse(older.capped)
+        XCTAssertEqual(older.offlineTransferBound, 2)
+
+        XCTAssertEqual(try decode(#"{"transferLimit": "none"}"#).transferLimit, .two)
+        XCTAssertEqual(try decode(#"{"transferLimit": 2}"#).transferLimit, .two)
+        XCTAssertEqual(try decode(#"{"transferLimit": "any"}"#).transferLimit, .any)
+        XCTAssertEqual(try decode(#"{"flags": ["transferLimit"]}"#).flags, [:])
+        XCTAssertEqual(try decode(#"{"flags": "on"}"#).flags, [:])
+        XCTAssertEqual(try decode(#"{"flags": {"transferLimit": 1, "other": true}}"#).flags, ["other": true])
+    }
+
+    func testTheCapAppliesOnlyWithTheFlagAndTheTwoPreference() throws {
+        let capped = UserData(transferLimit: .two, flags: ["transferLimit": true])
+        let uncapped = UserData(transferLimit: .any, flags: ["transferLimit": true])
+        let flagOff = UserData(transferLimit: .two)
+
+        XCTAssertTrue(capped.capped)
+        XCTAssertEqual(capped.requestTransferLimit, 2)
+        XCTAssertEqual(capped.offlineTransferBound, 2)
+
+        XCTAssertFalse(uncapped.capped)
+        XCTAssertNil(uncapped.requestTransferLimit)
+        XCTAssertEqual(uncapped.offlineTransferBound, 4)
+
+        XCTAssertFalse(flagOff.capped)
+        XCTAssertNil(flagOff.requestTransferLimit)
+        XCTAssertEqual(flagOff.offlineTransferBound, 2)
+        XCTAssertEqual(UserData(transferLimit: .any).offlineTransferBound, 2)
+    }
+
     func testCacheIsPairAwareAndDeletionPurgesBothDirections() async throws {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

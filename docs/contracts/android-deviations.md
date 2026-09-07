@@ -14,7 +14,7 @@ This file records deliberate differences between the native Android app and the 
 
 ## Feedback fixes — 2026-09-07
 
-- Settings gives Use location and Home 72dp minimum rows with 10dp vertical padding. Service choices show only `On` or `Off`, without checkmarks, circles or underlines. Appearance keeps the selected checkmark, removes the underline and reserves the System subtitle's space in every option so previews and labels align.
+- Settings gives Use location, Home and Transfer limit 72dp minimum rows with 10dp vertical padding, where the web composition is 56px. Transfer limit uses that row without its icon column, so its title sits at the page margin. Service choices show only `On` or `Off`, without checkmarks, circles or underlines. Appearance keeps the selected checkmark, removes the underline and reserves the System subtitle's space in every option so previews and labels align.
 - Home and board figures keep `Now` on one line, including enlarged Android text. They must fit their allocated column without clipping or invading the adjacent station/time columns.
 - Line and platform chips are sized in text units: enlarged text grows the chip, and the small journey axis with it, rather than clipping the glyphs (owner bug report, 2026-09-07). The bottom message bar's deletion text may wrap to two lines at enlarged text so its verb survives.
 - Journey lines have 3dp rounded corners at the destination end in Home, Board and Detail. Internal ride/transfer joins remain square so the time axis stays continuous (owner ruling, 2026-09-07).
@@ -22,7 +22,10 @@ This file records deliberate differences between the native Android app and the 
 - Offline boards retain departed services and last-known delays; the shared native retention rules are in [native-data.md](native-data.md#cached-boards-and-departed-services). Departed rows show elapsed time with `AGO`, including retained observations. Future retained estimates keep numerical countdowns, matching web/iOS; the unchanged freshness indicator distinguishes stale observations.
 
 Current native exemplars are `assets/comps/latest/android-settings-390x844.png`
-and its `-light` variant, `android-home-390x844-now.png`,
+and its `-light` variant, the flag-on
+`android-settings-390x844-transfer-limit.png` (capped, dark) and
+`android-settings-390x844-transfer-limit-light.png` (uncapped, light),
+`android-home-390x844-now.png`,
 `android-board-390x844-now.png`, the Home/Board
 `-390x844-offline-retained-t9.png` frames, and the swipe-to-delete pair
 `android-home-390x844-deleting.png` (row dragged past the threshold) and

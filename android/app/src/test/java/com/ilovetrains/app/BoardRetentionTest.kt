@@ -22,6 +22,20 @@ class BoardRetentionTest {
         assertFalse(restored.board.isLive(now))
     }
 
+    @Test fun aCachedBoardLosesItsThreeChangeRowsOnlyWhileTheCapIsOn() {
+        val hub = Station("200060", "Central Station")
+        fun leg(from: Station, to: Station, index: Int) = Leg("T1", "train", to.name, from, to,
+            now + index * 20 * 60_000L, now + (index * 20 + 15) * 60_000L)
+        val threeChanges = Journey(listOf(leg(townHall, hub, 0), leg(hub, rhodes, 1), leg(rhodes, hub, 2), leg(hub, rhodes, 3)))
+        val cached = Wire.board(JSONObject(Wire.board(previous.copy(journeys = listOf(t9, threeChanges))).toString()))
+
+        assertEquals(listOf(t9.key), cached.withinTransferCap(true).journeys.map { it.key })
+        assertEquals(listOf(t9.key, threeChanges.key), cached.withinTransferCap(false).journeys.map { it.key })
+        assertFalse(threeChanges.withinTransferCap(true))
+        assertTrue(threeChanges.withinTransferCap(false))
+        assertTrue(t9.withinTransferCap(true))
+    }
+
     @Test fun delayedTrainSurvivesOfflineReopenFiveMinutesAfterDeparture() {
         val reopened = now + 9 * 60_000
         val cached = Wire.board(JSONObject(Wire.board(previous).toString()))

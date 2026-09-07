@@ -1,14 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
   FEEDBACK_BODY_LIMIT, FEEDBACK_LIMIT, createFeedbackDraft, feedbackPayload,
-  nextChoiceIndex, submitFeedback
+  nextChoiceIndex, services, submitFeedback, transferRow
 } from '../js/settings.js';
 import { homeHtml, homeModel } from '../js/home.js';
 import { cacheKey, emptyDoc } from '../js/storage.js';
+import { SUPPORTED_MODES } from '../js/preferences.js';
 import { ferryBody, transferJourneys } from './fixture.js';
 
 const RHODES = { id: '213820', name: 'Rhodes Station' };
@@ -162,4 +164,48 @@ test('settings smoke: the approved grouped controls and private feedback copy sh
   assert.match(source, /Trains[\s\S]*Metro[\s\S]*Ferries[\s\S]*Buses/);
   assert.match(source, /Don’t include personal details\./);
   assert.match(css, /\.st-service-set\s*\{[^}]*repeat\(4/);
+});
+
+/* The flag off is the before of every transfer-cap frame, so Settings must draw
+   the bytes it drew at cc7f165. An intended Settings change updates these
+   digests the way an intended screen change updates a baseline. */
+test('the transfer limit is absent from Settings until the backend turns it on', () => {
+  const digest = (markup) => createHash('sha256').update(markup).digest('hex');
+  assert.equal(digest(services(SUPPORTED_MODES)),
+    '98b03aebe9c9a299259313567a38ccf0ae07f70ad982bbdd51cdd60d923c38a8');
+  assert.equal(digest(services([])),
+    'e3413a43abc3e619b88562e8407a2a171c7465cdbee5a805b549ec458717f832');
+  assert.equal(services(SUPPORTED_MODES, null), services(SUPPORTED_MODES));
+  assert.doesNotMatch(services(SUPPORTED_MODES), /st-transfer-row/);
+});
+
+test('the transfer limit row shows the value and offers the other one', () => {
+  const capped = services(SUPPORTED_MODES, 'two');
+  const uncapped = services(SUPPORTED_MODES, 'any');
+
+  assert.match(capped, /Trips use chosen services only\.<\/p><button class="st-person-row st-transfer-row"/);
+  assert.match(capped, /<span class="st-name">Transfer limit<\/span><span class="st-value">Up to 2<\/span>/);
+  assert.match(capped, /<span class="st-state">No limit<\/span><\/button><\/section>/);
+  assert.match(capped, /aria-label="Transfer limit, Up to 2 transfers, Change to no limit"/);
+  assert.match(uncapped, /<span class="st-value">No limit<\/span>/);
+  assert.match(uncapped, /<span class="st-state">Up to 2<\/span>/);
+  assert.match(uncapped, /aria-label="Transfer limit, No limit on transfers, Change to up to 2 transfers"/);
+  assert.equal(transferRow('junk'), transferRow('two'));
+
+  // Every service off hides the journey line, and keeps the words (round 2).
+  const allOff = services([], 'two');
+  assert.match(allOff, /Turn one on to see trips\.<\/p><button class="st-person-row st-transfer-row"/);
+  assert.doesNotMatch(allOff, /sy-bar|st-section">Transfer/);
+});
+
+/* Tapping the row goes through the same preference path the service buttons
+   use, so the board refetches instead of only repainting. */
+test('the transfer limit row swaps the value through setPreferences', () => {
+  const source = readFileSync(join(import.meta.dirname, '..', 'js', 'settings.js'), 'utf8');
+  const branch = /if \(action === 'transfer-limit'\) \{([\s\S]*?)\n    \}/.exec(source);
+
+  assert.ok(branch, 'the settings handler still answers the row');
+  assert.match(branch[1], /ctx\.setPreferences\(\{ transferLimit: current === 'two' \? 'any' : 'two' \}\)/);
+  assert.match(branch[1], /paintMain\(root, ctx, permission\)/);
+  assert.match(source, /flagsOf\(ctx\.doc\)\.transferLimit \? prefs\.transferLimit : null/);
 });

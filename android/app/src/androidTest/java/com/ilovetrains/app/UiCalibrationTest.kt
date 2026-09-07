@@ -201,6 +201,10 @@ class UiCalibrationTest {
         capture("board-light")
         compose.runOnIdle { state.value = fixture.settingsState.copy(appearance = Appearance.Light) }
         capture("settings-light")
+        compose.runOnIdle { state.value = fixture.settingsState.copy(transferLimit = TransferLimit.Two, appearance = Appearance.Dark) }
+        capture("settings-transfer-limit")
+        compose.runOnIdle { state.value = fixture.settingsState.copy(transferLimit = TransferLimit.Any, appearance = Appearance.Light) }
+        capture("settings-transfer-limit-light")
         compose.runOnIdle { state.value = fixture.homeNowState }
         capture("home-now")
         compose.runOnIdle { state.value = fixture.justAddedState }
@@ -675,6 +679,7 @@ private object NoActions : UiActions {
     override fun clearSetupFrom() {} ; override fun chooseSetupTo(station: Station) {} ; override fun clearSetupTo() {}
     override fun saveTrip(from: Station, to: Station) {} ; override fun deleteTrip(id: String) {} ; override fun undoDelete() {} ; override fun openSettings() {}
     override fun setAppearance(value: Appearance) {} ; override fun setMode(mode: String, enabled: Boolean) {}
+    override fun setTransferLimit(value: TransferLimit) {}
     override fun setUseLocation(enabled: Boolean) {} ; override fun requestLocation() {} ; override fun chooseHome() {}
     override fun setHome(station: Station?) {} ; override fun refresh() {} ; override fun earlier() {}
     override fun updateTimetable() {} ; override fun setFeedbackDraft(text: String) {} ; override fun setFeedbackCategory(category: String) {}

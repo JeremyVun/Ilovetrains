@@ -38,11 +38,12 @@ var testNow = time.Date(2026, 9, 1, 17, 52, 0, 0, sydney)
 // fakeUpstream stands in for the TfNSW client so handler tests never touch the
 // network.
 type fakeUpstream struct {
-	departures     *tfnsw.DeparturesResponse
-	err            error
-	errAfterFirst  error
-	departureCalls atomic.Int32
-	lastLimit      atomic.Int32
+	departures        *tfnsw.DeparturesResponse
+	err               error
+	errAfterFirst     error
+	departureCalls    atomic.Int32
+	lastLimit         atomic.Int32
+	lastTransferLimit atomic.Int32
 
 	mu        sync.Mutex
 	lastAt    time.Time
@@ -53,6 +54,7 @@ func (f *fakeUpstream) DeparturesWithOptions(_ context.Context, from, to string,
 	options tfnsw.DeparturesOptions) (*tfnsw.DeparturesResponse, error) {
 	call := f.departureCalls.Add(1)
 	f.lastLimit.Store(int32(limit))
+	f.lastTransferLimit.Store(int32(options.TransferLimit))
 	f.mu.Lock()
 	f.lastAt = at
 	f.lastModes = append(f.lastModes[:0], options.Modes...)
@@ -103,9 +105,9 @@ func sampleDepartures() *tfnsw.DeparturesResponse {
 	}
 }
 
-func newTestServer(t *testing.T, upstream Upstream) http.Handler {
+func newTestServer(t *testing.T, upstream Upstream, options ...Option) http.Handler {
 	t.Helper()
-	return New(upstream, filepath.Join(t.TempDir(), "no-web-dir")).Handler()
+	return New(upstream, filepath.Join(t.TempDir(), "no-web-dir"), options...).Handler()
 }
 
 // pinnedServer returns a server whose clock is fixed at testNow, so `at`

@@ -134,9 +134,11 @@ struct OfflineRouter: Sendable {
         to: Station,
         at: Millis,
         connections: [ScheduledConnection],
-        limit: Int
+        limit: Int,
+        maxTransfers: Int? = nil
     ) -> [Journey] {
         guard from.id != to.id, limit > 0 else { return [] }
+        let bound = maxTransfers ?? self.maxTransfers
 
         var seenTrips = Set<String>()
         var seeds: [Int] = []
@@ -163,7 +165,7 @@ struct OfflineRouter: Sendable {
 
         var candidates: [Label] = []
         for (seedPosition, index) in seeds.enumerated() {
-            if let result = routeSeed(destination: to.id, startIndex: index, seed: connections[index], connections: connections) {
+            if let result = routeSeed(destination: to.id, startIndex: index, seed: connections[index], connections: connections, maxTransfers: bound) {
                 candidates.append(result)
             }
             let eligible = filterConditionalLongWaits(candidates)
@@ -188,7 +190,8 @@ struct OfflineRouter: Sendable {
         destination: String,
         startIndex: Int,
         seed: ScheduledConnection,
-        connections: [ScheduledConnection]
+        connections: [ScheduledConnection],
+        maxTransfers: Int
     ) -> Label? {
         guard seed.effectiveArrival >= seed.effectiveDeparture else { return nil }
         let seedLabel = Label(

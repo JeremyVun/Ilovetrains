@@ -61,17 +61,20 @@ Flag inventory:
 | Key | Type | Public | Owner | Default | Removal condition |
 | --- | --- | --- | --- | --- | --- |
 | `tiny_train` | boolean | yes | Jeremy | off | Remove after the owner accepts or retires the Easter egg |
+| `transfer_limit` | boolean | yes | Jeremy | off | Retire once the owner rules the transfer cap permanent or drops it |
 
 Target project/environment: `ilovetrains` / `prod` (UI label **Production**).
 The label is not the API key: requesting environment `production` returns 404.
-Definition description:
+`tiny_train`'s definition description is
 `Play the tiny train Easter egg beneath the Home header.` Boolean variations
 are `off=false` and `on=true`; initial environment config is disabled with
 `off_variation=off`, empty targets/rules and `fallthrough.variation=on`.
-This is a global UX switch, with no per-device targeting or percentage rollout.
+Both are global UX switches, with no per-device targeting or percentage rollout.
 
-The browser boundary is `GET /api/v1/flags`. The local-only `?tinyTrain=1`
-preview cannot override production. The server uses one shared Go SDK client,
+The browser boundary is `GET /api/v1/flags`, which publishes each flag under
+the name its clients read: `tiny_train` as `tiny_train` and `transfer_limit`
+as `transferLimit`. The local-only `?tinyTrain=1` preview cannot override
+production. The server uses one shared Go SDK client,
 streaming internal snapshots and evaluating only public definitions locally.
 Keys and raw rules never enter the web bundle. The owner approved vendoring
 on 2026-09-08; the pinned SDK, unchanged evaluator and additive public accessor
@@ -90,13 +93,16 @@ Boot never waits for flagsd. With no disk cache, each process starts off until
 its first snapshot. Once synced, the SDK retains the last valid snapshot in
 memory through a flagsd outage; a kill switch update needs a working stream.
 Browsers refresh on foreground and every 30 seconds; a failed browser fetch
-turns the feature off. Evaluation uses fixed context `ilovetrains`, with no
+turns the tiny train off and leaves the transfer limit on its stored answer.
+Evaluation uses fixed context `ilovetrains`, with no
 personal attributes. Read attribution is `svc:ilovetrains` / `ilovetrains-api`.
 
+To turn either feature on, flip its flag in the admin UI at
+https://flags.jeremyvun.com. Clients pick the new value up at their next open.
+
 The owner created both public flags and supplied the sealed read key. The
-transfer-limit implementation is being integrated separately; its flagsd key
-is `transfer_limit`. The flags stack creates `shared-flags`; ilovetrains joins
-it externally. Deploy flags first if that network does not yet exist.
+flags stack creates `shared-flags`; ilovetrains joins it externally. Deploy
+flags first if that network does not yet exist.
 
 Production configuration is committed in infra `58f5a36`. An owner-authorized
 read-only container probe verified the actual environment key `prod` and a true
