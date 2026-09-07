@@ -1,5 +1,10 @@
 # Native offline timetables with a realtime overlay
 
+Current implementation audit: [September 7 reliability investigation](investigation-2026-09-07.md).
+Native routing and shared ingestion now exist; the historical deferred-design
+text below is not an accurate inventory of the shipped implementation. The
+audit records confirmed compatibility failures and the remaining evidence gates.
+
 Deferred to native Android/iOS design by owner ruling, 2026-09-06. The web
 PWA keeps the existing TfNSW Trip Planner architecture, including cached
 last-known journeys offline. It will not build a local routing engine under
@@ -9,6 +14,17 @@ when those apps are built; no executable build plan exists.
 This is a scope choice, not a claim that browsers cannot store timetables or
 route locally. The September 5 architecture and the research below are inputs
 to future native design. They no longer block web work or Settings.
+
+## Owner rulings — 2026-09-07 (on the reliability investigation)
+
+- Finding 6, the in-progress arrival freeze from the settled `at` cache, is
+  to be fixed. It affects the web, Android and iOS online focus paths.
+- Recording a ride from a stale expected arrival (investigation section 6,
+  `settleFocus`, `recordCompletedFocus`) is fixed in the same change.
+- Finding 2, replacement stop patterns, platform changes and added trips, is
+  split into its own item: `../realtime-replacements/design.md`.
+- Findings 1 and 3, the Sydney Trains service-date gate and the 90-second
+  trip-timestamp gate, and the empty-snapshot logging gap remain here.
 
 ## Current owner ruling — 2026-09-06
 
