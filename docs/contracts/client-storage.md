@@ -248,10 +248,10 @@ to the foreground and per 30-second refresh tick, shared by every flag; the web
 times out after three seconds and a hidden document cancels the request in
 flight. The transfer limit persists that answer as `flags` above, so an open
 with no network draws with the last answer. The tiny train stores no flag
-response of its own: it reads only the answer this foreground fetched, so it is
-off until one lands and a failure leaves the toy off. Requests send no
-credentials or personal context, and the service worker never caches or replays
-this endpoint.
+response of its own: it reads only an answer this process fetched, never the
+stored one, so it is off until one lands and a failure leaves the toy off.
+Requests send no credentials or personal context, and the service worker never
+caches or replays this endpoint.
 
 On `localhost`, `127.0.0.1` or `[::1]` only, opening `/?tinyTrain=1` opts this
 browser into a local preview; `/?tinyTrain=0` opts it out.
