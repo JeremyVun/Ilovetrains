@@ -62,7 +62,9 @@ Flag inventory:
 | --- | --- | --- | --- | --- | --- |
 | `tiny_train` | boolean | yes | Jeremy | off | Remove after the owner accepts or retires the Easter egg |
 
-Target project/environment: `ilovetrains` / `production`. Definition description:
+Target project/environment: `ilovetrains` / `prod` (UI label **Production**).
+The label is not the API key: requesting environment `production` returns 404.
+Definition description:
 `Play the tiny train Easter egg beneath the Home header.` Boolean variations
 are `off=false` and `on=true`; initial environment config is disabled with
 `off_variation=off`, empty targets/rules and `fallthrough.variation=on`.
@@ -82,7 +84,7 @@ Runtime configuration:
 | `FLAGS_URL` | Internal flagsd base URL; unset leaves the feature off |
 | `FLAGS_KEY` | Read-only key scoped to this project and environment; required with `FLAGS_URL` |
 | `FLAGS_PROJECT` | Defaults to `ilovetrains` |
-| `FLAGS_ENV` | Defaults to `production` |
+| `FLAGS_ENV` | Set to `prod`; the code's `production` fallback does not name this project's environment |
 
 Boot never waits for flagsd. With no disk cache, each process starts off until
 its first snapshot. Once synced, the SDK retains the last valid snapshot in
@@ -108,8 +110,18 @@ Production Chromium checks passed on fresh and returning profiles: service worke
 `v46` installed and controlled the return visit, real departures and Home/Settings
 navigation worked, and `?tinyTrain=1` could not enable the production feature.
 Live on/off changes, private visibility and deletion passed against a local
-flagsd protocol fixture. A production flag-on toggle has not yet been verified.
-No production credentials were read during implementation.
+flagsd protocol fixture.
+An owner-authorized read-only container probe found that `production` returned
+404 while `prod` evaluated `tiny_train` to true with reason `FALLTHROUGH`.
+Infra commit `58f5a36` corrects `FLAGS_ENV` to `prod`, using the existing read key.
+Redeploy job `cda2a822d26bcf7506cbf641afc250b5` succeeded; the production endpoint
+then returned `{"tiny_train":true}` with `Cache-Control: no-store` and health
+remained 200. This verifies the real flagsd-to-app path for the enabled flag.
+The returning production browser then displayed the 44px divider control at
+the plain app URL; clicks created three, then four carriages with Home layout
+and service-worker control intact.
+No `.env` files were read or credentials printed; the probe used the container's
+existing process environment.
 
 ## Verify
 
