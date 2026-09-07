@@ -288,6 +288,70 @@ final class ControllerTests: XCTestCase {
         XCTAssertEqual(settledRides(corrected, focus: focus, arrived: false).filter { $0.tripId == "trip" }.count, 0)
     }
 
+    private func identified(_ fixture: (data: UserData, stale: Millis)) -> (data: UserData, stale: Millis) {
+        var value = fixture
+        let identity = TripIdentity(source: "sydneytrains", tripId: "T1.42", serviceDate: "2026-09-07", fromStopId: "200060", toStopId: "215020")
+        value.data.focus!.journey.legs[0].identity = identity
+        value.data.focus!.board.journeys[0].legs[0].identity = identity
+        return value
+    }
+
+    func testProbeALocallyIdentifiedFocusHandsOffToTheMatchingAPIJourney() async throws {
+        let fixture = identified(departedFocus())
+        let (store, model) = try await networkedModel(data: fixture.data, arrival: fixture.stale + 300_000)
+        model.resume()
+        try await refreshed(model, arrival: fixture.stale + 300_000)
+        XCTAssertNil(model.state.focus?.journey.legs[0].identity, "the API journey replaced the local one and carries no identity")
+        XCTAssertEqual(model.state.focus?.board.source, "live")
+        XCTAssertNil(model.state.focus?.alternatives)
+        XCTAssertFalse(model.state.focusComplete)
+        let persisted = await store.load()
+        XCTAssertEqual(persisted.rides, [])
+        model.pause()
+    }
+
+    func testProbeAnUnmatchedAPIBoardDemotesALocallyIdentifiedFocusAndSettlesItFromTheSnapshot() async throws {
+        let fixture = identified(departedFocus())
+        let (store, model) = try await networkedModel(data: fixture.data, arrival: fixture.stale + 300_000)
+        var elsewhere = fixture.data
+        elsewhere.focus!.journey.legs[0].departure += 60_000
+        StubbedDepartures.body = try departuresBody(elsewhere, arrival: fixture.stale + 300_000)
+        model.resume()
+        for _ in 0..<100 where model.state.focus?.journey.retained != true { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertEqual(model.state.focus?.journey.retained, true, "no matching key: lastKnown() demoted the focus")
+        XCTAssertEqual(model.state.focus?.board.offline, true)
+        XCTAssertNotNil(model.state.focus?.journey.legs[0].identity, "identity survives the demotion, so the overlay may re-promote it")
+        XCTAssertEqual(model.state.focus?.journey.effectiveArrival, fixture.stale, "the moved arrival never reached the focus")
+        try await settled(store) { $0.rides.map(\.arrival) == [fixture.stale] }
+        model.pause()
+    }
+
+    func testProbeAFailedFocusRequestSettlesALocallyIdentifiedFocusFromItsSnapshot() async throws {
+        let fixture = identified(departedFocus())
+        let (store, model) = try await networkedModel(data: fixture.data, arrival: fixture.stale + 300_000)
+        StubbedDepartures.body = Data("not a board".utf8)
+        XCTAssertFalse(model.state.focus!.board.isLive(model.state.now), "the tick alone cannot settle this focus")
+        model.resume()
+        try await settled(store) { $0.rides.map(\.arrival) == [fixture.stale] }
+        XCTAssertEqual(model.state.focus?.journey.retained, true)
+        XCTAssertTrue(model.state.focusComplete)
+        model.pause()
+    }
+
+    func testProbeTheRealtimeTaskRestartsTheFocusRequestWhenItsOwnFetchFails() async throws {
+        let fixture = departedFocus()
+        let (_, model) = try await networkedModel(data: fixture.data, arrival: fixture.stale + 300_000, delay: .seconds(3))
+        StubbedDepartures.requests = []
+        model.resume()
+        try await Task.sleep(for: .milliseconds(2_500))
+        let focusRequests = StubbedDepartures.requests.filter { $0.query?.contains("at=") == true }
+        XCTExpectFailure("refreshSharedData now falls through a failed realtime fetch to refresh(), which cancels and restarts the followed journey's request") {
+            XCTAssertEqual(focusRequests.count, 1, "asked more than once before any answer: \(StubbedDepartures.requests.map(\.absoluteString))")
+        }
+        model.pause()
+        StubbedDepartures.delay = .zero
+    }
+
     private func refreshed(_ model: TrainViewModel, arrival: Millis) async throws {
         for _ in 0..<300 {
             if model.state.focus?.journey.effectiveArrival == arrival { return }
@@ -401,9 +465,11 @@ final class ControllerTests: XCTestCase {
 final class StubbedDepartures: URLProtocol {
     static var body = Data()
     static var delay: Duration = .zero
+    static var requests: [URL] = []
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
+        StubbedDepartures.requests.append(request.url!)
         let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
         let deliver = { [self] in
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
