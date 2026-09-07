@@ -8,6 +8,7 @@ import {
   directionsModel, focusStatus, inferTravel, arrived, FOCUS_CLEAR_MS
 } from '../js/focus.js';
 import { parseDoc, serializeDoc, emptyDoc, recordLastOpen, removeTrip } from '../js/storage.js';
+import { setFlags, setPreferences } from '../js/preferences.js';
 import {
   TRANSFER_NOW, TRANSFER_DEPARTED_NOW, transferBody, transferJourneys, delayLeg, cancelLeg,
   ferryJourneys, mixedJourneys,
@@ -56,6 +57,21 @@ test('the focus survives a storage round trip, and a malformed one is dropped', 
   assert.equal(parseDoc(serializeDoc(emptyDoc())).focus, undefined);
   assert.equal(parseDoc(JSON.stringify({ focus: { tripId: 'x' } })).focus, undefined);
   assert.equal(parseDoc(JSON.stringify({ focus: { ...doc.focus, journey: null } })).focus, undefined);
+});
+
+/* The cap hides the followed journey without discarding it: the rider who
+   turns the limit off gets the journey they were following back. */
+test('a three-change focus hides under the cap and returns without it', () => {
+  const leg = { line: { mode: 'train' } };
+  const journey = {
+    ...transferJourneys()[0], legs: 4, legDetail: [leg, leg, leg, leg]
+  };
+  const doc = setFlags(docWithFocus(journey), { transferLimit: true });
+
+  assert.equal(visibleFocus(doc, TRANSFER_NOW, []), null);
+  const uncapped = setPreferences(doc, { transferLimit: 'any' });
+  assert.equal(visibleFocus(uncapped, TRANSFER_NOW, [])?.journey, journey);
+  assert.equal(parseDoc(serializeDoc(doc)).focus.journey.legs, 4);
 });
 
 test('deleting a trip takes its focused journey with it', () => {

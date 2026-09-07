@@ -313,8 +313,10 @@ substitutes for going back.
   uses the dynamic viewport, its rows scroll when the frame is too short for
   them, and its footer keeps a separate line
   outside the scroller. A sparse board leaves the space under its last row
-  empty rather than distributing rows through it. When six services are
-  returned, all six remain whole and reachable at 390×844 and 412×732.
+  empty rather than distributing rows through it. When six services with at
+  most two changes are returned, all six remain whole and reachable at 390×844
+  and 412×732. A three-change row is taller, so a board of them shows fewer
+  whole services; each row still renders whole and every row stays reachable.
 - Every change names its station beneath the midpoint of its transfer interval,
   shared by the alighting and boarding platform markers. Names have their own
   band on Home, results and detail; they never overlap a headsign or instruction.
@@ -703,6 +705,30 @@ it is still current. Home shows an eligible suggestion or the filtered empty
 state. A saved pair remains eligible for alternative routes only when its
 endpoints support the enabled modes; focus never bypasses that check.
 Preferences cause no new history or prediction exposure event.
+
+The transfer limit is one row inside Services, directly after the services
+note, and it appears only while the backend publishes the `transferLimit` flag
+as on. With the flag off Settings renders exactly as it did before the row
+existed. The row is the Location row's composition without its icon column,
+because no glyph in the set means a change count: the title `Transfer limit`,
+the current value as the subtitle, and the other value as the action mark in
+the mark's letterspaced caps. It has no heading, no note, no glyph, no journey
+line and no colour, and it is one 56px button read as title, subtitle, then
+action, with the same row height in every state.
+
+| Value | Subtitle | Mark | Tap |
+| --- | --- | --- | --- |
+| Two changes | Up to 2 | `NO LIMIT` | Lift the limit |
+| No limit | No limit | `UP TO 2` | Cap at two changes |
+
+The default is two changes. Tapping swaps the value and takes the service
+change's path: eligible cached rows are kept, replacements are fetched through
+the departures API, and an excluded journey is never restored on failure. While
+capped, a journey with more than two changes is hidden wherever the service
+allow-list applies, and the followed journey's own all-mode refresh stays
+uncapped. The row survives the all-off state: every service off hides the
+journey line, not these words. A flag answer that changes the cap mid-session
+repaints Settings and refetches the board exactly as a tap does.
 
 Appearance has radio semantics for System, Light and Dark. Manual choice wins
 before first paint and updates browser chrome; System follows device changes.

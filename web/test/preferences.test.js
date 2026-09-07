@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  SUPPORTED_MODES, filterBody, journeyAllowed, preferencesOf, setPreferences, tripAllowed, tripsForModes
+  SUPPORTED_MODES, effectiveCap, filterBody, flagsOf, journeyAllowed, preferencesOf,
+  setFlags, setPreferences, tripAllowed, tripsForModes
 } from '../js/preferences.js';
 import { emptyDoc, parseDoc, serializeDoc } from '../js/storage.js';
 
@@ -12,14 +13,14 @@ const HOME = {
 
 test('preferences default to the current behaviour and preserve all-off', () => {
   assert.deepEqual(preferencesOf(emptyDoc()), {
-    appearance: 'system', useLocation: true, enabledModes: SUPPORTED_MODES
+    appearance: 'system', useLocation: true, enabledModes: SUPPORTED_MODES, transferLimit: 'two'
   });
 
   const parsed = parseDoc(JSON.stringify({ preferences: {
     appearance: 'dark', useLocation: false, enabledModes: []
   } }));
   assert.deepEqual(preferencesOf(parsed), {
-    appearance: 'dark', useLocation: false, enabledModes: []
+    appearance: 'dark', useLocation: false, enabledModes: [], transferLimit: 'two'
   });
   assert.deepEqual(parseDoc(serializeDoc(parsed)).preferences, parsed.preferences);
 });
@@ -31,7 +32,7 @@ test('corrupt preference fields normalize without reviving an intentional all-of
   } }));
 
   assert.deepEqual(parsed.preferences, {
-    appearance: 'system', useLocation: true, enabledModes: ['train', 'ferry']
+    appearance: 'system', useLocation: true, enabledModes: ['train', 'ferry'], transferLimit: 'two'
   });
   assert.deepEqual(preferencesOf({ preferences: { enabledModes: 'train' } }).enabledModes, SUPPORTED_MODES);
 });
@@ -41,13 +42,63 @@ test('setting preferences is additive and a null home override restores automati
     appearance: 'light', useLocation: false, enabledModes: ['ferry'], homeOverride: HOME
   });
   assert.deepEqual(initial.preferences, {
-    appearance: 'light', useLocation: false, enabledModes: ['ferry'], homeOverride: HOME
+    appearance: 'light', useLocation: false, enabledModes: ['ferry'], transferLimit: 'two',
+    homeOverride: HOME
   });
 
   const restored = setPreferences(initial, { homeOverride: null });
   assert.deepEqual(restored.preferences, {
-    appearance: 'light', useLocation: false, enabledModes: ['ferry']
+    appearance: 'light', useLocation: false, enabledModes: ['ferry'], transferLimit: 'two'
   });
+});
+
+test('the transfer limit reads as up to two changes unless it says otherwise', () => {
+  assert.equal(preferencesOf(emptyDoc()).transferLimit, 'two');
+  assert.equal(preferencesOf({ preferences: { transferLimit: 'any' } }).transferLimit, 'any');
+  assert.equal(preferencesOf({ preferences: { transferLimit: 'two' } }).transferLimit, 'two');
+  assert.equal(preferencesOf({ preferences: { transferLimit: 'none' } }).transferLimit, 'two');
+  assert.equal(preferencesOf({ preferences: { transferLimit: 4 } }).transferLimit, 'two');
+
+  const chosen = setPreferences(emptyDoc(), { transferLimit: 'any' });
+  assert.equal(preferencesOf(chosen).transferLimit, 'any');
+  assert.equal(preferencesOf(setPreferences(chosen, { transferLimit: 'sometimes' })).transferLimit, 'any');
+  assert.equal(preferencesOf(setPreferences(chosen, { appearance: 'dark' })).transferLimit, 'any');
+});
+
+test('flags are booleans this backend answered, and the cap needs the flag and the choice', () => {
+  assert.deepEqual(flagsOf(emptyDoc()), {});
+  assert.deepEqual(flagsOf({ flags: 'transferLimit' }), {});
+  assert.deepEqual(flagsOf({ flags: ['transferLimit'] }), {});
+  assert.deepEqual(flagsOf({ flags: { transferLimit: 'true', other: true } }), { other: true });
+
+  const on = setFlags(emptyDoc(), { transferLimit: true });
+  assert.equal(effectiveCap(on), true);
+  assert.equal(effectiveCap(setPreferences(on, { transferLimit: 'any' })), false);
+  assert.equal(effectiveCap(emptyDoc()), false);
+  assert.equal(effectiveCap(setFlags(emptyDoc(), { transferLimit: 'yes' })), false);
+
+  const round = parseDoc(serializeDoc(setPreferences(on, { transferLimit: 'any' })));
+  assert.deepEqual(round.flags, { transferLimit: true });
+  assert.equal(effectiveCap(round), false);
+  assert.equal(parseDoc(JSON.stringify({ flags: [1] })).flags, undefined);
+});
+
+test('the cap hides a journey with more than two changes wherever modes are applied', () => {
+  const leg = { line: { mode: 'train' } };
+  const twoChanges = { legs: 3, legDetail: [leg, leg, leg] };
+  const threeChanges = { legs: 4, legDetail: [leg, leg, leg, leg] };
+  const body = { generatedAt: 'now', journeys: [twoChanges, threeChanges] };
+
+  assert.equal(journeyAllowed(twoChanges, SUPPORTED_MODES, true), true);
+  assert.equal(journeyAllowed(threeChanges, SUPPORTED_MODES, true), false);
+  assert.equal(journeyAllowed(threeChanges, SUPPORTED_MODES, false), true);
+  assert.equal(journeyAllowed(threeChanges, SUPPORTED_MODES), true);
+  // A body cached before `legs` shipped is still counted by its legs.
+  assert.equal(journeyAllowed({ legDetail: [leg, leg, leg, leg] }, SUPPORTED_MODES, true), false);
+
+  assert.deepEqual(filterBody(body, SUPPORTED_MODES, true).journeys, [twoChanges]);
+  assert.deepEqual(filterBody(body, SUPPORTED_MODES, false).journeys, [twoChanges, threeChanges]);
+  assert.deepEqual(filterBody(body, ['ferry'], false).journeys, []);
 });
 
 test('journeys require every service leg and filtering leaves the raw response unchanged', () => {

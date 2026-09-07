@@ -29,12 +29,19 @@ async function getJson(path, signal) {
 
 /** `X-Data-Stale` is CORS-exposed by the backend; it is the server telling us
     it is serving from its own stale window, independent of generatedAt age. */
-export async function getDepartures(fromId, toId, { limit = 6, at, modes, signal } = {}) {
+export async function getDepartures(fromId, toId, { limit = 6, at, modes, transferLimit, signal } = {}) {
   const q = new URLSearchParams({ from: fromId, to: toId, limit: String(limit) });
   if (modes !== undefined) q.set('modes', modes.join(','));
+  if (transferLimit !== undefined) q.set('transferLimit', String(transferLimit));
   if (at) q.set('at', typeof at === 'string' ? at : new Date(at).toISOString());
   const { body, res } = await getJson('/api/v1/departures?' + q, signal);
   return { body, serverStale: res.headers.get('X-Data-Stale') === 'true' };
+}
+
+/** The flags this backend has already decided for every client (api.md). */
+export async function getFlags({ signal } = {}) {
+  const { body } = await getJson('/api/v1/flags', signal);
+  return body.flags && typeof body.flags === 'object' ? body.flags : {};
 }
 
 export async function getStops(query, { signal } = {}) {
