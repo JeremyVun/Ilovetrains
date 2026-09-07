@@ -173,6 +173,28 @@ Done when the gate is green on one booted iPhone simulator.
 
 ## Phase 3 — verification wave and owner verdict — DONE marker: `swipe-to-delete phase 3` commit
 
+**Status 2026-09-07:** steps 1–5 done, step 6 awaits the owner's verdict on
+`comps/index.html`. Findings from the verification wave:
+
+- Android: every existing baseline identical except `home-light`, which
+  differs by one pixel at one channel level (GPU noise, not a change). The
+  bar text at font scale 1.3 fills its single line exactly and clips beyond.
+- iOS: `home`, `home-light` and `home-inferred` differ only in the trips row's
+  text rasterisation (one device pixel, geometry unchanged; see `design.md`
+  "Build decisions"). `home-pinned`, `home-offline`, `detail-offline` and
+  `setup` differ in the smart header's journey axis, the detail screen and a
+  text caret, none of which this item touches; their baselines were accepted
+  by a peer session at commit `c8288c1` and look mid-animation.
+- Web: eight frames report `MISSING` because a peer session's uncommitted
+  edits to `web/js/settings.js` and `web/sw.js` break the settings and
+  analytics seams the shooter drives. Nothing under `web/` is part of this
+  item.
+- Accessibility: replaced the manual TalkBack and VoiceOver drives with
+  tree assertions in the instrumented tests: Android keeps exactly one
+  `Trip actions` custom action per row after a swipe and the bar is a
+  clickable node with the deletion text and `Undo`; on iOS the UI test finds
+  the swipe action as a `Delete` button and the bar as `message-undo`.
+
 Owns: `assets/comps/latest/` (four new frames), `tools/baselines/`
 (accepted frames), `tools/README.md` (how the iOS `home-deleting` frame is
 exported from the xcresult, and the Android partial-drag capture).

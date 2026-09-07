@@ -15,9 +15,10 @@
  * writes every captured frame into tools/baselines/ after the comparison and
  * records the capturing device in its manifest.
  *
- * A frame passes when no pixel differs by more than `--fuzz` (default 0) in
- * any channel, and the count of pixels over that never exceeds `--threshold`
- * (default 0). The report lists the count, the worst channel delta and the
+ * A frame passes when no pixel differs by more than `--fuzz` (default 1: the
+ * emulator's rasteriser flips a lone pixel by one level between runs, which no
+ * screen can show) in any channel, and the count of pixels over that never
+ * exceeds `--threshold` (default 0). The report lists the count, the worst channel delta and the
  * bands of the frame that moved, and writes baseline | current | diff
  * composites, so a small difference can be justified by looking rather than
  * by widening the threshold. iOS frames ignore the simulator status bar,
@@ -66,6 +67,8 @@ const SCREENS = [
   ['home-now-light', null, 'home-now-light', null],
   ['home-offline-retained', null, 'home-offline-retained-t9', null],
   ['home-offline', null, null, 'home-offline'],
+  ['home-deleting', null, 'home-deleting', null],
+  ['home-deleted', null, 'home-deleted', 'home-deleted'],
   ['board', 'on-time', 'board', 'board'],
   ['board-light', 'on-time@light', 'board-light', 'board-light'],
   ['board-412', 'short-on-time', null, null],
@@ -102,9 +105,9 @@ const SCREENS = [
   ['settings-412', 'settings:settings-412x732.png', null, null]
 ].map(([screen, web, android, ios]) => ({ screen, web, android, ios }));
 
-const MASKS = { ios: [{ top: 190 }] };
-const WEB_JOBS = Number(process.env.VISUAL_WEB_JOBS || 3);
-const WEB_CHUNK = Number(process.env.VISUAL_WEB_CHUNK || 14);
+const MASKS = { ios: [{ top: 190 }, { bottom: 60 }] };
+const WEB_JOBS = Number(process.env.VISUAL_WEB_JOBS || 10);
+const WEB_CHUNK = Number(process.env.VISUAL_WEB_CHUNK || 4);
 
 const run = (cmd, args, env = {}) => new Promise((resolve, reject) => {
   const child = spawn(cmd, args, { cwd: ROOT, env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -259,12 +262,14 @@ async function shootAndroid(screens, out, log) {
   let state = '';
   try { state = execFileSync(ADB, ['get-state'], { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch (_) { /* no adb or device */ }
   if (state !== 'device') throw new Error('one booted Android emulator is required (adb get-state)');
+  await waitForPeer('shoot-android.sh|am instrument', 'android', log);
   const tmp = path.join(os.tmpdir(), `trains-visual-android-${process.pid}`);
   fs.rmSync(tmp, { recursive: true, force: true });
   const missing = {};
   let metrics = '';
   try {
-    await run('bash', [path.join(ROOT, 'tools/shoot-android.sh'), '390x844'], { OUT: tmp });
+    await run('bash', [path.join(ROOT, 'tools/shoot-android.sh'), '390x844'],
+      { OUT: tmp, INSTRUMENT_CLASS: 'com.ilovetrains.app.UiCalibrationTest#captureCanonicalScreens' });
     metrics = fs.readFileSync(path.join(tmp, 'metrics.txt'), 'utf8').trim().replace(/\n/g, ' ');
     for (const screen of screens) {
       const shot = path.join(tmp, `${screen.android}.png`);
@@ -288,10 +293,15 @@ async function shootIos(screens, out, log) {
   fs.rmSync(tmp, { recursive: true, force: true });
   const missing = {};
   let metrics = '';
+  let simulatorName = '';
   try {
-    await run('bash', [path.join(ROOT, 'tools/shoot-ios.sh'), ...screens.map((s) => s.ios)], { OUT: tmp });
+    const simulator = bootedIphone();
+    await waitForPeer('shoot-ios.sh', 'ios', log);
+    await run('bash', [path.join(ROOT, 'tools/shoot-ios.sh'), ...screens.map((s) => s.ios)],
+      { OUT: tmp, ILOVETRAINS_SIMULATOR_ID: simulator, SETTLE_SECONDS: process.env.SETTLE_SECONDS || '2' });
     const fields = Object.fromEntries(fs.readFileSync(path.join(tmp, 'metrics.txt'), 'utf8').trim().split('\n').map((l) => l.split('=')));
     metrics = `${fields.device} ${fields.capture_pixels}px, content size ${fields.content_size}`;
+    simulatorName = fields.device;
     for (const screen of screens) {
       const shot = path.join(tmp, `${screen.ios}.png`);
       if (fs.existsSync(shot)) fs.copyFileSync(shot, path.join(dir, `${screen.screen}.png`));
@@ -303,10 +313,38 @@ async function shootIos(screens, out, log) {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
   log(`ios: ${screens.length - Object.keys(missing).length} frames`);
-  return { device: metrics, missing };
+  return { device: metrics, simulator: simulatorName, missing };
 }
 
 const SHOOT = { web: shootWeb, android: shootAndroid, ios: shootIos };
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/* One emulator and one simulator serve every session on this machine; a peer's
+   drive mid-flight would put its frames, or its display size, into ours. */
+async function waitForPeer(pattern, label, log) {
+  const busy = () => { try { return execFileSync('pgrep', ['-f', pattern]).toString().trim() !== ''; } catch (_) { return false; } };
+  if (!busy()) return;
+  log(`${label}: waiting for a peer's drive to finish`);
+  const deadline = Date.now() + 10 * 60 * 1000;
+  while (busy()) {
+    if (Date.now() > deadline) throw new Error(`a peer's drive (${pattern}) held the device for ten minutes`);
+    await sleep(3000);
+  }
+}
+
+function bootedIphone() {
+  if (process.env.ILOVETRAINS_SIMULATOR_ID) return process.env.ILOVETRAINS_SIMULATOR_ID;
+  const listing = JSON.parse(execFileSync('xcrun', ['simctl', 'list', 'devices', 'booted', '-j']).toString());
+  const booted = Object.values(listing.devices).flat().filter((d) => d.name.includes('iPhone'));
+  if (booted.length === 1) return booted[0].udid;
+  if (!booted.length) throw new Error('no booted iPhone simulator');
+  const manifestFile = path.join(BASELINE, 'manifest.json');
+  const wanted = fs.existsSync(manifestFile) ? (JSON.parse(fs.readFileSync(manifestFile, 'utf8')).ios || {}).simulator : null;
+  const match = booted.find((d) => d.name === wanted);
+  if (match) return match.udid;
+  throw new Error(`several iPhone simulators are booted (${booted.map((d) => d.name).join(', ')}); set ILOVETRAINS_SIMULATOR_ID`);
+}
 
 /* Both PNGs are decoded by Chrome and compared through getImageData; the same
    decoder the web frames came from. Differing pixels are painted in the house
@@ -329,7 +367,7 @@ const COMPARE = `(async (a, b, fuzz, masks) => {
   };
   const pixels = (img) => { const [, x] = canvas(w, h); x.drawImage(img, 0, 0); return x.getImageData(0, 0, w, h).data; };
   const pa = pixels(ia), pb = pixels(ib);
-  const maskedRow = (y) => masks.some((m) => y < m.top);
+  const maskedRow = (y) => masks.some((m) => (m.top && y < m.top) || (m.bottom && y >= h - m.bottom));
   const rows = [];
   let differs = 0, worst = 0;
   const hits = new Uint8Array(w * h);
@@ -485,14 +523,17 @@ function accept(results, capture) {
     touched.add(r.platform);
   }
   for (const platform of touched) {
-    manifest[platform] = { commit, date: new Date().toISOString().slice(0, 10), device: capture[platform] && capture[platform].device || manifest[platform] && manifest[platform].device || '' };
+    const previous = manifest[platform] || {};
+    const shot = capture[platform] || {};
+    manifest[platform] = { commit, date: new Date().toISOString().slice(0, 10), device: shot.device || previous.device || '' };
+    if (shot.simulator || previous.simulator) manifest[platform].simulator = shot.simulator || previous.simulator;
   }
   fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 2) + '\n');
   return touched;
 }
 
 function parseArgs(argv) {
-  const options = { platforms: PLATFORMS, screens: null, out: null, compare: null, accept: false, threshold: 0, fuzz: 0, list: false };
+  const options = { platforms: PLATFORMS, screens: null, out: null, compare: null, accept: false, threshold: 0, fuzz: 1, list: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--platform') options.platforms = argv[++i].split(',');
@@ -529,7 +570,8 @@ async function main() {
   let capture = {};
   if (options.compare) {
     const captureFile = path.join(out, 'capture.json');
-    capture = fs.existsSync(captureFile) ? JSON.parse(fs.readFileSync(captureFile, 'utf8')) : {};
+    if (fs.existsSync(captureFile)) capture = JSON.parse(fs.readFileSync(captureFile, 'utf8'));
+    else for (const platform of options.platforms) capture[platform] = { device: '', missing: {} };
   } else {
     console.log(`shooting ${options.platforms.join(', ')} into ${out}`);
     await Promise.all(options.platforms.map(async (platform) => {

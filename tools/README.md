@@ -24,14 +24,32 @@
   test hooks are packaged only in the instrumentation APK.
   It also checks feedback-success timeout, simplified Settings selection marks,
   and scrolling to a retained departed T9 offline; its captures include
-  Home/Board `Now` and retained-journey states. Current native exemplars are
-  indexed in `docs/contracts/android-deviations.md`.
+  Home/Board `Now` and retained-journey states, and the swipe-to-delete pair:
+  `home-deleting` holds a row mid-drag (`down` + `moveBy` past the threshold,
+  then `cancel`, so the fixture's no-op actions never see a dismiss) and
+  `home-deleted` seeds the bar with `undoAvailable`. Current native exemplars
+  are indexed in `docs/contracts/android-deviations.md`.
 - `shoot-ios.sh` — install and capture seeded SwiftUI states on one booted
   iPhone simulator. Build first, then set `ILOVETRAINS_SIMULATOR_ID`,
   `ILOVETRAINS_IOS_APP` and optionally `OUT`; state arguments replace the
   default matrix. `CONTENT_SIZE=accessibility-medium` exercises large text.
-  The script fixes the status-bar clock, waits for launch transitions, records
-  capture metrics and restores the content-size and status-bar overrides.
+  The script fixes the status-bar clock, waits for each launch to settle (two
+  shots half a second apart byte-identical, `SETTLE_SECONDS` the cap, default
+  3), records capture metrics and restores the content-size and status-bar
+  overrides.
+  `home-deleted` seeds a pending deletion with the bar showing. The mid-swipe
+  `home-deleting` frame is a gesture in flight that no seed can produce; the
+  `AppFlowTests.testSwipeRevealsDeleteAndUndoRestoresRow` UI test attaches it,
+  and it is exported from the newest test result with
+
+  ```
+  xcrun xcresulttool export attachments --path ios/build/Logs/Test/<newest>.xcresult \
+      --output-path /tmp/<unique> --test-id 'AppFlowTests/testSwipeRevealsDeleteAndUndoRestoresRow()'
+  ```
+
+  which writes the PNG under a generated name beside a `manifest.json` that
+  maps it back to the attachment name `home-deleting`. It is a comp, not a
+  `visual-regression.js` baseline.
 - `probe-tfnsw.sh` — probe TfNSW Trip Planner endpoints, save raw responses
   to `fixtures/` (needs `TFNSW_API_KEY` already in the environment; never
   sources `.env`; ~5 requests). `--ferries` captures four stop searches
@@ -163,8 +181,10 @@ The output directory holds `<platform>/<screen>.png`, `diff/<platform>/` for
 frames that differ, `capture.json` (device, missing frames and why) and
 `report.html`. Each line of the console summary is a frame with its status:
 
-- `same` — no pixel differs by more than `--fuzz` (default 0) in any channel,
-  and the count over that never exceeds `--threshold` (default 0);
+- `same` — no pixel differs by more than `--fuzz` (default 1: the Android
+  emulator flips a lone pixel by one level between runs, which no screen can
+  show) in any channel, and the count over that never exceeds `--threshold`
+  (default 0);
 - `DIFF` — the count, the worst channel delta and the bands of the frame that
   moved, in CSS px, with a composite under `diff/` showing baseline, current
   and the moved pixels painted in the accent over a dimmed current frame;
@@ -192,12 +212,23 @@ Traps:
 - The Settings frames come from `check-settings-browser.js`, which asserts as
   it drives; when any of its assertions fails (a version string that no longer
   matches, say), all four Settings frames report `MISSING` with the message.
-- iOS frames ignore the top 190 device px, the simulator status bar, whose
-  glyphs shift one channel level between launches. An app background change in
-  that band is not seen.
-- One emulator, one simulator. A peer session mid-drive on either device
-  corrupts both runs; `pgrep -fl "shoot-android|shoot-ios"` before a native
-  run, and use `--platform web` when a device is taken.
+- iOS frames ignore the top 190 and bottom 60 device px: the simulator status
+  bar, whose glyphs shift one channel level between launches, and the home
+  indicator, which dims a couple of seconds after launch. An app background
+  change in those bands is not seen.
+- One emulator, one simulator. A peer session mid-drive on either device puts
+  its frames, or its display size, into yours; the tool polls for a running
+  `shoot-android.sh`, `am instrument` or `shoot-ios.sh` and waits up to ten
+  minutes, saying so, before it starts its own native drive. With several
+  iPhone simulators booted it picks the one whose name the baseline manifest
+  records, else it asks for `ILOVETRAINS_SIMULATOR_ID`.
+- The Android drive runs only `UiCalibrationTest#captureCanonicalScreens`
+  (`INSTRUMENT_CLASS` on `shoot-android.sh`); the class's other tests assert
+  behaviour and are the build gate's job. The iOS drive caps the settle at two
+  seconds (`SETTLE_SECONDS`) and stops as soon as two shots half a second apart
+  are byte-identical. The web drive runs ten `shoot-states.js` processes of
+  four states each (`VISUAL_WEB_JOBS`, `VISUAL_WEB_CHUNK`); more than that
+  gains nothing on a twelve-core machine.
 - The Android frames are captured by `UiCalibrationTest`, so a new Android
   screen needs a `capture()` there and a row in the table; the iOS and web
   states likewise. A frame the table does not name is not checked.

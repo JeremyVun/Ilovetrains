@@ -58,6 +58,7 @@ fun TrainApp(state: AppState, actions: UiActions) {
                     .padding(horizontal = PagePadding), verticalAlignment = Alignment.CenterVertically) {
                     Text(message, Modifier.weight(1f), color = c.ground, fontSize = 14.sp, fontWeight = FontWeight.Normal,
                         maxLines = if (state.undoAvailable) 1 else Int.MAX_VALUE, overflow = TextOverflow.Clip)
+                    Spacer(Modifier.width(12.dp))
                     Label(if (state.undoAvailable) "Undo" else "Dismiss", color = c.ground)
                 }
             }

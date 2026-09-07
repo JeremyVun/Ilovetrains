@@ -7,7 +7,11 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.assertIsDisplayed
@@ -156,8 +160,10 @@ class UiCalibrationTest {
         compose.waitUntil(5_000) { actions.deleted.isNotEmpty() }
         assertEquals(listOf(fixture.beachTrip.id), actions.deleted)
         compose.onNodeWithText("UNDO").assertIsDisplayed()
-        compose.onNodeWithText("Rhodes → Bondi Junction deleted").assertIsDisplayed()
+        compose.onNodeWithText("Rhodes → Bondi Junction deleted").assertIsDisplayed().assertHasClickAction()
         compose.onNodeWithTag(row).assertDoesNotExist()
+        compose.onAllNodes(hasAnyAncestor(hasTestTag("trip-${fixture.centralTrip.id}")) and SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions))
+            .assertCountEquals(1)
 
         compose.onNodeWithText("UNDO").performClick()
         compose.onNodeWithTag(row).assertIsDisplayed()
@@ -171,10 +177,15 @@ class UiCalibrationTest {
     @Test fun tripListStillScrollsVertically() {
         val fixture = Fixtures()
         val trips = (0 until 8).map { i -> fixture.beachTrip.copy(id = "$i") }
-        compose.setContent { TrainApp(fixture.home.copy(trips = trips, totalTrips = trips.size), NoActions) }
+        val actions = object : UiActions by NoActions {
+            var deleted = 0
+            override fun deleteTrip(id: String) { deleted++ }
+        }
+        compose.setContent { TrainApp(fixture.home.copy(trips = trips, totalTrips = trips.size), actions) }
         compose.onNodeWithTag("trip-7").assertIsNotDisplayed()
-        compose.onNodeWithTag("trip-0").performTouchInput { swipeUp() }
+        repeat(2) { compose.onNode(hasScrollAction()).performTouchInput { swipeUp() } }
         compose.onNodeWithTag("trip-7").assertIsDisplayed()
+        assertEquals(0, actions.deleted)
     }
 
     @Test fun pagesEarlierAfterPastRowsArrive() {
@@ -282,7 +293,7 @@ private class Fixtures {
     private val pyrmontNow = pyrmontBoardSource.journeys.first().effectiveDeparture - 5 * 60_000
     private val pyrmontBoard = pyrmontBoardSource.copy(generatedAt = pyrmontNow)
 
-    private val centralTrip = SavedTrip("central-parramatta", centralBoard.from, centralBoard.to, lines = listOf("T1"))
+    val centralTrip = SavedTrip("central-parramatta", centralBoard.from, centralBoard.to, lines = listOf("T1"))
     private fun state(now: Long = centralNow, board: BoardData = centralBoard) = AppState(
         ready = true, screen = Screen.Home, trips = listOf(centralTrip), totalTrips = 1,
         selectedTripId = centralTrip.id, board = board, homeBoard = board, now = now,
