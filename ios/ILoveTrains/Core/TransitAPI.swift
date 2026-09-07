@@ -4,11 +4,12 @@ struct TransitAPI: Sendable {
     var baseURL = "https://ilovetrains.jeremyvun.com"
     var session: URLSession = .shared
 
-    func departures(from: Station, to: Station, modes: Set<String>, at: Double? = nil) async throws -> BoardData {
+    func departures(from: Station, to: Station, modes: Set<String>, at: Double? = nil, transferLimit: Int? = nil) async throws -> BoardData {
         var url = URLComponents(string: baseURL + "/api/v1/departures")!
         url.queryItems = [URLQueryItem(name: "from", value: from.id), URLQueryItem(name: "to", value: to.id),
             URLQueryItem(name: "limit", value: "10"), URLQueryItem(name: "modes", value: modes.sorted().joined(separator: ","))]
         if let at { url.queryItems?.append(URLQueryItem(name: "at", value: ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: at / 1000)))) }
+        if let transferLimit { url.queryItems?.append(URLQueryItem(name: "transferLimit", value: String(transferLimit))) }
         var request = URLRequest(url: url.url!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         let (bytes, response) = try await session.data(for: request)
@@ -17,6 +18,14 @@ struct TransitAPI: Sendable {
         board.from = from; board.to = to
         board.serverStale = http.value(forHTTPHeaderField: "X-Data-Stale")?.lowercased() == "true"
         return board
+    }
+
+    func flags() async throws -> [String: Bool] {
+        var request = URLRequest(url: URL(string: baseURL + "/api/v1/flags")!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        let (bytes, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200, bytes.count <= 65_536 else { throw TransitError.unavailable }
+        return try TransitWire.flags(bytes)
     }
 
     func feedback(text: String, category: String) async throws {
@@ -42,6 +51,15 @@ enum TransitWire {
         if let date = format.date(from: string) { return (date.timeIntervalSince1970 * 1000).rounded() }
         format.formatOptions = [.withInternetDateTime]
         return format.date(from: string).map { ($0.timeIntervalSince1970 * 1000).rounded() }
+    }
+    static func boolean(_ value: Any?) -> Bool? {
+        // JSON numbers also bridge to NSNumber and cast to Bool, so ask for the boolean type itself.
+        guard let number = value as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() else { return nil }
+        return number.boolValue
+    }
+    static func flags(_ bytes: Data) throws -> [String: Bool] {
+        guard let raw = try JSONSerialization.jsonObject(with: bytes) as? [String: Any] else { throw TransitError.invalid }
+        return (raw["flags"] as? [String: Any] ?? [:]).compactMapValues(boolean)
     }
     static func station(_ raw: [String: Any]) throws -> Station {
         guard let id = raw["id"] as? String, let name = raw["name"] as? String else { throw TransitError.invalid }

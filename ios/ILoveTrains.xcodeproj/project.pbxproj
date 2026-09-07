@@ -7,50 +7,51 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		00A6CC90803EC19B137C112954354A6F /* RowConformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3712E3E1CA2CB3CC2381AD358EDBD5F9 /* RowConformanceTests.swift */; };
+		02BDF7A22215BB830E4C32A3910031A5 /* OfflinePackageStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A86D2559A95D2EADA2ECB26994EF668D /* OfflinePackageStoreTests.swift */; };
 		087732BE6816B598BAF98261817B8962 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F73A9793884A98DC81A1795D0C3DCA1 /* Theme.swift */; };
 		0D4AB715003936B50D401C92A93ED9F3 /* timetable.zip in Resources */ = {isa = PBXBuildFile; fileRef = 182FE857EA97EFD719A745BA8720CFFE /* timetable.zip */; };
 		0F43FE8D726E429998E2E74860E7D008 /* OfflineZip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92A0A5C4D870B1113675F13ECF72A530 /* OfflineZip.swift */; };
-		161497505CADA024A011A346B45B0E47 /* BoardRetentionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25AC9C044213813934E60F18943C3902 /* BoardRetentionTests.swift */; };
 		161DE8DDCE1E548EAE8E7A79F2387B20 /* stations.json in Resources */ = {isa = PBXBuildFile; fileRef = 83F3C91479FEF2D83389ECA406538F12 /* stations.json */; };
 		16890EBDE5A34C1C29DB2C89E09E7D21 /* JourneyAxisLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35B272AD42BBE6CF38A51CD4866A7A80 /* JourneyAxisLayout.swift */; };
 		171FDCFCB616A3389220FC53AE8AF40C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A6A720BFD7C1239778644EE2178B6FEB /* Assets.xcassets */; };
+		17EA87299E0E8236470AA5566D96FBB1 /* calibration.json in Resources */ = {isa = PBXBuildFile; fileRef = 0F00D5834AA8CD296A78671B98F366B9 /* calibration.json */; };
+		1D3E72B3422BD0F3B8CD3FDB57BF7E6A /* prediction.json in Resources */ = {isa = PBXBuildFile; fileRef = CCF9F353578F2449D9D62F29EBA158B8 /* prediction.json */; };
 		1D53368F877EEA9C12581BC9909E1777 /* DeviceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90F580CBE84AA756CD63EE0455947C8C /* DeviceStore.swift */; };
-		227C4681257578CCD221273B8028B71D /* PredictionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 886A038593A84A19382E589337B95141 /* PredictionTests.swift */; };
-		22C9C689987563D58D526A6BA4CC127E /* OfflineRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDA9D73822E8193F23D712829238E66B /* OfflineRouterTests.swift */; };
+		24A1277C383037293952A3CF24D2A757 /* PredictionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BE8C1238A7DFAC1D5023B63FD05769A /* PredictionTests.swift */; };
 		2EC7307F78DB3FA9DC195098E4909A1C /* calibration.json in Resources */ = {isa = PBXBuildFile; fileRef = 0F00D5834AA8CD296A78671B98F366B9 /* calibration.json */; };
 		3A44F47136861DD4164C6A7834FEAAF2 /* TrainViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57DD7FF8FC3C334C57C7CFC3EEBAB61D /* TrainViewModel.swift */; };
 		3BC6FD02DD8B82028A2150405D3EEF3A /* ILoveTrainsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C33FC07BDE6739D660B7BE805F53D25 /* ILoveTrainsApp.swift */; };
 		3FA9C96A149BD4505A919F287CDE3448 /* DetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F99A9E07614D25517EFB47B525BBC577 /* DetailView.swift */; };
 		415344D61BBAB0A435A205D06F43463D /* OfflineRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09ECF11EDB32084E2AEA90314ABFA4E7 /* OfflineRouter.swift */; };
-		4318F31D1B925A5C05C440FAC908ECA0 /* RowConformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AC09C9409003F3D7E4E206C4EDD16B0 /* RowConformanceTests.swift */; };
-		4618AE84BC96A2DFEFF7DE3AC340E07D /* OfflinePackageStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2269C1581DC5132C8800C6E786AD18 /* OfflinePackageStoreTests.swift */; };
+		458955CA5D28E0F1D7EBFFC2525BB333 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DF0CE4B4B489206BAD2B19377D1990F5 /* Foundation.framework */; };
 		477DFB7310465CCA4CCD251490C07E7E /* AppFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0D676BD29373C9C0CE8DE3ED663C4A /* AppFlowTests.swift */; };
+		47C12CA335C583A0060C3E35B3960B20 /* TransferLimitRequestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C1B7E259C963818AE80759491362DBA /* TransferLimitRequestTests.swift */; };
 		4854ECCE21B41B8C389825908A5D6B16 /* TransitModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 187B2015508A3DA090330C7C6EBDCE0E /* TransitModels.swift */; };
 		4AB1D15BEDFA009447E7C03D822C1D71 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 369E3C3CE85C8D9794DE25612E6AAD6B /* SettingsView.swift */; };
 		4E24C8385B6FAEEFD2D53BA212ACA25A /* OfflineRealtime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75EE451EE7896A90B5C84525EAC53FC4 /* OfflineRealtime.swift */; };
 		5103AF8E065964CEF116140FCB210591 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B7D9A893C91691BDAAF872209754910 /* HomeView.swift */; };
-		538B69BA0181E229B1B71D3BD7F61456 /* StorageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF850A09F92B75BDBB02B3779C13B3A5 /* StorageTests.swift */; };
-		560EC98CB1EDAD0CFCB6F75007678D60 /* ControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F7B7DB6A767CE62B869425D595E9263 /* ControllerTests.swift */; };
-		5DD1D9BF38AB2B0CE555EE8C8E34077B /* OfflineRealtimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 114EAF36CE8AC644EF2A5725C2D95716 /* OfflineRealtimeTests.swift */; };
 		6715CEFAAC9DD94139A88273372943B6 /* TransitAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 448A4BD4D50296E87A28CE895EABCC71 /* TransitAPI.swift */; };
+		69123E8D77B4FABC8EC2C95CD7E69307 /* rows.json in Resources */ = {isa = PBXBuildFile; fileRef = 0D18AC45E2EED300E4D4AD4DCB9CE8F8 /* rows.json */; };
 		73BB200B4179885CDB40AABACC014006 /* Common.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD4DAE0D758CB4DF9D3052CDD4914019 /* Common.swift */; };
+		758225C936FD1D864D0F9D5B90136DE4 /* OfflineRealtimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28028BF3A008B7909D3B5E76E2FC1F6D /* OfflineRealtimeTests.swift */; };
 		77D881F53DE546E8A049A6C232641FF3 /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 487CBDD900CB8FB87CAA132C03E47266 /* LocationService.swift */; };
+		7C549C9A5CAA5807EF5305E83822B5AC /* StorageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA72F363E66AA9B0C535459125B4BEFA /* StorageTests.swift */; };
 		7DF22448FBEE8FCF123506E4F1DC06C3 /* OfflinePackageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1554BF5D4735CE7608D4D2BFDF432892 /* OfflinePackageStore.swift */; };
+		80B09F8E6F54DFC30F4328FF67CB60D2 /* OfflinePlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACAD98074707E44A3D94F9A3222B0CD3 /* OfflinePlannerTests.swift */; };
 		82E99068347C9C7B05322B188FA467F8 /* BoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15C4B1DD3C827B68946FBD1E83D3473D /* BoardView.swift */; };
-		839574B4043377482393F28CE528B0A7 /* HomeStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47C6C9BF08B29567D99AF04090C5D52B /* HomeStatusTests.swift */; };
-		8A9B7741EA7C7177E12D54920CBD078F /* prediction.json in Resources */ = {isa = PBXBuildFile; fileRef = CCF9F353578F2449D9D62F29EBA158B8 /* prediction.json */; };
-		8C3CDE54C66EAFCFA96616350D39D588 /* JourneyAxisLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBB7378360287999016F12B0BCD5B94B /* JourneyAxisLayoutTests.swift */; };
 		8FC022321C20DFC6330EFF74F9C4BBEA /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DF0CE4B4B489206BAD2B19377D1990F5 /* Foundation.framework */; };
 		97CC26322414B58F9809649437E494A3 /* OfflinePlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A8BA43E41A6935B648AEE219294B6E0 /* OfflinePlanner.swift */; };
 		9C24377ACE26B2901AD4FBFDD59FB95B /* timetable-manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = 3615243F548DB6A2604B7946A7B38EF9 /* timetable-manifest.json */; };
-		ABEB582A751594711563A7B405B389A2 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DF0CE4B4B489206BAD2B19377D1990F5 /* Foundation.framework */; };
 		B15B228D78093FC2F02E9F290234D746 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0E4FA6B9A3E199FD2B24A607F32AE71 /* AppState.swift */; };
 		B53FD94ADF1C592799151269ADC1DDC6 /* TripDeletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB44FBBD9134AB75A8EE343080605076 /* TripDeletion.swift */; };
-		C5CE415B5E9199F901500E4C3DABABD3 /* calibration.json in Resources */ = {isa = PBXBuildFile; fileRef = 0F00D5834AA8CD296A78671B98F366B9 /* calibration.json */; };
-		D3B8A1492BAC820115D65979B73C2ED0 /* OfflinePlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACC7764BC77045166B79F67C694B1453 /* OfflinePlannerTests.swift */; };
+		C0F7A5203726543279B1F33F6DBA897E /* JourneyAxisLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A2CD55895E33B3E97C58D1F5CFBE35B /* JourneyAxisLayoutTests.swift */; };
+		CA731A1132084ED748EBB68C83BC1441 /* ControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCB3914C0B0C4F15EBFCCCEEA9B1DD46 /* ControllerTests.swift */; };
+		CAE6D090B9B9DFF3942C1691A5A9401F /* BoardRetentionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 005C90ADC75007A90A8D2790AEE58553 /* BoardRetentionTests.swift */; };
+		D4E1447E130BECDC041015DFC079C3B8 /* OfflineRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54B1D9ED06651540CE75FBD0262205F9 /* OfflineRouterTests.swift */; };
+		DBB78416FEDD566321AE22836696B538 /* HomeStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55A520983ADC3294953EB1DD7A1249B1 /* HomeStatusTests.swift */; };
 		E071068EEE81F77630384D075D5BC2D0 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE08B61C43CA96D0168182C2CA0CB8A0 /* SetupView.swift */; };
 		E1EE15B60EA3AA12B30A02C0FF9BFF42 /* AppView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E884F9CE9E76571F197ED782E17779F7 /* AppView.swift */; };
-		EF3C38C65B2898B1F3E25EB9BE97C2CF /* rows.json in Resources */ = {isa = PBXBuildFile; fileRef = 0D18AC45E2EED300E4D4AD4DCB9CE8F8 /* rows.json */; };
 		F36BFFEBF05217936981DDFD8A48B80E /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DF0CE4B4B489206BAD2B19377D1990F5 /* Foundation.framework */; };
 		F4A9303D657CAB3CE1BD90901077256E /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 629298F5116802F5134DF36EE7908FEE /* PrivacyInfo.xcprivacy */; };
 		F5D721F995E12D1AAD778E4A5B9BB0D0 /* Prediction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0328A903C52EA7B0B568F9870B6C20C8 /* Prediction.swift */; };
@@ -65,7 +66,7 @@
 			remoteGlobalIDString = CEF34622959541AFF90D4EBD9ADF6DF6;
 			remoteInfo = ILoveTrains;
 		};
-		CE2B39DE12FDEDE26B31173DA84E528D /* PBXContainerItemProxy */ = {
+		8B88ED1582C2C985521501A6FED1367E /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 6565F67C49D70F290716235AAC408279 /* Project object */;
 			proxyType = 1;
@@ -75,70 +76,71 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		005C90ADC75007A90A8D2790AEE58553 /* BoardRetentionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BoardRetentionTests.swift; sourceTree = "<group>"; };
 		0328A903C52EA7B0B568F9870B6C20C8 /* Prediction.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Prediction.swift; path = Core/Prediction.swift; sourceTree = "<group>"; };
 		09ECF11EDB32084E2AEA90314ABFA4E7 /* OfflineRouter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflineRouter.swift; path = Core/OfflineRouter.swift; sourceTree = "<group>"; };
 		0D18AC45E2EED300E4D4AD4DCB9CE8F8 /* rows.json */ = {isa = PBXFileReference; includeInIndex = 1; path = rows.json; sourceTree = "<group>"; };
 		0F00D5834AA8CD296A78671B98F366B9 /* calibration.json */ = {isa = PBXFileReference; includeInIndex = 1; path = calibration.json; sourceTree = "<group>"; };
-		114EAF36CE8AC644EF2A5725C2D95716 /* OfflineRealtimeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OfflineRealtimeTests.swift; sourceTree = "<group>"; };
 		1554BF5D4735CE7608D4D2BFDF432892 /* OfflinePackageStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflinePackageStore.swift; path = Core/OfflinePackageStore.swift; sourceTree = "<group>"; };
 		15C4B1DD3C827B68946FBD1E83D3473D /* BoardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BoardView.swift; path = UI/BoardView.swift; sourceTree = "<group>"; };
 		182FE857EA97EFD719A745BA8720CFFE /* timetable.zip */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = archive.zip; path = timetable.zip; sourceTree = "<group>"; };
 		187B2015508A3DA090330C7C6EBDCE0E /* TransitModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TransitModels.swift; path = Core/TransitModels.swift; sourceTree = "<group>"; };
+		1C1B7E259C963818AE80759491362DBA /* TransferLimitRequestTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TransferLimitRequestTests.swift; sourceTree = "<group>"; };
 		1C33FC07BDE6739D660B7BE805F53D25 /* ILoveTrainsApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ILoveTrainsApp.swift; sourceTree = "<group>"; };
 		1F73A9793884A98DC81A1795D0C3DCA1 /* Theme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Theme.swift; path = UI/Theme.swift; sourceTree = "<group>"; };
-		25AC9C044213813934E60F18943C3902 /* BoardRetentionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BoardRetentionTests.swift; sourceTree = "<group>"; };
-		2F7B7DB6A767CE62B869425D595E9263 /* ControllerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ControllerTests.swift; sourceTree = "<group>"; };
+		28028BF3A008B7909D3B5E76E2FC1F6D /* OfflineRealtimeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OfflineRealtimeTests.swift; sourceTree = "<group>"; };
+		2A2CD55895E33B3E97C58D1F5CFBE35B /* JourneyAxisLayoutTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JourneyAxisLayoutTests.swift; sourceTree = "<group>"; };
 		35B272AD42BBE6CF38A51CD4866A7A80 /* JourneyAxisLayout.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = JourneyAxisLayout.swift; path = UI/JourneyAxisLayout.swift; sourceTree = "<group>"; };
 		3615243F548DB6A2604B7946A7B38EF9 /* timetable-manifest.json */ = {isa = PBXFileReference; includeInIndex = 1; path = "timetable-manifest.json"; sourceTree = "<group>"; };
 		369E3C3CE85C8D9794DE25612E6AAD6B /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SettingsView.swift; path = UI/SettingsView.swift; sourceTree = "<group>"; };
+		3712E3E1CA2CB3CC2381AD358EDBD5F9 /* RowConformanceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RowConformanceTests.swift; sourceTree = "<group>"; };
 		448A4BD4D50296E87A28CE895EABCC71 /* TransitAPI.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TransitAPI.swift; path = Core/TransitAPI.swift; sourceTree = "<group>"; };
-		47C6C9BF08B29567D99AF04090C5D52B /* HomeStatusTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeStatusTests.swift; sourceTree = "<group>"; };
 		487CBDD900CB8FB87CAA132C03E47266 /* LocationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LocationService.swift; path = Core/LocationService.swift; sourceTree = "<group>"; };
-		4A2269C1581DC5132C8800C6E786AD18 /* OfflinePackageStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OfflinePackageStoreTests.swift; sourceTree = "<group>"; };
 		4B7D9A893C91691BDAAF872209754910 /* HomeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HomeView.swift; path = UI/HomeView.swift; sourceTree = "<group>"; };
+		4BE8C1238A7DFAC1D5023B63FD05769A /* PredictionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PredictionTests.swift; sourceTree = "<group>"; };
+		54B1D9ED06651540CE75FBD0262205F9 /* OfflineRouterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OfflineRouterTests.swift; sourceTree = "<group>"; };
+		55A520983ADC3294953EB1DD7A1249B1 /* HomeStatusTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeStatusTests.swift; sourceTree = "<group>"; };
 		57DD7FF8FC3C334C57C7CFC3EEBAB61D /* TrainViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TrainViewModel.swift; path = Core/TrainViewModel.swift; sourceTree = "<group>"; };
 		5B56DA782CD3D4D59DA36F8105F62EDA /* ILoveTrainsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ILoveTrainsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		629298F5116802F5134DF36EE7908FEE /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		649B2E9AB807B9BE4376911329B9D7D4 /* ILoveTrainsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ILoveTrainsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		6AC09C9409003F3D7E4E206C4EDD16B0 /* RowConformanceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RowConformanceTests.swift; sourceTree = "<group>"; };
 		75EE451EE7896A90B5C84525EAC53FC4 /* OfflineRealtime.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflineRealtime.swift; path = Core/OfflineRealtime.swift; sourceTree = "<group>"; };
 		83F3C91479FEF2D83389ECA406538F12 /* stations.json */ = {isa = PBXFileReference; includeInIndex = 1; path = stations.json; sourceTree = "<group>"; };
 		87B509202582DCB9F7B3E40D094D16BB /* OfflineDatabase.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflineDatabase.swift; path = Core/OfflineDatabase.swift; sourceTree = "<group>"; };
-		886A038593A84A19382E589337B95141 /* PredictionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PredictionTests.swift; sourceTree = "<group>"; };
 		8A0D676BD29373C9C0CE8DE3ED663C4A /* AppFlowTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppFlowTests.swift; sourceTree = "<group>"; };
 		8A8BA43E41A6935B648AEE219294B6E0 /* OfflinePlanner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflinePlanner.swift; path = Core/OfflinePlanner.swift; sourceTree = "<group>"; };
 		90F580CBE84AA756CD63EE0455947C8C /* DeviceStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DeviceStore.swift; path = Core/DeviceStore.swift; sourceTree = "<group>"; };
 		92A0A5C4D870B1113675F13ECF72A530 /* OfflineZip.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflineZip.swift; path = Core/OfflineZip.swift; sourceTree = "<group>"; };
 		9BFC7C822A4E5378540BB99E190550F7 /* ILoveTrains.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ILoveTrains.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A6A720BFD7C1239778644EE2178B6FEB /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		ACC7764BC77045166B79F67C694B1453 /* OfflinePlannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OfflinePlannerTests.swift; sourceTree = "<group>"; };
+		A86D2559A95D2EADA2ECB26994EF668D /* OfflinePackageStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OfflinePackageStoreTests.swift; sourceTree = "<group>"; };
+		ACAD98074707E44A3D94F9A3222B0CD3 /* OfflinePlannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OfflinePlannerTests.swift; sourceTree = "<group>"; };
 		AD4DAE0D758CB4DF9D3052CDD4914019 /* Common.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Common.swift; path = UI/Common.swift; sourceTree = "<group>"; };
-		AF850A09F92B75BDBB02B3779C13B3A5 /* StorageTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StorageTests.swift; sourceTree = "<group>"; };
 		BB44FBBD9134AB75A8EE343080605076 /* TripDeletion.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TripDeletion.swift; path = Core/TripDeletion.swift; sourceTree = "<group>"; };
 		CCF9F353578F2449D9D62F29EBA158B8 /* prediction.json */ = {isa = PBXFileReference; includeInIndex = 1; path = prediction.json; sourceTree = "<group>"; };
-		DBB7378360287999016F12B0BCD5B94B /* JourneyAxisLayoutTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JourneyAxisLayoutTests.swift; sourceTree = "<group>"; };
-		DDA9D73822E8193F23D712829238E66B /* OfflineRouterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OfflineRouterTests.swift; sourceTree = "<group>"; };
+		DCB3914C0B0C4F15EBFCCCEEA9B1DD46 /* ControllerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ControllerTests.swift; sourceTree = "<group>"; };
 		DF0CE4B4B489206BAD2B19377D1990F5 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		E884F9CE9E76571F197ED782E17779F7 /* AppView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppView.swift; path = UI/AppView.swift; sourceTree = "<group>"; };
+		EA72F363E66AA9B0C535459125B4BEFA /* StorageTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StorageTests.swift; sourceTree = "<group>"; };
 		EE08B61C43CA96D0168182C2CA0CB8A0 /* SetupView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SetupView.swift; path = UI/SetupView.swift; sourceTree = "<group>"; };
 		F0E4FA6B9A3E199FD2B24A607F32AE71 /* AppState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppState.swift; path = Core/AppState.swift; sourceTree = "<group>"; };
 		F99A9E07614D25517EFB47B525BBC577 /* DetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DetailView.swift; path = UI/DetailView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		0F84262BF8FD1DC717CF7EB3FAD3DE1C /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				ABEB582A751594711563A7B405B389A2 /* Foundation.framework in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		0FECD0C734106CB671447B36DEFF8759 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				8FC022321C20DFC6330EFF74F9C4BBEA /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		81C309837847EDF4990DD416BE57457C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				458955CA5D28E0F1D7EBFFC2525BB333 /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -201,25 +203,6 @@
 			path = ILoveTrains;
 			sourceTree = "<group>";
 		};
-		6B2601766C47D02DD0DBEECDEA0E7C58 /* ILoveTrainsTests */ = {
-			isa = PBXGroup;
-			children = (
-				25AC9C044213813934E60F18943C3902 /* BoardRetentionTests.swift */,
-				2F7B7DB6A767CE62B869425D595E9263 /* ControllerTests.swift */,
-				47C6C9BF08B29567D99AF04090C5D52B /* HomeStatusTests.swift */,
-				DBB7378360287999016F12B0BCD5B94B /* JourneyAxisLayoutTests.swift */,
-				4A2269C1581DC5132C8800C6E786AD18 /* OfflinePackageStoreTests.swift */,
-				ACC7764BC77045166B79F67C694B1453 /* OfflinePlannerTests.swift */,
-				114EAF36CE8AC644EF2A5725C2D95716 /* OfflineRealtimeTests.swift */,
-				DDA9D73822E8193F23D712829238E66B /* OfflineRouterTests.swift */,
-				886A038593A84A19382E589337B95141 /* PredictionTests.swift */,
-				6AC09C9409003F3D7E4E206C4EDD16B0 /* RowConformanceTests.swift */,
-				AF850A09F92B75BDBB02B3779C13B3A5 /* StorageTests.swift */,
-			);
-			name = ILoveTrainsTests;
-			path = ILoveTrainsTests;
-			sourceTree = "<group>";
-		};
 		81CC0235E36FF664E67FCFE5AF2727E1 /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -252,13 +235,33 @@
 			path = ILoveTrains/Resources;
 			sourceTree = "<group>";
 		};
+		D328A786F849BBEDDA41E9393D1C74F7 /* ILoveTrainsTests */ = {
+			isa = PBXGroup;
+			children = (
+				005C90ADC75007A90A8D2790AEE58553 /* BoardRetentionTests.swift */,
+				DCB3914C0B0C4F15EBFCCCEEA9B1DD46 /* ControllerTests.swift */,
+				55A520983ADC3294953EB1DD7A1249B1 /* HomeStatusTests.swift */,
+				2A2CD55895E33B3E97C58D1F5CFBE35B /* JourneyAxisLayoutTests.swift */,
+				A86D2559A95D2EADA2ECB26994EF668D /* OfflinePackageStoreTests.swift */,
+				ACAD98074707E44A3D94F9A3222B0CD3 /* OfflinePlannerTests.swift */,
+				28028BF3A008B7909D3B5E76E2FC1F6D /* OfflineRealtimeTests.swift */,
+				54B1D9ED06651540CE75FBD0262205F9 /* OfflineRouterTests.swift */,
+				4BE8C1238A7DFAC1D5023B63FD05769A /* PredictionTests.swift */,
+				3712E3E1CA2CB3CC2381AD358EDBD5F9 /* RowConformanceTests.swift */,
+				EA72F363E66AA9B0C535459125B4BEFA /* StorageTests.swift */,
+				1C1B7E259C963818AE80759491362DBA /* TransferLimitRequestTests.swift */,
+			);
+			name = ILoveTrainsTests;
+			path = ILoveTrainsTests;
+			sourceTree = "<group>";
+		};
 		DB8D0DB4D38F96852B3D7D387C3C6383 = {
 			isa = PBXGroup;
 			children = (
 				81CC0235E36FF664E67FCFE5AF2727E1 /* Products */,
 				0611571C3E490FF7966437D23A1313CB /* Frameworks */,
 				490C4F0BB9951B060A10D3288513D5B1 /* ILoveTrains */,
-				6B2601766C47D02DD0DBEECDEA0E7C58 /* ILoveTrainsTests */,
+				D328A786F849BBEDDA41E9393D1C74F7 /* ILoveTrainsTests */,
 				BD847F75E3604E8973D14149C8CFB7D9 /* ILoveTrainsUITests */,
 				C30B5669F8BA20F8515E8B45133EB152 /* Resources */,
 				EE2886ADD4F2C13C66C11FC9B11C9B21 /* Conformance */,
@@ -279,24 +282,6 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		54FC0156F81BADE5DA141F2FAF62ABD5 /* ILoveTrainsTests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 92D3EE6CEAAC7A41F17CF5A46474DE91 /* Build configuration list for PBXNativeTarget "ILoveTrainsTests" */;
-			buildPhases = (
-				FD6803C4724E46691CA7362D7F14B216 /* Sources */,
-				0F84262BF8FD1DC717CF7EB3FAD3DE1C /* Frameworks */,
-				52086B9A1813DC4C11F2D965D7237D7A /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				607DD4894DB96C1AEC03696789430B08 /* PBXTargetDependency */,
-			);
-			name = ILoveTrainsTests;
-			productName = ILoveTrainsTests;
-			productReference = 649B2E9AB807B9BE4376911329B9D7D4 /* ILoveTrainsTests.xctest */;
-			productType = "com.apple.product-type.bundle.unit-test";
-		};
 		91E28EE1CF6E6354BA398B93D50B86AE /* ILoveTrainsUITests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = DCA15BFEBB4CC9EA747638EB95893D85 /* Build configuration list for PBXNativeTarget "ILoveTrainsUITests" */;
@@ -332,6 +317,24 @@
 			productReference = 9BFC7C822A4E5378540BB99E190550F7 /* ILoveTrains.app */;
 			productType = "com.apple.product-type.application";
 		};
+		FA0A0F5A92588881A6F903A51610245E /* ILoveTrainsTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FA666B7312E85653CAE732C2002107AD /* Build configuration list for PBXNativeTarget "ILoveTrainsTests" */;
+			buildPhases = (
+				C2D91669E053AF7C8E169FB77DF5A016 /* Sources */,
+				81C309837847EDF4990DD416BE57457C /* Frameworks */,
+				8FF305EEA245E74E97850186C22369CE /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				0851703BB3C0DC2C1210A7DF3E3EACB4 /* PBXTargetDependency */,
+			);
+			name = ILoveTrainsTests;
+			productName = ILoveTrainsTests;
+			productReference = 649B2E9AB807B9BE4376911329B9D7D4 /* ILoveTrainsTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -357,7 +360,7 @@
 			projectRoot = "";
 			targets = (
 				CEF34622959541AFF90D4EBD9ADF6DF6 /* ILoveTrains */,
-				54FC0156F81BADE5DA141F2FAF62ABD5 /* ILoveTrainsTests */,
+				FA0A0F5A92588881A6F903A51610245E /* ILoveTrainsTests */,
 				91E28EE1CF6E6354BA398B93D50B86AE /* ILoveTrainsUITests */,
 			);
 		};
@@ -377,13 +380,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		52086B9A1813DC4C11F2D965D7237D7A /* Resources */ = {
+		8FF305EEA245E74E97850186C22369CE /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C5CE415B5E9199F901500E4C3DABABD3 /* calibration.json in Resources */,
-				8A9B7741EA7C7177E12D54920CBD078F /* prediction.json in Resources */,
-				EF3C38C65B2898B1F3E25EB9BE97C2CF /* rows.json in Resources */,
+				17EA87299E0E8236470AA5566D96FBB1 /* calibration.json in Resources */,
+				1D3E72B3422BD0F3B8CD3FDB57BF7E6A /* prediction.json in Resources */,
+				69123E8D77B4FABC8EC2C95CD7E69307 /* rows.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -402,6 +405,25 @@
 			buildActionMask = 2147483647;
 			files = (
 				477DFB7310465CCA4CCD251490C07E7E /* AppFlowTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C2D91669E053AF7C8E169FB77DF5A016 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CAE6D090B9B9DFF3942C1691A5A9401F /* BoardRetentionTests.swift in Sources */,
+				CA731A1132084ED748EBB68C83BC1441 /* ControllerTests.swift in Sources */,
+				DBB78416FEDD566321AE22836696B538 /* HomeStatusTests.swift in Sources */,
+				C0F7A5203726543279B1F33F6DBA897E /* JourneyAxisLayoutTests.swift in Sources */,
+				02BDF7A22215BB830E4C32A3910031A5 /* OfflinePackageStoreTests.swift in Sources */,
+				80B09F8E6F54DFC30F4328FF67CB60D2 /* OfflinePlannerTests.swift in Sources */,
+				758225C936FD1D864D0F9D5B90136DE4 /* OfflineRealtimeTests.swift in Sources */,
+				D4E1447E130BECDC041015DFC079C3B8 /* OfflineRouterTests.swift in Sources */,
+				24A1277C383037293952A3CF24D2A757 /* PredictionTests.swift in Sources */,
+				00A6CC90803EC19B137C112954354A6F /* RowConformanceTests.swift in Sources */,
+				7C549C9A5CAA5807EF5305E83822B5AC /* StorageTests.swift in Sources */,
+				47C12CA335C583A0060C3E35B3960B20 /* TransferLimitRequestTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -436,32 +458,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		FD6803C4724E46691CA7362D7F14B216 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				161497505CADA024A011A346B45B0E47 /* BoardRetentionTests.swift in Sources */,
-				560EC98CB1EDAD0CFCB6F75007678D60 /* ControllerTests.swift in Sources */,
-				839574B4043377482393F28CE528B0A7 /* HomeStatusTests.swift in Sources */,
-				8C3CDE54C66EAFCFA96616350D39D588 /* JourneyAxisLayoutTests.swift in Sources */,
-				4618AE84BC96A2DFEFF7DE3AC340E07D /* OfflinePackageStoreTests.swift in Sources */,
-				D3B8A1492BAC820115D65979B73C2ED0 /* OfflinePlannerTests.swift in Sources */,
-				5DD1D9BF38AB2B0CE555EE8C8E34077B /* OfflineRealtimeTests.swift in Sources */,
-				22C9C689987563D58D526A6BA4CC127E /* OfflineRouterTests.swift in Sources */,
-				227C4681257578CCD221273B8028B71D /* PredictionTests.swift in Sources */,
-				4318F31D1B925A5C05C440FAC908ECA0 /* RowConformanceTests.swift in Sources */,
-				538B69BA0181E229B1B71D3BD7F61456 /* StorageTests.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		607DD4894DB96C1AEC03696789430B08 /* PBXTargetDependency */ = {
+		0851703BB3C0DC2C1210A7DF3E3EACB4 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = ILoveTrains;
 			target = CEF34622959541AFF90D4EBD9ADF6DF6 /* ILoveTrains */;
-			targetProxy = CE2B39DE12FDEDE26B31173DA84E528D /* PBXContainerItemProxy */;
+			targetProxy = 8B88ED1582C2C985521501A6FED1367E /* PBXContainerItemProxy */;
 		};
 		7F632E42EE5E9346FD3F08E5D706CFB4 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -472,58 +476,6 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		024B7BF43666BCD24597EFC598330241 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
-				DEVELOPMENT_TEAM = 6TTZ5U96V9;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.2.4;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios.tests;
-				SDKROOT = iphoneos;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ILoveTrains.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ILoveTrains";
-				TEST_TARGET_NAME = ILoveTrains;
-			};
-			name = Debug;
-		};
-		0C5932CB64CD782F016995BE7DB31105 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
-				DEVELOPMENT_TEAM = 6TTZ5U96V9;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = ILoveTrains/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 1.2.4;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					"-lsqlite3",
-					"-lz",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios;
-				SDKROOT = iphoneos;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
 		2F17DE207F9ED7FB03E0A134FA3C0091 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -639,7 +591,7 @@
 			};
 			name = Debug;
 		};
-		64AC132EAF3CB82850FB023D5AA689EC /* Debug */ = {
+		4A5C99008B4D26C21CD91034E824FE87 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = NO;
@@ -660,7 +612,7 @@
 			};
 			name = Debug;
 		};
-		6CE2AEB48A38DBD320506D382CE85442 /* Release */ = {
+		56CE8C518BC4E802D05EC38D8246CDCA /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -683,7 +635,51 @@
 			};
 			name = Release;
 		};
-		73CC7C0C3752C275A5556BC6204E4ACD /* Release */ = {
+		7D6B22015BAEAE0A9640817F084F1BC4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 5;
+				DEVELOPMENT_TEAM = 6TTZ5U96V9;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.2.4;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios.uitests;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = ILoveTrains;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		B8B078EF407CB5CAE53F0B85463A30F3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 5;
+				DEVELOPMENT_TEAM = 6TTZ5U96V9;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.2.4;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios.tests;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ILoveTrains.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ILoveTrains";
+				TEST_TARGET_NAME = ILoveTrains;
+			};
+			name = Debug;
+		};
+		CA9424282763865805F4653448D2D43B /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -713,44 +709,43 @@
 			};
 			name = Release;
 		};
-		EAA351430B310F090D280A0F0412857A /* Release */ = {
+		D8451B422E664B6286BB1FBE8CC6C245 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 6TTZ5U96V9;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ILoveTrains/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MARKETING_VERSION = 1.2.4;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios.uitests;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lsqlite3",
+					"-lz",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios;
 				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = ILoveTrains;
-				VALIDATE_PRODUCT = YES;
 			};
-			name = Release;
+			name = Debug;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		92D3EE6CEAAC7A41F17CF5A46474DE91 /* Build configuration list for PBXNativeTarget "ILoveTrainsTests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				6CE2AEB48A38DBD320506D382CE85442 /* Release */,
-				024B7BF43666BCD24597EFC598330241 /* Debug */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		B46868B238DB6C6B081FEE3BA11C459F /* Build configuration list for PBXNativeTarget "ILoveTrains" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				73CC7C0C3752C275A5556BC6204E4ACD /* Release */,
-				0C5932CB64CD782F016995BE7DB31105 /* Debug */,
+				CA9424282763865805F4653448D2D43B /* Release */,
+				D8451B422E664B6286BB1FBE8CC6C245 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -758,8 +753,8 @@
 		DCA15BFEBB4CC9EA747638EB95893D85 /* Build configuration list for PBXNativeTarget "ILoveTrainsUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				EAA351430B310F090D280A0F0412857A /* Release */,
-				64AC132EAF3CB82850FB023D5AA689EC /* Debug */,
+				7D6B22015BAEAE0A9640817F084F1BC4 /* Release */,
+				4A5C99008B4D26C21CD91034E824FE87 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -769,6 +764,15 @@
 			buildConfigurations = (
 				40866C63785216791DC89AE58498CDB3 /* Debug */,
 				2F17DE207F9ED7FB03E0A134FA3C0091 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FA666B7312E85653CAE732C2002107AD /* Build configuration list for PBXNativeTarget "ILoveTrainsTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				56CE8C518BC4E802D05EC38D8246CDCA /* Release */,
+				B8B078EF407CB5CAE53F0B85463A30F3 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

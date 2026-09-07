@@ -18,6 +18,45 @@ final class ControllerTests: XCTestCase {
                                    action: .turnOff, warning: false, selected: true)
     }
 
+    func testSettingsTransferLimitPresentationOffersTheOtherValue() {
+        let capped = SettingsTransferLimitPresentation(limit: .two)
+        XCTAssertEqual(capped.subtitle, "Up to 2")
+        XCTAssertEqual(capped.mark, "NO LIMIT")
+        XCTAssertEqual(capped.next, .any)
+
+        let uncapped = SettingsTransferLimitPresentation(limit: .any)
+        XCTAssertEqual(uncapped.subtitle, "No limit")
+        XCTAssertEqual(uncapped.mark, "UP TO 2")
+        XCTAssertEqual(uncapped.next, .two)
+    }
+
+    func testCappedBoardHidesCachedThreeChangeRowsUntilTheLimitIsLifted() async throws {
+        let now = epochNow()
+        let from = Station(id: "a", name: "A")
+        let to = Station(id: "b", name: "B")
+        let direct = Journey(legs: [leg("T1", from: from, to: to, departure: now + 600_000, arrival: now + 1_800_000)])
+        let changes = (1...3).map { Station(id: "c\($0)", name: "Change \($0)") }
+        let stops: [(Station, Station)] = [(from, changes[0]), (changes[0], changes[1]), (changes[1], changes[2]), (changes[2], to)]
+        let threeChange = Journey(legs: stops.enumerated().map { index, pair in
+            let departure: Millis = now + 300_000 * Double(index + 1)
+            return leg("T\(index + 2)", from: pair.0, to: pair.1, departure: departure, arrival: departure + 240_000)
+        })
+        let board = BoardData(from: from, to: to, journeys: [direct, threeChange], generatedAt: now, source: "schedule", offline: true)
+        let data = UserData(trips: [SavedTrip(id: "trip", from: from, to: to, createdAt: now)], lastTripId: "trip",
+                            transferLimit: .two, flags: ["transferLimit": true])
+        let (_, model) = try await model(data: data, undoWindow: defaultUndoWindow, cached: board)
+        model.resume()
+
+        try await settledBoard(model) { Set($0.map(\.key)) == [direct.key] }
+
+        model.setTransferLimit(.any)
+        try await settledBoard(model) { Set($0.map(\.key)) == [direct.key, threeChange.key] }
+
+        model.setTransferLimit(.two)
+        try await settledBoard(model) { Set($0.map(\.key)) == [direct.key] }
+        model.pause()
+    }
+
     func testOpeningAlternativeKeepsItsOwnSourceAndTheOriginalPin() async throws {
         let fixture = makeFocus()
         let (_, model) = try await model(data: fixture.0)
@@ -146,6 +185,18 @@ final class ControllerTests: XCTestCase {
         model.pause()
     }
 
+    private func settledBoard(_ model: TrainViewModel, _ check: ([Journey]) -> Bool) async throws {
+        for _ in 0..<500 {
+            if check(model.state.board?.journeys ?? []) { return }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTFail("Board did not settle, showing \(model.state.board?.journeys.map(\.key) ?? [])")
+    }
+
+    private func leg(_ line: String, from: Station, to: Station, departure: Millis, arrival: Millis) -> Leg {
+        Leg(line: line, mode: "train", headsign: to.name, from: from, to: to, departure: departure, arrival: arrival)
+    }
+
     private func settled(_ store: DeviceStore, _ check: @escaping (UserData) -> Bool) async throws {
         for _ in 0..<200 {
             if check(await store.load()) { return }
@@ -165,9 +216,10 @@ final class ControllerTests: XCTestCase {
         XCTAssertEqual(presentation.selected, selected)
     }
 
-    private func model(data: UserData, undoWindow: Duration) async throws -> (DeviceStore, TrainViewModel) {
+    private func model(data: UserData, undoWindow: Duration, cached: BoardData? = nil) async throws -> (DeviceStore, TrainViewModel) {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let store = DeviceStore(directory: directory)
+        if let cached { try await store.cache(cached, modes: data.modes) }
         try await store.save(data)
         let model = TrainViewModel(store: store, undoWindow: undoWindow)
         model.networkDisabled = true

@@ -87,6 +87,28 @@ final class OfflineRouterTests: XCTestCase {
         )
     }
 
+    func testThreeChangeRouteAppearsOnlyWhenTheTransferBoundIsRaised() {
+        let first = Station(id: "C1", name: "Change One")
+        let second = Station(id: "C2", name: "Change Two")
+        let third = Station(id: "C3", name: "Change Three")
+        let wait = 300_000.0
+        let values = [
+            connection("one", from: alpha, to: first, departure: 0, arrival: 100),
+            connection("two", from: first, to: second, departure: 100 + wait, arrival: 200 + wait),
+            connection("three", from: second, to: third, departure: 200 + 2 * wait, arrival: 300 + 2 * wait),
+            connection("four", from: third, to: bravo, departure: 300 + 3 * wait, arrival: 400 + 3 * wait)
+        ].sorted { $0.departure < $1.departure }
+        let router = OfflineRouter()
+
+        XCTAssertTrue(router.route(from: alpha, to: bravo, at: 0, connections: values, limit: 12).isEmpty)
+        XCTAssertTrue(router.route(from: alpha, to: bravo, at: 0, connections: values, limit: 12, maxTransfers: 2).isEmpty)
+
+        let raised = router.route(from: alpha, to: bravo, at: 0, connections: values, limit: 12, maxTransfers: 4)
+
+        XCTAssertEqual(raised.count, 1)
+        XCTAssertEqual(raised.first?.legs.compactMap { $0.identity?.tripId }, ["one", "two", "three", "four"])
+    }
+
     func testGTFSUsesSydneyCivilTimeAcrossDSTAndAfterMidnight() {
         XCTAssertEqual(
             OfflinePlanner.gtfsEpochMillis(serviceDate: "20261004", seconds: 3 * 3_600 + 30 * 60),
