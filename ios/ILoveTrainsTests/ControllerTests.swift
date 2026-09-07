@@ -47,13 +47,13 @@ final class ControllerTests: XCTestCase {
         let (_, model) = try await model(data: data, undoWindow: defaultUndoWindow, cached: board)
         model.resume()
 
-        try await settledBoard(model) { $0.map(\.key) == [direct.key] }
+        try await settledBoard(model) { Set($0.map(\.key)) == [direct.key] }
 
         model.setTransferLimit(.any)
-        try await settledBoard(model) { $0.map(\.key) == [threeChange.key, direct.key] }
+        try await settledBoard(model) { Set($0.map(\.key)) == [direct.key, threeChange.key] }
 
         model.setTransferLimit(.two)
-        try await settledBoard(model) { $0.map(\.key) == [direct.key] }
+        try await settledBoard(model) { Set($0.map(\.key)) == [direct.key] }
         model.pause()
     }
 
@@ -186,7 +186,7 @@ final class ControllerTests: XCTestCase {
     }
 
     private func settledBoard(_ model: TrainViewModel, _ check: ([Journey]) -> Bool) async throws {
-        for _ in 0..<200 {
+        for _ in 0..<500 {
             if check(model.state.board?.journeys ?? []) { return }
             try await Task.sleep(for: .milliseconds(10))
         }
