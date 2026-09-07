@@ -290,34 +290,6 @@ any nearest-station comparison outright. It powers the client-side
 geolocation term in trip prediction — the server never receives a user
 location, only publishes where stations are.
 
-## GET /api/v1/flags
-
-The feature flags this backend has already decided for every client, so one
-switch changes the server and all three clients without a release. The server
-names the flags its clients read and publishes their evaluated values; it
-never forwards the underlying snapshot, so internal flags and the rules
-behind them stay server-side.
-
-```json
-{"version": "2026-09-07T04:00:00Z", "flags": {"transferLimit": false}}
-```
-
-- `flags` names every public flag, always with a boolean and never with a
-  missing key, so a client can tell "off" from "this server does not publish
-  it".
-- `version` identifies the evaluated snapshot. It is opaque: only equality
-  means anything. It may be `""`.
-- Cache: `s-maxage=60, stale-while-revalidate=300`, so flipping a flag
-  reaches new opens within about a minute.
-- The endpoint exists whether or not a flag source is configured. With none
-  configured, or before a first snapshot has been read, every flag is `false`
-  and `version` is `""` — the same answer as every flag being off, so a flag
-  source that is down or absent can only mean today's behaviour, never a
-  half-enabled one.
-- Evaluation takes no identity, because the backend has none to take. A flag
-  is on or off for everyone, and percentage rollouts are unsupported by
-  design.
-
 ## GET /api/v1/timetable/manifest
 
 Publishes the current native timetable generation. Dates use `YYYYMMDD`, and
@@ -423,6 +395,38 @@ freshness once it has a service date, explicit or resolved as described in
 `native-data.md`. A repeated byte-identical
 upstream body preserves the previous `generatedAt` and ETag even if the
 upstream answers `200` instead of `304`.
+
+## GET /api/v1/flags
+
+The feature flags this backend has already decided for every client, so one
+switch changes the server and all three clients without a release. The body is
+a flat object of published name to evaluated boolean, with `Cache-Control:
+no-store`:
+
+```json
+{"tiny_train": false, "transferLimit": false}
+```
+
+Every published name is always present with a boolean, so a client can tell
+"off" from "this server does not publish it". The published name is the one
+every client reads; flagsd keys are lower snake case, so `transferLimit` is
+stored there as `transfer_limit` and the server holds the translation.
+Missing, private, invalid or uninitialized values leave the feature off. No raw
+rules, targets, rollout configuration, service credentials or unknown flags
+appear in this response. One Go SDK client filters definitions by `public` and
+evaluates against a single snapshot before returning values through
+`api.WithPublicFlags`. It syncs through the internal flagsd stream without
+blocking server startup. After initial sync it keeps the last valid in-memory
+snapshot through service outages; a restarted process defaults off until its
+first sync, so a flag source that is down or absent can only mean today's
+behaviour, never a half-enabled one.
+
+Evaluation is global to the app, with no request identity, saved state,
+location or other personal context: a flag is on or off for everyone, and
+percentage rollouts are unsupported by design. The service worker uses
+network-only delivery, and browsers retain no response across launches. Runtime
+configuration and production provisioning are tracked in [deployment
+operations](../operations/deploy.md#feature-flags).
 
 ## GET /healthz
 

@@ -13,31 +13,52 @@ import (
 	"trains/internal/tfnsw"
 )
 
-type stubFlags struct {
-	values  map[string]bool
-	version string
+func flagsProvider(values map[string]any) Option {
+	return WithPublicFlags(func() map[string]any { return values })
 }
 
-func (s stubFlags) Bool(key string, def bool) bool {
-	if value, ok := s.values[key]; ok {
-		return value
+func TestPublicFlagsBoundary(t *testing.T) {
+	published := map[string]string{"tiny_train": "tiny_train", "transferLimit": "transfer_limit"}
+	for name, key := range published {
+		for _, tc := range []struct {
+			name   string
+			values func() map[string]any
+			want   bool
+		}{
+			{"unconfigured", nil, false},
+			{"missing", func() map[string]any { return nil }, false},
+			{"invalid", func() map[string]any { return map[string]any{key: "true"} }, false},
+			{"off", func() map[string]any { return map[string]any{key: false} }, false},
+			{"on", func() map[string]any {
+				return map[string]any{
+					key: true, "private.flag": "secret", "rules": []string{"never expose"},
+				}
+			}, true},
+		} {
+			t.Run(name+"/"+tc.name, func(t *testing.T) {
+				s := New(nil, "", WithPublicFlags(tc.values))
+				r := httptest.NewRequest("GET", "/api/v1/flags", nil)
+				w := httptest.NewRecorder()
+				s.Handler().ServeHTTP(w, r)
+				if w.Code != 200 || w.Header().Get("Cache-Control") != "no-store" {
+					t.Fatalf("status/cache = %d / %q", w.Code, w.Header().Get("Cache-Control"))
+				}
+				var values map[string]bool
+				if err := json.Unmarshal(w.Body.Bytes(), &values); err != nil {
+					t.Fatal(err)
+				}
+				if len(values) != len(published) || values[name] != tc.want {
+					t.Fatalf("public values = %v, want %s %v and the other published names only",
+						values, name, tc.want)
+				}
+				for other := range published {
+					if other != name && values[other] {
+						t.Fatalf("public values = %v, want %s off", values, other)
+					}
+				}
+			})
+		}
 	}
-	return def
-}
-
-func (s stubFlags) Version() string { return s.version }
-
-func flagOn(key string) Option {
-	return WithFlags(stubFlags{values: map[string]bool{key: true}})
-}
-
-func decodeFlags(t *testing.T, recorder *httptest.ResponseRecorder) FlagsResponse {
-	t.Helper()
-	var body FlagsResponse
-	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decoding flags body %q: %v", recorder.Body.String(), err)
-	}
-	return body
 }
 
 func TestJourneyTransferLimit(t *testing.T) {
@@ -89,9 +110,11 @@ func TestDeparturesTransferLimitKeysTheCacheOnlyWhenFlagged(t *testing.T) {
 		wantCalls         int32
 		wantTransferLimit int32
 	}{
-		{"no source", nil, 1, tfnsw.NoTransferLimit},
-		{"flag off", []Option{WithFlags(stubFlags{})}, 1, tfnsw.NoTransferLimit},
-		{"flag on", []Option{flagOn(transferLimitFlag)}, 2, 2},
+		{"no provider", nil, 1, tfnsw.NoTransferLimit},
+		{"provider with no snapshot", []Option{flagsProvider(nil)}, 1, tfnsw.NoTransferLimit},
+		{"flag off", []Option{flagsProvider(map[string]any{"transfer_limit": false})}, 1, tfnsw.NoTransferLimit},
+		{"flag not a boolean", []Option{flagsProvider(map[string]any{"transfer_limit": "true"})}, 1, tfnsw.NoTransferLimit},
+		{"flag on", []Option{flagsProvider(map[string]any{"transfer_limit": true})}, 2, 2},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -114,7 +137,7 @@ func TestDeparturesTransferLimitKeysTheCacheOnlyWhenFlagged(t *testing.T) {
 
 func TestDeparturesRejectsABadTransferLimitWhicheverWayTheFlagIsSet(t *testing.T) {
 	// Validation never varies with a switch the caller cannot see.
-	for _, options := range [][]Option{nil, {flagOn(transferLimitFlag)}} {
+	for _, options := range [][]Option{nil, {flagsProvider(map[string]any{"transfer_limit": true})}} {
 		handler := newTestServer(t, &fakeUpstream{departures: sampleDepartures()}, options...)
 		for _, value := range []string{"10", "-1", "x", "2.5"} {
 			target := fmt.Sprintf("/api/v1/departures?from=200060&to=215020&transferLimit=%s", value)
@@ -129,77 +152,18 @@ func TestDeparturesRejectsABadTransferLimitWhicheverWayTheFlagIsSet(t *testing.T
 	}
 }
 
-func TestFlagsEndpointNamesEveryPublicFlagWithoutASource(t *testing.T) {
-	got := get(t, newTestServer(t, &fakeUpstream{departures: sampleDepartures()}), "/api/v1/flags")
-	if got.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200: %s", got.Code, got.Body)
-	}
-	if cc := got.Header().Get("Cache-Control"); cc != flagsCacheControl {
-		t.Errorf("Cache-Control = %q, want %q", cc, flagsCacheControl)
-	}
-	body := decodeFlags(t, got)
-	if body.Version != "" {
-		t.Errorf("version = %q, want empty with no source configured", body.Version)
-	}
-	if len(body.Flags) != len(publicFlags) {
-		t.Fatalf("flags = %v, want the %d public flags named", body.Flags, len(publicFlags))
-	}
-	for _, key := range publicFlags {
-		if body.Flags[key] {
-			t.Errorf("flag %q is on with no source configured", key)
-		}
-	}
-}
-
-func TestFlagsEndpointPublishesTheEvaluatedValueAndVersion(t *testing.T) {
-	source := stubFlags{values: map[string]bool{transferLimitFlag: true}, version: "snapshot-42"}
-	handler := newTestServer(t, &fakeUpstream{departures: sampleDepartures()}, WithFlags(source))
-
-	got := get(t, handler, "/api/v1/flags")
-	if got.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200: %s", got.Code, got.Body)
-	}
-	if cc := got.Header().Get("Cache-Control"); cc != flagsCacheControl {
-		t.Errorf("Cache-Control = %q, want %q", cc, flagsCacheControl)
-	}
-	body := decodeFlags(t, got)
-	if body.Version != "snapshot-42" {
-		t.Errorf("version = %q, want snapshot-42", body.Version)
-	}
-	if !body.Flags[transferLimitFlag] {
-		t.Errorf("flags = %v, want %s on", body.Flags, transferLimitFlag)
-	}
-
-	off := get(t, newTestServer(t, &fakeUpstream{departures: sampleDepartures()},
-		WithFlags(stubFlags{version: "snapshot-43"})), "/api/v1/flags")
-	body = decodeFlags(t, off)
-	if body.Version != "snapshot-43" || body.Flags[transferLimitFlag] {
-		t.Errorf("unset flag = %+v, want the version with every flag off", body)
-	}
-}
-
-// togglingFlags stands in for the phase 2 SDK adapter, whose snapshot changes
-// under readers.
-type togglingFlags struct{ on atomic.Bool }
-
-func (f *togglingFlags) Bool(_ string, _ bool) bool { return f.on.Load() }
-
-func (f *togglingFlags) Version() string {
-	if f.on.Load() {
-		return "on"
-	}
-	return "off"
-}
-
-func TestFlagsEndpointServesReadsWhileTheSourceChanges(t *testing.T) {
-	source := &togglingFlags{}
-	handler := newTestServer(t, &fakeUpstream{departures: sampleDepartures()}, WithFlags(source))
+func TestFlagsEndpointServesReadsWhileTheSnapshotChanges(t *testing.T) {
+	var on atomic.Bool
+	handler := newTestServer(t, &fakeUpstream{departures: sampleDepartures()},
+		WithPublicFlags(func() map[string]any {
+			return map[string]any{"transfer_limit": on.Load(), "tiny_train": !on.Load()}
+		}))
 	var wait sync.WaitGroup
 	for i := range 8 {
 		wait.Add(1)
 		go func() {
 			defer wait.Done()
-			source.on.Store(i%2 == 0)
+			on.Store(i%2 == 0)
 			if got := get(t, handler, "/api/v1/flags"); got.Code != http.StatusOK {
 				t.Errorf("status = %d, want 200: %s", got.Code, got.Body)
 			}

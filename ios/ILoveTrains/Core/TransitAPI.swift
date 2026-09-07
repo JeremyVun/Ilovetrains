@@ -59,7 +59,7 @@ enum TransitWire {
     }
     static func flags(_ bytes: Data) throws -> [String: Bool] {
         guard let raw = try JSONSerialization.jsonObject(with: bytes) as? [String: Any] else { throw TransitError.invalid }
-        return (raw["flags"] as? [String: Any] ?? [:]).compactMapValues(boolean)
+        return raw.compactMapValues(boolean)
     }
     static func station(_ raw: [String: Any]) throws -> Station {
         guard let id = raw["id"] as? String, let name = raw["name"] as? String else { throw TransitError.invalid }

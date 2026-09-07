@@ -73,8 +73,8 @@ go run ./cmd/server
 Open http://localhost:8080. Runtime variables are `TFNSW_API_KEY` (required),
 `PORT` (default `8080`), `WEB_DIR` (default `./web`),
 `MIN_CONNECTION_TIME` (default `3m`), `MAX_CONNECTION_TIME` (default `60m`),
-and `FLAGSD_URL` with `FLAGSD_KEY` (both optional; unless both are set the
-feature flags are disabled and every flag reads its default).
+and `FLAGS_URL`, `FLAGS_KEY`, `FLAGS_PROJECT`, `FLAGS_ENV` (all optional;
+without `FLAGS_URL` every feature flag reads its default).
 
 Primary test gates:
 

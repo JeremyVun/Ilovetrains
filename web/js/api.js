@@ -41,7 +41,7 @@ export async function getDepartures(fromId, toId, { limit = 6, at, modes, transf
 /** The flags this backend has already decided for every client (api.md). */
 export async function getFlags({ signal } = {}) {
   const { body } = await getJson('/api/v1/flags', signal);
-  return body.flags && typeof body.flags === 'object' ? body.flags : {};
+  return typeof body === 'object' ? body : {};
 }
 
 export async function getStops(query, { signal } = {}) {

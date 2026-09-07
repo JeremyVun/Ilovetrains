@@ -23,7 +23,7 @@
  * Bump VERSION on every deploy that changes any file in SHELL.
  */
 
-const VERSION = 'v45';
+const VERSION = 'v48';
 const SHELL_CACHE = 'shell-' + VERSION;
 const DATA_CACHE = 'data-' + VERSION;
 
@@ -46,6 +46,7 @@ const SHELL = [
   '/js/detail.js',
   '/js/dom.js',
   '/js/focus.js',
+  '/js/feature-flags.js',
   '/js/home.js',
   '/js/journey.js',
   '/js/journeybar.js',
@@ -58,6 +59,7 @@ const SHELL = [
   '/js/stations.js',
   '/js/storage.js',
   '/js/time.js',
+  '/js/tiny-train.js',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/icon-maskable-512.png',
@@ -92,6 +94,11 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
+  // Runtime rollout switches must never replay an old enabled value offline.
+  if (url.pathname === '/api/v1/flags') {
+    event.respondWith(fetch(request));
+    return;
+  }
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(networkFirst(request));
     return;

@@ -41,12 +41,12 @@ class TransitApiTest {
     }
 
     @Test fun flagsReadBooleansAndIgnoreEverythingElse() {
-        val body = """{"version":"v1","flags":{"transferLimit":true,"words":"yes","count":3}}"""
+        val body = """{"transferLimit":true,"tiny_train":false,"words":"yes","count":3}"""
         var read: Map<String, Boolean> = emptyMap()
         val asked = served(body) { api -> read = api.flags() }
         assertEquals("/api/v1/flags", asked.single())
-        assertEquals(mapOf("transferLimit" to true), read)
-        served("""{"version":"v1"}""") { api -> assertTrue(api.flags().isEmpty()) }
+        assertEquals(mapOf("transferLimit" to true, "tiny_train" to false), read)
+        served("{}") { api -> assertTrue(api.flags().isEmpty()) }
     }
 
     private fun served(body: String, use: suspend (TransitApi) -> Unit): List<String> {

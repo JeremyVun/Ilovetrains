@@ -52,7 +52,6 @@ const (
 	departuresCacheControl     = "public, s-maxage=30, stale-while-revalidate=60"
 	departuresPastCacheControl = "public, s-maxage=3600, stale-while-revalidate=86400"
 	stopsCacheControl          = "public, s-maxage=86400, stale-while-revalidate=604800"
-	flagsCacheControl          = "public, s-maxage=60, stale-while-revalidate=300"
 	errorCacheableControl      = "public, s-maxage=60"
 	noStore                    = "no-store"
 )
@@ -98,13 +97,20 @@ type Server struct {
 	loc            *time.Location
 	now            func() time.Time
 	native         *native.Service
-	flags          Flags
+	publicFlags    func() map[string]any
 }
 
 type Option func(*Server)
 
 func WithNative(service *native.Service) Option {
 	return func(server *Server) { server.native = service }
+}
+
+// WithPublicFlags accepts locally evaluated values from the server-side SDK.
+// The provider must filter by the definition's public metadata before returning.
+// No request identity or personal client state participates in evaluation.
+func WithPublicFlags(values func() map[string]any) Option {
+	return func(server *Server) { server.publicFlags = values }
 }
 
 // New returns a server serving the API plus, if webDir exists, the static

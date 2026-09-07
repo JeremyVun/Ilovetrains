@@ -68,7 +68,7 @@ telemetry is disabled; explicit feedback drafts remain only in controller memory
 
 ## localStorage schema
 
-Single key `trains.v1` holding one JSON document (single key keeps
+Personal state uses key `trains.v1` holding one JSON document (single key keeps
 read/write atomic and migration simple):
 
 ```json
@@ -152,8 +152,8 @@ read/write atomic and migration simple):
   schema stays version 1. The preference document never leaves the device; the
   selected mode allow-list and, while capped, the transfer limit are sent only
   with the stateless departures query they shape.
-- `flags` is optional and holds the last `GET /api/v1/flags` answer as flag key
-  to boolean. Absent, malformed or non-boolean entries read as off, so a
+- `flags` is optional and holds the last `GET /api/v1/flags` answer as
+  published name to boolean. Absent, malformed or non-boolean entries read as off, so a
   missing or unreachable backend can only mean the behaviour that shipped
   before the flag existed. It is fetched once per open after the first paint,
   never awaited before a board request, and the stored value is what that open
@@ -233,6 +233,27 @@ read/write atomic and migration simple):
 - A station's optional `location` is captured from `/api/v1/stops` at save
   time. Trips without coordinates are backfilled lazily by stop id. Missing
   coordinates disable only the location term.
+
+## Local preview flags
+
+Production uses server-evaluated public flags from `GET /api/v1/flags`, defaults
+off. The tiny train stores no flag response of its own: it reads the endpoint
+after first paint, every 30 seconds on timer-driven screens and on
+foregrounding, times out after three seconds, and a failure leaves the toy off.
+The transfer limit reads the same endpoint once per open and persists the answer
+as `flags` above, so an open with no network draws with the last answer.
+Requests send no credentials or personal context, and the service worker never
+caches or replays this endpoint.
+
+On `localhost`, `127.0.0.1` or `[::1]` only, opening `/?tinyTrain=1` opts this
+browser into a local preview; `/?tinyTrain=0` opts it out.
+Only the exact query values `1` and `0` are accepted. The override is stored
+under `trains.flags.tinyTrain`, independently of personal state, and applies
+on subsequent local launches. Missing or invalid stored values use the API.
+If storage is unavailable, an explicit query still applies for that page's
+lifetime. Preview overrides are read at startup, so changing one requires a
+reload. Production ignores these query values and this storage key entirely.
+Toy interactions emit no analytics or API requests.
 
 ## Analytics queue
 

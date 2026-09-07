@@ -43,12 +43,12 @@ test('flags are read from the backend and an offline open keeps the stored answe
   const paths = [];
   globalThis.fetch = async (url) => {
     paths.push(url);
-    return new Response(JSON.stringify({ version: 'v1', flags: { transferLimit: true } }));
+    return new Response(JSON.stringify({ tiny_train: false, transferLimit: true }));
   };
   try {
-    assert.deepEqual(await getFlags(), { transferLimit: true });
+    assert.deepEqual(await getFlags(), { tiny_train: false, transferLimit: true });
     assert.equal(paths[0], '/api/v1/flags');
-    globalThis.fetch = async () => new Response(JSON.stringify({ version: '' }));
+    globalThis.fetch = async () => new Response(JSON.stringify({}));
     assert.deepEqual(await getFlags(), {});
     globalThis.fetch = async () => { throw new TypeError('failed to fetch'); };
     await assert.rejects(getFlags(), (error) => error.code === 'offline');

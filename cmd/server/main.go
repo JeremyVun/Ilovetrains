@@ -15,8 +15,10 @@
 //	MAX_CONNECTION_TIME longest planned transfer offered while a later
 //	                    departure arrives sooner than that wait ends,
 //	                    default 60m (Go duration)
-//	FLAGSD_URL      flagsd base URL; with FLAGSD_KEY it enables feature flags
-//	FLAGSD_KEY      flagsd read key; never logged
+//	FLAGS_URL      optional internal flagsd base URL; unset leaves flags off
+//	FLAGS_KEY      read-only SDK key; required when FLAGS_URL is set
+//	FLAGS_PROJECT  flagsd project, default ilovetrains
+//	FLAGS_ENV      flagsd environment, default production
 package main
 
 import (
@@ -27,12 +29,10 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
 	"trains/internal/api"
-	"trains/internal/flagsd"
 	"trains/internal/native"
 	"trains/internal/tfnsw"
 )
@@ -80,15 +80,19 @@ func run() error {
 	}
 
 	webDir := envOr("WEB_DIR", "./web")
+	publicFlags, closeFlags, err := publicFlagsFromEnv(os.Getenv)
+	if err != nil {
+		return err
+	}
+	defer closeFlags()
 	addr := net.JoinHostPort("", envOr("PORT", "8080"))
-	nativeDataDir := envOr("NATIVE_DATA_DIR", "./native-data/runtime")
 	feedClient, err := native.NewHTTPFeedClient(apiKey, os.Getenv("TFNSW_FEED_BASE_URL"), nil)
 	if err != nil {
 		return err
 	}
 	nativeService, err := native.NewService(native.Config{
 		Fetcher:      feedClient,
-		DataDir:      nativeDataDir,
+		DataDir:      envOr("NATIVE_DATA_DIR", "./native-data/runtime"),
 		BootstrapDir: envOr("NATIVE_BOOTSTRAP_DIR", "./native-data/bootstrap"),
 		CompilerPath: envOr("TIMETABLE_COMPILER", "./tools/compile-timetable.py"),
 		Logf:         log.Printf,
@@ -96,23 +100,13 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	options := []api.Option{api.WithNative(nativeService)}
-	flagSource, err := newFlagSource(nativeDataDir)
-	if err != nil {
-		return err
-	}
-	if flagSource != nil {
-		defer flagSource.Close()
-		options = append(options, api.WithFlags(flagSource))
-	}
-
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	go nativeService.Run(ctx)
 
 	server := &http.Server{
 		Addr:              addr,
-		Handler:           withAccessLog(api.New(client, webDir, options...).Handler()),
+		Handler:           withAccessLog(api.New(client, webDir, api.WithNative(nativeService), api.WithPublicFlags(publicFlags)).Handler()),
 		ReadHeaderTimeout: readHeaderTimeout,
 		WriteTimeout:      writeTimeout,
 		IdleTimeout:       idleTimeout,
@@ -137,26 +131,6 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownGrace)
 	defer cancel()
 	return server.Shutdown(shutdownCtx)
-}
-
-// newFlagSource returns nil when either variable is unset, which leaves every
-// flag at its default.
-func newFlagSource(nativeDataDir string) (*flagsd.Client, error) {
-	url, key := os.Getenv("FLAGSD_URL"), os.Getenv("FLAGSD_KEY")
-	if url == "" || key == "" {
-		log.Print("flags disabled (FLAGSD_URL or FLAGSD_KEY unset)")
-		return nil, nil
-	}
-	cacheDir := nativeDataDir
-	if cacheDir == "" {
-		cacheDir = os.TempDir()
-	}
-	source, err := flagsd.New(url, key, filepath.Join(cacheDir, "flags-snapshot.json"))
-	if err != nil {
-		return nil, err
-	}
-	log.Printf("flags enabled (flagsd at %s)", url)
-	return source, nil
 }
 
 func envOr(name, fallback string) string {

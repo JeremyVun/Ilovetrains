@@ -55,6 +55,33 @@ test('precache requests are unique so cache.addAll can install atomically', () =
   assert.equal(new Set(shell).size, shell.length);
 });
 
+test('runtime flags always use the network and never read or write a cache', async () => {
+  const handlers = new Map();
+  const offline = new Error('offline');
+  let fail = false;
+  const request = { method: 'GET', url: 'https://example.com/api/v1/flags' };
+  const response = { ok: true };
+  vm.runInNewContext(source, {
+    self: {
+      location: { origin: 'https://example.com' },
+      addEventListener: (name, handler) => handlers.set(name, handler)
+    },
+    URL,
+    caches: { match() { assert.fail('cached flags'); }, open() { assert.fail('cached flags'); } },
+    fetch: async (value) => {
+      assert.equal(value, request);
+      if (fail) throw offline;
+      return response;
+    }
+  });
+  let fetched;
+  handlers.get('fetch')({ request, respondWith: (value) => { fetched = value; } });
+  assert.equal(await fetched, response);
+  fail = true;
+  handlers.get('fetch')({ request, respondWith: (value) => { fetched = value; } });
+  await assert.rejects(fetched, offline);
+});
+
 test('every shell path the worker precaches exists on disk', () => {
   for (const entry of shellList()) {
     if (entry === '/') continue; // the navigation URL, served as index.html

@@ -26,16 +26,16 @@ final class TransferLimitRequestTests: XCTestCase {
 
     func testFlagsKeepBooleansAndDropEverythingElse() async throws {
         RecordingProtocol.respond { _ in
-            Data(#"{"version": "v1", "flags": {"transferLimit": true, "off": false, "count": 1, "text": "true"}}"#.utf8)
+            Data(#"{"transferLimit": true, "tiny_train": false, "count": 1, "text": "true"}"#.utf8)
         }
         let api = TransitAPI(baseURL: "https://stub.invalid", session: RecordingProtocol.session())
 
         let flags = try await api.flags()
 
         XCTAssertEqual(RecordingProtocol.urls.map(\.path), ["/api/v1/flags"])
-        XCTAssertEqual(flags, ["transferLimit": true, "off": false])
-        XCTAssertEqual(try TransitWire.flags(Data(#"{"version": ""}"#.utf8)), [:])
-        XCTAssertEqual(try TransitWire.flags(Data(#"{"flags": ["transferLimit"]}"#.utf8)), [:])
+        XCTAssertEqual(flags, ["transferLimit": true, "tiny_train": false])
+        XCTAssertEqual(try TransitWire.flags(Data("{}".utf8)), [:])
+        XCTAssertEqual(try TransitWire.flags(Data(#"{"transferLimit": ["yes"]}"#.utf8)), [:])
         XCTAssertThrowsError(try TransitWire.flags(Data("[]".utf8)))
     }
 
@@ -95,7 +95,7 @@ private final class RecordingProtocol: URLProtocol {
 
     private static let defaultBody: (URL) -> Data = { url in
         url.path == "/api/v1/flags"
-            ? Data(#"{"version": "v1", "flags": {"transferLimit": true}}"#.utf8)
+            ? Data(#"{"transferLimit": true}"#.utf8)
             : Data(#"{"from": {"id": "a", "name": "A"}, "to": {"id": "b", "name": "B"}, "generatedAt": "2026-09-07T09:00:00+10:00", "journeys": []}"#.utf8)
     }
 

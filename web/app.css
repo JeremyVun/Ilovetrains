@@ -844,3 +844,98 @@ html[data-theme="light"] .dchip { color:var(--bg) !important; }
 .hm-filtered-empty { padding: 28px 0; color: var(--ink-2); }
 .hm-filtered-empty p { margin: 0 0 16px; font-size: 20px; line-height: 1.4; }
 .hm-filtered-empty .hm-empty-settings { margin-left: 0; }
+/* The Home trip line is the track; the toy never changes its geometry. */
+.tiny-train-lane { position: relative; }
+
+.tiny-train-trigger {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 44px;
+  transform: translateY(-50%);
+  touch-action: manipulation;
+}
+
+.tiny-train-trigger:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+
+.tiny-train-lane > .tiny-train-stage {
+  position: absolute;
+  z-index: 1;
+  top: -18px;
+  bottom: auto;
+  right: 0;
+  left: 0;
+  height: 18px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Platform labels and the real journey marker remain above the drawing. */
+.tiny-train-lane > .sy-mk { z-index: 2; }
+
+.tiny-train-consist {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 1px;
+  width: max-content;
+  height: 18px;
+  transform: translateX(-100%);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.tiny-train-car {
+  display: block;
+  flex: none;
+  width: 32px;
+  height: 18px;
+  shape-rendering: crispEdges;
+}
+
+.tiny-train-body { fill: #B6BAB8; }
+.tiny-train-window.upper,
+.tiny-train-windscreen { fill: #4A3328; }
+.tiny-train-window.lower { fill: #2A1D18; }
+.tiny-train-door { fill: #939896; }
+.tiny-train-nose { fill: #F9B928; }
+.tiny-train-headlight { fill: #FFF1AE; }
+.tiny-train-wheel { fill: #201C1A; }
+
+@media (prefers-color-scheme: light) {
+  .tiny-train-body { fill: #9DA3A1; }
+  .tiny-train-window.upper,
+  .tiny-train-windscreen { fill: #4A3125; }
+  .tiny-train-window.lower { fill: #291B16; }
+  .tiny-train-door { fill: #747B79; }
+  .tiny-train-nose { fill: #E4A20C; }
+  .tiny-train-headlight { fill: #FFF3B3; }
+}
+
+html[data-theme="light"] .tiny-train-body { fill: #9DA3A1; }
+html[data-theme="light"] .tiny-train-window.upper,
+html[data-theme="light"] .tiny-train-windscreen { fill: #3B2A22; }
+html[data-theme="light"] .tiny-train-window.lower { fill: #241713; }
+html[data-theme="light"] .tiny-train-door { fill: #747B79; }
+html[data-theme="light"] .tiny-train-nose { fill: #E4A20C; }
+html[data-theme="light"] .tiny-train-headlight { fill: #FFF3B3; }
+html[data-theme="dark"] .tiny-train-body { fill: #B6BAB8; }
+html[data-theme="dark"] .tiny-train-window.upper,
+html[data-theme="dark"] .tiny-train-windscreen { fill: #4A3328; }
+html[data-theme="dark"] .tiny-train-window.lower { fill: #2A1D18; }
+html[data-theme="dark"] .tiny-train-door { fill: #939896; }
+html[data-theme="dark"] .tiny-train-nose { fill: #F9B928; }
+html[data-theme="dark"] .tiny-train-headlight { fill: #FFF1AE; }
+
+.tiny-train-reduced .tiny-train-consist { transform: translateX(-50%); will-change: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tiny-train-consist { will-change: auto; }
+}

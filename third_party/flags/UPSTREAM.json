@@ -1,0 +1,18 @@
+{
+  "repository": "https://github.com/JeremyVun/flags",
+  "commit": "0f553854418177049de859176f64973b0c516b61",
+  "sha256": {
+    "LICENSE": "043ade192fb7f4e1ea476e8fc6e6decd9d7fe71470eb0cf2d9363e2ab5945c84",
+    "sdk/go/go.mod": "8fdfb9b434923af7a2690965b3fd3d43b2e8d5e4b6eda3f5e2d19bae0c116aa3",
+    "sdk/go/flags.go": "ab3b623f91f38da9aff02882d96368c356b511256a927d427af34dbf7bc211a9",
+    "sdk/go/cache.go": "25e5a996763922b79e00a9596c8c04cd720aaaea91d78a43f1ae75d5a616f294",
+    "sdk/go/transport.go": "0ab48db58dea1169399e2baee3bdda0bda2243dea52b14508c4cf35a742bbde8",
+    "sdk/go/flags_test.go": "d9bf303f87936be128ff871091894f5998934ffd5f4f913ad78198899240ee2a",
+    "sdk/go/transport_test.go": "de966d9947e1e0a633bf94eb6d99dcd4d2481a5e59c859cbb1a4984eaa4c0711",
+    "server/pkg/flags/bucket.go": "bb1479d8a182c2f9210ebc119d17272e0a546089cf0983c058ce7913010e6904",
+    "server/pkg/flags/domain.go": "826d0bc8bc0a881d866df64c51f6a7a78c600049faa2ec8b14098d678866b2af",
+    "server/pkg/flags/eval.go": "79e8502f1abe7e748d74f0d9f43a19a6b7cd5abe936dd7ecbe7534c6eaf46c9d",
+    "server/pkg/flags/validate.go": "655bc4c080d33dc9191dea699ac8be23caaa2a884d215166460afb29c432ef0a",
+    "server/pkg/flags/version.go": "50052656eb481eaf16d5a1bdd014bbf6c04831e5a120c61f6f6f235d372d1a17"
+  }
+}

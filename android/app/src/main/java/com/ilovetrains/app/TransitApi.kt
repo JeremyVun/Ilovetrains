@@ -29,7 +29,7 @@ class TransitApi(baseUrl: String = BuildConfig.API_BASE) {
         val connection = open("/api/v1/flags")
         try {
             check(connection.responseCode == 200) { "Flags are unavailable" }
-            flagsOf(JSONObject(readLimited(connection.inputStream, 64_000)).optJSONObject("flags"))
+            flagsOf(JSONObject(readLimited(connection.inputStream, 64_000)))
         } finally { connection.disconnect() }
     }
     private fun open(path: String): HttpURLConnection {

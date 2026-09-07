@@ -56,35 +56,67 @@ generation; the bundled bootstrap serves a new volume immediately.
 
 ## Feature flags
 
-The server reads the `transfer_limit` flag from flagsd and republishes the
-evaluated value at `/api/v1/flags` under the name every client reads,
-`transferLimit`; flagsd keys must be lower-case, so the adapter translates.
-`FLAGSD_URL` belongs in `config.env` as `http://flagsd:8080`; `FLAGSD_KEY`
-belongs in `secrets.env`. With either unset the server logs that flags are
-disabled and every flag reads `false`, which is the behaviour from before the
-flag existed.
+Flag inventory:
 
-flagsd publishes no ports, so the two stacks meet on an external Docker network
-created once on the host:
+| Key | Type | Public | Owner | Default | Removal condition |
+| --- | --- | --- | --- | --- | --- |
+| `tiny_train` | boolean | yes | Jeremy | off | Remove after the owner accepts or retires the Easter egg |
+| `transfer_limit` | boolean | yes | Jeremy | off | Retire once the owner rules the transfer cap permanent or drops it |
 
-```sh
-docker network create shared-flags
-```
+Target project/environment: `ilovetrains` / `prod` (UI label **Production**).
+The label is not the API key: requesting environment `production` returns 404.
+`tiny_train`'s definition description is
+`Play the tiny train Easter egg beneath the Home header.` Boolean variations
+are `off=false` and `on=true`; initial environment config is disabled with
+`off_variation=off`, empty targets/rules and `fallthrough.variation=on`.
+Both are global UX switches, with no per-device targeting or percentage rollout.
 
-The flags stack's `flagsd` service and the ilovetrains service both join it.
+The browser boundary is `GET /api/v1/flags`, which publishes each flag under
+the name its clients read: `tiny_train` as `tiny_train` and `transfer_limit`
+as `transferLimit`. The local-only `?tinyTrain=1` preview cannot override
+production. The server uses one shared Go SDK client,
+streaming internal snapshots and evaluating only public definitions locally.
+Keys and raw rules never enter the web bundle. The owner approved vendoring
+on 2026-09-08; the pinned SDK, unchanged evaluator and additive public accessor
+are documented in [third_party/flags](../../third_party/flags/README.md).
 
-Enable the flag once, in this order:
+Runtime configuration:
 
-1. In the admin UI at https://flags.jeremyvun.com, create project
-   `ilovetrains` with the single environment `production`.
-2. Create flag `transfer_limit`: boolean, public, off.
-3. Mint a read-only key scoped to `ilovetrains/production`. Its secret is shown
-   once and is never read back.
-4. Paste that secret into `../projects/stacks/ilovetrains/secrets.env` as
-   `FLAGSD_KEY`, then commit the infra repository so the pre-commit hook seals
-   it into `secrets.env.age`.
-5. Deploy, then read `https://ilovetrains.jeremyvun.com/api/v1/flags`. Toggling
-   the flag in the admin UI reaches new opens within about a minute.
+| Variable | Value |
+| --- | --- |
+| `FLAGS_URL` | Internal flagsd base URL; unset leaves the feature off |
+| `FLAGS_KEY` | Read-only key scoped to this project and environment; required with `FLAGS_URL` |
+| `FLAGS_PROJECT` | Defaults to `ilovetrains` |
+| `FLAGS_ENV` | Set to `prod`; the code's `production` fallback does not name this project's environment |
+
+Boot never waits for flagsd. With no disk cache, each process starts off until
+its first snapshot. Once synced, the SDK retains the last valid snapshot in
+memory through a flagsd outage; a kill switch update needs a working stream.
+Browsers refresh on foreground and every 30 seconds; a failed browser fetch
+turns the tiny train off and leaves the transfer limit on its stored answer.
+Evaluation uses fixed context `ilovetrains`, with no
+personal attributes. Read attribution is `svc:ilovetrains` / `ilovetrains-api`.
+
+To turn either feature on, flip its flag in the admin UI at
+https://flags.jeremyvun.com. Clients pick the new value up at their next open.
+
+The owner created both public flags and supplied the sealed read key. The
+flags stack creates `shared-flags`; ilovetrains joins it externally. Deploy
+flags first if that network does not yet exist.
+
+Production configuration is committed in infra `58f5a36`. An owner-authorized
+read-only container probe verified the actual environment key `prod` and a true
+`tiny_train` evaluation (`FALLTHROUGH`). No `.env` files were read or credentials
+printed; the probe used the container's existing process environment.
+
+Version `1.3.1` (source `e4f25d2`, service worker `v47`) deployed on 2026-09-08
+in job `a887f8acc7f488f53f1f22a0def04090`. Image digest:
+`sha256:fce592e8a9a92b6870d3603e969655add807491e813f68fdc64233ae27809898`.
+Production health, version and shell bytes passed HTTP checks, and the public
+endpoint returned `{"tiny_train":true}`. All 342 web tests, the signed Android
+release build and the four size/scheme interaction checks passed. Seven affected
+Home regression frames matched; no baseline changed. The train starts with six
+cars on the coloured trip line; activating it leaves the line and divider fixed.
 
 ## Verify
 
