@@ -1,6 +1,6 @@
 import { esc, mount, shortName } from './dom.js';
 import { automaticHomeOf } from './predict.js';
-import { preferencesOf } from './preferences.js';
+import { flagsOf, preferencesOf } from './preferences.js';
 import { MIN_QUERY, fuzzyScore, hintFor, rankStops } from './search.js';
 import { loadStations } from './stations.js';
 import { VERSION } from './version.js';
@@ -169,14 +169,26 @@ function serviceButton(mode, label, on, disabled = false) {
     ${icon(mode, 'st-mode-icon')}<span class="st-mode-label">${label}</span>${stateMark(on)}</button>`;
 }
 
-function services(enabledModes) {
+const TRANSFER_VALUES = {
+  two: { value: 'Up to 2', mark: 'No limit', label: 'Transfer limit, Up to 2 transfers, Change to no limit' },
+  any: { value: 'No limit', mark: 'Up to 2', label: 'Transfer limit, No limit on transfers, Change to up to 2 transfers' }
+};
+
+/** The Personal rows' composition without an icon column: no glyph in the set
+    means this, and an invented one would not be a borrow. */
+export function transferRow(transferLimit) {
+  const words = TRANSFER_VALUES[transferLimit] || TRANSFER_VALUES.two;
+  return `<button class="st-person-row st-transfer-row" data-act="transfer-limit" aria-label="${esc(words.label)}"><span class="st-copy"><span class="st-name">Transfer limit</span><span class="st-value">${words.value}</span></span><span class="st-state">${words.mark}</span></button>`;
+}
+
+export function services(enabledModes, transferLimit = null) {
   const enabled = new Set(enabledModes);
   const allOff = enabled.size === 0;
   const note = allOff ? '<p class="st-service-empty">No services selected. Turn one on to see trips.</p>'
     : '<p class="st-service-note">Trips use chosen services only.</p>';
   return `<section class="st-group">${section('Services')}<div class="st-choice-set st-service-set" role="group" aria-label="Services">
     ${serviceButton('train', 'Trains', enabled.has('train'))}${serviceButton('metro', 'Metro', enabled.has('metro'))}${serviceButton('ferry', 'Ferries', enabled.has('ferry'))}${serviceButton('bus', 'Buses', false, true)}
-  </div>${note}</section>`;
+  </div>${note}${transferLimit ? transferRow(transferLimit) : ''}</section>`;
 }
 
 function preview(appearance) {
@@ -201,7 +213,8 @@ function paintMain(root, ctx, permission) {
   const restore = activeControl(root);
   const prefs = preferencesOf(ctx.doc);
   const automatic = automaticHomeOf(ctx.doc);
-  mount(root, shell('Settings', `${personal(prefs, automatic, permission)}${services(prefs.enabledModes)}${appearance(prefs.appearance)}
+  const transferLimit = flagsOf(ctx.doc).transferLimit ? prefs.transferLimit : null;
+  mount(root, shell('Settings', `${personal(prefs, automatic, permission)}${services(prefs.enabledModes, transferLimit)}${appearance(prefs.appearance)}
     <div class="st-secondary"><button class="st-secondary-row" data-act="feedback"><span class="st-name">Send feedback</span>${icon('next')}</button>
     <div class="st-secondary-row passive"><span class="st-name">Version ${esc(VERSION)}</span></div></div>`, { back: '#/' }));
   bind(root, async (action, el, event) => {
@@ -214,6 +227,12 @@ function paintMain(root, ctx, permission) {
       const next = current.includes(mode)
         ? current.filter((item) => item !== mode) : [...current, mode];
       ctx.setPreferences({ enabledModes: next });
+      paintMain(root, ctx, permission);
+      return;
+    }
+    if (action === 'transfer-limit') {
+      const current = preferencesOf(ctx.doc).transferLimit;
+      ctx.setPreferences({ transferLimit: current === 'two' ? 'any' : 'two' });
       paintMain(root, ctx, permission);
       return;
     }

@@ -58,7 +58,8 @@ History, home votes, recent choices and completed rides keep the same caps and
 evidence rules. The focused exact service
 and its alternative journeys can carry separate `BoardData` sources: refreshing
 a cancellation must not renew an alternative's age. Focus visibility follows
-mode preferences while its stored state survives a temporary mode exclusion.
+mode preferences and the transfer cap while its stored state survives a
+temporary exclusion by either.
 Native expiry restores scheduled times and static platform baselines, as bound
 by [native-data.md](native-data.md).
 
@@ -120,8 +121,10 @@ read/write atomic and migration simple):
     "useLocation": true,
     "homeOverride": {"id": "213820", "name": "Rhodes",
                      "location": {"lat": -33.8308, "lon": 151.0879}},
-    "enabledModes": ["train", "metro", "ferry"]
+    "enabledModes": ["train", "metro", "ferry"],
+    "transferLimit": "two"
   },
+  "flags": {"transferLimit": false},
   "cache": {
     "<from>-<to>": {"fetchedAt": "...", "body": {"…": "last departures response"}}
   }
@@ -144,9 +147,29 @@ read/write atomic and migration simple):
   `useLocation` accepts only a boolean; a malformed `homeOverride` drops; and
   `enabledModes` keeps only `train`, `metro` and `ferry` in that stable order.
   Missing or non-array modes means all three, while an explicit `[]` remains
-  all-off. The schema stays version 1. The preference document never leaves
-  the device; the selected mode allow-list is sent only with the stateless
-  departures query that it shapes.
+  all-off. `transferLimit` accepts only `two` and `any`; anything else, or its
+  absence, reads as `two`, the cap of two changes. The schema stays version 1.
+  The preference document never leaves the device; the selected mode allow-list
+  and, while capped, the transfer limit are sent only with the stateless
+  departures query they shape.
+- `flags` is optional and holds the last `GET /api/v1/flags` answer as flag key
+  to boolean. Absent, malformed or non-boolean entries read as off, so a
+  missing or unreachable backend can only mean the behaviour that shipped
+  before the flag existed. It is fetched once per open after the first paint,
+  never awaited before a board request, and the stored value is what that open
+  draws with. A flag is the backend's decision about this build, never about
+  this device, so it carries no identity and is not a stored preference.
+- The transfer cap is `flags.transferLimit` and `preferences.transferLimit`
+  together: capped means the flag is on and the choice is `two`. While capped
+  the client hides every journey with more than two changes wherever it applies
+  the mode allow-list — the board, the smart header, the next-service rail,
+  cancellation replacements, focus alternatives and past pages all derive from
+  that filtered body — and asks the departures API for `transferLimit=2`. The
+  cap is not part of the cache key: a body cached under the other setting is
+  filtered on read and healed by the refetch every change already triggers.
+  Changing either the flag or the choice takes the mode-change path: eligible
+  cached rows are kept, replacements are fetched, and an excluded journey is
+  never restored by a failed fetch.
 - `cache` holds the last successful raw departures response per saved directed
   pair and served-mode set, used for instant first paint and offline. All three
   modes retain the legacy `<from>-<to>` key; each subset has the canonical
@@ -294,13 +317,15 @@ The document may contain an optional `focus` field for a pinned or inferred serv
   both endpoints compatible, and every service leg enabled. A train first leg
   cannot exempt a later metro or ferry leg. Hidden focus contributes no Home
   header/status or Detail fallback, and does not force its pair into the list.
-  Retain the snapshot for restoration when modes are re-enabled; while it is
-  unexpired, automatic inference cannot overwrite it with another journey.
+  Retain the snapshot for restoration when modes are re-enabled or the cap is
+  lifted; while it is unexpired, automatic inference cannot overwrite it with
+  another journey.
   Restoring visible focus synchronizes the Home controller selection and
   reloads that pair’s cache before fetching. Cancellation replacements must
   come from the focused pair and direction, with their own source freshness.
-- Service preferences never stop the stored followed journey's refresh. Its
-  separate all-mode request uses the followed pair; after departure it asks for the
+- Service preferences and the transfer cap never stop the stored followed
+  journey's refresh. Its separate all-mode, uncapped request uses the followed
+  pair; after departure it asks for the
   departure window so upstream can still match the service. Focus freshness
   comes from a matching response for that pair (or its matching raw cache),
   never from an unrelated suggestion request. No matching source means stale

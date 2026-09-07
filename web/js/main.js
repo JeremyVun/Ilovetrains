@@ -18,12 +18,12 @@ import { clampJourneyBars } from './journeybar.js';
 import * as Detail from './detail.js';
 import * as Home from './home.js';
 import { renderSetup } from './setup.js';
-import { getDepartures, getStops } from './api.js';
+import { getDepartures, getFlags, getStops } from './api.js';
 import { onAction } from './dom.js';
 import { renderSettings } from './settings.js';
 import {
   tripAllowed, tripsForModes, stationAllowed, SUPPORTED_MODES,
-  preferencesOf, setPreferences, journeyAllowed, filterBody
+  preferencesOf, setPreferences, setFlags, effectiveCap, journeyAllowed, filterBody
 } from './preferences.js';
 import {
   createAnalytics, install as installAnalytics, isEnabled, variant, EXPERIMENTS
@@ -33,6 +33,7 @@ const REFRESH_MS = 30_000;
 const TICK_MS = 1_000;
 const VIEW_QUALIFIES_MS = 5_000;
 const LIMIT = 6;
+const CAPPED_CHANGES = 2;
 const PAST_STEP_MS = 60 * 60_000;
 const PAST_BOUND_MS = 24 * 60 * 60_000;
 const FIX_MAX_AGE_MS = 5 * 60_000;
@@ -176,6 +177,7 @@ const ctx = {
   get useLocation() { return preferencesOf(state.doc).useLocation; },
   setPreferences(patch) {
     const before = preferencesOf(state.doc);
+    const wasCapped = capped();
     ctx.update(setPreferences(state.doc, patch));
     const after = preferencesOf(state.doc);
     globalThis.trainsAppearance?.apply(after.appearance);
@@ -190,36 +192,8 @@ const ctx = {
         preserveSelection = false;
       }
     }
-    if (before.enabledModes.join(',') !== after.enabledModes.join(',')) {
-      invalidateSuggestions();
-      const previousSelection = state.selection;
-      const previousBody = filterBody(state.body, after.enabledModes);
-      const previousStale = state.serverStale;
-      const followed = focusSelection();
-      if (followed) {
-        state.selection = followed;
-        state.predicted = false;
-        state.leap = null;
-      } else if (!suggestionAllowed(state.selection)) {
-        state.selection = null;
-        state.predicted = true;
-        state.selection = locateSelection();
-      }
-      const samePair = previousSelection && state.selection
-        && previousSelection.tripId === state.selection.tripId
-        && previousSelection.direction === state.selection.direction;
-      state.body = { journeys: [] };
-      state.serverStale = false;
-      if (state.selection) loadSelectedCache();
-      if (samePair && (!state.body || (!(state.body.journeys || []).length && previousBody.journeys.length))) {
-        state.body = previousBody;
-        state.serverStale = previousStale;
-      }
-      state.pastBodies = [];
-      state.seenLive = new Map();
-      state.seenKey = null;
-      state.journey = null;
-      fetchLive();
+    if (before.enabledModes.join(',') !== after.enabledModes.join(',') || wasCapped !== capped()) {
+      refetchEligible();
     }
     return state.doc;
   },
@@ -269,9 +243,10 @@ function savePair(trip) {
 async function redirectJourney(trip, redirect) {
   try {
     const { body } = await getDepartures(trip.from.id, trip.to.id, {
-      at: redirect.departureMs - 60_000, limit: LIMIT, modes: enabledModes()
+      at: redirect.departureMs - 60_000, limit: LIMIT, modes: enabledModes(),
+      transferLimit: transferLimit()
     });
-    return (body.journeys || []).find((item) => journeyAllowed(item, enabledModes()) && departureKey(item) === redirect.journeyKey) || null;
+    return (body.journeys || []).find((item) => journeyAllowed(item, enabledModes(), capped()) && departureKey(item) === redirect.journeyKey) || null;
   } catch (_) {
     return null;
   }
@@ -285,6 +260,61 @@ function invalidateSuggestions() {
 }
 
 function enabledModes() { return preferencesOf(state.doc).enabledModes; }
+
+function capped() { return effectiveCap(state.doc); }
+
+function transferLimit() { return capped() ? CAPPED_CHANGES : undefined; }
+
+/* What a changed filter does, whether the rider changed it or the backend
+   did: keep the rows that still qualify, ask the API for the rest, and never
+   restore an excluded journey if that answer fails (ui.md, Settings). */
+function refetchEligible() {
+  invalidateSuggestions();
+  const previousSelection = state.selection;
+  const previousBody = filterBody(state.body, enabledModes(), capped());
+  const previousStale = state.serverStale;
+  const followed = focusSelection();
+  if (followed) {
+    state.selection = followed;
+    state.predicted = false;
+    state.leap = null;
+  } else if (!suggestionAllowed(state.selection)) {
+    state.selection = null;
+    state.predicted = true;
+    state.selection = locateSelection();
+  }
+  const samePair = previousSelection && state.selection
+    && previousSelection.tripId === state.selection.tripId
+    && previousSelection.direction === state.selection.direction;
+  state.body = { journeys: [] };
+  state.serverStale = false;
+  if (state.selection) loadSelectedCache();
+  if (samePair && (!state.body || (!(state.body.journeys || []).length && previousBody.journeys.length))) {
+    state.body = previousBody;
+    state.serverStale = previousStale;
+  }
+  state.pastBodies = [];
+  state.seenLive = new Map();
+  state.seenKey = null;
+  state.journey = null;
+  fetchLive();
+}
+
+/* One answer per open, after the first paint: the board never waits on it, and
+   the stored answer is what this open already drew with. */
+async function loadFlags() {
+  let flags;
+  try { flags = await getFlags(); } catch (_) { return; }
+  const wasCapped = capped();
+  ctx.update(setFlags(state.doc, flags));
+  if (capped() === wasCapped) return;
+  if (state.view === 'settings') renderSettings(state.root, ctx, settingsSubview());
+  refetchEligible();
+}
+
+function settingsSubview() {
+  return location.hash.slice('#/settings'.length).replace(/^\//, '');
+}
 
 function route() {
   preserveSelection = Boolean(state.view?.startsWith('settings')) && Boolean(state.selection);
@@ -304,7 +334,7 @@ function route() {
 
   if (hash === '#/settings' || hash.startsWith('#/settings/')) {
     state.view = 'settings';
-    renderSettings(root, ctx, hash.slice('#/settings'.length).replace(/^\//, ''));
+    renderSettings(root, ctx, settingsSubview());
     startTimers(false);
     refreshFollowed();
     return;
@@ -420,7 +450,7 @@ function loadSelectedCache() {
   const ends = currentLeg();
   const cached = getCache(state.doc, currentKey())
     || getCache(state.doc, cacheKey(ends.from.id, ends.to.id));
-  state.body = cached ? filterBody(cached.body, enabledModes()) : null;
+  state.body = cached ? filterBody(cached.body, enabledModes(), capped()) : null;
   state.serverStale = cached?.serverStale === true;
   state.offline = false;
 }
@@ -479,7 +509,7 @@ function indexReady(list) {
 function noteLastOpen() {
   if (suppressPreferenceEvents || state.view !== 'home' || focusSelection() || !state.selection) return;
   const journeys = (state.body && state.body.journeys) || [];
-  const journey = journeys.find((item) => journeyAllowed(item, enabledModes()) && !journeyCancelled(item));
+  const journey = journeys.find((item) => journeyAllowed(item, enabledModes(), capped()) && !journeyCancelled(item));
   if (!journey) return;
   const spot = here(state.doc, state.stations, validFix());
   ctx.update(recordLastOpen(state.doc, {
@@ -589,7 +619,7 @@ function useFix() {
   const storedFocus = focusOf(state.doc);
   const entered = (storedFocus && !focusExpired(storedFocus, now()))
     || rideRecorded(state.doc, state.previousOpen) ? null
-    : journeyAllowed(state.previousOpen?.journey, enabledModes())
+    : journeyAllowed(state.previousOpen?.journey, enabledModes(), capped())
       ? inferTravel({ ...state.doc, lastOpen: state.previousOpen }, now(), fix) : null;
   if (entered) {
     ctx.update(setFocus(state.doc, entered, entered.journey, now(), 'inferred'));
@@ -991,7 +1021,7 @@ function showDetail(root) {
     state.selection = { tripId: focus.tripId, direction: focus.direction };
   }
   if (!state.journey || !state.selection || !selectedTrip()
-      || !journeyAllowed(state.journey, enabledModes())
+      || !journeyAllowed(state.journey, enabledModes(), capped())
       || !suggestionAllowed(state.selection)) {
     location.hash = '#/';
     return;
@@ -1001,7 +1031,7 @@ function showDetail(root) {
   const handoff = state.detailHandoff;
   state.detailHandoff = null;
   if (handoff?.key === currentKey() && handoff.journeyKey === journeyKey(state.journey)) {
-    state.body = filterBody(handoff.body, enabledModes());
+    state.body = filterBody(handoff.body, enabledModes(), capped());
     state.offline = handoff.offline;
     state.serverStale = handoff.serverStale;
   }
@@ -1157,10 +1187,10 @@ async function fetchLive({ independent = false } = {}) {
   const generation = ++requestGeneration;
   try {
     const { body, serverStale } = await getDepartures(ends.from.id, ends.to.id, {
-      limit: LIMIT, modes, signal: controller.signal
+      limit: LIMIT, modes, transferLimit: transferLimit(), signal: controller.signal
     });
     if (controller.signal.aborted || generation !== requestGeneration || !state.selection || key !== currentKey()) return;
-    const eligible = filterBody(body, modes);
+    const eligible = filterBody(body, modes, capped());
     if (state.seenKey !== key) { state.seenLive = new Map(); state.seenKey = key; }
     for (const journey of eligible.journeys || []) state.seenLive.set(departureKey(journey), journey);
     state.body = eligible;
@@ -1218,14 +1248,14 @@ async function fetchPast(initial) {
   try {
     const { body } = await getDepartures(ends.from.id, ends.to.id, {
       limit: LIMIT,
-      at, modes: enabledModes(),
+      at, modes: enabledModes(), transferLimit: transferLimit(),
       signal: controller.signal
     });
     if (controller.signal.aborted || generation !== routeGeneration || state.view !== 'board' || key !== currentKey()) return;
     const before = new Set(state.pastBodies.flatMap((page) => page.journeys || []).map(departureKey));
     const gained = (body.journeys || []).some((journey) => !before.has(departureKey(journey)));
     if (!gained) state.pastExhausted = true;
-    else state.pastBodies.unshift(filterBody(body, enabledModes()));
+    else state.pastBodies.unshift(filterBody(body, enabledModes(), capped()));
     if (initial) state.initialBoardLanding = true;
     renderBoard({ addedAbove: !initial });
   } catch (error) {
@@ -1341,3 +1371,4 @@ if (location.hostname === 'localhost') {
 }
 
 route();
+loadFlags();

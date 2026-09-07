@@ -788,3 +788,39 @@ test('only an explicit header pin offers unpin; the saved-row label stays read-o
   doc.focus.by = 'inferred';
   assert.doesNotMatch(homeHtml(homeModel(doc, HOME_SELECTION, transferBody(), at('09:33'), {})), /data-act="unpin"/);
 });
+
+/* A flag answer that changes nothing must not disturb the open, and one that
+   does goes down the same road a changed service preference goes down. */
+test('a backend flag answer refetches once, and only when it changes the cap', () => {
+  const main = readFileSync(join(import.meta.dirname, '..', 'js', 'main.js'), 'utf8');
+  const body = /async function loadFlags\(\) \{([\s\S]*?)\n\}/.exec(main);
+
+  assert.ok(body, 'the controller still reads the flags endpoint');
+  assert.match(body[1], /try \{ flags = await getFlags\(\); \} catch \(_\) \{ return; \}/);
+  assert.match(body[1], /ctx\.update\(setFlags\(state\.doc, flags\)\)/);
+  assert.match(body[1], /if \(capped\(\) === wasCapped\) return;/);
+  assert.equal(body[1].match(/refetchEligible\(\)/g).length, 1);
+  assert.match(body[1], /if \(state\.view === 'settings'\) renderSettings/);
+  assert.equal(main.match(/^\s*refetchEligible\(\);$/gm).length, 2,
+    'the rider changing a preference, and the backend changing the flag');
+  assert.equal(/function refetchEligible\(\) \{[\s\S]*?\n\}/.exec(main)[0]
+    .match(/fetchLive\(\)/g).length, 1);
+  assert.match(main, /^loadFlags\(\);$/m);
+  assert.equal(main.indexOf('\nloadFlags();') > main.indexOf('\nroute();'), true,
+    'the first paint never waits on the flag');
+});
+
+/* The followed journey is already fetched all-mode, so the cap must not narrow
+   the one request that keeps a rider's own train on screen. */
+test('every departures request carries the cap except the focus refresh', () => {
+  const main = readFileSync(join(import.meta.dirname, '..', 'js', 'main.js'), 'utf8');
+  const calls = main.match(/getDepartures\([\s\S]*?\n?\s*\}\);/g);
+
+  assert.equal(calls.length, 4);
+  assert.equal(calls.filter((call) => call.includes('transferLimit: transferLimit()')).length, 3);
+  const refresh = /async function refreshFollowed\(\) \{([\s\S]*?)\n\}/.exec(main)[1];
+  assert.match(refresh, /modes: SUPPORTED_MODES/);
+  assert.doesNotMatch(refresh, /transferLimit/);
+  assert.match(main, /function transferLimit\(\) \{ return capped\(\) \? CAPPED_CHANGES : undefined; \}/);
+  assert.match(main, /const CAPPED_CHANGES = 2;/);
+});

@@ -1,4 +1,4 @@
-import { SUPPORTED_MODES, normalizeModes, preferencesOf } from './preferences.js';
+import { SUPPORTED_MODES, flagsOf, normalizeModes, preferencesOf } from './preferences.js';
 
 /* localStorage document per docs/contracts/client-storage.md.
    Everything above the load/save pair is pure: document in, new document out.
@@ -155,6 +155,7 @@ export function parseDoc(raw) {
   if (v.preferences && typeof v.preferences === 'object' && !Array.isArray(v.preferences)) {
     doc.preferences = preferencesOf({ preferences: v.preferences });
   }
+  if (v.flags && typeof v.flags === 'object' && !Array.isArray(v.flags)) doc.flags = flagsOf(v);
   if (v.cache && typeof v.cache === 'object') {
     for (const [k, entry] of Object.entries(v.cache)) {
       if (entry && typeof entry.fetchedAt === 'string' && entry.body && typeof entry.body === 'object') {
@@ -182,6 +183,7 @@ export function serializeDoc(doc) {
   if (doc.locationAsk) out.locationAsk = doc.locationAsk;
   if (doc.telemetry) out.telemetry = doc.telemetry;
   if (doc.preferences) out.preferences = preferencesOf(doc);
+  if (doc.flags) out.flags = flagsOf(doc);
   return JSON.stringify(out);
 }
 
