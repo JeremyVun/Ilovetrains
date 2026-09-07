@@ -3,6 +3,21 @@ import XCTest
 
 @MainActor
 final class ControllerTests: XCTestCase {
+    func testSettingsLocationPresentationCoversEachPermissionAction() {
+        assertLocationPresentation(useLocation: false, granted: false, denied: false,
+                                   subtitle: "Location is not used", mark: "TURN ON",
+                                   action: .turnOn, warning: false, selected: false)
+        assertLocationPresentation(useLocation: true, granted: false, denied: false,
+                                   subtitle: "Location needs permission", mark: "ALLOW",
+                                   action: .allow, warning: false, selected: nil)
+        assertLocationPresentation(useLocation: true, granted: false, denied: true,
+                                   subtitle: "Location is blocked", mark: "OPEN SETTINGS ›",
+                                   action: .openSettings, warning: true, selected: nil)
+        assertLocationPresentation(useLocation: true, granted: true, denied: false,
+                                   subtitle: "Nearby trips use location", mark: "TURN OFF",
+                                   action: .turnOff, warning: false, selected: true)
+    }
+
     func testOpeningAlternativeKeepsItsOwnSourceAndTheOriginalPin() async throws {
         let fixture = makeFocus()
         let (_, model) = try await model(data: fixture.0)
@@ -137,6 +152,17 @@ final class ControllerTests: XCTestCase {
             try await Task.sleep(for: .milliseconds(10))
         }
         XCTFail("Persisted state did not settle")
+    }
+
+    private func assertLocationPresentation(useLocation: Bool, granted: Bool, denied: Bool,
+                                            subtitle: String, mark: String, action: SettingsLocationAction,
+                                            warning: Bool, selected: Bool?) {
+        let presentation = SettingsLocationPresentation(useLocation: useLocation, granted: granted, denied: denied)
+        XCTAssertEqual(presentation.subtitle, subtitle)
+        XCTAssertEqual(presentation.mark, mark)
+        XCTAssertEqual(presentation.action, action)
+        XCTAssertEqual(presentation.warning, warning)
+        XCTAssertEqual(presentation.selected, selected)
     }
 
     private func model(data: UserData, undoWindow: Duration) async throws -> (DeviceStore, TrainViewModel) {

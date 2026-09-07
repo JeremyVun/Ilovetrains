@@ -138,8 +138,10 @@ Rules that fell out of the comps and the code:
   `.restricted` (as today). Android: `locationAsked && !granted &&
   !shouldShowRequestPermissionRationale(ACCESS_COARSE_LOCATION)`; a soft
   "Don't allow" or a dismissed dialog leaves the row in the not-decided state,
-  whose tap shows the dialog again. This is a change to how `locationDenied` is
-  computed in `MainActivity`, not to the row. Web: `permission === 'denied'`.
+  whose tap shows the dialog again. The existing `locationAsked` flag is recorded only after a non-empty
+  permission result, rather than before launch. A dismissed first dialog has
+  no answer and can still be shown, despite a false rationale flag. The same
+  blocked rule drives resume, callback and the request action in `MainActivity`. Web: `permission === 'denied'`.
 - **Ask and open-settings reuse the existing request path.** iOS
   `requestLocation()` already branches on status; Android `onLocationRequest`
   already does. The row's tap in the not-decided and denied states calls that

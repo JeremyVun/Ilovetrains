@@ -20,11 +20,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 private enum class SettingsPage { Main, Feedback }
+private enum class LocationSettingsState { Off, Ask, Blocked, On }
 
 @Composable
 fun SettingsScreen(state: AppState, actions: UiActions) {
@@ -70,21 +75,37 @@ private fun SettingsMain(state: AppState, actions: UiActions, feedback: () -> Un
     val c = LocalTrainColors.current
     SettingsShell("Settings", "Home", actions::back) {
         SettingsSection("Personal")
-        SettingsPersonalRow(Icons.Outlined.LocationOn, "Use location", when {
-            !state.useLocation -> "Location is not used"
-            state.locationDenied -> "Blocked in Android settings"
-            !state.locationGranted -> "Permission not decided"
-            else -> "Choose nearby trips"
-        }, if (state.useLocation) "✓  On" else "○  Off", { actions.setUseLocation(!state.useLocation) })
-        if (state.useLocation && !state.locationGranted && !state.locationDenied) {
-            Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Location is on, but this phone hasn’t decided whether to allow it.", Modifier.weight(1f),
-                    color = c.ink2, fontSize = 12.sp, fontWeight = FontWeight.Light, lineHeight = 17.sp)
-                Label("Use my location", Modifier.heightIn(min = 44.dp).clickable(role = Role.Button, onClick = actions::requestLocation)
-                    .wrapContentHeight(Alignment.CenterVertically), color = c.ink)
-            }
-            Rule()
+        val locationState = when {
+            !state.useLocation -> LocationSettingsState.Off
+            state.locationDenied -> LocationSettingsState.Blocked
+            !state.locationGranted -> LocationSettingsState.Ask
+            else -> LocationSettingsState.On
         }
+        val locationSubtitle = when (locationState) {
+            LocationSettingsState.Off -> "Location is not used"
+            LocationSettingsState.Ask -> "Location needs permission"
+            LocationSettingsState.Blocked -> "Location is blocked"
+            LocationSettingsState.On -> "Nearby trips use location"
+        }
+        val locationMark = when (locationState) {
+            LocationSettingsState.Off -> "TURN ON"
+            LocationSettingsState.Ask -> "ALLOW"
+            LocationSettingsState.Blocked -> "OPEN SETTINGS ›"
+            LocationSettingsState.On -> "TURN OFF"
+        }
+        val locationAction: () -> Unit = when (locationState) {
+            LocationSettingsState.Off -> { { actions.setUseLocation(true) } }
+            LocationSettingsState.Ask, LocationSettingsState.Blocked -> actions::requestLocation
+            LocationSettingsState.On -> { { actions.setUseLocation(false) } }
+        }
+        val locationToggleState = when (locationState) {
+            LocationSettingsState.Off -> ToggleableState.Off
+            LocationSettingsState.On -> ToggleableState.On
+            LocationSettingsState.Ask, LocationSettingsState.Blocked -> null
+        }
+        SettingsPersonalRow(Icons.Outlined.LocationOn, "Use location", locationSubtitle, locationMark,
+            locationAction, valueWarning = locationState == LocationSettingsState.Blocked,
+            primaryState = true, toggleState = locationToggleState)
         val homeValue = when {
             state.home == null -> "Automatic"
             state.homeIsManual -> state.home.shortName
@@ -104,7 +125,7 @@ private fun SettingsMain(state: AppState, actions: UiActions, feedback: () -> Un
         }
         Rule()
         Label(if (state.enabledModes.isEmpty()) "No services selected. Turn one on to see trips."
-            else "Only trips using your selected services are shown.", Modifier.padding(top = 8.dp),
+            else "Trips use chosen services only.", Modifier.padding(top = 8.dp),
             color = if (state.enabledModes.isEmpty()) c.warning else c.ink3, maxLines = 3)
 
         Spacer(Modifier.height(22.dp)); SettingsSection("Appearance")
@@ -132,17 +153,23 @@ private fun SettingsSection(text: String) {
 
 @Composable
 private fun SettingsPersonalRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, value: String,
-                                state: String, onClick: () -> Unit) {
+                                state: String, onClick: () -> Unit, valueWarning: Boolean = false,
+                                primaryState: Boolean = false, toggleState: ToggleableState? = null) {
     val c = LocalTrainColors.current
-    Row(Modifier.fillMaxWidth().heightIn(min = 72.dp).clickable(role = Role.Button, onClick = onClick)
+    Row(Modifier.fillMaxWidth().heightIn(min = 72.dp)
+        .semantics(mergeDescendants = true) {
+            contentDescription = "$title, $value, $state"
+            if (toggleState != null) toggleableState = toggleState
+        }
+        .clickable(role = Role.Button, onClick = onClick)
         .padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, null, Modifier.size(23.dp), c.ink2); Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(title, color = c.ink, fontSize = 17.sp, fontWeight = FontWeight.Normal)
-            Text(value, color = if (value.startsWith("Blocked")) c.warning else c.ink2, fontSize = 12.sp,
+            Text(value, color = if (valueWarning) c.warning else c.ink2, fontSize = 12.sp,
                 fontWeight = FontWeight.Light, modifier = Modifier.padding(top = 4.dp))
         }
-        Label(state, color = c.ink2)
+        Label(state, color = if (primaryState) c.ink else c.ink2, maxLines = 1)
     }
     Rule()
 }

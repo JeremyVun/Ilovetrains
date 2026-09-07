@@ -23,7 +23,7 @@
  * Bump VERSION on every deploy that changes any file in SHELL.
  */
 
-const VERSION = 'v41';
+const VERSION = 'v43';
 const SHELL_CACHE = 'shell-' + VERSION;
 const DATA_CACHE = 'data-' + VERSION;
 

@@ -470,7 +470,13 @@ final class TrainViewModel: ObservableObject {
         persist(); syncPersonal()
         if enabled { requestLocation() } else { choosePrediction(); refresh() }
     }
-    func requestLocation() { if data.useLocation { location.request(prompt: true) } }
+    func requestLocation() {
+        guard data.useLocation else { return }
+        #if DEBUG
+        if seeded { return }
+        #endif
+        location.request(prompt: true)
+    }
     func chooseHome() { state.screen = .setup; state.selectingHome = true; state.setupFrom = nil; state.setupTo = nil }
     func setHome(_ station: Station?) { data.home = station; persist(); state.screen = .settings; state.selectingHome = false; syncPersonal() }
     func earlier() {
@@ -559,6 +565,9 @@ private extension TrainViewModel {
         let trip = SavedTrip(id: "calibration-trip", from: board.from, to: board.to, createdAt: now, lines: Array(Set(board.journeys.first?.legs.map(\.line) ?? [])).sorted())
         data.trips = [trip]; data.appearance = name.contains("light") ? .light : .dark
         data.lastTripId = trip.id
+        if ["settings-off", "settings-off-light"].contains(name) { data.useLocation = false }
+        if ["settings-on", "settings-on-light"].contains(name) { state.locationGranted = true }
+        if ["settings-blocked", "settings-blocked-light"].contains(name) { state.locationDenied = true }
         if name.contains("two-trips") || name.contains("deleted") {
             let second = SavedTrip(id: "second-trip", from: Station(id: "213820", name: "Rhodes Station", modes: ["train"]),
                                    to: Station(id: "201040", name: "Bondi Junction Station", modes: ["train"]), createdAt: now, lines: ["T4", "T9"])

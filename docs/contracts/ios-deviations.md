@@ -10,8 +10,9 @@ iOS implementation requested on 2026-09-07.
   support. Content remains scrollable rather than clipping a fixed web frame.
 - Location uses the native When In Use permission sheet after an explicit
   action in setup or Settings. There is no footer permission popup and no
-  background tracking. Denial is labelled `Blocked in Settings`; a deliberate
-  location action can open the app's iOS Settings page.
+  background tracking. Denied or restricted permission is labelled
+  `Location is blocked`; the
+  row’s `OPEN SETTINGS ›` action opens the app's iOS Settings page.
 - Station search uses the native keyboard and Return chooses the first match.
   System keyboard avoidance resizes the available content area.
 - A saved trip row carries trailing swipe actions: a short swipe reveals a
@@ -62,3 +63,9 @@ iOS implementation requested on 2026-09-07.
 
 The shared behavior remains defined by [ui.md](ui.md),
 [client-storage.md](client-storage.md) and [native-data.md](native-data.md).
+
+Current Settings exemplars are `assets/comps/latest/ios-settings.png` and
+`ios-settings-light.png`, reproduced with `tools/shoot-ios.sh settings
+settings-light`. The additional `settings-off`, `settings-blocked` and
+`settings-on` calibration states (and their `-light` variants) exercise every
+location-row action.

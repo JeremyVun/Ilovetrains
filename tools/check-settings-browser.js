@@ -3,6 +3,7 @@
 /*
  * Usage: node tools/check-settings-browser.js --url http://localhost:8197
  *        [--frames assets/comps/latest]
+ *        [--location-frames /tmp/location-row-web-frames]
  *
  * Drives the built settings UI through a private Chromium/CDP port. All
  * departures and feedback requests are replaced in the page; this never sends
@@ -23,8 +24,13 @@ const value = (flag, fallback = null) => {
 };
 const baseURL = new URL(value('--url', 'http://localhost:8197'));
 const framesDir = value('--frames');
+const locationFramesDir = value('--location-frames');
 const firstPort = Number.parseInt(process.env.CDP_PORT || '9571', 10);
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'trains-settings-'));
+const versionSource = fs.readFileSync(path.join(ROOT, 'web/js/version.js'), 'utf8');
+const canonicalVersion = versionSource.match(/VERSION\s*=\s*['"]([^'"]+)['"]/)?.[1];
+
+if (!canonicalVersion) throw new Error('could not read the canonical web version');
 
 if (!['localhost', '127.0.0.1'].includes(baseURL.hostname)) {
   throw new Error('--url must use a private localhost server');
@@ -157,11 +163,168 @@ function geometryScript(extra = '') {
         versionBottom, scrollerBottom, scrollTop: scroller.scrollTop,
         scrollHeight: scroller.scrollHeight, clientHeight: scroller.clientHeight
       }));
-    assert(version.textContent.trim() === 'Version 1.0.1',
+    assert(version.textContent.trim() === ${JSON.stringify(`Version ${canonicalVersion}`)},
       'settings did not show the canonical version: ' + version.textContent.trim());
     scroller.scrollTop = 0;
     ${extra}
   })()`;
+}
+
+function locationRowScript(finalState = 'on') {
+  return `
+    let permissionState = 'prompt';
+    const geoRequests = [];
+    Object.defineProperty(navigator.permissions, 'query', {
+      configurable: true, value: async () => ({ state: permissionState })
+    });
+    Object.defineProperty(navigator.geolocation, 'getCurrentPosition', {
+      configurable: true, value: (success, error) => geoRequests.push({ success, error })
+    });
+    const expectedLocation = {
+      off: { use: false, permission: 'denied', value: 'Location is not used', mark: 'Turn on', action: 'toggle-location', pressed: 'false' },
+      ask: { use: true, permission: 'prompt', value: 'Location needs permission', mark: 'Allow', action: 'request-location', pressed: null },
+      blocked: { use: true, permission: 'denied', value: 'Blocked in browser', mark: 'Turn off', action: 'toggle-location', pressed: null },
+      on: { use: true, permission: 'granted', value: 'Nearby trips use location', mark: 'Turn off', action: 'toggle-location', pressed: 'true' }
+    };
+    const locationHeights = {};
+    const assertLocation = (state, measure = true) => {
+      const want = expectedLocation[state];
+      const row = document.querySelector('.st-location-row');
+      assert(row instanceof HTMLButtonElement, state + ': location row is not one button');
+      const name = row.querySelector('.st-name');
+      const value = row.querySelector('.st-value');
+      const mark = row.querySelector('.st-state');
+      assert(name?.textContent.trim() === 'Use location', state + ': wrong title');
+      assert(value?.textContent.trim() === want.value, state + ': wrong subtitle: ' + value?.textContent.trim());
+      assert(mark?.textContent.trim() === want.mark, state + ': wrong mark: ' + mark?.textContent.trim());
+      assert(row.dataset.act === want.action, state + ': wrong action: ' + row.dataset.act);
+      assert(row.getAttribute('aria-pressed') === want.pressed,
+        state + ': wrong pressed semantics: ' + row.getAttribute('aria-pressed'));
+      assert(row.innerText.trim().replace(/\\s+/g, ' ') === ['Use location', want.value, want.mark.toUpperCase()].join(' '),
+        state + ': accessible text is not title, subtitle, action: ' + row.innerText.trim().replace(/\\s+/g, ' '));
+      assert(name.compareDocumentPosition(value) & Node.DOCUMENT_POSITION_FOLLOWING,
+        state + ': subtitle does not follow title');
+      assert(value.compareDocumentPosition(mark) & Node.DOCUMENT_POSITION_FOLLOWING,
+        state + ': action does not follow subtitle');
+      assert(row.tabIndex === 0 && !row.disabled, state + ': location button is not keyboard reachable');
+      assert(getComputedStyle(mark).whiteSpace === 'nowrap', state + ': action mark can wrap');
+      assert(getComputedStyle(mark).color === getComputedStyle(name).color, state + ': action mark is not primary ink');
+      const rowRect = row.getBoundingClientRect();
+      const valueRect = value.getBoundingClientRect();
+      const markRect = mark.getBoundingClientRect();
+      assert(Math.abs(rowRect.height - 56) <= 0.5, state + ': location row is not 56px: ' + rowRect.height);
+      assert(valueRect.right <= markRect.left + 0.5,
+        state + ': subtitle overlaps action: ' + JSON.stringify({ valueRight: valueRect.right, markLeft: markRect.left }));
+      assert(markRect.right <= rowRect.right + 0.5, state + ': action escapes the row');
+      assert(!document.querySelector('.st-location-note'), state + ': separate location strip remains');
+      assert(!document.body.textContent.includes('this phone hasn’t decided'), state + ': old prompt explanation remains');
+      assert(!document.body.textContent.includes('Allow location in your browser'), state + ': old blocked explanation remains');
+      const requests = document.querySelectorAll('[data-act="request-location"]');
+      assert(requests.length === (state === 'ask' ? 1 : 0), state + ': request action exists outside the ask state');
+      if (state === 'blocked') assert(value.classList.contains('warn'), 'blocked: subtitle lost warning ink');
+      else assert(!value.classList.contains('warn'), state + ': non-blocked subtitle uses warning ink');
+      if (measure) locationHeights[state] = rowRect.height;
+      return row;
+    };
+    const showLocation = async (state, measure = true) => {
+      const want = expectedLocation[state];
+      permissionState = want.permission;
+      t.setPreferences({ useLocation: want.use });
+      history.replaceState(null, '', '#/settings');
+      t.route();
+      await waitFor(() => document.querySelector('.st-location-row .st-value')?.textContent.trim() === want.value,
+        state + ': location state did not render');
+      await sleep(20);
+      return assertLocation(state, measure);
+    };
+
+    const delayedPermissions = [];
+    Object.defineProperty(navigator.permissions, 'query', {
+      configurable: true, value: () => new Promise((resolve) => delayedPermissions.push(resolve))
+    });
+    t.setPreferences({ useLocation: true });
+    history.replaceState(null, '', '#/settings');
+    t.route();
+    assertLocation('ask', false);
+    await waitFor(() => delayedPermissions.length === 1, 'permission query did not start');
+    document.querySelector('.st-location-row').click();
+    await waitFor(() => geoRequests.length === 1, 'ALLOW did not supersede the initial permission query');
+    geoRequests[0].error(new Error('not decided'));
+    await waitFor(() => delayedPermissions.length === 2, 'ALLOW did not recheck permission');
+    delayedPermissions[1]({ state: 'prompt' });
+    await sleep(20);
+    assertLocation('ask', false);
+    delayedPermissions[0]({ state: 'granted' });
+    await sleep(20);
+    assertLocation('ask', false);
+    Object.defineProperty(navigator.permissions, 'query', {
+      configurable: true, value: async () => ({ state: permissionState })
+    });
+
+    for (const state of ['off', 'ask', 'blocked', 'on']) await showLocation(state);
+    const heightValues = Object.values(locationHeights);
+    assert(Math.max(...heightValues) - Math.min(...heightValues) <= 0.5,
+      'location row height changes by state: ' + JSON.stringify(locationHeights));
+
+    let row = await showLocation('off', false);
+    row.focus();
+    const beforeOff = geoRequests.length;
+    permissionState = 'prompt';
+    row.click();
+    await waitFor(() => geoRequests.length === beforeOff + 1, 'TURN ON did not request location');
+    assert(t.state.doc.preferences.useLocation, 'TURN ON did not enable the preference');
+    assertLocation('ask', false);
+    assert(document.activeElement?.classList.contains('st-location-row'), 'TURN ON lost keyboard focus');
+    geoRequests.at(-1).error(new Error('not decided'));
+    await sleep(30);
+    assertLocation('ask', false);
+
+    row = document.querySelector('.st-location-row');
+    row.focus();
+    const beforeAsk = geoRequests.length;
+    row.click();
+    await waitFor(() => geoRequests.length === beforeAsk + 1, 'ALLOW did not request location');
+    permissionState = 'granted';
+    geoRequests.at(-1).success({ timestamp: Date.now(), coords: {
+      latitude: ${from.location.lat}, longitude: ${from.location.lon}, speed: null
+    } });
+    await waitFor(() => document.querySelector('.st-location-row .st-value')?.textContent.trim() === 'Nearby trips use location',
+      'ALLOW success did not paint granted');
+    assertLocation('on', false);
+    assert(document.activeElement?.classList.contains('st-location-row'), 'ALLOW lost keyboard focus');
+
+    row = document.querySelector('.st-location-row');
+    const beforeOn = geoRequests.length;
+    row.click();
+    await waitFor(() => !t.state.doc.preferences.useLocation, 'TURN OFF did not disable the preference');
+    assertLocation('off', false);
+    assert(geoRequests.length === beforeOn, 'TURN OFF requested location');
+    assert(document.activeElement?.classList.contains('st-location-row'), 'TURN OFF lost keyboard focus');
+
+    row = await showLocation('blocked', false);
+    row.focus();
+    const beforeBlocked = geoRequests.length;
+    row.click();
+    await waitFor(() => !t.state.doc.preferences.useLocation, 'blocked TURN OFF did not disable the preference');
+    assertLocation('off', false);
+    assert(geoRequests.length === beforeBlocked, 'blocked TURN OFF requested location');
+    assert(document.activeElement?.classList.contains('st-location-row'), 'blocked TURN OFF lost keyboard focus');
+
+    row = await showLocation('ask', false);
+    row.click();
+    await waitFor(() => geoRequests.length === beforeBlocked + 1, 'navigation race did not start a location request');
+    history.replaceState(null, '', '#/settings/feedback');
+    t.route();
+    await waitFor(() => document.querySelector('[data-role="feedback-message"]'), 'navigation race did not open feedback');
+    permissionState = 'granted';
+    geoRequests.at(-1).success({ timestamp: Date.now(), coords: {
+      latitude: ${from.location.lat}, longitude: ${from.location.lon}, speed: null
+    } });
+    await sleep(40);
+    assert(document.querySelector('[data-role="feedback-message"]'), 'late location answer replaced the Settings subview');
+    assert(!document.querySelector('.st-location-row'), 'late location answer repainted the main Settings view');
+    await showLocation(${JSON.stringify(finalState)}, false);
+  `;
 }
 
 function raceScript() {
@@ -630,14 +793,18 @@ function locationScript() {
     assert(toggle.getAttribute('aria-pressed') === 'false', 'location did not start off');
     toggle.click();
     await waitFor(() => fixes === 1 && late, 'turning location on did not start a fix');
-    const onToggle = document.querySelector('[data-act="toggle-location"]');
-    assert(onToggle.getAttribute('aria-pressed') === 'true', 'location did not paint on before the fix resolved');
-    onToggle.click();
+    const ask = document.querySelector('.st-location-row');
+    assert(ask.dataset.act === 'request-location' && !ask.hasAttribute('aria-pressed'),
+      'location did not paint the ask state before the fix resolved');
+    t.setPreferences({ useLocation: false });
+    t.route();
     await waitFor(() => document.querySelector('[data-act="toggle-location"]')?.getAttribute('aria-pressed') === 'false',
       'location did not turn off while its fix was pending');
     late({ timestamp: Date.now(), coords: { latitude: ${from.location.lat}, longitude: ${from.location.lon}, speed: null } });
     await sleep(40);
     assert(t.state.fix === null, 'pending location callback mutated state after location was turned off');
+    assert(document.querySelector('.st-location-row')?.getAttribute('aria-pressed') === 'false',
+      'pending location callback repainted after a newer Settings render');
   })()`;
 }
 
@@ -805,6 +972,41 @@ function frame(name) {
   return framesDir ? path.resolve(ROOT, framesDir, name) : null;
 }
 
+function locationFrame(name) {
+  return locationFramesDir ? path.resolve(ROOT, locationFramesDir, name) : null;
+}
+
+const locationViewports = [
+  { name: '390x844', size: '390x844' },
+  { name: '412x732', size: '412x732' },
+  { name: '360x780', size: '360x780' }
+];
+const locationSchemes = [
+  { name: 'dark' },
+  { name: 'light', media: 'prefers-color-scheme:light' }
+];
+const locationStates = [
+  { name: 'off', permission: 'denied' },
+  { name: 'ask', permission: 'prompt' },
+  { name: 'blocked', permission: 'denied' },
+  { name: 'on', permission: 'granted' }
+];
+
+async function runLocationFrames(doc, port) {
+  for (const viewport of locationViewports) {
+    for (const scheme of locationSchemes) {
+      await Promise.all(locationStates.map((state, index) => run(
+        `location-${state.name}-${viewport.name}-${scheme.name}`,
+        state.name === 'off' ? { ...doc, preferences: { useLocation: false, enabledModes: ['train', 'metro', 'ferry'] } } : doc,
+        geometryScript(locationRowScript(state.name)), port + index, {
+          permission: state.permission, size: viewport.size, media: scheme.media,
+          out: locationFrame(`location-${state.name}-${viewport.name}-${scheme.name}.png`) || undefined
+        }
+      )));
+    }
+  }
+}
+
 try {
   const marker = await fetch(new URL('/js/settings.js', baseURL)).then((response) => response.text());
   if (!marker.includes('export async function renderSettings')) {
@@ -867,6 +1069,13 @@ try {
   });
 
   const only = value('--only');
+  if (only === 'location-row') {
+    await runLocationFrames(visualSeed, firstPort);
+    console.log(`settings location-row browser checks passed${locationFramesDir
+      ? `; frames written to ${path.resolve(ROOT, locationFramesDir)}` : ''}`);
+    fs.rmSync(tmp, { recursive: true, force: true });
+    process.exit(0);
+  }
   if (only === 'service-eligibility') {
     await run('service-eligibility', serviceSeed, serviceEligibilityScript(serviceStations), firstPort, {
       permission: 'granted', out: frame('home-390x844-services-filtered.png') || undefined
@@ -913,21 +1122,29 @@ try {
     process.exit(0);
   }
   const checks = [
-    run('settings-dark-390', visualSeed, geometryScript(), firstPort, {
+    run('settings-dark-390', visualSeed, geometryScript(locationRowScript('on')), firstPort, {
       permission: 'granted', out: frame('settings-390x844.png') || undefined
     }),
-    run('settings-light-390', visualSeed, geometryScript(), firstPort + 1, {
+    run('settings-light-390', visualSeed, geometryScript(locationRowScript('on')), firstPort + 1, {
       permission: 'granted', media: 'prefers-color-scheme:light', out: frame('settings-390x844-light.png') || undefined
     }),
-    run('settings-dark-412', visualSeed, geometryScript(), firstPort + 2, {
+    run('settings-dark-412', visualSeed, geometryScript(locationRowScript('on')), firstPort + 2, {
       permission: 'granted', size: '412x732', out: frame('settings-412x732.png') || undefined
     }),
-    run('settings-light-412', visualSeed, geometryScript(), firstPort + 3, {
+    run('settings-light-412', visualSeed, geometryScript(locationRowScript('on')), firstPort + 3, {
       permission: 'granted', size: '412x732', media: 'prefers-color-scheme:light',
       out: frame('settings-412x732-light.png') || undefined
     })
   ];
   await Promise.all(checks);
+  await Promise.all([
+    run('settings-dark-360', visualSeed, geometryScript(locationRowScript('ask')), firstPort, {
+      permission: 'prompt', size: '360x780'
+    }),
+    run('settings-light-360', visualSeed, geometryScript(locationRowScript('ask')), firstPort + 1, {
+      permission: 'prompt', size: '360x780', media: 'prefers-color-scheme:light'
+    })
+  ]);
 
   await run('long-home', longSeed, geometryScript(), firstPort, {
     permission: 'granted', out: frame('settings-390x844-long-home.png') || undefined
@@ -941,11 +1158,21 @@ try {
     out: frame('settings-390x844-feedback.png') || undefined
   });
   await run('permission-prompt', visualSeed, geometryScript(`
-    assert(document.body.textContent.includes('Permission not decided'), 'prompt state not explained');
-    assert(document.querySelector('[data-act="request-location"]'), 'prompt state has no explicit request action');
-  `), firstPort, { permission: 'prompt' });
+    const row = document.querySelector('.st-location-row');
+    assert(row?.querySelector('.st-value')?.textContent.trim() === 'Location needs permission', 'prompt state not explained');
+    assert(row?.dataset.act === 'request-location', 'prompt action is not on the location row');
+    assert(!row.hasAttribute('aria-pressed'), 'prompt state has toggle semantics');
+    assert(!document.querySelector('.st-location-note'), 'prompt state retained a separate strip');
+  `), firstPort, {
+    permission: 'prompt', out: frame('settings-390x844-ask.png') || undefined
+  });
   await run('permission-denied', visualSeed, geometryScript(`
-    assert(document.body.textContent.includes('Blocked in browser'), 'denied state not explained');
+    const row = document.querySelector('.st-location-row');
+    assert(row?.querySelector('.st-value')?.textContent.trim() === 'Blocked in browser', 'denied state not explained');
+    assert(row?.querySelector('.st-state')?.textContent.trim() === 'Turn off', 'denied state has the wrong action');
+    assert(row?.dataset.act === 'toggle-location', 'denied action is not on the location row');
+    assert(!row.hasAttribute('aria-pressed'), 'denied state has toggle semantics');
+    assert(!document.querySelector('.st-location-note'), 'denied state retained a separate strip');
   `), firstPort, { permission: 'denied' });
   await run('location-off', allOffSeed, locationScript(), firstPort, { permission: 'granted' });
   await run('home-override', seed({ homeVotes: [

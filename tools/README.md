@@ -118,6 +118,12 @@ CDP_PORT=9571 node tools/check-settings-browser.js \
   --url http://127.0.0.1:8197 --frames assets/comps/latest
 ```
 
+For the four location-row states at 390×844, 412×732 and 360×780 in both
+schemes, add `--only location-row --location-frames /tmp/location-row-frames`.
+The checker drives state changes and delayed permission answers, verifies
+accessible actions and focus, and measures equal 56px row heights. Its version
+assertion reads the canonical `web/js/version.js` rather than a fixed string.
+
 The checker first fetches `/js/settings.js` and refuses to run if that server
 is not serving the Settings module. Keep the server alive for the whole run;
 the four initial browser drives run in parallel on `CDP_PORT` through

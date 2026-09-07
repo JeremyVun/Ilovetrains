@@ -1,5 +1,29 @@
 import SwiftUI
 
+enum SettingsLocationAction: Equatable {
+    case turnOn, allow, openSettings, turnOff
+}
+
+struct SettingsLocationPresentation: Equatable {
+    let subtitle: String
+    let mark: String
+    let action: SettingsLocationAction
+    let warning: Bool
+    let selected: Bool?
+
+    init(useLocation: Bool, granted: Bool, denied: Bool) {
+        if !useLocation {
+            subtitle = "Location is not used"; mark = "TURN ON"; action = .turnOn; warning = false; selected = false
+        } else if denied {
+            subtitle = "Location is blocked"; mark = "OPEN SETTINGS ›"; action = .openSettings; warning = true; selected = nil
+        } else if !granted {
+            subtitle = "Location needs permission"; mark = "ALLOW"; action = .allow; warning = false; selected = nil
+        } else {
+            subtitle = "Nearby trips use location"; mark = "TURN OFF"; action = .turnOff; warning = false; selected = true
+        }
+    }
+}
+
 struct SettingsView: View {
     @ObservedObject var model: TrainViewModel
     @State private var page: Page = .main
@@ -66,16 +90,14 @@ private struct SettingsMain: View {
 
     var body: some View {
         settingsSection("Personal")
-        personalRow(icon: "location", title: "Use location", value: locationValue,
-                    state: model.state.useLocation ? "✓  On" : "○  Off", id: "location-setting") {
-            model.setUseLocation(!model.state.useLocation)
-        }
-        if model.state.useLocation && !model.state.locationGranted && !model.state.locationDenied {
-            HStack(spacing: 12) {
-                Text("Allow location to show nearby trips.")
-                    .font(.system(size: 12, weight: .light)).foregroundStyle(colors.ink2).frame(maxWidth: .infinity, alignment: .leading)
-                Button("Use my location", action: model.requestLocation).buttonStyle(TrainTextButtonStyle(colors: colors))
-            }.frame(minHeight: 52); TrainRule()
+        personalRow(icon: "location", title: "Use location", value: locationPresentation.subtitle,
+                    state: locationPresentation.mark, id: "location-setting", warning: locationPresentation.warning,
+                    markColor: colors.ink, selected: locationPresentation.selected) {
+            switch locationPresentation.action {
+            case .turnOn: model.setUseLocation(true)
+            case .allow, .openSettings: model.requestLocation()
+            case .turnOff: model.setUseLocation(false)
+            }
         }
         personalRow(icon: "house", title: "Home", value: homeValue,
                     state: model.state.homeIsManual ? "Change  ›" : "Set  ›", id: "home-setting", action: model.chooseHome)
@@ -88,7 +110,7 @@ private struct SettingsMain: View {
             serviceChoice("bus", "Buses", icon: "bus", available: false)
         }
         TrainRule()
-        TrainLabel(text: model.state.enabledModes.isEmpty ? "No services selected. Turn one on to see trips." : "Only trips using your selected services are shown.",
+        TrainLabel(text: model.state.enabledModes.isEmpty ? "No services selected. Turn one on to see trips." : "Trips use chosen services only.",
                    color: model.state.enabledModes.isEmpty ? colors.warning : colors.ink3, lines: 3)
             .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8)
 
@@ -106,11 +128,10 @@ private struct SettingsMain: View {
         Spacer().frame(height: 18)
     }
 
-    private var locationValue: String {
-        if !model.state.useLocation { return "Location is not used" }
-        if model.state.locationDenied { return "Blocked in Settings" }
-        if !model.state.locationGranted { return "Permission not decided" }
-        return "Choose nearby trips"
+    private var locationPresentation: SettingsLocationPresentation {
+        SettingsLocationPresentation(useLocation: model.state.useLocation,
+                                     granted: model.state.locationGranted,
+                                     denied: model.state.locationDenied)
     }
     private var homeValue: String {
         guard let home = model.state.home else { return "Automatic" }
@@ -119,18 +140,29 @@ private struct SettingsMain: View {
     private func settingsSection(_ text: String) -> some View {
         VStack(spacing: 7) { TrainLabel(text: text).frame(maxWidth: .infinity, alignment: .leading); TrainRule() }.padding(.top, 14)
     }
-    private func personalRow(icon: String, title: String, value: String, state: String, id: String, action: @escaping () -> Void) -> some View {
+    private func personalRow(icon: String, title: String, value: String, state: String, id: String,
+                             warning: Bool = false, markColor: Color? = nil, selected: Bool? = nil,
+                             action: @escaping () -> Void) -> some View {
         VStack(spacing: 0) {
             Button(action: action) {
                 HStack(spacing: 12) {
                     Image(systemName: icon).font(.system(size: 23, weight: .light)).foregroundStyle(colors.ink2).frame(width: 28)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(title).font(.system(size: 17, weight: .regular)).foregroundStyle(colors.ink)
-                        Text(value).font(.system(size: 12, weight: .light)).foregroundStyle(value.hasPrefix("Blocked") ? colors.warning : colors.ink2)
+                        Text(value).font(.system(size: 12, weight: .light)).foregroundStyle(warning ? colors.warning : colors.ink2)
                     }.frame(maxWidth: .infinity, alignment: .leading)
-                    TrainLabel(text: state, color: colors.ink2)
+                    TrainLabel(text: state, color: markColor ?? colors.ink2)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .layoutPriority(1)
                 }.padding(.vertical, 10).frame(minHeight: 72).contentShape(Rectangle())
-            }.buttonStyle(.plain).accessibilityIdentifier(id)
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(title), \(value), \(state)")
+            .accessibilityValue(selected.map { $0 ? "On" : "Off" } ?? "")
+            .accessibilityIdentifier(id)
+            .accessibilityAddTraits(selected == nil ? .isButton : .isToggle)
+            .accessibilityAddTraits(selected == true ? .isSelected : [])
             TrainRule()
         }
     }

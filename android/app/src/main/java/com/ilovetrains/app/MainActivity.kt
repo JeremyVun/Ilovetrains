@@ -31,7 +31,12 @@ class MainActivity : ComponentActivity() {
     private val locationManager get() = getSystemService(LocationManager::class.java)
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
         val granted = permissions.values.any { it } || hasLocation()
-        model.permission(granted, !granted)
+        if (permissions.isNotEmpty()) {
+            getPreferences(MODE_PRIVATE).edit().putBoolean("locationAsked", true).apply()
+        }
+        val asked = getPreferences(MODE_PRIVATE).getBoolean("locationAsked", false)
+        model.permission(granted, isLocationPermissionBlocked(asked, granted,
+            shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_COARSE_LOCATION)))
         if (granted) takeLocation()
     }
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,10 +45,10 @@ class MainActivity : ComponentActivity() {
         model.onLocationRequest = {
             if (hasLocation()) takeLocation() else {
                 val asked = getPreferences(MODE_PRIVATE).getBoolean("locationAsked", false)
-                if (asked && !shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_COARSE_LOCATION)) {
+                if (isLocationPermissionBlocked(asked, granted = false,
+                        shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_COARSE_LOCATION))) {
                     startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:$packageName")))
                 } else {
-                    getPreferences(MODE_PRIVATE).edit().putBoolean("locationAsked", true).apply()
                     permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
                 }
             }
@@ -74,7 +79,10 @@ class MainActivity : ComponentActivity() {
     }
     override fun onResume() {
         super.onResume()
-        model.permission(hasLocation(), getPreferences(MODE_PRIVATE).getBoolean("locationAsked", false) && !hasLocation())
+        val granted = hasLocation()
+        val asked = getPreferences(MODE_PRIVATE).getBoolean("locationAsked", false)
+        model.permission(granted, isLocationPermissionBlocked(asked, granted,
+            shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_COARSE_LOCATION)))
         model.resume()
         if (hasLocation() && model.state.value.ready && model.state.value.useLocation) takeLocation()
     }
@@ -113,3 +121,6 @@ class MainActivity : ComponentActivity() {
         } catch (_: SecurityException) { stopLocation() }
     }
 }
+
+internal fun isLocationPermissionBlocked(locationAsked: Boolean, granted: Boolean, shouldShowRationale: Boolean) =
+    locationAsked && !granted && !shouldShowRationale

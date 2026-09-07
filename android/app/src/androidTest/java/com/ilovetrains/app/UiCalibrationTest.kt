@@ -1,6 +1,9 @@
 package com.ilovetrains.app
 
 import android.graphics.Bitmap
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.runtime.SideEffect
@@ -8,11 +11,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
@@ -27,6 +32,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performScrollToNode
@@ -35,6 +41,7 @@ import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.state.ToggleableState
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.json.JSONObject
@@ -258,9 +265,73 @@ class UiCalibrationTest {
 
         compose.onAllNodesWithText("ON").assertCountEquals(3)
         compose.onAllNodesWithText("OFF").assertCountEquals(1)
-        // The personal location row keeps its compact status glyph; service choices do not.
-        compose.onAllNodesWithText("✓  ON").assertCountEquals(1)
-        compose.onAllNodesWithText("○  OFF").assertCountEquals(0)
+        compose.onAllNodesWithText("TURN OFF").assertCountEquals(1)
+        compose.onAllNodesWithText("Use my location").assertCountEquals(0)
+    }
+
+    @Test fun settingsLocationRowHasPermissionAwareActionsAndTraits() {
+        val fixture = Fixtures()
+        val state = mutableStateOf(fixture.settingsState)
+        val actions = object : UiActions by NoActions {
+            val calls = mutableListOf<String>()
+            override fun setUseLocation(enabled: Boolean) { calls += "set:$enabled" }
+            override fun requestLocation() { calls += "request" }
+        }
+        compose.setContent { TrainApp(state.value, actions) }
+
+        fun check(useLocation: Boolean, granted: Boolean, denied: Boolean, subtitle: String, mark: String,
+                  toggle: ToggleableState?, action: String) {
+            compose.runOnIdle {
+                state.value = fixture.settingsState.copy(useLocation = useLocation,
+                    locationGranted = granted, locationDenied = denied)
+            }
+            val row = compose.onNodeWithContentDescription("Use location, $subtitle, $mark")
+            row.assertHasClickAction()
+            assertEquals(toggle, row.fetchSemanticsNode().config.getOrNull(SemanticsProperties.ToggleableState))
+            row.performClick()
+            assertEquals(action, actions.calls.removeLast())
+        }
+
+        check(false, false, false, "Location is not used", "TURN ON", ToggleableState.Off, "set:true")
+        check(true, false, false, "Location needs permission", "ALLOW", null, "request")
+        check(true, false, true, "Location is blocked", "OPEN SETTINGS ›", null, "request")
+        check(true, true, false, "Nearby trips use location", "TURN OFF", ToggleableState.On, "set:false")
+    }
+
+    @Test fun settingsLocationRowKeepsItsGeometryAtPhoneWidthsInBothSchemes() {
+        val fixture = Fixtures()
+        val state = mutableStateOf(fixture.settingsState)
+        val width = mutableStateOf(360.dp)
+        var density = 1f
+        compose.setContent {
+            density = LocalDensity.current.density
+            Box(Modifier.width(width.value).fillMaxHeight()) { TrainApp(state.value, NoActions) }
+        }
+        val states = listOf(
+            Triple(fixture.settingsState.copy(useLocation = false, locationGranted = false), "Location is not used", "TURN ON"),
+            Triple(fixture.settingsState.copy(locationGranted = false, locationDenied = false), "Location needs permission", "ALLOW"),
+            Triple(fixture.settingsState.copy(locationGranted = false, locationDenied = true), "Location is blocked", "OPEN SETTINGS ›"),
+            Triple(fixture.settingsState.copy(locationGranted = true, locationDenied = false), "Nearby trips use location", "TURN OFF"),
+        )
+
+        for (widthDp in listOf(360, 412)) for (appearance in listOf(Appearance.Dark, Appearance.Light)) {
+            val heights = states.map { (location, subtitle, mark) ->
+                compose.runOnIdle {
+                    width.value = widthDp.dp
+                    state.value = location.copy(appearance = appearance)
+                }
+                val row = compose.onNodeWithContentDescription("Use location, $subtitle, $mark")
+                    .fetchSemanticsNode().boundsInRoot
+                val subtitleBounds = compose.onNodeWithText(subtitle, useUnmergedTree = true)
+                    .fetchSemanticsNode().boundsInRoot
+                val markBounds = compose.onNodeWithText(mark, useUnmergedTree = true)
+                    .fetchSemanticsNode().boundsInRoot
+                assertTrue("$widthDp/${appearance.name}: subtitle overlaps action", subtitleBounds.right <= markBounds.left)
+                assertTrue("$widthDp/${appearance.name}: action leaves the row", markBounds.right <= row.right)
+                row.height
+            }
+            heights.forEach { height -> assertEquals(72f * density, height, 1f) }
+        }
     }
 
     @Test fun feedbackSuccessDismissesButErrorRemains() {

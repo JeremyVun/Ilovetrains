@@ -42,7 +42,7 @@ private static server over `web/`; `node tools/visual-regression.js --platform w
 --screens settings,settings-light,settings-412` and judge the diff: the only
 change is the row.
 
-Done marker: `[ ] phase 1 done`.
+Done marker: `[x] phase 1 done`.
 
 ## Phase 2: iOS
 
@@ -67,7 +67,7 @@ Verify: `tools/build-ios.sh --test`; `node tools/visual-regression.js --platform
 --screens settings,settings-light` (export `ILOVETRAINS_SIMULATOR_ID` from
 `tools/baselines/manifest.json` first; one simulator booted).
 
-Done marker: `[ ] phase 2 done`.
+Done marker: `[x] phase 2 done`.
 
 ## Phase 3: Android
 
@@ -77,8 +77,9 @@ JVM test for the blocked rule if it is extracted into a pure function.
 
 - `MainActivity`: `locationDenied` = `locationAsked && !hasLocation() &&
   !shouldShowRequestPermissionRationale(ACCESS_COARSE_LOCATION)` in both
-  `onResume` and the launcher callback. Everything else in `onLocationRequest`
-  stays.
+  `onResume` and the launcher callback. Record `locationAsked` only after a
+  non-empty result; dismissal must not turn the initial no-rationale state
+  into blocked. The request action uses the same blocked predicate.
 - `SettingsMain`: delete the strip `Row`. `SettingsPersonalRow` for location
   takes subtitle, mark and click per state: `off` → `TURN ON` /
   `setUseLocation(true)`; `ask` → `ALLOW` / `requestLocation()`; `blocked` →
@@ -94,7 +95,7 @@ Verify: `tools/build-android.sh`; `node tools/visual-regression.js --platform
 android --screens settings,settings-light` (check `pgrep -fl "shoot-android|shoot-ios"`
 first; one emulator).
 
-Done marker: `[ ] phase 3 done`.
+Done marker: `[x] phase 3 done`.
 
 ## Phase 4: verification wave and calibration
 
@@ -123,3 +124,24 @@ regressions live in the real-client checker rather than source-matching unit tes
 Release 1.2.4 increments Android versionCode to 4 and iOS build number to 5;
 service-worker cache version is v43. Closeout and deployment follow the repository
 AGENTS.md standing instruction after all gates pass.
+
+Phase 1 verification: 335 web unit tests and the documented Settings browser
+checker passed. The four-state matrix passed at 390×844, 412×732 and 360×780
+in both schemes; every location row measured 56px. The built ask exemplar
+differs only at the 1.2.4 release digit. Pending permission queries render
+ALLOW; generation checks reject answers superseded by a newer action or route,
+and the stable row selector preserves keyboard focus when its action changes.
+
+Phase 2 verification: 56 iOS unit tests and five UI tests passed. Final targeted
+four-state UI verification passed with Button semantics for ask/blocked and
+Toggle semantics plus On/Off values for the toggle states. Eight dark/light
+client captures retain 72pt row geometry and show the complete action mark.
+
+Phase 3 verification: final Android build, JVM tests and lint passed. Ten UI
+calibration tests passed, including action/trait checks and equal 72dp rows
+at 360 and 412 in both schemes. Real API36 checks proved first-dialog dismissal
+and first refusal permit another prompt. The second prompt exposed the OS
+don't-ask-again action; the emulator exited during that tap, so its final
+screenshot was not captured. The initial broader connected suite failed two
+unchanged planner timing gates (next service 41.7s, cold route 8.1s); all UI
+calibration tests passed. A separate Sol cross-client review found no defects.

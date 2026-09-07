@@ -115,6 +115,7 @@ function isCurrentRoot(root) {
 function activeControl(root) {
   const active = root.ownerDocument.activeElement;
   if (!active || !root.contains(active)) return '';
+  if (active.classList.contains('st-location-row')) return '.st-location-row';
   if (active.dataset.mode) return `[data-mode="${active.dataset.mode}"]`;
   if (active.dataset.appearance) return `[data-appearance="${active.dataset.appearance}"]`;
   return active.dataset.act ? `[data-act="${active.dataset.act}"]` : '';
@@ -146,20 +147,18 @@ function stateMark(on) {
 
 function personal(prefs, automatic, permission) {
   const blocked = prefs.useLocation && permission === 'denied';
-  const prompt = prefs.useLocation && permission === 'prompt';
+  const prompt = prefs.useLocation && permission !== 'granted' && permission !== 'denied';
   const locationValue = !prefs.useLocation ? 'Location is not used'
-    : blocked ? 'Blocked in browser' : prompt ? 'Permission not decided' : 'Choose nearby trips';
+    : blocked ? 'Blocked in browser' : prompt ? 'Location needs permission' : 'Nearby trips use location';
+  const locationAction = prompt ? 'request-location' : 'toggle-location';
+  const locationMark = !prefs.useLocation ? 'Turn on' : prompt ? 'Allow' : 'Turn off';
+  const pressed = !prompt && !blocked ? ` aria-pressed="${prefs.useLocation}"` : '';
   const current = prefs.homeOverride;
   const automaticName = automatic && automatic.station ? shortName(automatic.station.name) : '';
   const homeValue = current ? current.name
     : automaticName ? `Automatic — ${automaticName}` : 'Automatic';
-  const note = prompt
-    ? '<div class="st-location-note"><p>Location is on, but this phone hasn’t decided whether to allow it.</p><button data-act="request-location">Use my location</button></div>'
-    : blocked
-      ? '<div class="st-location-note"><p><strong>Blocked in browser</strong>Allow location in your browser or installed-app settings.</p></div>' : '';
   return `<section class="st-group">${section('Personal')}<div class="st-person">
-    <button class="st-person-row" data-act="toggle-location" aria-pressed="${prefs.useLocation}">${icon('location')}<span class="st-copy"><span class="st-name">Use location</span><span class="st-value${blocked ? ' warn' : ''}">${esc(locationValue)}</span></span>${stateMark(prefs.useLocation)}</button>
-    ${note}
+    <button class="st-person-row st-location-row" data-act="${locationAction}"${pressed}>${icon('location')}<span class="st-copy"><span class="st-name">Use location</span><span class="st-value${blocked ? ' warn' : ''}">${esc(locationValue)}</span></span><span class="st-state">${locationMark}</span></button>
     <button class="st-person-row" data-act="home-station">${icon('home')}<span class="st-copy"><span class="st-name">Home</span><span class="st-value">${esc(homeValue)}</span></span><span class="st-person-state">${current ? 'Change' : 'Set'}${icon('next')}</span></button>
   </div></section>`;
 }
@@ -174,7 +173,7 @@ function services(enabledModes) {
   const enabled = new Set(enabledModes);
   const allOff = enabled.size === 0;
   const note = allOff ? '<p class="st-service-empty">No services selected. Turn one on to see trips.</p>'
-    : '<p class="st-service-note">Only trips using your selected services are shown.</p>';
+    : '<p class="st-service-note">Trips use chosen services only.</p>';
   return `<section class="st-group">${section('Services')}<div class="st-choice-set st-service-set" role="group" aria-label="Services">
     ${serviceButton('train', 'Trains', enabled.has('train'))}${serviceButton('metro', 'Metro', enabled.has('metro'))}${serviceButton('ferry', 'Ferries', enabled.has('ferry'))}${serviceButton('bus', 'Buses', false, true)}
   </div>${note}</section>`;
@@ -229,19 +228,23 @@ function paintMain(root, ctx, permission) {
       return;
     }
     if (action === 'toggle-location') {
+      const generation = (renders.get(root) || 0) + 1;
+      renders.set(root, generation);
       const useLocation = !preferencesOf(ctx.doc).useLocation;
       ctx.setPreferences({ useLocation });
       paintMain(root, ctx, permission);
       if (!useLocation || permission === 'denied') return;
       const nextPermission = await ctx.requestLocation();
-      if (!isCurrentRoot(root)) return;
+      if (!isCurrentRoot(root) || renders.get(root) !== generation) return;
       permission = nextPermission;
       paintMain(root, ctx, permission);
       return;
     }
     if (action === 'request-location') {
+      const generation = (renders.get(root) || 0) + 1;
+      renders.set(root, generation);
       const nextPermission = await ctx.requestLocation();
-      if (!isCurrentRoot(root)) return;
+      if (!isCurrentRoot(root) || renders.get(root) !== generation) return;
       permission = nextPermission;
       paintMain(root, ctx, permission);
     }

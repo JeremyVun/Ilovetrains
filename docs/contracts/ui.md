@@ -554,11 +554,12 @@ is a shot of the built client from `tools/shoot-states.js` or
 removed rather than left to rot.
 
 The board, home and detail calibration frames are listed below.
-`tools/check-settings-browser.js --frames assets/comps/latest` adds seven
+`tools/check-settings-browser.js --frames assets/comps/latest` adds eight
 Settings frames and two filtered-Home frames:
 
 - Settings: `settings-390x844.png`, its `light`, `long-home`, `all-off` and
   `feedback` variants, plus `settings-412x732.png` and its `light` variant.
+  `settings-390x844-ask.png` is the location-row permission exemplar.
   They preserve the C1 grouping, controls, spacing and reachable final rows.
 - Filtered Home: `home-390x844-services-filtered.png` preserves the eligible
   prediction and rows; `home-390x844-services-empty.png` shows the all-hidden
@@ -646,9 +647,35 @@ markers, 44px minimum targets and reachable content at 390×844 and 412×732.
 
 Location is an app preference, distinct from browser permission. Off prevents
 fixes and contextual prompts, including late results from earlier requests.
-A browser denial is labelled `Blocked in browser`; enabling the app preference
-cannot revoke that denial. A deliberate location action is available when
-browser permission still awaits a choice.
+Settings uses one location row with the state in its subtitle and the next
+action in its mark; there is no separate permission strip.
+
+| Preference | Permission | Subtitle | Mark | Tap |
+| --- | --- | --- | --- | --- |
+| Off | Any | Location is not used | `TURN ON` | Enable the preference and request location |
+| On | Not decided | Location needs permission | `ALLOW` | Request system permission |
+| On | Blocked | Location is blocked | `OPEN SETTINGS ›` | Open the app's system settings |
+| On | Granted | Nearby trips use location | `TURN OFF` | Disable the preference |
+
+Web's blocked state instead uses `Blocked in browser` and `TURN OFF`, which
+disables the preference; browsers cannot open site permission settings.
+Enabling the preference cannot revoke a browser denial. On Android, blocked
+means a permission request has returned an answer, permission is absent and
+the system will no longer show a permission rationale. A soft refusal or
+dismissed first dialog remains `ALLOW`; dismissal records no answer. iOS treats denied
+and restricted permission as blocked. Returning from system settings refreshes
+the row from the current permission.
+
+The action mark uses primary ink in every state; blocked subtitles use warning
+ink. Only `OPEN SETTINGS` has the next chevron, meaning it leaves this screen.
+Row height stays equal across states (web minimum 56px, Android 72dp, existing
+iOS geometry). Each row is one accessible button, read as title, subtitle,
+then action. Pressed/toggle semantics apply only to Off and Granted; awaiting
+permission and blocked are plain buttons, including web's blocked deviation.
+Web shows `ALLOW` until its permission query resolves. An answer superseded
+by a newer location action or navigation cannot repaint Settings, and keyboard
+focus stays on the row when its action changes. Setup's location action and
+the web Home footer location panel are unchanged.
 
 Home displays the current automatic station and allows a local station
 selection. `Use automatic home` removes only the override. Automatic votes

@@ -103,4 +103,46 @@ final class AppFlowTests: XCTestCase {
         app.buttons["send-feedback"].tap()
         XCTAssertEqual(app.textViews["feedback-message"].value as? String, "Draft kept on this phone")
     }
+
+    @MainActor
+    func testSettingsLocationRowStatesAndActions() {
+        var rowHeight: CGFloat?
+        rowHeight = checkLocationRow(calibration: "settings-off",
+                                     label: "Use location, Location is not used, TURN ON",
+                                     labelAfterTap: "Use location, Location needs permission, ALLOW",
+                                     toggleValue: "Off", expectedHeight: rowHeight)
+        rowHeight = checkLocationRow(calibration: "settings",
+                                     label: "Use location, Location needs permission, ALLOW",
+                                     labelAfterTap: "Use location, Location needs permission, ALLOW",
+                                     toggleValue: nil, expectedHeight: rowHeight)
+        rowHeight = checkLocationRow(calibration: "settings-blocked",
+                                     label: "Use location, Location is blocked, OPEN SETTINGS ›",
+                                     labelAfterTap: "Use location, Location is blocked, OPEN SETTINGS ›",
+                                     toggleValue: nil, expectedHeight: rowHeight)
+        _ = checkLocationRow(calibration: "settings-on",
+                             label: "Use location, Nearby trips use location, TURN OFF",
+                             labelAfterTap: "Use location, Location is not used, TURN ON",
+                             toggleValue: "On", expectedHeight: rowHeight)
+    }
+
+    @MainActor
+    private func checkLocationRow(calibration: String, label: String, labelAfterTap: String,
+                                  toggleValue: String?, expectedHeight: CGFloat?) -> CGFloat {
+        let app = XCUIApplication()
+        app.launchArguments = ["--calibration", calibration]
+        app.launch()
+        let row = app.descendants(matching: .any)["location-setting"]
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        XCTAssertEqual(row.label, label)
+        XCTAssertEqual(row.elementType, toggleValue == nil ? .button : .toggle)
+        if let toggleValue { XCTAssertEqual(row.value as? String, toggleValue) }
+        XCTAssertFalse(app.staticTexts["Allow location to show nearby trips."].exists)
+        XCTAssertFalse(app.buttons["Use my location"].exists)
+        if let expectedHeight { XCTAssertEqual(row.frame.height, expectedHeight, accuracy: 0.5) }
+        let height = row.frame.height
+        row.tap()
+        XCTAssertEqual(row.label, labelAfterTap)
+        app.terminate()
+        return height
+    }
 }
