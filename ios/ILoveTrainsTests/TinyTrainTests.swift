@@ -48,3 +48,80 @@ final class TinyTrainTests: XCTestCase {
         XCTAssertTrue(appView.contains(#".environment(\.tinyTrainFlag, model.state.tinyTrain)"#))
     }
 }
+
+/* Review probe: the toy follows only an answer fetched in this process, one
+   request per open and per foreground return, none while paused. */
+@MainActor
+final class FlagsFetchProbeTests: XCTestCase {
+    func testOneRequestPerOpenAndReturnAndTheToyNeverReadsTheStoredAnswer() async throws {
+        FlagsProbeProtocol.reset()
+        let from = Station(id: "a", name: "A"), to = Station(id: "b", name: "B")
+        let trip = SavedTrip(id: "trip", from: from, to: to, createdAt: epochNow())
+        let store = DeviceStore(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        try await store.save(UserData(trips: [trip], lastTripId: "trip", transferLimit: .two, flags: ["transferLimit": true, "tiny_train": true]))
+        FlagsProbeProtocol.flags = (503, #"{"tiny_train":true,"transferLimit":true}"#)
+
+        let model = TrainViewModel(store: store, api: TransitAPI(baseURL: "https://stub.invalid", session: FlagsProbeProtocol.session()))
+        for _ in 0..<200 where !model.state.ready { try await Task.sleep(for: .milliseconds(10)) }
+        for _ in 0..<300 where FlagsProbeProtocol.flagsRequests < 1 { try await Task.sleep(for: .milliseconds(10)) }
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertEqual(FlagsProbeProtocol.flagsRequests, 1, "I1 open: exactly one flags request")
+        XCTAssertFalse(model.state.tinyTrain, "I2 stored true plus a 503 never shows the toy")
+        XCTAssertEqual(model.state.flags["transferLimit"], true, "I2 the cap still reads the stored answer")
+
+        func foreground(_ answer: (Int, String), expectRequests: Int) async throws {
+            FlagsProbeProtocol.flags = answer
+            model.pause(); model.resume()
+            for _ in 0..<300 where FlagsProbeProtocol.flagsRequests < expectRequests { try await Task.sleep(for: .milliseconds(10)) }
+            try await Task.sleep(for: .milliseconds(300))
+            XCTAssertEqual(FlagsProbeProtocol.flagsRequests, expectRequests, "I1 one request per foreground return")
+        }
+        try await foreground((200, #"{"tiny_train":true,"transferLimit":true}"#), expectRequests: 2)
+        XCTAssertTrue(model.state.tinyTrain, "I4 a true answer turns the toy on at the next fetch")
+        try await foreground((503, #"{"tiny_train":true,"transferLimit":true}"#), expectRequests: 3)
+        XCTAssertFalse(model.state.tinyTrain, "I7 a failed return fetch turns the toy off, not the previous in-process value")
+        XCTAssertEqual(model.state.flags["transferLimit"], true)
+        try await foreground((200, #"{"tiny_train":"true","transferLimit":true}"#), expectRequests: 4)
+        XCTAssertFalse(model.state.tinyTrain, "I2 string true is not true")
+        try await foreground((200, #"{"tiny_train":true,"transferLimit":false}"#), expectRequests: 5)
+        XCTAssertTrue(model.state.tinyTrain)
+        XCTAssertEqual(model.state.flags["transferLimit"], false, "the same answer moved the cap")
+
+        model.pause()
+        try await Task.sleep(for: .milliseconds(1500))
+        XCTAssertEqual(FlagsProbeProtocol.flagsRequests, 5, "I1 nothing while backgrounded")
+        XCTAssertEqual(FlagsProbeProtocol.paths.filter { $0 == "/api/v1/flags" }.count, FlagsProbeProtocol.flagsRequests)
+    }
+}
+
+private final class FlagsProbeProtocol: URLProtocol {
+    private static let lock = NSLock()
+    private static var recorded: [String] = []
+    private static var answer = (200, "{}")
+    static var flags: (Int, String) {
+        get { lock.lock(); defer { lock.unlock() }; return answer }
+        set { lock.lock(); defer { lock.unlock() }; answer = newValue }
+    }
+    static var paths: [String] { lock.lock(); defer { lock.unlock() }; return recorded }
+    static var flagsRequests: Int { paths.filter { $0 == "/api/v1/flags" }.count }
+    static func reset() { lock.lock(); defer { lock.unlock() }; recorded = []; answer = (200, "{}") }
+    static func session() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [FlagsProbeProtocol.self]
+        return URLSession(configuration: configuration)
+    }
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        guard let url = request.url else { return }
+        Self.lock.lock()
+        Self.recorded.append(url.path)
+        let (status, body) = url.path == "/api/v1/flags" ? Self.answer
+            : (200, #"{"from": {"id": "a", "name": "A"}, "to": {"id": "b", "name": "B"}, "generatedAt": "2026-09-07T09:00:00+10:00", "journeys": []}"#)
+        Self.lock.unlock()
+        client?.urlProtocol(self, didReceive: HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil)!, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(body.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
