@@ -607,103 +607,7 @@
 			};
 			name = Debug;
 		};
-		46216153A5FCE18337834CEAA8DAB112 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
-				DEVELOPMENT_TEAM = 6TTZ5U96V9;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.3.1;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios.tests;
-				SDKROOT = iphoneos;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ILoveTrains.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ILoveTrains";
-				TEST_TARGET_NAME = ILoveTrains;
-				VALIDATE_PRODUCT = YES;
-			};
-			name = Release;
-		};
-		629D490ECD381F34E5B684AF3F69721F /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
-				DEVELOPMENT_TEAM = 6TTZ5U96V9;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = ILoveTrains/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 1.3.1;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					"-lsqlite3",
-					"-lz",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios;
-				SDKROOT = iphoneos;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		7D37BAF5B72BD15BCF50E939548F6479 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
-				DEVELOPMENT_TEAM = 6TTZ5U96V9;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.3.1;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios.tests;
-				SDKROOT = iphoneos;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ILoveTrains.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ILoveTrains";
-				TEST_TARGET_NAME = ILoveTrains;
-			};
-			name = Debug;
-		};
-		8AD7F6E889EB2E0CDB6C2710B9D8C63E /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
-				DEVELOPMENT_TEAM = 6TTZ5U96V9;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.3.1;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios.uitests;
-				SDKROOT = iphoneos;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = ILoveTrains;
-			};
-			name = Debug;
-		};
-		A65D2788A22763BE7970A4DF249E3922 /* Release */ = {
+		5B9F7E8834B0004DD37B202D37D6448B /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -718,7 +622,7 @@
 				INFOPLIST_FILE = ILoveTrains/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 1.3.1;
+				MARKETING_VERSION = 1.4.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-lsqlite3",
@@ -733,7 +637,7 @@
 			};
 			name = Release;
 		};
-		A739FD5ACA7BFDBD27B5F3EC569D80CD /* Release */ = {
+		99C3A612029B9BB18D326D2A9528312A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = NO;
@@ -743,7 +647,57 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.3.1;
+				MARKETING_VERSION = 1.4.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios.uitests;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = ILoveTrains;
+			};
+			name = Debug;
+		};
+		D15493EFA53570D92835243054B0F0DC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 5;
+				DEVELOPMENT_TEAM = 6TTZ5U96V9;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ILoveTrains/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 1.4.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lsqlite3",
+					"-lz",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D3AFF891BB6535998BEFC49134B6DB5B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 5;
+				DEVELOPMENT_TEAM = 6TTZ5U96V9;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios.uitests;
 				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -754,14 +708,60 @@
 			};
 			name = Release;
 		};
+		D59D248B66C5EE1399CCF0109A3189D3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 5;
+				DEVELOPMENT_TEAM = 6TTZ5U96V9;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.4.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios.tests;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ILoveTrains.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ILoveTrains";
+				TEST_TARGET_NAME = ILoveTrains;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		DD32C7B98AAC32B00CC2A91F0F69AF2F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 5;
+				DEVELOPMENT_TEAM = 6TTZ5U96V9;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.4.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios.tests;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ILoveTrains.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ILoveTrains";
+				TEST_TARGET_NAME = ILoveTrains;
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
 		1010EB97A55B2E6E9C1ABEE14713C3D3 /* Build configuration list for PBXNativeTarget "ILoveTrains" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				A65D2788A22763BE7970A4DF249E3922 /* Release */,
-				629D490ECD381F34E5B684AF3F69721F /* Debug */,
+				5B9F7E8834B0004DD37B202D37D6448B /* Release */,
+				D15493EFA53570D92835243054B0F0DC /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -769,8 +769,8 @@
 		4707BCE1B54C2243FF7446E5EFB6A73E /* Build configuration list for PBXNativeTarget "ILoveTrainsTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				46216153A5FCE18337834CEAA8DAB112 /* Release */,
-				7D37BAF5B72BD15BCF50E939548F6479 /* Debug */,
+				D59D248B66C5EE1399CCF0109A3189D3 /* Release */,
+				DD32C7B98AAC32B00CC2A91F0F69AF2F /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -778,8 +778,8 @@
 		C33936D9F92D2016E82ACE027A2CE216 /* Build configuration list for PBXNativeTarget "ILoveTrainsUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				A739FD5ACA7BFDBD27B5F3EC569D80CD /* Release */,
-				8AD7F6E889EB2E0CDB6C2710B9D8C63E /* Debug */,
+				D3AFF891BB6535998BEFC49134B6DB5B /* Release */,
+				99C3A612029B9BB18D326D2A9528312A /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
