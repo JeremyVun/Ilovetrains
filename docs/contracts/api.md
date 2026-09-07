@@ -21,7 +21,7 @@ Invariants:
   `2026-08-31T17:42:00+10:00`). Shared timetable and realtime source
   timestamps are RFC 3339 instants and may use `Z`.
 
-## GET /api/v1/departures?from={stopId}&to={stopId}&limit={n}&at={t}&modes={modes}
+## GET /api/v1/departures?from={stopId}&to={stopId}&limit={n}&at={t}&modes={modes}&transferLimit={n}
 
 `at` is an optional ISO 8601 time with an offset
 (`2026-09-01T17:30:00+10:00` or the same instant as `...Z`). Absent means now
@@ -90,6 +90,13 @@ services that actually reach the destination).
   key, so equivalent orderings share a response. `modes=` deliberately means
   no enabled modes and returns an empty journey list without a TfNSW request.
   An unknown name or empty element is a `400`.
+- `transferLimit`: optional cap on a journey's changes, a whole number from 0
+  to 9. Omitted means no cap, which is what every client sent before the cap
+  existed. Anything else is a `400`, whether or not the `transferLimit`
+  feature flag is on, so validation never varies with a switch the caller
+  cannot see. The range is small deliberately: it bounds junk, and it bounds
+  how far the parameter can multiply the cache key space. No Sydney journey
+  has nine changes.
 - Cache: `s-maxage=30, stale-while-revalidate=60`, except for a settled past
   `at` window — see the `at` paragraph above.
 
@@ -182,6 +189,14 @@ Semantics:
   leg of a journey must be enabled; walking legs do not count. Thus a
   train+metro journey needs both modes, and filtering happens before `limit`
   so eligible replacements can fill the board.
+- `transferLimit={n}` drops a journey whose `legs - 1` exceeds `n`. The drop
+  happens in the same pass as the mode drop — before the connection floor and
+  ceiling and before `limit` — so eligible replacements fill the board rather
+  than leaving it short. `legs` counts services only, so a walking transfer is
+  never a change. The value joins the in-memory cache key. While the
+  `transferLimit` feature flag is off the server treats the parameter as
+  omitted and it never enters the key, so turning the flag off restores the
+  uncapped board at once, including for clients that keep sending it.
 - Cancelled services are included with `cancelled: true` (clients render
   struck-through), never silently dropped. Detection is deliberately loose
   (any upstream realtime status containing "cancel"): the exact upstream shape
@@ -274,6 +289,34 @@ never `{"lat": 0, "lon": 0}`, which is a point in the Atlantic that would win
 any nearest-station comparison outright. It powers the client-side
 geolocation term in trip prediction — the server never receives a user
 location, only publishes where stations are.
+
+## GET /api/v1/flags
+
+The feature flags this backend has already decided for every client, so one
+switch changes the server and all three clients without a release. The server
+names the flags its clients read and publishes their evaluated values; it
+never forwards the underlying snapshot, so internal flags and the rules
+behind them stay server-side.
+
+```json
+{"version": "2026-09-07T04:00:00Z", "flags": {"transferLimit": false}}
+```
+
+- `flags` names every public flag, always with a boolean and never with a
+  missing key, so a client can tell "off" from "this server does not publish
+  it".
+- `version` identifies the evaluated snapshot. It is opaque: only equality
+  means anything. It may be `""`.
+- Cache: `s-maxage=60, stale-while-revalidate=300`, so flipping a flag
+  reaches new opens within about a minute.
+- The endpoint exists whether or not a flag source is configured. With none
+  configured, or before a first snapshot has been read, every flag is `false`
+  and `version` is `""` — the same answer as every flag being off, so a flag
+  source that is down or absent can only mean today's behaviour, never a
+  half-enabled one.
+- Evaluation takes no identity, because the backend has none to take. A flag
+  is on or off for everyone, and percentage rollouts are unsupported by
+  design.
 
 ## GET /api/v1/timetable/manifest
 
