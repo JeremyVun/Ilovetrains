@@ -221,7 +221,9 @@ func (s *Server) handleDepartures(w http.ResponseWriter, r *http.Request) {
 		return s.upstream.DeparturesWithOptions(ctx, from, to, limit, at, tfnsw.DeparturesOptions{Modes: modes})
 	})
 	if err != nil {
-		if response, ok := s.pastFallback(past, key); ok {
+		// What already happened is better served old than as a 502, which is
+		// why a past window's stale window is a day rather than 10 minutes.
+		if response, ok := s.departuresPast.Stale(key); past && ok {
 			writeData(w, departuresPastCacheControl, true, response)
 			return
 		}
@@ -290,16 +292,6 @@ func effectiveArrival(journey tfnsw.Journey) string {
 		return *journey.Arrival.Estimated
 	}
 	return journey.Arrival.Scheduled
-}
-
-// pastFallback serves a settled window that has outlived its hour rather than
-// failing the request, as the contract's 24-hour stale window for a past
-// window promises.
-func (s *Server) pastFallback(past bool, key string) (*tfnsw.DeparturesResponse, bool) {
-	if !past {
-		return nil, false
-	}
-	return s.departuresPast.Stale(key)
 }
 
 // bucketKey renders a window for the cache key. The empty string is "now",
