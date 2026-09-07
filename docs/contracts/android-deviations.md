@@ -3,11 +3,28 @@
 This file records deliberate differences between the native Android app and the web reference.
 
 - System bars use Android edge-to-edge insets. The content starts below display cutouts and status icons and ends above gesture navigation rather than reproducing browser chrome or CSS safe-area behavior.
-- Location permission uses Android's native permission sheet. Settings says `Blocked in Android settings` after denial and offers the app's normal location action while a decision is still available. Android does not show the web footer permission panel.
+- First launch with no saved trips requests Android location permission once, before trip setup. Granting it fills the nearest eligible station in From; denial leaves manual search available. There is no extra home-confirmation screen. A manually selected or cleared origin cannot be overwritten by a late fix. This initial fix casts no home vote; the chosen first trip origin supplies the existing home fallback. The automatic request is recorded locally and does not recur on restart. Settings says `Blocked in Android settings` after denial. Android does not show the web footer permission panel (owner ruling, 2026-09-07).
 - Android system Back performs the same navigation as each visible back control. The Compose screens do not add a second browser-style history mechanism.
-- Long-pressing a saved trip opens a native menu with a separate `Delete trip` choice. TalkBack exposes the same menu as `Trip actions`, keeping the ordinary row visually identical to the web composition while preventing an accidental long-press from deleting data.
+- Swiping a saved trip row towards the start edge deletes it: the Material dismiss pattern, with a `Delete` label on the warning-coloured background the row uncovers, committing past half the row width. The deletion is reversible for the undo window from the bottom message bar, which reads `{from} → {to} deleted` and whose label becomes `Undo`; the cached boards go when the window ends ([client-storage.md](client-storage.md#android-storage)). Long-pressing the row still opens a native menu with a separate `Delete trip` choice, equally undoable, and TalkBack exposes the same menu as `Trip actions`; the menu is the TalkBack and fallback path because the swipe is not exposed to accessibility services. The ordinary row stays visually identical to the web composition.
 - Station search uses a native text field and keyboard action. Results and ranking remain local; the keyboard can resize the sheet rather than overlaying it as mobile browsers sometimes do.
 - Offline timetable status and its manual update action appear as a quiet Settings row beside feedback and version. The web app's service worker has no corresponding packaged-timetable lifecycle.
 - New offline journeys use the bundled timetable and conservative transfers within a station or wharf hub. Routes may differ from the online Trip Planner; cross-hub walks such as Wynyard–Barangaroo require the online fallback. Coverage gaps and realtime identity limits are recorded in [native-data.md](native-data.md).
 - Native v1 leaves anonymous analytics counters off. This avoids mixing native renderer adoption and prediction behavior into the existing web-only experiment; functional feedback submission still works.
 - Android stores user state in app-private atomic files and excludes it from cloud backup and device transfer. The native trip list is not capped at the web client’s ten-trip LRU, and each trip has the explicit native deletion menu described above.
+
+## Feedback fixes — 2026-09-07
+
+- Settings gives Use location and Home 72dp minimum rows with 10dp vertical padding. Service choices show only `On` or `Off`, without checkmarks, circles or underlines. Appearance keeps the selected checkmark, removes the underline and reserves the System subtitle's space in every option so previews and labels align.
+- Home and board figures keep `Now` on one line, including enlarged Android text. They must fit their allocated column without clipping or invading the adjacent station/time columns.
+- Journey lines have 3dp rounded corners at the destination end in Home, Board and Detail. Internal ride/transfer joins remain square so the time axis stays continuous (owner ruling, 2026-09-07).
+- Successful feedback confirmation dismisses after four seconds, extended by Android's accessibility timeout. Errors retain their manual dismissal and draft recovery.
+- Offline boards retain departed services and last-known delays; the shared native retention rules are in [native-data.md](native-data.md#cached-boards-and-departed-services). `LAST KNOWN` distinguishes retained estimates from fresh observations. No stale countdown or travelling-direction figure is presented as live.
+
+Current native exemplars are `assets/comps/latest/android-settings-390x844.png`
+and its `-light` variant, `android-home-390x844-now.png`,
+`android-board-390x844-now.png`, the Home/Board
+`-390x844-offline-retained-t9.png` frames, and the swipe-to-delete pair
+`android-home-390x844-deleting.png` (row dragged past the threshold) and
+`android-home-390x844-deleted.png` (row gone, bar offering `Undo`). `tools/shoot-android.sh` reproduces
+them, with the offline Board scrolled upward to reveal the retained service.
+The same states are checked at 412×732 and font scale 1.3.

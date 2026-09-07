@@ -147,9 +147,10 @@ moves through are binding in `docs/contracts/ui.md`.
   "Show the way back", which fetches a REAL return journey with its own
   transfer platforms.
 - **Setup and add-trip**: recent searches per field, fuzzy-ranked station
-  typeahead, one full-width save action. Geolocation is asked contextually
-  once the user has two or more trips, never on first load, and denial
-  degrades silently.
+  typeahead, one full-width save action. Web geolocation is asked contextually
+  once the user has two or more trips. Android first launch asks once and fills
+  the nearest station when granted; the user can change it before choosing a
+  destination. Denial leaves manual setup available.
 - Dark is the primary scheme; light is derived by measurement and shipped.
 
 The measured geometry that resulted is recorded as invariants in
@@ -243,6 +244,11 @@ Browser (localStorage: trips, history, rides, focus, home, searches, cache)
   PWA was rejected because the extra layer costs feel; Flutter was tried and
   deleted because it costs the native feel it was meant to buy. See "Native
   clients" below for how the ports stay in sync.
+- **Web retains TfNSW Trip Planner; offline route planning belongs to native
+  design** (2026-09-06). Web continues caching small journey responses for
+  immediate paint and last-known offline use. Design timetable downloads and
+  local route construction when building Android/iOS; this is not a web or
+  Settings prerequisite. Research is in `docs/backlog/timetable-realtime/`.
 - **Backend: Go.** Single static binary shipped as one image with `web/`
   baked in.
 - **Personalisation is client-side only.** The load-bearing decision:
@@ -295,8 +301,23 @@ round. They exist for what the browser cannot give at native quality: cold
 launch, widgets, background location for ride detection, notifications,
 preloaded assets.
 
-The ports do not start until three things are stable, checked against the
-roadmap gate rather than a feeling of "perfect":
+Android lives in `android/` and iOS in `ios/`. Each bundles a validated timetable for new offline
+journeys, refreshes exact source identities with realtime data, and uses the
+online Trip Planner for its full routing coverage. The web continues using
+TfNSW Trip Planner. The package, source joins and conservative offline transfer
+rules are binding in [native-data.md](contracts/native-data.md); installation
+and signing are in [android.md](operations/android.md) and [ios.md](operations/ios.md).
+Platform differences are recorded in [android-deviations.md](contracts/android-deviations.md)
+and [ios-deviations.md](contracts/ios-deviations.md).
+
+The original port gates below remain the standard for subsequent ports. The
+owner authorized Android on 2026-09-06 against the current web reference;
+Android v1 adds shared prediction and row conformance cases plus emulator
+calibration. The owner authorized iOS on 2026-09-07; its XCTest suite consumes
+the same generated expectations and its simulator shooter renders the native
+screens. Physical iPhone installation awaits a connected phone and renewed
+Xcode account login. The full generated token and cross-platform layout-dump pipeline
+below remains follow-up work.
 
 - the contracts in `docs/contracts/` (API, storage document, prediction,
   home inference, rides), because porting logic that the next round will

@@ -1,0 +1,4 @@
+build/
+releases/
+*.xcuserstate
+xcuserdata/

@@ -131,4 +131,4 @@ async function main() {
 
 if (require.main === module) main().catch((e) => { console.error(e.message || e); process.exit(1); });
 
-module.exports = { diff, compare };
+module.exports = { diff, compare, bands, describeBands };

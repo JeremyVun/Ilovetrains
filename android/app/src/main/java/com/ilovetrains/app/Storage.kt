@@ -34,7 +34,7 @@ object Wire {
         return Station(o.getString("id"), o.getString("name"), loc?.optDouble("lat", 0.0) ?: 0.0, loc?.optDouble("lon", 0.0) ?: 0.0, modes)
     }
     private fun epoch(o: JSONObject, key: String) = o.opt(key)?.let { if (it is Number) it.toLong() else runCatching { Instant.parse(it.toString()).toEpochMilli() }.getOrNull() }
-    fun journey(j: Journey): JSONObject = JSONObject().put("legDetail", j.legs.jsonEach { l ->
+    fun journey(j: Journey): JSONObject = JSONObject().put("retained", j.retained).put("legDetail", j.legs.jsonEach { l ->
         JSONObject().put("line", JSONObject().put("name", l.line).put("mode", l.mode)).put("headsign", l.headsign)
             .put("from", station(l.from).put("platform", l.fromPlatform)).put("to", station(l.to).put("platform", l.toPlatform))
             .put("departure", JSONObject().put("scheduled", l.departure).put("estimated", l.estimatedDeparture))
@@ -57,14 +57,15 @@ object Wire {
         }
         require(legs.isNotEmpty() && legs.size == o.getJSONArray("legDetail").length())
         require(legs.all { it.arrival >= it.departure })
-        return Journey(legs)
+        return Journey(legs, o.optBoolean("retained"))
     }
     fun board(b: BoardData) = JSONObject().put("from", station(b.from)).put("to", station(b.to))
         .put("journeys", b.journeys.jsonEach(::journey)).put("generatedAt", b.generatedAt).put("source", b.source)
-        .put("offline", b.offline).put("serverStale", b.serverStale).put("coverage", b.coverage).put("error", b.error)
+        .put("offline", b.offline).put("serverStale", b.serverStale).put("coverage", b.coverage).put("error", b.error).put("homeJourneyKey", b.homeJourneyKey)
     fun board(o: JSONObject, api: Boolean = false) = BoardData(station(o.getJSONObject("from")), station(o.getJSONObject("to")),
         o.optJSONArray("journeys").readEach(::journey), epoch(o, "generatedAt") ?: 0,
-        if (api) "live" else o.optString("source", "schedule"), o.optBoolean("offline"), o.optBoolean("serverStale"), o.optString("coverage"), o.stringOrNull("error"))
+        if (api) "live" else o.optString("source", "schedule"), o.optBoolean("offline"), o.optBoolean("serverStale"), o.optString("coverage"), o.stringOrNull("error"),
+        if (api) null else o.stringOrNull("homeJourneyKey"))
     private fun trip(t: SavedTrip) = JSONObject().put("id", t.id).put("from", station(t.from)).put("to", station(t.to))
         .put("createdAt", t.createdAt).put("lastViewed", t.lastViewed).put("lines", JSONArray(t.lines))
     private fun trip(o: JSONObject) = SavedTrip(o.getString("id"), station(o.getJSONObject("from")), station(o.getJSONObject("to")), o.optLong("createdAt"), o.optLong("lastViewed"),

@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -40,10 +41,7 @@ fun BoardScreen(state: AppState, actions: UiActions) {
     }
     Column(Modifier.fillMaxSize()) {
         BoardMast(board, state.now, actions)
-        val stale = board.offline || state.now - board.generatedAt > 90_000
-        val visibleJourneys = remember(board.journeys, state.now, stale) {
-            if (stale) board.journeys.filter { it.effectiveDeparture >= state.now } else board.journeys
-        }
+        val visibleJourneys = board.journeys
         val past = remember(visibleJourneys, state.now) { visibleJourneys.filter { it.effectiveDeparture < state.now } }
         val future = remember(visibleJourneys, state.now) { visibleJourneys.filter { it.effectiveDeparture >= state.now } }
         val listState = rememberLazyListState(initialFirstVisibleItemIndex = past.size)
@@ -124,7 +122,7 @@ fun BoardRow(journey: Journey, board: BoardData?, now: Long, onClick: (() -> Uni
     val fig = figureOverride ?: figureFor(journey, board, now)
     val first = journey.legs.first()
     val late = minutesBetween(journey.departure, journey.effectiveDeparture) > 0
-    val stale = board == null || board.offline || now - board.generatedAt > 90_000
+    val stale = board == null || board.offline || journey.retained || now - board.generatedAt > 90_000
     val figureColor = when {
         journey.cancelled || fig.past -> c.ink3
         late && !fig.past -> c.warning
@@ -133,18 +131,25 @@ fun BoardRow(journey: Journey, board: BoardData?, now: Long, onClick: (() -> Uni
         else -> c.ink
     }
     val clickable = if (onClick == null) Modifier else Modifier.clickable(role = Role.Button, onClick = onClick)
-    Row(clickable.fillMaxWidth().heightIn(min = if (detail) 100.dp else 96.dp)
+    Row(clickable.fillMaxWidth().testTag("board-journey-${journey.key}").heightIn(min = if (detail) 100.dp else 96.dp)
         .background(c.ground).padding(horizontal = PagePadding, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.width(if (detail) 69.dp else 72.dp), horizontalAlignment = Alignment.End) {
             Row(verticalAlignment = Alignment.Bottom) {
-                Text(fig.value, color = figureColor, fontSize = if (fig.value.length >= 5) 28.sp else 40.sp,
+                Text(fig.value, color = figureColor, fontSize = when {
+                    fig.value.equals("NOW", ignoreCase = true) -> 27.sp
+                    fig.value.length >= 5 -> 28.sp
+                    else -> 40.sp
+                },
+                    modifier = Modifier.testTag("board-figure-${journey.key}"),
                     fontWeight = FontWeight(250), letterSpacing = (-1.5).sp, lineHeight = 38.sp,
-                    textDecoration = if (journey.cancelled && fig.value.contains(':')) TextDecoration.LineThrough else null)
+                    textDecoration = if (journey.cancelled && fig.value.contains(':')) TextDecoration.LineThrough else null,
+                    maxLines = 1, softWrap = false)
                 if (fig.unit.isNotEmpty()) Text(fig.unit, color = figureColor, fontSize = 12.sp,
                     fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 2.dp, bottom = 4.dp))
             }
             Label(fig.provenance, Modifier.heightIn(min = 12.dp).padding(top = 4.dp),
-                color = if (late && !fig.past || journey.cancelled) c.warning else c.ink3, size = 9, maxLines = 1)
+                color = if (late && !fig.past || journey.cancelled) c.warning else c.ink3,
+                size = if (fig.provenance.length >= 9) 7 else 9, maxLines = 1)
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {

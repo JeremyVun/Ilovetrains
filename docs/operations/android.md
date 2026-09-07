@@ -25,20 +25,23 @@ that directory in a secure backup: future updates require the same signing
 key. `ILOVETRAINS_SIGNING_DIR` can select an existing signing directory.
 Signing files and release outputs are excluded from git.
 
-Release output is `android/releases/ilovetrains-1.0.0.apk`, with a SHA-256
+Release output is `android/releases/ilovetrains-<version>.apk`, with a SHA-256
 sidecar. The helper also stages that APK in `web/downloads/` for the normal
 server-image deployment. Build the APK before the Docker image to include
 the phone download. The PWA service worker does not cache the APK.
+Android's display version and filename read the canonical `web/js/version.js`;
+increment Android `versionCode` for each installable update. Building the APK
+does not publish it: the server image must still be deployed.
 
 ## Install
 
-Open `https://ilovetrains.jeremyvun.com/downloads/ilovetrains-1.0.0.apk` on
+Open `https://ilovetrains.jeremyvun.com/downloads/ilovetrains-<version>.apk` on
 the phone after deployment, download it, and open the download. Android may
 ask to allow installation from that browser. Alternatively, copy the APK
 to the phone or install over USB debugging:
 
 ```sh
-adb install -r android/releases/ilovetrains-1.0.0.apk
+adb install -r android/releases/ilovetrains-1.2.3.apk
 ```
 
 A debug APK has a different signing identity. Android cannot replace it with

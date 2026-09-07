@@ -1,0 +1,775 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0469840EE53DAD35C5E5B987A8E601ED /* BoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A5C1418A6C846CF72D6AA9FD39F21E6 /* BoardView.swift */; };
+		0551A3C5A7A355B2B4EE01E940D49F8E /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DF0CE4B4B489206BAD2B19377D1990F5 /* Foundation.framework */; };
+		161497505CADA024A011A346B45B0E47 /* BoardRetentionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25AC9C044213813934E60F18943C3902 /* BoardRetentionTests.swift */; };
+		227C4681257578CCD221273B8028B71D /* PredictionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 886A038593A84A19382E589337B95141 /* PredictionTests.swift */; };
+		22C9C689987563D58D526A6BA4CC127E /* OfflineRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDA9D73822E8193F23D712829238E66B /* OfflineRouterTests.swift */; };
+		320FB920A102033FA61C31A274A5C7A7 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 629298F5116802F5134DF36EE7908FEE /* PrivacyInfo.xcprivacy */; };
+		3687573B2A6DA2C27E35021F4A077B7B /* TrainViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42517480E75B3FFA72C60A66BB67D250 /* TrainViewModel.swift */; };
+		38D2B022CD3A614AD57E639623B86851 /* timetable-manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = 3615243F548DB6A2604B7946A7B38EF9 /* timetable-manifest.json */; };
+		3D92BB886EC1A77263EFE97E15F24353 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BA83440D20B5F2BAD57BB7A2898E931 /* SetupView.swift */; };
+		3E7C81ACD517FAB8AC08DA5EF79FE34A /* DeviceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C99563647B0455300FBB1320713168C9 /* DeviceStore.swift */; };
+		4318F31D1B925A5C05C440FAC908ECA0 /* RowConformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AC09C9409003F3D7E4E206C4EDD16B0 /* RowConformanceTests.swift */; };
+		4618AE84BC96A2DFEFF7DE3AC340E07D /* OfflinePackageStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2269C1581DC5132C8800C6E786AD18 /* OfflinePackageStoreTests.swift */; };
+		477DFB7310465CCA4CCD251490C07E7E /* AppFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0D676BD29373C9C0CE8DE3ED663C4A /* AppFlowTests.swift */; };
+		538B69BA0181E229B1B71D3BD7F61456 /* StorageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF850A09F92B75BDBB02B3779C13B3A5 /* StorageTests.swift */; };
+		560EC98CB1EDAD0CFCB6F75007678D60 /* ControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F7B7DB6A767CE62B869425D595E9263 /* ControllerTests.swift */; };
+		5C87A827ECBB9D7ADB06F00709B5F4EA /* OfflineRealtime.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9BD2EB8E5FA819A772457CB4DAAAF4 /* OfflineRealtime.swift */; };
+		5DD1D9BF38AB2B0CE555EE8C8E34077B /* OfflineRealtimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 114EAF36CE8AC644EF2A5725C2D95716 /* OfflineRealtimeTests.swift */; };
+		6A9974284CAD0498FBE80250FACF7692 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 961614011D1C448189ED1CF41B302B2C /* AppState.swift */; };
+		72E89E338E32740CFAAE5A09B9E5C914 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A6A720BFD7C1239778644EE2178B6FEB /* Assets.xcassets */; };
+		7F0322FA2081BE0C8E44BF71DABDEF99 /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D917A8F9AA79423513C55F97D08F000 /* LocationService.swift */; };
+		839574B4043377482393F28CE528B0A7 /* HomeStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47C6C9BF08B29567D99AF04090C5D52B /* HomeStatusTests.swift */; };
+		844A8BB3C69CBC35DDAFE4D0BEFE337B /* AppView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D04A6F059ED2D7E3064AACCA6B03317F /* AppView.swift */; };
+		84AD53D163AEBB159F3D05B72C9376E3 /* OfflinePlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BBB3C5538BFB99D79740D7CF7826305 /* OfflinePlanner.swift */; };
+		8A9B7741EA7C7177E12D54920CBD078F /* prediction.json in Resources */ = {isa = PBXBuildFile; fileRef = CCF9F353578F2449D9D62F29EBA158B8 /* prediction.json */; };
+		8C3CDE54C66EAFCFA96616350D39D588 /* JourneyAxisLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBB7378360287999016F12B0BCD5B94B /* JourneyAxisLayoutTests.swift */; };
+		8FC022321C20DFC6330EFF74F9C4BBEA /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DF0CE4B4B489206BAD2B19377D1990F5 /* Foundation.framework */; };
+		90FE1B92C4485ECCF132566869D7191E /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13174E4D616BF3DFC90026CE97C8F5CE /* HomeView.swift */; };
+		98A51C5E34EC37BBCBFCA79A9EF7ED5C /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68C0E33F4E434E2B1034EBF4ED943D18 /* Theme.swift */; };
+		9CB81ADA6EC2889C06C4EB4F47B8B372 /* OfflineDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FC9C3F4F0CAE1F86B1DDFC68E68DED3 /* OfflineDatabase.swift */; };
+		9E7D2EF345E320BA9B76B6B9F4394C12 /* JourneyAxisLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = B99E4B9B11A54900375D5791625173A6 /* JourneyAxisLayout.swift */; };
+		A5704B31E221A340E5E42317CCABD009 /* TransitModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F17BB166E3D02A46723E238A1A7F8FA0 /* TransitModels.swift */; };
+		A793E66AA669EF460F9E39D67569F91F /* Common.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA8D683F0DBF0963C0530E2F37102DE1 /* Common.swift */; };
+		A938884FC2ECF04163DCC482914D4D4B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 909FD5761A6688AD36837D88FD8B0429 /* SettingsView.swift */; };
+		AB1E2BB15EB481FD95D9D08D90A7A9B3 /* DetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D09EA61A57BEBDAA9C7947A61554F32 /* DetailView.swift */; };
+		ABEB582A751594711563A7B405B389A2 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DF0CE4B4B489206BAD2B19377D1990F5 /* Foundation.framework */; };
+		AC87B3D9B4EA4FEE1261180E1A623FB8 /* stations.json in Resources */ = {isa = PBXBuildFile; fileRef = 83F3C91479FEF2D83389ECA406538F12 /* stations.json */; };
+		B1546DA132586E2BCF45519DF4504106 /* OfflineRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54EACFCDB3EE9915CE460D10C0BE6C9D /* OfflineRouter.swift */; };
+		C21E56F75B4A94830EB1C43EAB1CE06D /* OfflineZip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9057088967828D1E15D6A65F315EA227 /* OfflineZip.swift */; };
+		C4276617E995B8466C48007CBB77251D /* OfflinePackageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3631E985A94E2BCB388479CF1462BD2 /* OfflinePackageStore.swift */; };
+		C5CE415B5E9199F901500E4C3DABABD3 /* calibration.json in Resources */ = {isa = PBXBuildFile; fileRef = 0F00D5834AA8CD296A78671B98F366B9 /* calibration.json */; };
+		CCD1461AC2294499C698DE467F436F0B /* timetable.zip in Resources */ = {isa = PBXBuildFile; fileRef = 182FE857EA97EFD719A745BA8720CFFE /* timetable.zip */; };
+		D0C39E438D9ACE45A3CABDB714E4616D /* Prediction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78E0B35A437366712706229C50594259 /* Prediction.swift */; };
+		D26A868810A7ACC4DB95B88D55519A72 /* calibration.json in Resources */ = {isa = PBXBuildFile; fileRef = 0F00D5834AA8CD296A78671B98F366B9 /* calibration.json */; };
+		D3B8A1492BAC820115D65979B73C2ED0 /* OfflinePlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACC7764BC77045166B79F67C694B1453 /* OfflinePlannerTests.swift */; };
+		EF3C38C65B2898B1F3E25EB9BE97C2CF /* rows.json in Resources */ = {isa = PBXBuildFile; fileRef = 0D18AC45E2EED300E4D4AD4DCB9CE8F8 /* rows.json */; };
+		F58B8C8AC587A2E55FD9D4F551890F5D /* ILoveTrainsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46538B333FBE7831F3D38C184E1999EC /* ILoveTrainsApp.swift */; };
+		FAD09A0C5BF32C358B2EB7DAE2280CB9 /* TransitAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9533DB91EA2A920ADC391AD5B6B7C35 /* TransitAPI.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		3A187C592BC37748641653A6225810CC /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6565F67C49D70F290716235AAC408279 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9D84F5CB24F0B9BE0300F525B29A1C99;
+			remoteInfo = ILoveTrains;
+		};
+		DD8B503F7BAF4DE98F09E4EEB669F45A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6565F67C49D70F290716235AAC408279 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9D84F5CB24F0B9BE0300F525B29A1C99;
+			remoteInfo = ILoveTrains;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0BA83440D20B5F2BAD57BB7A2898E931 /* SetupView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SetupView.swift; path = UI/SetupView.swift; sourceTree = "<group>"; };
+		0D18AC45E2EED300E4D4AD4DCB9CE8F8 /* rows.json */ = {isa = PBXFileReference; includeInIndex = 1; path = rows.json; sourceTree = "<group>"; };
+		0F00D5834AA8CD296A78671B98F366B9 /* calibration.json */ = {isa = PBXFileReference; includeInIndex = 1; path = calibration.json; sourceTree = "<group>"; };
+		114EAF36CE8AC644EF2A5725C2D95716 /* OfflineRealtimeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OfflineRealtimeTests.swift; sourceTree = "<group>"; };
+		13174E4D616BF3DFC90026CE97C8F5CE /* HomeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HomeView.swift; path = UI/HomeView.swift; sourceTree = "<group>"; };
+		182FE857EA97EFD719A745BA8720CFFE /* timetable.zip */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = archive.zip; path = timetable.zip; sourceTree = "<group>"; };
+		25AC9C044213813934E60F18943C3902 /* BoardRetentionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BoardRetentionTests.swift; sourceTree = "<group>"; };
+		2F7B7DB6A767CE62B869425D595E9263 /* ControllerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ControllerTests.swift; sourceTree = "<group>"; };
+		3615243F548DB6A2604B7946A7B38EF9 /* timetable-manifest.json */ = {isa = PBXFileReference; includeInIndex = 1; path = "timetable-manifest.json"; sourceTree = "<group>"; };
+		3FC9C3F4F0CAE1F86B1DDFC68E68DED3 /* OfflineDatabase.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflineDatabase.swift; path = Core/OfflineDatabase.swift; sourceTree = "<group>"; };
+		42517480E75B3FFA72C60A66BB67D250 /* TrainViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TrainViewModel.swift; path = Core/TrainViewModel.swift; sourceTree = "<group>"; };
+		46538B333FBE7831F3D38C184E1999EC /* ILoveTrainsApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ILoveTrainsApp.swift; sourceTree = "<group>"; };
+		47C6C9BF08B29567D99AF04090C5D52B /* HomeStatusTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeStatusTests.swift; sourceTree = "<group>"; };
+		4A2269C1581DC5132C8800C6E786AD18 /* OfflinePackageStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OfflinePackageStoreTests.swift; sourceTree = "<group>"; };
+		4BBB3C5538BFB99D79740D7CF7826305 /* OfflinePlanner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflinePlanner.swift; path = Core/OfflinePlanner.swift; sourceTree = "<group>"; };
+		54EACFCDB3EE9915CE460D10C0BE6C9D /* OfflineRouter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflineRouter.swift; path = Core/OfflineRouter.swift; sourceTree = "<group>"; };
+		5B56DA782CD3D4D59DA36F8105F62EDA /* ILoveTrainsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ILoveTrainsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		629298F5116802F5134DF36EE7908FEE /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		649B2E9AB807B9BE4376911329B9D7D4 /* ILoveTrainsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ILoveTrainsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		68C0E33F4E434E2B1034EBF4ED943D18 /* Theme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Theme.swift; path = UI/Theme.swift; sourceTree = "<group>"; };
+		6A5C1418A6C846CF72D6AA9FD39F21E6 /* BoardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BoardView.swift; path = UI/BoardView.swift; sourceTree = "<group>"; };
+		6AC09C9409003F3D7E4E206C4EDD16B0 /* RowConformanceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RowConformanceTests.swift; sourceTree = "<group>"; };
+		6D917A8F9AA79423513C55F97D08F000 /* LocationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LocationService.swift; path = Core/LocationService.swift; sourceTree = "<group>"; };
+		78E0B35A437366712706229C50594259 /* Prediction.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Prediction.swift; path = Core/Prediction.swift; sourceTree = "<group>"; };
+		7D09EA61A57BEBDAA9C7947A61554F32 /* DetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DetailView.swift; path = UI/DetailView.swift; sourceTree = "<group>"; };
+		83F3C91479FEF2D83389ECA406538F12 /* stations.json */ = {isa = PBXFileReference; includeInIndex = 1; path = stations.json; sourceTree = "<group>"; };
+		886A038593A84A19382E589337B95141 /* PredictionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PredictionTests.swift; sourceTree = "<group>"; };
+		8A0D676BD29373C9C0CE8DE3ED663C4A /* AppFlowTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppFlowTests.swift; sourceTree = "<group>"; };
+		9057088967828D1E15D6A65F315EA227 /* OfflineZip.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflineZip.swift; path = Core/OfflineZip.swift; sourceTree = "<group>"; };
+		909FD5761A6688AD36837D88FD8B0429 /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SettingsView.swift; path = UI/SettingsView.swift; sourceTree = "<group>"; };
+		961614011D1C448189ED1CF41B302B2C /* AppState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppState.swift; path = Core/AppState.swift; sourceTree = "<group>"; };
+		9BFC7C822A4E5378540BB99E190550F7 /* ILoveTrains.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ILoveTrains.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A6A720BFD7C1239778644EE2178B6FEB /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		ACC7764BC77045166B79F67C694B1453 /* OfflinePlannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OfflinePlannerTests.swift; sourceTree = "<group>"; };
+		AF850A09F92B75BDBB02B3779C13B3A5 /* StorageTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StorageTests.swift; sourceTree = "<group>"; };
+		B9533DB91EA2A920ADC391AD5B6B7C35 /* TransitAPI.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TransitAPI.swift; path = Core/TransitAPI.swift; sourceTree = "<group>"; };
+		B99E4B9B11A54900375D5791625173A6 /* JourneyAxisLayout.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = JourneyAxisLayout.swift; path = UI/JourneyAxisLayout.swift; sourceTree = "<group>"; };
+		C99563647B0455300FBB1320713168C9 /* DeviceStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DeviceStore.swift; path = Core/DeviceStore.swift; sourceTree = "<group>"; };
+		CA8D683F0DBF0963C0530E2F37102DE1 /* Common.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Common.swift; path = UI/Common.swift; sourceTree = "<group>"; };
+		CB9BD2EB8E5FA819A772457CB4DAAAF4 /* OfflineRealtime.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflineRealtime.swift; path = Core/OfflineRealtime.swift; sourceTree = "<group>"; };
+		CCF9F353578F2449D9D62F29EBA158B8 /* prediction.json */ = {isa = PBXFileReference; includeInIndex = 1; path = prediction.json; sourceTree = "<group>"; };
+		D04A6F059ED2D7E3064AACCA6B03317F /* AppView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppView.swift; path = UI/AppView.swift; sourceTree = "<group>"; };
+		DBB7378360287999016F12B0BCD5B94B /* JourneyAxisLayoutTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JourneyAxisLayoutTests.swift; sourceTree = "<group>"; };
+		DDA9D73822E8193F23D712829238E66B /* OfflineRouterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OfflineRouterTests.swift; sourceTree = "<group>"; };
+		DF0CE4B4B489206BAD2B19377D1990F5 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		F17BB166E3D02A46723E238A1A7F8FA0 /* TransitModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TransitModels.swift; path = Core/TransitModels.swift; sourceTree = "<group>"; };
+		F3631E985A94E2BCB388479CF1462BD2 /* OfflinePackageStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflinePackageStore.swift; path = Core/OfflinePackageStore.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		0F84262BF8FD1DC717CF7EB3FAD3DE1C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				ABEB582A751594711563A7B405B389A2 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0FECD0C734106CB671447B36DEFF8759 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8FC022321C20DFC6330EFF74F9C4BBEA /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		68783941F191991A0D801C4619698C05 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0551A3C5A7A355B2B4EE01E940D49F8E /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0611571C3E490FF7966437D23A1313CB /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				402A203CF6C516942356BA89113A4730 /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		402A203CF6C516942356BA89113A4730 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				DF0CE4B4B489206BAD2B19377D1990F5 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		6B2601766C47D02DD0DBEECDEA0E7C58 /* ILoveTrainsTests */ = {
+			isa = PBXGroup;
+			children = (
+				25AC9C044213813934E60F18943C3902 /* BoardRetentionTests.swift */,
+				2F7B7DB6A767CE62B869425D595E9263 /* ControllerTests.swift */,
+				47C6C9BF08B29567D99AF04090C5D52B /* HomeStatusTests.swift */,
+				DBB7378360287999016F12B0BCD5B94B /* JourneyAxisLayoutTests.swift */,
+				4A2269C1581DC5132C8800C6E786AD18 /* OfflinePackageStoreTests.swift */,
+				ACC7764BC77045166B79F67C694B1453 /* OfflinePlannerTests.swift */,
+				114EAF36CE8AC644EF2A5725C2D95716 /* OfflineRealtimeTests.swift */,
+				DDA9D73822E8193F23D712829238E66B /* OfflineRouterTests.swift */,
+				886A038593A84A19382E589337B95141 /* PredictionTests.swift */,
+				6AC09C9409003F3D7E4E206C4EDD16B0 /* RowConformanceTests.swift */,
+				AF850A09F92B75BDBB02B3779C13B3A5 /* StorageTests.swift */,
+			);
+			name = ILoveTrainsTests;
+			path = ILoveTrainsTests;
+			sourceTree = "<group>";
+		};
+		81CC0235E36FF664E67FCFE5AF2727E1 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				9BFC7C822A4E5378540BB99E190550F7 /* ILoveTrains.app */,
+				649B2E9AB807B9BE4376911329B9D7D4 /* ILoveTrainsTests.xctest */,
+				5B56DA782CD3D4D59DA36F8105F62EDA /* ILoveTrainsUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		B6A4D072269C549861776828549AF3A9 /* ILoveTrains */ = {
+			isa = PBXGroup;
+			children = (
+				961614011D1C448189ED1CF41B302B2C /* AppState.swift */,
+				C99563647B0455300FBB1320713168C9 /* DeviceStore.swift */,
+				6D917A8F9AA79423513C55F97D08F000 /* LocationService.swift */,
+				3FC9C3F4F0CAE1F86B1DDFC68E68DED3 /* OfflineDatabase.swift */,
+				F3631E985A94E2BCB388479CF1462BD2 /* OfflinePackageStore.swift */,
+				4BBB3C5538BFB99D79740D7CF7826305 /* OfflinePlanner.swift */,
+				CB9BD2EB8E5FA819A772457CB4DAAAF4 /* OfflineRealtime.swift */,
+				54EACFCDB3EE9915CE460D10C0BE6C9D /* OfflineRouter.swift */,
+				9057088967828D1E15D6A65F315EA227 /* OfflineZip.swift */,
+				78E0B35A437366712706229C50594259 /* Prediction.swift */,
+				42517480E75B3FFA72C60A66BB67D250 /* TrainViewModel.swift */,
+				B9533DB91EA2A920ADC391AD5B6B7C35 /* TransitAPI.swift */,
+				F17BB166E3D02A46723E238A1A7F8FA0 /* TransitModels.swift */,
+				46538B333FBE7831F3D38C184E1999EC /* ILoveTrainsApp.swift */,
+				D04A6F059ED2D7E3064AACCA6B03317F /* AppView.swift */,
+				6A5C1418A6C846CF72D6AA9FD39F21E6 /* BoardView.swift */,
+				CA8D683F0DBF0963C0530E2F37102DE1 /* Common.swift */,
+				7D09EA61A57BEBDAA9C7947A61554F32 /* DetailView.swift */,
+				13174E4D616BF3DFC90026CE97C8F5CE /* HomeView.swift */,
+				B99E4B9B11A54900375D5791625173A6 /* JourneyAxisLayout.swift */,
+				909FD5761A6688AD36837D88FD8B0429 /* SettingsView.swift */,
+				0BA83440D20B5F2BAD57BB7A2898E931 /* SetupView.swift */,
+				68C0E33F4E434E2B1034EBF4ED943D18 /* Theme.swift */,
+			);
+			name = ILoveTrains;
+			path = ILoveTrains;
+			sourceTree = "<group>";
+		};
+		BD847F75E3604E8973D14149C8CFB7D9 /* ILoveTrainsUITests */ = {
+			isa = PBXGroup;
+			children = (
+				8A0D676BD29373C9C0CE8DE3ED663C4A /* AppFlowTests.swift */,
+			);
+			name = ILoveTrainsUITests;
+			path = ILoveTrainsUITests;
+			sourceTree = "<group>";
+		};
+		C30B5669F8BA20F8515E8B45133EB152 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				A6A720BFD7C1239778644EE2178B6FEB /* Assets.xcassets */,
+				629298F5116802F5134DF36EE7908FEE /* PrivacyInfo.xcprivacy */,
+				83F3C91479FEF2D83389ECA406538F12 /* stations.json */,
+				3615243F548DB6A2604B7946A7B38EF9 /* timetable-manifest.json */,
+				182FE857EA97EFD719A745BA8720CFFE /* timetable.zip */,
+			);
+			name = Resources;
+			path = ILoveTrains/Resources;
+			sourceTree = "<group>";
+		};
+		DB8D0DB4D38F96852B3D7D387C3C6383 = {
+			isa = PBXGroup;
+			children = (
+				81CC0235E36FF664E67FCFE5AF2727E1 /* Products */,
+				0611571C3E490FF7966437D23A1313CB /* Frameworks */,
+				B6A4D072269C549861776828549AF3A9 /* ILoveTrains */,
+				6B2601766C47D02DD0DBEECDEA0E7C58 /* ILoveTrainsTests */,
+				BD847F75E3604E8973D14149C8CFB7D9 /* ILoveTrainsUITests */,
+				C30B5669F8BA20F8515E8B45133EB152 /* Resources */,
+				EE2886ADD4F2C13C66C11FC9B11C9B21 /* Conformance */,
+			);
+			sourceTree = "<group>";
+		};
+		EE2886ADD4F2C13C66C11FC9B11C9B21 /* Conformance */ = {
+			isa = PBXGroup;
+			children = (
+				0F00D5834AA8CD296A78671B98F366B9 /* calibration.json */,
+				CCF9F353578F2449D9D62F29EBA158B8 /* prediction.json */,
+				0D18AC45E2EED300E4D4AD4DCB9CE8F8 /* rows.json */,
+			);
+			name = Conformance;
+			path = ../tools/fixtures/conformance;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		54FC0156F81BADE5DA141F2FAF62ABD5 /* ILoveTrainsTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 92D3EE6CEAAC7A41F17CF5A46474DE91 /* Build configuration list for PBXNativeTarget "ILoveTrainsTests" */;
+			buildPhases = (
+				FD6803C4724E46691CA7362D7F14B216 /* Sources */,
+				0F84262BF8FD1DC717CF7EB3FAD3DE1C /* Frameworks */,
+				52086B9A1813DC4C11F2D965D7237D7A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				DECAB6513F8CBAA173B279E8A64800DC /* PBXTargetDependency */,
+			);
+			name = ILoveTrainsTests;
+			productName = ILoveTrainsTests;
+			productReference = 649B2E9AB807B9BE4376911329B9D7D4 /* ILoveTrainsTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		91E28EE1CF6E6354BA398B93D50B86AE /* ILoveTrainsUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DCA15BFEBB4CC9EA747638EB95893D85 /* Build configuration list for PBXNativeTarget "ILoveTrainsUITests" */;
+			buildPhases = (
+				511AE58909661B1FB5D898081AA0FED0 /* Sources */,
+				0FECD0C734106CB671447B36DEFF8759 /* Frameworks */,
+				914512C2DE148A0FE019AA3F82700B41 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AD952E22EC0575748FB41845732CECA6 /* PBXTargetDependency */,
+			);
+			name = ILoveTrainsUITests;
+			productName = ILoveTrainsUITests;
+			productReference = 5B56DA782CD3D4D59DA36F8105F62EDA /* ILoveTrainsUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		9D84F5CB24F0B9BE0300F525B29A1C99 /* ILoveTrains */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 85AA86FFB983DCB24804254E9855C729 /* Build configuration list for PBXNativeTarget "ILoveTrains" */;
+			buildPhases = (
+				B95E458E9E5F575CAE53DA890D4CD4FE /* Sources */,
+				68783941F191991A0D801C4619698C05 /* Frameworks */,
+				550D632537170763B3333C1F8F5D6D5D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ILoveTrains;
+			productName = ILoveTrains;
+			productReference = 9BFC7C822A4E5378540BB99E190550F7 /* ILoveTrains.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		6565F67C49D70F290716235AAC408279 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+			};
+			buildConfigurationList = ECC0FC2F8AB74ADCFCADFBE1B35B9AB1 /* Build configuration list for PBXProject "ILoveTrains" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = DB8D0DB4D38F96852B3D7D387C3C6383;
+			minimizedProjectReferenceProxies = 0;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 81CC0235E36FF664E67FCFE5AF2727E1 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				9D84F5CB24F0B9BE0300F525B29A1C99 /* ILoveTrains */,
+				54FC0156F81BADE5DA141F2FAF62ABD5 /* ILoveTrainsTests */,
+				91E28EE1CF6E6354BA398B93D50B86AE /* ILoveTrainsUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		52086B9A1813DC4C11F2D965D7237D7A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C5CE415B5E9199F901500E4C3DABABD3 /* calibration.json in Resources */,
+				8A9B7741EA7C7177E12D54920CBD078F /* prediction.json in Resources */,
+				EF3C38C65B2898B1F3E25EB9BE97C2CF /* rows.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		550D632537170763B3333C1F8F5D6D5D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				72E89E338E32740CFAAE5A09B9E5C914 /* Assets.xcassets in Resources */,
+				320FB920A102033FA61C31A274A5C7A7 /* PrivacyInfo.xcprivacy in Resources */,
+				AC87B3D9B4EA4FEE1261180E1A623FB8 /* stations.json in Resources */,
+				38D2B022CD3A614AD57E639623B86851 /* timetable-manifest.json in Resources */,
+				CCD1461AC2294499C698DE467F436F0B /* timetable.zip in Resources */,
+				D26A868810A7ACC4DB95B88D55519A72 /* calibration.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		914512C2DE148A0FE019AA3F82700B41 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		511AE58909661B1FB5D898081AA0FED0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				477DFB7310465CCA4CCD251490C07E7E /* AppFlowTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B95E458E9E5F575CAE53DA890D4CD4FE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6A9974284CAD0498FBE80250FACF7692 /* AppState.swift in Sources */,
+				3E7C81ACD517FAB8AC08DA5EF79FE34A /* DeviceStore.swift in Sources */,
+				7F0322FA2081BE0C8E44BF71DABDEF99 /* LocationService.swift in Sources */,
+				9CB81ADA6EC2889C06C4EB4F47B8B372 /* OfflineDatabase.swift in Sources */,
+				C4276617E995B8466C48007CBB77251D /* OfflinePackageStore.swift in Sources */,
+				84AD53D163AEBB159F3D05B72C9376E3 /* OfflinePlanner.swift in Sources */,
+				5C87A827ECBB9D7ADB06F00709B5F4EA /* OfflineRealtime.swift in Sources */,
+				B1546DA132586E2BCF45519DF4504106 /* OfflineRouter.swift in Sources */,
+				C21E56F75B4A94830EB1C43EAB1CE06D /* OfflineZip.swift in Sources */,
+				D0C39E438D9ACE45A3CABDB714E4616D /* Prediction.swift in Sources */,
+				3687573B2A6DA2C27E35021F4A077B7B /* TrainViewModel.swift in Sources */,
+				FAD09A0C5BF32C358B2EB7DAE2280CB9 /* TransitAPI.swift in Sources */,
+				A5704B31E221A340E5E42317CCABD009 /* TransitModels.swift in Sources */,
+				F58B8C8AC587A2E55FD9D4F551890F5D /* ILoveTrainsApp.swift in Sources */,
+				844A8BB3C69CBC35DDAFE4D0BEFE337B /* AppView.swift in Sources */,
+				0469840EE53DAD35C5E5B987A8E601ED /* BoardView.swift in Sources */,
+				A793E66AA669EF460F9E39D67569F91F /* Common.swift in Sources */,
+				AB1E2BB15EB481FD95D9D08D90A7A9B3 /* DetailView.swift in Sources */,
+				90FE1B92C4485ECCF132566869D7191E /* HomeView.swift in Sources */,
+				9E7D2EF345E320BA9B76B6B9F4394C12 /* JourneyAxisLayout.swift in Sources */,
+				A938884FC2ECF04163DCC482914D4D4B /* SettingsView.swift in Sources */,
+				3D92BB886EC1A77263EFE97E15F24353 /* SetupView.swift in Sources */,
+				98A51C5E34EC37BBCBFCA79A9EF7ED5C /* Theme.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FD6803C4724E46691CA7362D7F14B216 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				161497505CADA024A011A346B45B0E47 /* BoardRetentionTests.swift in Sources */,
+				560EC98CB1EDAD0CFCB6F75007678D60 /* ControllerTests.swift in Sources */,
+				839574B4043377482393F28CE528B0A7 /* HomeStatusTests.swift in Sources */,
+				8C3CDE54C66EAFCFA96616350D39D588 /* JourneyAxisLayoutTests.swift in Sources */,
+				4618AE84BC96A2DFEFF7DE3AC340E07D /* OfflinePackageStoreTests.swift in Sources */,
+				D3B8A1492BAC820115D65979B73C2ED0 /* OfflinePlannerTests.swift in Sources */,
+				5DD1D9BF38AB2B0CE555EE8C8E34077B /* OfflineRealtimeTests.swift in Sources */,
+				22C9C689987563D58D526A6BA4CC127E /* OfflineRouterTests.swift in Sources */,
+				227C4681257578CCD221273B8028B71D /* PredictionTests.swift in Sources */,
+				4318F31D1B925A5C05C440FAC908ECA0 /* RowConformanceTests.swift in Sources */,
+				538B69BA0181E229B1B71D3BD7F61456 /* StorageTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AD952E22EC0575748FB41845732CECA6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = ILoveTrains;
+			target = 9D84F5CB24F0B9BE0300F525B29A1C99 /* ILoveTrains */;
+			targetProxy = DD8B503F7BAF4DE98F09E4EEB669F45A /* PBXContainerItemProxy */;
+		};
+		DECAB6513F8CBAA173B279E8A64800DC /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = ILoveTrains;
+			target = 9D84F5CB24F0B9BE0300F525B29A1C99 /* ILoveTrains */;
+			targetProxy = 3A187C592BC37748641653A6225810CC /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		024B7BF43666BCD24597EFC598330241 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = 6TTZ5U96V9;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.2.3;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios.tests;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ILoveTrains.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ILoveTrains";
+				TEST_TARGET_NAME = ILoveTrains;
+			};
+			name = Debug;
+		};
+		2F17DE207F9ED7FB03E0A134FA3C0091 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		38DE2AA3B6CEA08D7D6F9834E04CA9D9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = 6TTZ5U96V9;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ILoveTrains/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 1.2.3;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lsqlite3",
+					"-lz",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		40866C63785216791DC89AE58498CDB3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		40B25769A26071931AADB4023EE124D0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = 6TTZ5U96V9;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				EXCLUDED_SOURCE_FILE_NAMES = calibration.json;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ILoveTrains/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 1.2.3;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lsqlite3",
+					"-lz",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		64AC132EAF3CB82850FB023D5AA689EC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = 6TTZ5U96V9;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.2.3;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios.uitests;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = ILoveTrains;
+			};
+			name = Debug;
+		};
+		6CE2AEB48A38DBD320506D382CE85442 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = 6TTZ5U96V9;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.2.3;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios.tests;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ILoveTrains.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ILoveTrains";
+				TEST_TARGET_NAME = ILoveTrains;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		EAA351430B310F090D280A0F0412857A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = 6TTZ5U96V9;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.2.3;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios.uitests;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = ILoveTrains;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		85AA86FFB983DCB24804254E9855C729 /* Build configuration list for PBXNativeTarget "ILoveTrains" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				40B25769A26071931AADB4023EE124D0 /* Release */,
+				38DE2AA3B6CEA08D7D6F9834E04CA9D9 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		92D3EE6CEAAC7A41F17CF5A46474DE91 /* Build configuration list for PBXNativeTarget "ILoveTrainsTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6CE2AEB48A38DBD320506D382CE85442 /* Release */,
+				024B7BF43666BCD24597EFC598330241 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DCA15BFEBB4CC9EA747638EB95893D85 /* Build configuration list for PBXNativeTarget "ILoveTrainsUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EAA351430B310F090D280A0F0412857A /* Release */,
+				64AC132EAF3CB82850FB023D5AA689EC /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		ECC0FC2F8AB74ADCFCADFBE1B35B9AB1 /* Build configuration list for PBXProject "ILoveTrains" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				40866C63785216791DC89AE58498CDB3 /* Debug */,
+				2F17DE207F9ED7FB03E0A134FA3C0091 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 6565F67C49D70F290716235AAC408279 /* Project object */;
+}

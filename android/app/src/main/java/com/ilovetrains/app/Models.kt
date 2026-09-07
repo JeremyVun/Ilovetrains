@@ -27,7 +27,7 @@ data class Leg(val line: String, val mode: String, val headsign: String, val fro
     val effectiveDeparture get() = estimatedDeparture ?: departure
     val effectiveArrival get() = estimatedArrival ?: arrival
 }
-data class Journey(val legs: List<Leg>) {
+data class Journey(val legs: List<Leg>, val retained: Boolean = false) {
     val key get() = legs.joinToString("|") { "${it.line}:${it.departure}" }
     val departure get() = legs.first().departure
     val arrival get() = legs.last().arrival
@@ -39,7 +39,7 @@ data class Journey(val legs: List<Leg>) {
 }
 data class BoardData(val from: Station, val to: Station, val journeys: List<Journey>, val generatedAt: Long,
     val source: String = "schedule", val offline: Boolean = false, val serverStale: Boolean = false,
-    val coverage: String = "", val error: String? = null) {
+    val coverage: String = "", val error: String? = null, val homeJourneyKey: String? = null) {
     fun isLive(now: Long) = source == "live" && !offline && !serverStale && now - generatedAt in 0..90_000
 }
 enum class Screen { Home, Board, Detail, Setup, Settings }

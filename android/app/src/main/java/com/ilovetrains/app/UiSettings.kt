@@ -134,7 +134,8 @@ private fun SettingsSection(text: String) {
 private fun SettingsPersonalRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, value: String,
                                 state: String, onClick: () -> Unit) {
     val c = LocalTrainColors.current
-    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button, onClick = onClick), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 72.dp).clickable(role = Role.Button, onClick = onClick)
+        .padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, null, Modifier.size(23.dp), c.ink2); Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(title, color = c.ink, fontSize = 17.sp, fontWeight = FontWeight.Normal)
@@ -155,8 +156,8 @@ private fun ServiceChoice(mode: String, label: String, enabled: Boolean, availab
             .padding(vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             ServiceIcon(mode, if (enabled && available) c.ink else c.ink3)
             Label(label, Modifier.padding(top = 6.dp), color = if (available) c.ink else c.ink3, size = 12)
-            Label(if (enabled) "✓  On" else "○  Off", Modifier.padding(top = 4.dp), color = if (enabled) c.ink else c.ink3, size = 9)
-            if (enabled && available) Box(Modifier.fillMaxWidth().padding(horizontal = 10.dp).height(2.dp).background(c.ink))
+            Label(if (enabled) "On" else "Off", Modifier.padding(top = 4.dp),
+                color = if (enabled) c.ink else c.ink3, size = 9)
         }
         if (mode != "train") Box(Modifier.align(Alignment.CenterStart).fillMaxHeight().width(1.dp).background(c.rule))
     }
@@ -165,13 +166,15 @@ private fun ServiceChoice(mode: String, label: String, enabled: Boolean, availab
 @Composable
 private fun AppearanceChoice(value: Appearance, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val c = LocalTrainColors.current
-    Box(modifier.height(86.dp)) {
+    val height = if (LocalDensity.current.fontScale > 1.15f) 102.dp else 86.dp
+    Box(modifier.height(height)) {
     Column(Modifier.fillMaxSize().clickable(role = Role.RadioButton, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         AppearancePreview(value)
         Label(value.name, Modifier.padding(top = 7.dp), color = if (selected) c.ink else c.ink2, size = 12)
-        if (value == Appearance.System) Label("Follow device", color = if (selected) c.ink else c.ink3, size = 9)
-        if (selected) Box(Modifier.fillMaxWidth().padding(horizontal = 10.dp).height(2.dp).background(c.ink))
+        Box(Modifier.height(14.dp), contentAlignment = Alignment.Center) {
+            if (value == Appearance.System) Label("Follow device", color = if (selected) c.ink else c.ink3, size = 9)
+        }
     }
     if (value != Appearance.System) Box(Modifier.align(Alignment.CenterStart).fillMaxHeight().width(1.dp).background(c.rule))
     if (selected) Icon(Icons.Outlined.Check, null, Modifier.align(Alignment.TopEnd).padding(8.dp).size(14.dp), tint = c.ink)

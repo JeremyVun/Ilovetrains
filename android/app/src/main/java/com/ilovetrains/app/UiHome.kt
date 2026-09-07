@@ -22,6 +22,7 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -34,8 +35,10 @@ fun HomeScreen(state: AppState, actions: UiActions) {
     val c = LocalTrainColors.current
     val board = state.homeBoard ?: state.board
     val focusJourney = state.focus?.journey
-    val firstFuture = board?.journeys?.firstOrNull { it.effectiveDeparture >= state.now }
-    val firstRunning = board?.journeys?.firstOrNull { !it.cancelled && it.effectiveDeparture >= state.now }
+    val retainedJourney = retainedHomeJourney(board, state.now)
+    val firstFuture = retainedJourney ?: board?.journeys?.firstOrNull { it.effectiveDeparture >= state.now }
+    val firstRunning = retainedJourney?.takeUnless { it.cancelled }
+        ?: board?.journeys?.firstOrNull { !it.cancelled && it.effectiveDeparture >= state.now }
     val focusReplacement = focusJourney?.takeIf { it.cancelled && state.now < it.effectiveDeparture }?.let { cancelled ->
         board?.journeys?.firstOrNull { !it.cancelled && it.effectiveDeparture > cancelled.effectiveDeparture }
     }
@@ -106,7 +109,9 @@ private fun SmartHeader(state: AppState, board: BoardData, journey: Journey, can
     val explicitlyPinned = focused && focus?.pinned == true
     val departed = focused && state.now >= journey.effectiveDeparture
     val completed = state.focusComplete || state.now >= journey.effectiveArrival
-    val directionFigure = if (departed && !completed) directionFigureFor(journey, state.now) ?: fig else fig
+    val directionFigure = if (departed && !completed && !journey.retained && board.isLive(state.now)) {
+        directionFigureFor(journey, state.now) ?: fig
+    } else fig
     val late = minutesBetween(journey.departure, journey.effectiveDeparture) > 0
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().heightIn(min = if (explicitlyPinned) 44.dp else 22.dp).padding(horizontal = PagePadding), verticalAlignment = Alignment.CenterVertically) {
@@ -117,6 +122,7 @@ private fun SmartHeader(state: AppState, board: BoardData, journey: Journey, can
                 focused && late -> "${minutesBetween(journey.departure, journey.effectiveDeparture)} min late"
                 departed && focused -> "Running"
                 explicitlyPinned -> "Pinned"
+                journey.retained && board.offline && state.now >= journey.effectiveDeparture -> "Last shown"
                 state.distanceMetres != null && state.distanceMetres <= 200 -> "At ${first.from.shortName}"
                 state.distanceMetres != null -> "${distanceText(state.distanceMetres)} to ${first.from.shortName}"
                 else -> "Next ${first.modeName()}"
@@ -143,8 +149,14 @@ private fun SmartHeader(state: AppState, board: BoardData, journey: Journey, can
             Column(Modifier.width(104.dp)) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(directionFigure.value, color = if (late) c.warning else c.ink,
-                        fontSize = if (directionFigure.value.length > 3) 50.sp else 64.sp,
-                        lineHeight = 58.sp, fontWeight = FontWeight(250), letterSpacing = (-2).sp)
+                        modifier = Modifier.testTag("home-primary-figure"),
+                        fontSize = when {
+                            directionFigure.value.equals("NOW", ignoreCase = true) -> 36.sp
+                            directionFigure.value.length > 3 -> 50.sp
+                            else -> 64.sp
+                        },
+                        lineHeight = 58.sp, fontWeight = FontWeight(250), letterSpacing = (-2).sp,
+                        maxLines = 1, softWrap = false)
                     Text(directionFigure.unit, color = c.ink2, fontSize = 16.sp, fontWeight = FontWeight.Normal,
                         modifier = Modifier.padding(start = 2.dp, bottom = 7.dp))
                 }

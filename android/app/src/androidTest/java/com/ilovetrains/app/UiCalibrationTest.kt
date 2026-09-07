@@ -6,12 +6,20 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
-import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -68,6 +76,18 @@ class UiCalibrationTest {
         capture("detail-two-changes")
         compose.runOnIdle { state.value = fixture.activePinnedState }
         capture("home-active-pinned")
+        compose.runOnIdle { state.value = fixture.activePinnedState.copy(appearance = Appearance.Light) }
+        capture("home-active-pinned-light")
+        compose.runOnIdle { state.value = fixture.activePinnedState.copy(screen = Screen.Board, focus = null) }
+        capture("board-transfer")
+        compose.runOnIdle {
+            state.value = fixture.activePinnedState.copy(
+                screen = Screen.Board,
+                focus = null,
+                appearance = Appearance.Light,
+            )
+        }
+        capture("board-transfer-light")
         compose.runOnIdle { state.value = fixture.activeInferredState }
         capture("home-active-inferred")
         compose.runOnIdle { state.value = fixture.completedState }
@@ -80,6 +100,20 @@ class UiCalibrationTest {
         capture("board-light")
         compose.runOnIdle { state.value = fixture.settingsState.copy(appearance = Appearance.Light) }
         capture("settings-light")
+        compose.runOnIdle { state.value = fixture.homeNowState }
+        capture("home-now")
+        compose.runOnIdle { state.value = fixture.boardNowState }
+        capture("board-now")
+        compose.runOnIdle { state.value = fixture.homeNowState.copy(appearance = Appearance.Light) }
+        capture("home-now-light")
+        compose.runOnIdle { state.value = fixture.boardNowState.copy(appearance = Appearance.Light) }
+        capture("board-now-light")
+        compose.runOnIdle { state.value = fixture.offlineDepartedT9State.copy(screen = Screen.Home) }
+        capture("home-offline-retained-t9")
+        compose.runOnIdle { state.value = fixture.offlineDepartedT9State }
+        val retainedT9 = checkNotNull(fixture.offlineDepartedT9State.board).journeys.first()
+        compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("board-journey-${retainedT9.key}"))
+        capture("board-offline-retained-t9")
         compose.runOnIdle { state.value = fixture.ferryState }
         capture("detail-f1-manly")
         compose.runOnIdle { state.value = fixture.pyrmontTransferState }
@@ -108,8 +142,50 @@ class UiCalibrationTest {
             )
         })
         compose.runOnIdle { state.value = original.copy(board = board.copy(journeys = listOf(past) + board.journeys)) }
-        compose.onRoot().performTouchInput { swipeDown() }
+        compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("board-journey-${past.key}"))
         compose.waitUntil(2_000) { actions.earlierCalls > 0 }
+    }
+
+    @Test fun offlineBoardKeepsDepartedDelayedServiceReachable() {
+        val fixture = Fixtures()
+        compose.setContent { TrainApp(fixture.offlineDepartedT9State, NoActions) }
+        val journey = checkNotNull(fixture.offlineDepartedT9State.board).journeys.first()
+
+        compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("board-journey-${journey.key}"))
+        compose.onNodeWithTag("board-journey-${journey.key}").assertIsDisplayed()
+    }
+
+    @Test fun settingsUseOnlyPlainServiceStates() {
+        val fixture = Fixtures()
+        compose.setContent { TrainApp(fixture.settingsState, NoActions) }
+
+        compose.onAllNodesWithText("ON").assertCountEquals(3)
+        compose.onAllNodesWithText("OFF").assertCountEquals(1)
+        // The personal location row keeps its compact status glyph; service choices do not.
+        compose.onAllNodesWithText("✓  ON").assertCountEquals(1)
+        compose.onAllNodesWithText("○  OFF").assertCountEquals(0)
+    }
+
+    @Test fun feedbackSuccessDismissesButErrorRemains() {
+        val fixture = Fixtures()
+        val success = "Feedback sent. Thank you."
+        val error = "Couldn’t send feedback. Check your connection and try again."
+        val state = mutableStateOf(fixture.settingsState.copy(message = success))
+        val actions = object : UiActions by NoActions {
+            override fun dismissMessage() { state.value = state.value.copy(message = null) }
+        }
+        compose.mainClock.autoAdvance = false
+        compose.setContent { TrainApp(state.value, actions) }
+
+        compose.onNodeWithText(success).assertIsDisplayed()
+        compose.mainClock.advanceTimeBy(4_100)
+        compose.runOnIdle { }
+        compose.onNodeWithText(success).assertIsNotDisplayed()
+
+        compose.runOnIdle { state.value = state.value.copy(message = error) }
+        compose.mainClock.advanceTimeBy(10_000)
+        compose.runOnIdle { }
+        compose.onNodeWithText(error).assertIsDisplayed()
     }
 
     private fun capture(name: String) {
@@ -158,6 +234,9 @@ private class Fixtures {
 
     val home = state()
     val boardState = home.copy(screen = Screen.Board)
+    private val nowBoard = centralBoard.copy(generatedAt = centralBoard.journeys.first().effectiveDeparture)
+    val homeNowState = state(nowBoard.generatedAt, nowBoard)
+    val boardNowState = homeNowState.copy(screen = Screen.Board)
     val detailState = state(transferNow, transferBoard).copy(
         screen = Screen.Detail, detail = transferBoard.journeys.first())
     val setupState = home.copy(
@@ -179,6 +258,22 @@ private class Fixtures {
     }
     val delayedState = boardState.copy(board = centralBoard.copy(
         journeys = listOf(delayedJourney) + centralBoard.journeys.drop(1)))
+
+    // Stress delta: the real T9/T4 transfer is five minutes late and retained after departure.
+    private val departedT9 = transferBoard.journeys.first().let { journey ->
+        Journey(journey.legs.map { leg -> leg.copy(
+            estimatedDeparture = leg.departure + 5 * 60_000,
+            estimatedArrival = leg.arrival + 5 * 60_000,
+        ) }, retained = true)
+    }
+    val offlineDepartedT9State = state(
+        now = departedT9.effectiveDeparture + 5 * 60_000,
+        board = transferBoard.copy(
+            journeys = listOf(departedT9) + transferBoard.journeys.drop(1),
+            offline = true,
+            homeJourneyKey = departedT9.key,
+        ),
+    ).copy(screen = Screen.Board)
 
     // Stress delta: the real first T9 leg is cancelled, preserving its transfer.
     private val cancelledJourney = transferBoard.journeys.first().let { journey ->

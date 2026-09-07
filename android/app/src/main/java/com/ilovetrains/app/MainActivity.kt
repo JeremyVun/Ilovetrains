@@ -52,6 +52,17 @@ class MainActivity : ComponentActivity() {
         model.onLocationDisabled = { stopLocation() }
         setContent {
             val state = model.state.collectAsStateWithLifecycle().value
+            LaunchedEffect(state.ready) {
+                if (state.ready) {
+                    val preferences = getPreferences(MODE_PRIVATE)
+                    if (!preferences.getBoolean("initialLocationHandled", false)) {
+                        preferences.edit().putBoolean("initialLocationHandled", true).apply()
+                        if (state.totalTrips == 0 && state.useLocation && !preferences.getBoolean("locationAsked", false)) {
+                            model.requestLocation()
+                        }
+                    }
+                }
+            }
             val dark = when (state.appearance) { Appearance.Dark -> true; Appearance.Light -> false; Appearance.System -> isSystemInDarkTheme() }
             LaunchedEffect(dark) {
                 val bars = if (dark) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT) else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)

@@ -1,7 +1,7 @@
 # Contract: Client experience and visual language
 
 This is the binding UI contract for every client: the web PWA today and the
-native Android and iOS ports to come. Platform controls may use native mechanics, but the information hierarchy, honesty
+native Android and iOS apps. Platform controls may use native mechanics, but the information hierarchy, honesty
 rules and core flows below do not vary by client.
 
 The product should answer the likely journey on open, make correction one tap,
@@ -128,7 +128,9 @@ substitutes for going back.
   the figure keeps counting to the next action, and the instruction names the
   leg that was lost rather than the one that left —
   `<HH:MM> FROM <STATION> CANCELLED`, its departure clock time and its
-  boarding station.
+  boarding station. Recovery from a cancelled leg belongs to the smart header;
+  cancelled journey detail carries no recovery control (owner ruling
+  2026-09-03).
 - The smart header omits `SCHEDULED` and realtime-source labels. Its status
   row collapses completely when empty; meaningful delay and travel labels
   (`N MIN LATE`, `TO CHANGE`, `TO GO`, `AGO`) keep their existing spacing.
@@ -229,7 +231,9 @@ substitutes for going back.
   repeats the full boarding label in its secondary direction. Unknown
   boarding places remain unknown; never infer a numbered wharf from the
   origin name or use a transfer's wharf as the journey origin.
-- Location permission is requested contextually, never on first load. Missing
+- Web location permission is requested contextually, never on first load. Android
+  requests it once during initial setup and prefills From when granted, as
+  specified in [android-deviations.md](android-deviations.md). Missing
   or denied location degrades silently to device history and time.
 - The panel that asks for location appears only once the permission state is
   known to be askable; a denied or granted permission never shows it, and it
@@ -364,9 +368,11 @@ substitutes for going back.
   the live response wins for as long as it still shows it as a departure; once
   it has run, the last live copy of it is the past row.
 - No past row shows a departure countdown.
-- Stale or offline future data drops countdown figures, removes already
+- Web stale or offline future data drops countdown figures, removes already
   departed rows, uses absolute clock times, and states
   `OFFLINE · LAST UPDATED X AGO`. A cached countdown is not presented as live.
+  Native boards retain departed rows and the last header answer under the
+  [native retention rules](native-data.md#cached-boards-and-departed-services).
 - Scheduled-only numerals are visually quieter and labelled `SCHEDULED`.
 - Delays show both the scheduled and effective time, and paint the figure and
   the effective departure in the warning colour. Cancellation remains
@@ -374,7 +380,8 @@ substitutes for going back.
   `<cancelled time> CANCELLED · NEXT TRAIN`.
 - There is no `ON TIME` label. The closed provenance vocabulary is `MIN`,
   `DEPARTING`, `SCHEDULED`, `CANCELLED`, `n MIN LATE`, `AGO`, `TO CHANGE` and
-  `TO GO`. `CANCELLED` and `n MIN LATE` are in the warning colour, because each
+  `TO GO`; native retained observations also use `LAST KNOWN`. `CANCELLED` and
+  `n MIN LATE` are in the warning colour, because each
   names an exception. An ordinary live board countdown
   leaves the provenance label empty because `min` is already on its numeral;
   other labels appear only when they change the figure's interpretation.
@@ -616,7 +623,9 @@ Client markup carries the data attributes the comps harness probes, so the
 instrument measures the built screen with the probes that judged its comps.
 
 Visual changes are compared side-by-side with the relevant calibration asset
-and verified in the real client. Use `tools/shoot-states.js` for web geometry
+and verified in the real client. `tools/visual-regression.js` proves the
+unchanged screens on all three clients still match `tools/baselines/`; an
+intended change accepts new baselines in the same commit. Use `tools/shoot-states.js` for web geometry
 and flows; a native port must ship an equivalent seeded-state shooter before
 its first verdict (PROJECT.md, "Native clients"). A design change requires
 new divergent comps and an owner verdict before product implementation

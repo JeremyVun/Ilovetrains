@@ -27,13 +27,14 @@ if [ ! -f "$ILOVETRAINS_KEYSTORE" ]; then
 fi
 umask 022
 ./gradlew :app:assembleRelease :app:testReleaseUnitTest :app:lintRelease --console=plain
+app_version="$(node --input-type=module -e "import { VERSION } from '../web/js/version.js'; process.stdout.write(VERSION)")"
+apk_name="ilovetrains-${app_version}.apk"
 mkdir -p releases
-cp app/build/outputs/apk/release/app-release.apk releases/ilovetrains-1.0.0.apk
-"$ANDROID_HOME/build-tools/36.0.0/apksigner" verify releases/ilovetrains-1.0.0.apk
-shasum -a 256 releases/ilovetrains-1.0.0.apk > releases/ilovetrains-1.0.0.apk.sha256
+cp app/build/outputs/apk/release/app-release.apk "releases/$apk_name"
+"$ANDROID_HOME/build-tools/36.0.0/apksigner" verify "releases/$apk_name"
+shasum -a 256 "releases/$apk_name" > "releases/$apk_name.sha256"
 mkdir -p "$project_dir/web/downloads"
 chmod 755 "$project_dir/web/downloads"
-cp releases/ilovetrains-1.0.0.apk "$project_dir/web/downloads/ilovetrains-1.0.0.apk"
-chmod 644 releases/ilovetrains-1.0.0.apk releases/ilovetrains-1.0.0.apk.sha256 \
-  "$project_dir/web/downloads/ilovetrains-1.0.0.apk"
-printf 'Installable APK: %s/android/releases/ilovetrains-1.0.0.apk\n' "$project_dir"
+cp "releases/$apk_name" "$project_dir/web/downloads/$apk_name"
+chmod 644 "releases/$apk_name" "releases/$apk_name.sha256" "$project_dir/web/downloads/$apk_name"
+printf 'Installable APK: %s/android/releases/%s\n' "$project_dir" "$apk_name"

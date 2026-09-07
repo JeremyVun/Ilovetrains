@@ -1,14 +1,69 @@
 # tools
 
+- `build-ios.sh` — build/test the native SwiftUI client or prepare a Release archive.
+  Use `--simulator`, `--test`, `--device` or `--unsigned-archive`; see
+  [iOS operations](../docs/operations/ios.md) for signing and installation.
+- `generate-ios-project.rb` — regenerate the checked-in Xcode project after adding
+  files. Requires the `xcodeproj` Ruby gem and reads the canonical web version.
+- `build-android.sh` — build the native app and run its JVM/lint gates. Add
+  `--release` for the signed installable APK and server download copy. See
+  [Android operations](../docs/operations/android.md) for SDK and signing setup.
+- `compile-timetable.py` — compile captured GTFS schedules into the shared
+  deterministic SQLite package. It never loads credentials. Input names,
+  source authority and package validation are specified in
+  [native-data.md](../docs/contracts/native-data.md).
+  Run compiler tests with `python3 -m unittest discover -s tools/test -p 'test_compile_timetable.py'`.
+- `export-android-conformance.mjs` — regenerate committed prediction and row
+  expectations from the web implementation: `node tools/export-android-conformance.mjs`.
+  Node and Android JVM tests consume the same JSON under `fixtures/conformance/`.
+- `shoot-android.sh` — build and drive the native renderer on one booted Android
+  emulator: `tools/shoot-android.sh 390x844` or `tools/shoot-android.sh 412x732`.
+  `FONT_SCALE=1.3` exercises enlarged text; `OUT` selects the capture directory.
+  The script restores display size and font scale on exit. Inputs are mapped
+  API captures with declared stress deltas in `fixtures/conformance/calibration.json`;
+  test hooks are packaged only in the instrumentation APK.
+  It also checks feedback-success timeout, simplified Settings selection marks,
+  and scrolling to a retained departed T9 offline; its captures include
+  Home/Board `Now` and retained-journey states. Current native exemplars are
+  indexed in `docs/contracts/android-deviations.md`.
+- `shoot-ios.sh` — install and capture seeded SwiftUI states on one booted
+  iPhone simulator. Build first, then set `ILOVETRAINS_SIMULATOR_ID`,
+  `ILOVETRAINS_IOS_APP` and optionally `OUT`; state arguments replace the
+  default matrix. `CONTENT_SIZE=accessibility-medium` exercises large text.
+  The script fixes the status-bar clock, waits for launch transitions, records
+  capture metrics and restores the content-size and status-bar overrides.
 - `probe-tfnsw.sh` — probe TfNSW Trip Planner endpoints, save raw responses
   to `fixtures/` (needs `TFNSW_API_KEY` already in the environment; never
   sources `.env`; ~5 requests). `--ferries` captures four stop searches
   and five ferry/mixed journey responses using verified Trip Planner IDs.
+- `probe-gtfs.py` — capture five source schedule bundles, two rounds of
+  trip updates and four alert feeds for timetable/realtime design evidence.
+  Requires an already-exported `TFNSW_API_KEY`; never reads `.env`. Run
+  `python3 tools/probe-gtfs.py --out /tmp/trains-gtfs-<unique-name>`.
+  Default: 19 requests, at least 20 seconds between realtime rounds, no
+  retries. `--rounds 1` makes 14 requests; `--rounds 3` makes 24. Output must
+  not exist. `capture.json` records timestamps, hashes, HTTP status, raw body
+  bytes and locally recompressed gzip sizes (not measured network egress).
+  Non-200 responses exit nonzero after completing the bounded capture; their
+  bodies are discarded. This measures source availability, not routing or
+  GTFS-R semantic correctness. Raw captures belong in `/tmp`; preserve small
+  reviewed fixtures and findings deliberately, not whole upstream bundles.
+- `inspect-gtfs.py` — offline hash-checked GTFS-R diagnostics for a capture:
+  `uv run --with gtfs-realtime-bindings==2.2.0 python tools/inspect-gtfs.py /tmp/trains-gtfs-<name> > /tmp/trains-gtfs-report.json`.
+  Reports source timestamps, standard schedule relationships and exact trip-ID
+  matches against each source's ZIP. Stop counts check membership only, not
+  trip/sequence consistency. It does not interpret TfNSW protobuf extensions,
+  resolve duplicate operators, or prove routing semantics. A successful parse
+  is not evidence that a feed is fresh or correctly joined.
 - `fixtures/` — raw TfNSW responses from probes; golden inputs for backend
   mapping tests. Re-run the probe to refresh; note refresh date in commits.
   The three `departures_*.json` files are mapped public-API captures from
   2026-09-05 for the approved ferry-board calibration: Pyrmont Bay → Double
   Bay, its reverse, and Circular Quay → Manly’s numbered/side wharf control.
+- `visual-regression.js` — one command that shoots the web, Android and iOS
+  clients, compares every frame pixel for pixel with `tools/baselines/`, and
+  writes a report with baseline | current | diff composites. Read
+  "visual-regression.js" below before trusting a green run.
 - `screenshot.js` — screenshot any URL at a real device viewport over CDP.
   No npm dependencies; kills Chrome in a `finally`.
 - `shoot-states.js` — drive the real client into every board state and shoot
@@ -82,6 +137,70 @@ exemplars shipping today are client shots of a later design, so pinning is what
 keeps this a gate on the harness while the product moves on. Both trees come
 out of git, so the oracle needs nothing but the repository. A difference is a
 defect in the harness or in the pin — report it, never widen the threshold.
+
+## visual-regression.js
+
+```
+node tools/visual-regression.js [--platform web,android,ios] [--screens a,b]
+        [--out DIR] [--compare DIR] [--accept] [--threshold N] [--fuzz N] [--list]
+```
+
+The cheap check after a change lands on every client. It shoots the three
+platforms in parallel — the web through its own private `localhost` server and
+`shoot-states.js` (plus `check-settings-browser.js` for the Settings frames),
+Android through `shoot-android.sh` on the booted emulator, iOS through
+`shoot-ios.sh` on the booted iPhone simulator — then compares each frame with
+the committed baseline in `tools/baselines/<platform>/<screen>.png`. A whole
+run is about ninety seconds with a warm Gradle cache and a built simulator app
+(`tools/build-ios.sh --simulator` first, or the iOS frames report `MISSING`);
+a cold Android build adds minutes. `--screens home,board,detail` is about
+twenty seconds. `--list` prints the screen table: one row per screen,
+naming the platform-native state that shows it, with `·` where a platform has
+no equivalent. Baselines are named by that shared screen, so the report can
+put the same screen from all three clients side by side.
+
+The output directory holds `<platform>/<screen>.png`, `diff/<platform>/` for
+frames that differ, `capture.json` (device, missing frames and why) and
+`report.html`. Each line of the console summary is a frame with its status:
+
+- `same` — no pixel differs by more than `--fuzz` (default 0) in any channel,
+  and the count over that never exceeds `--threshold` (default 0);
+- `DIFF` — the count, the worst channel delta and the bands of the frame that
+  moved, in CSS px, with a composite under `diff/` showing baseline, current
+  and the moved pixels painted in the accent over a dimmed current frame;
+- `NEW` — captured but no baseline yet; `--accept` writes it;
+- `MISSING` — a baseline or table entry whose frame was not captured, with the
+  shooter's last lines. A platform whose device is absent reports every one of
+  its frames this way; `--platform` is the only way to leave one out, so a
+  green run never silently omits a client.
+
+The exit status is non-zero for any `DIFF`, `NEW` or `MISSING`. A small
+difference is justified by reading the composite, never by widening the
+threshold: `--fuzz` and `--threshold` exist for a deliberate, argued exception
+in one invocation, not as a default. When a change is intended, re-run with
+`--accept` (or `--compare DIR --accept` on the capture you already read) and
+commit the baselines with the change, as with any contract; `manifest.json`
+records the commit, date and capturing device per platform. A baseline shot on
+a different emulator, simulator model or Chrome version differs everywhere,
+and the manifest is how to tell that from a regression.
+
+Traps:
+
+- The web frames come from `shoot-states.js`, so its traps apply. The client's
+  test seams exist only on the hostname `localhost`; the tool serves `web/` on
+  `localhost:<free port>` itself, and every drive takes a private `CDP_PORT`.
+- The Settings frames come from `check-settings-browser.js`, which asserts as
+  it drives; when any of its assertions fails (a version string that no longer
+  matches, say), all four Settings frames report `MISSING` with the message.
+- iOS frames ignore the top 190 device px, the simulator status bar, whose
+  glyphs shift one channel level between launches. An app background change in
+  that band is not seen.
+- One emulator, one simulator. A peer session mid-drive on either device
+  corrupts both runs; `pgrep -fl "shoot-android|shoot-ios"` before a native
+  run, and use `--platform web` when a device is taken.
+- The Android frames are captured by `UiCalibrationTest`, so a new Android
+  screen needs a `capture()` there and a row in the table; the iOS and web
+  states likewise. A frame the table does not name is not checked.
 
 ## screenshot.js
 
@@ -472,6 +591,26 @@ replacement stops.
 Regenerating is a deliberate act: the output is committed, so run it when
 the network changes, check the diff, and say in the commit message that the
 index was rebuilt and from bundles of what date.
+
+## compile-timetable.py
+
+Build the versioned native SQLite timetable and the identical bundled Android
+asset from five already captured GTFS ZIPs:
+
+```sh
+python3 tools/compile-timetable.py \
+  --input-dir /path/to/captured-zips \
+  --output-dir native-data/bootstrap \
+  --android-assets android/app/src/main/assets
+python3 -m unittest tools.test.test_compile_timetable -v
+```
+
+The input directory must contain `sydneytrains.zip`, `nswtrains.zip`,
+`metro.zip`, `ferries.zip` and `mff.zip`. The compiler makes no network request
+and never reads `.env`. It fails on unmapped boarding stops and emits a
+deterministic one-entry ZIP plus its SHA-256 manifest. Regeneration replaces
+the checked-in bootstrap, so review route counts, coverage and package size
+before accepting it.
 
 ## Analytics browser and production checks
 

@@ -137,10 +137,10 @@ data class Figure(val value: String, val unit: String = "", val provenance: Stri
 
 fun figureFor(journey: Journey, board: BoardData?, now: Long): Figure {
     val departure = journey.effectiveDeparture
-    val stale = board == null || board.offline || now - board.generatedAt > 90_000
+    val stale = board == null || board.offline || journey.retained || now - board.generatedAt > 90_000
     val mins = minutesBetween(now, departure)
     if (journey.cancelled) return Figure("—", provenance = "Cancelled", past = mins < 0)
-    if (stale) return Figure("", provenance = "Scheduled", past = mins < 0)
+    if (stale) return Figure("", provenance = if (journey.retained && journey.realtime) "Last known" else "Scheduled", past = mins < 0)
     if (mins < 0) return Figure(abs(mins).toString(), "min", "Ago", past = true)
     val liveRealtime = board.source == "live" && journey.realtime
     if (mins == 0) return Figure("Now", provenance = if (liveRealtime) "Departing" else "Scheduled")
@@ -185,7 +185,9 @@ fun JourneyAxis(journey: Journey, modifier: Modifier = Modifier, large: Boolean 
                 val ride = (leg.effectiveArrival - leg.effectiveDeparture).toFloat() / total
                 Box(Modifier.offset(x = maxWidth * start).width(maxWidth * ride.coerceAtLeast(.001f))
                     .height(barHeight).segmentPlacement()
-                    .background(lineColor(leg.line, leg.mode, c, fill = true)))
+                    .background(lineColor(leg.line, leg.mode, c, fill = true),
+                        RoundedCornerShape(topEnd = if (index == journey.legs.lastIndex) 3.dp else 0.dp,
+                            bottomEnd = if (index == journey.legs.lastIndex) 3.dp else 0.dp)))
                 if (index < journey.legs.lastIndex) {
                     val next = journey.legs[index + 1]
                     val waitStart = (leg.effectiveArrival - journey.effectiveDeparture).toFloat() / total
@@ -225,7 +227,9 @@ fun JourneyAxis(journey: Journey, modifier: Modifier = Modifier, large: Boolean 
                         ?: journey.legs.last()
                     val marker = lineColor(activeLeg.line, activeLeg.mode, c, fill = true)
                     Box(Modifier.width(maxWidth * at.coerceIn(0f, 1f)).height(barHeight).offset(y = 5.dp)
-                        .align(Alignment.TopStart).background(c.ground.copy(alpha = .62f)).zIndex(1f))
+                        .align(Alignment.TopStart).background(c.ground.copy(alpha = .62f),
+                            RoundedCornerShape(topEnd = if (at >= 1f) 3.dp else 0.dp,
+                                bottomEnd = if (at >= 1f) 3.dp else 0.dp)).zIndex(1f))
                     Canvas(Modifier.offset(x = maxWidth * at - 6.5.dp).width(13.dp).height(27.dp)
                         .align(Alignment.TopStart).zIndex(3f)) {
                         val triangle = Path().apply {

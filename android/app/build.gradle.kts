@@ -10,8 +10,8 @@ android {
         applicationId = "com.ilovetrains.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 3
+        versionName = Regex("VERSION = '([^']+)'").find(rootProject.file("../web/js/version.js").readText())!!.groupValues[1]
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "API_BASE", "\"https://ilovetrains.jeremyvun.com\"")
     }

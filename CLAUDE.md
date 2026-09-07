@@ -4,9 +4,9 @@ Sydney train, metro and ferry clients that answer “What train should I take ri
 now?” with no account, ads or server-side personal state. The web app is live
 at https://ilovetrains.jeremyvun.com.
 
-The installable web PWA and Kotlin Android app use the same stateless Go API,
-which caches Transport for NSW Open Data. Android also routes over a bundled,
-updatable offline timetable. Saved trips, history, prediction,
+The installable web PWA, Kotlin Android app and SwiftUI iOS app use the same
+stateless Go API, which caches Transport for NSW Open Data. Native clients also
+route over a bundled, updatable offline timetable. Saved trips, history, prediction,
 location and focused journeys stay on the device.
 
 ## Read first
@@ -22,7 +22,9 @@ location and focused journeys stay on the device.
   assignment, privacy controls and aggregate interpretation.
 - `docs/contracts/native-data.md` — Android timetable, routing and realtime.
 - `docs/contracts/android-deviations.md` — reviewable native differences.
-- `docs/operations/android.md` — build, signing, installation and verification.
+- `docs/operations/android.md` — Android build, signing and installation.
+- `docs/operations/ios.md` — iOS build, signing and simulator/phone installation.
+- `docs/contracts/ios-deviations.md` — reviewable iOS differences.
 - `assets/comps/latest/` — the authoritative comps: the current calibration
   exemplar frames every screen is judged against. Replaced, never
   accumulated, when an owner verdict changes a design.
@@ -47,6 +49,7 @@ references, and delete the entire folder. Git retains any history.
 - `internal/tfnsw/` — TfNSW client, upstream types and response mapping.
 - `web/` — dependency-free vanilla ES-module PWA, service worker and tests.
 - `android/` — native Kotlin/Compose app, JVM and emulator tests.
+- `ios/` — native SwiftUI app, Xcode project, XCTest and simulator tests.
 - `internal/native/` — shared timetable publication and realtime ingestion.
 - `native-data/bootstrap/` — verified public timetable bundled in the server.
 - `assets/` — durable media; `assets/comps/latest/` is the only comps
@@ -77,6 +80,7 @@ Primary test gates:
 go test ./...
 (cd web && npm test)
 tools/build-android.sh
+tools/build-ios.sh --test
 ```
 
 The web app is the reference implementation every later port is measured against
@@ -92,6 +96,9 @@ particular:
 - `tools/shoot-states.js` seeds and drives the real web client while checking
   geometry, scrolling, tap targets and content reachability.
 - `tools/measure-open.js` measures cached paint and live-data timing.
+- `tools/visual-regression.js` shoots web, Android and iOS and compares every
+  frame with `tools/baselines/`; run it after any change that reaches a screen,
+  and accept and commit the baselines with an intended change.
 - `tools/probe-tfnsw.sh` makes live upstream requests and requires an API key;
   use captured fixtures for normal tests.
 

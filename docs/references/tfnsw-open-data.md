@@ -281,12 +281,28 @@ Additional live coverage, 2026-09-05:
   the Wynyard train as a departure from Barangaroo. Walks between services
   remain supported; walks within the selected endpoint hub are retained.
 
-## GTFS / GTFS-realtime — not used in v1
+## GTFS / GTFS-realtime
 
-Static GTFS bundles + GTFS-R v2 protobuf feeds (Trip Updates, Vehicle
-Positions, Alerts) for Sydney Trains and Metro exist on the portal. Revisit
-if Trip Planner quota or latency becomes the bottleneck. Portal guidance:
+Native clients use bundled static schedules and normalized GTFS-R snapshots;
+web retains Trip Planner. Trip Updates, Vehicle Positions and Alerts for
+Sydney Trains and Metro exist on the portal. Portal guidance:
 poll realtime feeds ≥10–15s apart, static bundles at most daily.
+
+### Native Sydney Trains service-date gap — 2026-09-07
+
+Read `GET https://ilovetrains.jeremyvun.com/api/v1/realtime/sydneytrains`
+at 09:01:23 UTC with curl: HTTP 200, source header `2026-09-07T09:01:06Z`,
+expiry `2026-09-07T09:02:36Z`, and `updates: []`. This is a fresh but empty
+normalized snapshot, not proof that Sydney Trains has no realtime services.
+
+The reviewed 6 September capture in
+`tools/fixtures/gtfs_realtime_summary.json` has 308 Sydney Trains updates,
+all without `start_date`; 254 exactly match a static trip ID. The current
+`internal/native/realtime.go` rejects every missing service date before mapping
+stop updates. Fixing this needs a verified trip-instance/service-day join,
+including overnight runs and old per-trip observations, not a default to the
+current date. These observations explain a native coverage gap; they do not
+establish which estimate was shown on the owner's earlier Rhodes trip.
 
 ## Budget math for v1 caching
 

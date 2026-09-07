@@ -37,7 +37,7 @@ that range as unavailable.
 
 The immutable URL returns a ZIP containing exactly `timetable.sqlite3`.
 `sha256` and `bytes` cover the ZIP bytes. The database has SQLite
-`application_id=0x494c5452` and `user_version=1`. The Android APK includes the
+`application_id=0x494c5452` and `user_version=1`. The Android APK and iOS app include the
 same ZIP and manifest, so a first install can plan without a network request.
 
 Android downloads to a temporary file, enforces the declared size, verifies
@@ -190,10 +190,51 @@ routed locally and remain the online fallback's responsibility.
 Fresh delays, assignments and cancellations are applied before routing, so a
 broken transfer causes a local replan. A focused journey is refreshed by its
 exact identities even when its mode is later disabled. Missing or expired
-realtime clears prior estimates and reverts to scheduled values. A mixed-source
+realtime makes new local plans use scheduled values. Previously displayed
+journeys follow the last-known retention rules below rather than having their
+observed delays erased. A mixed-source
 journey's observation time is the oldest relevant source timestamp. A board is
 `source="live"` only when a returned journey matched a fresh update; otherwise
 it is an offline scheduled board and shows clock times.
+
+## Cached boards and departed services
+
+Native clients retain the selected pair's last board while online and local
+planning run. An empty local result or failed request cannot erase cached
+journeys. Offline results combine usable local routes with cached services;
+cached observations win over a static version of the same journey, and a new
+live observation supersedes the old one. A successful online answer remains
+authoritative for future services, including an empty answer, while recent
+departed services remain available for scrolling. Retained past rows are
+bounded to 24 hours and never cross station-pair or enabled-mode cache keys.
+
+The native cache stores an optional `homeJourneyKey`. Offline Home preserves
+that answer, even after departure, until its last-known arrival plus 30 minutes.
+This does not pin the train, infer boarding or record a ride. A fresh online
+answer resumes normal next-service selection. The key and retained journeys
+survive process restart. Older caches without the optional field remain readable.
+An unfocused retained answer whose departure has passed is labelled `Last shown`,
+so the header does not describe it as the next train.
+
+Retained observations keep their departure, arrival, delay and cancellation
+snapshot. A per-journey retention marker prevents an old row from borrowing
+the freshness of a new board. Retained realtime rows use `LAST KNOWN`, scheduled
+rows use `SCHEDULED`, and offline views keep absolute clocks without live
+countdowns. Pinned snapshots follow the same rule when refresh fails; connectivity
+loss cannot reset a delayed journey to its earlier printed arrival. These are
+native exceptions to the web's stale-row treatment (owner ruling, 2026-09-07).
+
+## Sydney Trains realtime coverage gap
+
+A production read at 19:01 Sydney time on 7 September 2026 returned HTTP 200
+with a fresh `sydneytrains` header and zero normalized updates. The current
+normalizer requires an explicit GTFS `start_date`; the captured Sydney Trains
+feed documented in the [source research](../references/tfnsw-open-data.md#native-sydney-trains-service-date-gap--2026-09-07)
+omits it. Thus fresh transport does not establish useful realtime coverage.
+The online Trip Planner currently remains the preferred online answer for both
+native clients. Restoring native Sydney Trains updates requires a verified
+service-day join against exact timetable identities, with overnight, replacement
+and stale-trip tests. Do not guess today's date or weaken freshness guards.
 
 ## Captured package measurement
 
@@ -217,3 +258,31 @@ ms for the first Mascot–Kellyville mixed-mode plan, 19 ms for the same cached
 plan, 15 ms for a new Central–Kellyville pair on that cache, and 29 ms for a
 Central–Parramatta board capped at 24 results. These are emulator observations
 for this package, not device performance guarantees.
+
+## iOS implementation
+
+Swift's `OfflinePlanner` actor owns SQLite reads, connection scans and realtime
+state away from the main actor. It uses the same schema, conservative transfer
+floors, 72-origin-service bound and six/30-hour horizon as Android. It validates
+ZIP size/hash, the sole database entry, SQLite integrity/version and coverage
+before activation. Manifest and realtime downloads are bounded before decoding.
+An update retains the active database on failure and keeps the prior generation.
+In-flight and generation guards reject overlapping or outdated snapshot commits;
+older source headers cannot replace newer observations.
+
+Static platform labels are retained through the realtime overlay and routing
+output. Expiry restores them, including an unknown static platform, instead of
+keeping a stale assignment. Skipped intermediate stops prohibit boarding and
+alighting but remain traversable by an already-boarded passenger; a skipped
+focused endpoint cancels that journey. The exact trip/service-date/stop-occurrence
+join remains mandatory.
+
+The iOS controller paints a stored board, races local planning against the online
+Trip Planner, and then prefers the online result while retaining local scheduled
+past rows. Foreground refresh is every 30 seconds and resumes immediately;
+backgrounding cancels request publication and location work. It checks timetable
+versions at most every six hours while active, plus the explicit Settings action.
+The shared API required no change for the iOS port.
+
+Builds, package synchronization and verification are documented in
+[iOS operations](../operations/ios.md).

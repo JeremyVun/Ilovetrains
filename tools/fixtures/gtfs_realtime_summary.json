@@ -1,0 +1,907 @@
+{
+  "capturedLocalDate": "2026-09-06",
+  "captureDirectory": "/tmp/trains-gtfs-20260906-design",
+  "decoder": "gtfs-realtime-bindings 2.2.0 / protobuf 7.36.1",
+  "limitations": [
+    "Exact trip IDs and static stop membership only; not a validated service-instance join.",
+    "TfNSW extensions not interpreted.",
+    "Two nighttime snapshots are not peak traffic or cadence evidence.",
+    "gzipBytes is local recompression, not observed transfer encoding."
+  ],
+  "captures": [
+    {
+      "file": "sydneytrains.zip",
+      "url": "https://api.transport.nsw.gov.au/v1/gtfs/schedule/sydneytrains",
+      "requestedAt": "2026-09-05T15:33:54.460633+00:00",
+      "status": 200,
+      "bytes": 12515627,
+      "sha256": "cc91b4554a336babaf258076db12e01818b612581436865f6261f75f897cbe28",
+      "gzipBytes": 10803044,
+      "headers": {
+        "Date": "Sat, 05 Sep 2026 15:33:54 GMT",
+        "Content-Type": "application/zip",
+        "Last-Modified": "Fri, 04 Sep 2026 15:58:22 GMT",
+        "Cache-Control": "private"
+      },
+      "receivedAt": "2026-09-05T15:33:55.293929+00:00",
+      "static": {
+        "tripRows": 83990,
+        "uniqueTrips": 83990,
+        "stops": 1214,
+        "feedInfo": [],
+        "uncompressedBytes": 197911231,
+        "memberBytes": {
+          "agency.txt": 266,
+          "routes.txt": 16832,
+          "shapes.txt": 4444804,
+          "stops.txt": 124214,
+          "vehicle_categories.txt": 1197,
+          "vehicle_boardings.txt": 358699,
+          "vehicle_couplings.txt": 3910,
+          "calendar.txt": 9527,
+          "trips.txt": 8649685,
+          "stop_times.txt": 138935204,
+          "occupancies.txt": 45366893
+        },
+        "routeTypes": {
+          "2": 137
+        }
+      }
+    },
+    {
+      "file": "nswtrains.zip",
+      "url": "https://api.transport.nsw.gov.au/v1/gtfs/schedule/nswtrains",
+      "requestedAt": "2026-09-05T15:33:55.598766+00:00",
+      "status": 200,
+      "bytes": 39890343,
+      "sha256": "413a28a62d8b57a5a886e00f6e651569f526e238201fcad93086f6abca14f7ca",
+      "gzipBytes": 38140927,
+      "headers": {
+        "Date": "Sat, 05 Sep 2026 15:33:55 GMT",
+        "Content-Type": "application/zip",
+        "Last-Modified": "Fri, 04 Sep 2026 15:13:17 GMT",
+        "Cache-Control": "private"
+      },
+      "receivedAt": "2026-09-05T15:33:57.433759+00:00",
+      "static": {
+        "tripRows": 58630,
+        "uniqueTrips": 58630,
+        "stops": 1177,
+        "feedInfo": [
+          {
+            "feed_publisher_name": "NSW TrainLink",
+            "feed_publisher_url": "http://www.nswtrainlink.info/",
+            "feed_lang": "en",
+            "feed_version": "05092026-011236"
+          }
+        ],
+        "uncompressedBytes": 208958056,
+        "memberBytes": {
+          "shapes.txt": 131505865,
+          "notes.txt": 446,
+          "vehicle_boardings.txt": 500703,
+          "vehicle_categories.txt": 2300,
+          "vehicle_couplings.txt": 6331,
+          "seats.txt": 0,
+          "agency.txt": 254,
+          "routes.txt": 33642,
+          "feed_info.txt": 141,
+          "stop_times.txt": 65203249,
+          "trips.txt": 7682822,
+          "calendar.txt": 3892510,
+          "calendar_dates.txt": 37,
+          "stops.txt": 129756
+        },
+        "routeTypes": {
+          "204": 163,
+          "205": 124,
+          "100": 4,
+          "106": 27
+        }
+      }
+    },
+    {
+      "file": "metro.zip",
+      "url": "https://api.transport.nsw.gov.au/v2/gtfs/schedule/metro",
+      "requestedAt": "2026-09-05T15:33:57.737622+00:00",
+      "status": 200,
+      "bytes": 1064707,
+      "sha256": "b5e986064f4b5ed495e611e9ef2158b4b5bb2870bffa6fd65ddeed2e89d0abd3",
+      "gzipBytes": 906890,
+      "headers": {
+        "Date": "Sat, 05 Sep 2026 15:33:57 GMT",
+        "Content-Type": "application/zip",
+        "Last-Modified": "Wed, 02 Sep 2026 17:20:10 GMT",
+        "Cache-Control": "private"
+      },
+      "receivedAt": "2026-09-05T15:33:58.023927+00:00",
+      "static": {
+        "tripRows": 3123,
+        "uniqueTrips": 3123,
+        "stops": 63,
+        "feedInfo": [],
+        "uncompressedBytes": 8876052,
+        "memberBytes": {
+          "agency.txt": 215,
+          "calendar.txt": 641,
+          "calendar_dates.txt": 35,
+          "routes.txt": 226,
+          "stops.txt": 5458,
+          "stop_times.txt": 6390447,
+          "trips.txt": 378432,
+          "shapes.txt": 2087462,
+          "notes.txt": 13136
+        },
+        "routeTypes": {
+          "401": 1
+        }
+      }
+    },
+    {
+      "file": "ferries.zip",
+      "url": "https://api.transport.nsw.gov.au/v1/gtfs/schedule/ferries/sydneyferries",
+      "requestedAt": "2026-09-05T15:33:58.325753+00:00",
+      "status": 200,
+      "bytes": 893137,
+      "sha256": "5a710c6244374b2759d27647c177497fd7e4748ae5fe1f02b8892de7988dc2ad",
+      "gzipBytes": 836711,
+      "headers": {
+        "Date": "Sat, 05 Sep 2026 15:33:58 GMT",
+        "Content-Type": "application/zip",
+        "Last-Modified": "Fri, 04 Sep 2026 15:02:21 GMT",
+        "Cache-Control": "private"
+      },
+      "receivedAt": "2026-09-05T15:33:58.596947+00:00",
+      "static": {
+        "tripRows": 8467,
+        "uniqueTrips": 8467,
+        "stops": 75,
+        "feedInfo": [
+          {
+            "feed_publisher_name": "Sydney Ferries",
+            "feed_publisher_url": "http://transportnsw.info",
+            "feed_lang": "EN",
+            "feed_version": "05092026-010132"
+          }
+        ],
+        "uncompressedBytes": 9507254,
+        "memberBytes": {
+          "shapes.txt": 2829380,
+          "notes.txt": 188,
+          "agency.txt": 162,
+          "routes.txt": 966,
+          "feed_info.txt": 137,
+          "stop_times.txt": 4540094,
+          "trips.txt": 1470978,
+          "calendar.txt": 657784,
+          "calendar_dates.txt": 37,
+          "stops.txt": 7528
+        },
+        "routeTypes": {
+          "4": 10
+        }
+      }
+    },
+    {
+      "file": "mff.zip",
+      "url": "https://api.transport.nsw.gov.au/v1/gtfs/schedule/ferries/MFF",
+      "requestedAt": "2026-09-05T15:33:58.897838+00:00",
+      "status": 200,
+      "bytes": 11324,
+      "sha256": "4834399879893d7efc0ad65c383f2b50cf1c64a6e7ac2eec70e5d12332c2ecd2",
+      "gzipBytes": 9919,
+      "headers": {
+        "Date": "Sat, 05 Sep 2026 15:33:58 GMT",
+        "Content-Type": "application/zip",
+        "Last-Modified": "Tue, 30 Jun 2026 08:42:31 GMT",
+        "Cache-Control": "private"
+      },
+      "receivedAt": "2026-09-05T15:33:58.947978+00:00",
+      "static": {
+        "tripRows": 532,
+        "uniqueTrips": 532,
+        "stops": 6,
+        "feedInfo": [],
+        "uncompressedBytes": 107021,
+        "memberBytes": {
+          "agency.txt": 145,
+          "routes.txt": 190,
+          "trips.txt": 43481,
+          "stops.txt": 549,
+          "notes.txt": 18,
+          "shapes.txt": 8369,
+          "stop_times.txt": 53806,
+          "calendar_dates.txt": 169,
+          "calendar.txt": 294
+        },
+        "routeTypes": {
+          "4": 1
+        }
+      }
+    },
+    {
+      "file": "sydneytrains-0.pb",
+      "url": "https://api.transport.nsw.gov.au/v2/gtfs/realtime/sydneytrains",
+      "requestedAt": "2026-09-05T15:33:59.255347+00:00",
+      "status": 200,
+      "bytes": 79085,
+      "sha256": "2994403111f2dfa78a50002f1a4b8777d8973ce09c49cc34419b3a2398ad5dd7",
+      "gzipBytes": 19273,
+      "headers": {
+        "Date": "Sat, 05 Sep 2026 15:33:59 GMT",
+        "Content-Type": "application/octet-stream",
+        "Cache-Control": "private"
+      },
+      "receivedAt": "2026-09-05T15:33:59.412746+00:00",
+      "realtime": {
+        "version": "2.0",
+        "incrementality": "FULL_DATASET",
+        "sourceTimestamp": "2026-09-05T15:33:46+00:00",
+        "sourceAgeSeconds": 13.41,
+        "entities": 308,
+        "tripUpdates": 308,
+        "alerts": 0,
+        "tripRelationships": {
+          "SCHEDULED": 150,
+          "REPLACEMENT": 88,
+          "CANCELED": 68,
+          "ADDED": 2
+        },
+        "startDates": {
+          "": 308
+        },
+        "exactTripMatches": 254,
+        "unmatchedTripExamples": [
+          "NY86.1396.160.64.R.6.91975234",
+          "73BS.1396.160.64.M.4.90985003",
+          "162T.1396.160.64.A.8.90990152",
+          "152W.1396.160.64.A.8.90987226",
+          "163T.1396.160.64.A.8.90985276",
+          "154V.1396.160.64.A.8.90986413",
+          "163V.1396.160.64.A.8.90985277",
+          "73BT.1396.160.64.M.4.90984884"
+        ],
+        "stopUpdates": 1378,
+        "stopIdsPresent": 1378,
+        "stopIdsInStatic": 1378,
+        "stopSequencesPresent": 0,
+        "stopRelationships": {
+          "SCHEDULED": 1350,
+          "SKIPPED": 28
+        },
+        "tripTimestampRange": [
+          "2026-09-04T14:24:52+00:00",
+          "2026-09-05T15:33:46+00:00"
+        ],
+        "tripTimestampsPresent": 308
+      }
+    },
+    {
+      "file": "nswtrains-0.pb",
+      "url": "https://api.transport.nsw.gov.au/v1/gtfs/realtime/nswtrains",
+      "requestedAt": "2026-09-05T15:33:59.715393+00:00",
+      "status": 200,
+      "bytes": 74482,
+      "sha256": "d047c1694d71a2bdfd71afc21c8f5859178ccb27f42ca4996df46d7a466a497d",
+      "gzipBytes": 23149,
+      "headers": {
+        "Date": "Sat, 05 Sep 2026 15:33:59 GMT",
+        "Content-Type": "application/x-google-protobuf",
+        "Last-Modified": "Sat, 05 Sep 2026 15:33:34 GMT",
+        "Cache-Control": "private"
+      },
+      "receivedAt": "2026-09-05T15:33:59.862585+00:00",
+      "realtime": {
+        "version": "1.0",
+        "incrementality": "FULL_DATASET",
+        "sourceTimestamp": "2026-09-05T15:33:14+00:00",
+        "sourceAgeSeconds": 45.86,
+        "entities": 177,
+        "tripUpdates": 177,
+        "alerts": 0,
+        "tripRelationships": {
+          "SCHEDULED": 167,
+          "REPLACEMENT": 2,
+          "CANCELED": 8
+        },
+        "startDates": {
+          "20260905": 83,
+          "20260906": 94
+        },
+        "exactTripMatches": 169,
+        "unmatchedTripExamples": [
+          "SP44.692026.ADDED",
+          "ST21.592026.ADDED",
+          "ST22.592026.ADDED",
+          "ST23.592026.ADDED",
+          "ST24.592026.ADDED",
+          "ST24.692026.ADDED",
+          "WT27.692026.ADDED",
+          "WT28.592026.ADDED"
+        ],
+        "stopUpdates": 1989,
+        "stopIdsPresent": 1989,
+        "stopIdsInStatic": 1989,
+        "stopSequencesPresent": 1989,
+        "stopRelationships": {
+          "NO_DATA": 31,
+          "SCHEDULED": 1947,
+          "SKIPPED": 11
+        },
+        "tripTimestampRange": [
+          "2026-09-05T12:11:27+00:00",
+          "2026-09-05T15:33:08+00:00"
+        ],
+        "tripTimestampsPresent": 12
+      }
+    },
+    {
+      "file": "metro-0.pb",
+      "url": "https://api.transport.nsw.gov.au/v2/gtfs/realtime/metro",
+      "requestedAt": "2026-09-05T15:34:00.171618+00:00",
+      "status": 200,
+      "bytes": 19575,
+      "sha256": "df5c6674aeba37bd32ac68d0c47b42db0d77f2287921d263b94124e2ea471369",
+      "gzipBytes": 5509,
+      "headers": {
+        "Date": "Sat, 05 Sep 2026 15:34:00 GMT",
+        "Content-Type": "application/x-google-protobuf",
+        "Last-Modified": "Sat, 05 Sep 2026 15:33:56 GMT",
+        "Cache-Control": "private"
+      },
+      "receivedAt": "2026-09-05T15:34:00.402923+00:00",
+      "realtime": {
+        "version": "1.0",
+        "incrementality": "FULL_DATASET",
+        "sourceTimestamp": "2026-09-05T15:33:54+00:00",
+        "sourceAgeSeconds": 6.4,
+        "entities": 24,
+        "tripUpdates": 24,
+        "alerts": 0,
+        "tripRelationships": {
+          "SCHEDULED": 10,
+          "ADDED": 11,
+          "REPLACEMENT": 3
+        },
+        "startDates": {
+          "20260905": 24
+        },
+        "exactTripMatches": 13,
+        "unmatchedTripExamples": [
+          "M1-O-CEN_UP-CUD_DN-1-20260905-142928:X",
+          "M1-O-CEN_UP-CUD_DN-1-20260905-145926:X",
+          "M1-O-CEN_UP-CUD_DN-1-20260905-152942:X",
+          "M1-O-CEN_UP-CUD_DN-1-20260905-143925:X",
+          "M1-O-CEN_UP-CUD_DN-1-20260905-144928:X",
+          "M1-I-WLO_DN-SYD_UP-1-20260905-151713:X",
+          "M1-I-WLO_DN-SYD_UP-1-20260905-152730:X",
+          "M1-O-CEN_UP-CUD_DN-1-20260905-141927:X"
+        ],
+        "stopUpdates": 431,
+        "stopIdsPresent": 431,
+        "stopIdsInStatic": 431,
+        "stopSequencesPresent": 431,
+        "stopRelationships": {
+          "SCHEDULED": 428,
+          "SKIPPED": 3
+        },
+        "tripTimestampRange": [
+          "2026-09-05T14:21:34+00:00",
+          "2026-09-05T15:33:52+00:00"
+        ],
+        "tripTimestampsPresent": 24
+      }
+    },
+    {
+      "file": "ferries-0.pb",
+      "url": "https://api.transport.nsw.gov.au/v1/gtfs/realtime/ferries/sydneyferries",
+      "requestedAt": "2026-09-05T15:34:00.704214+00:00",
+      "status": 200,
+      "bytes": 4312,
+      "sha256": "40fe96581f7bff36f57d22d15ba447e37a6df0116483e21798003ea665bd2e0e",
+      "gzipBytes": 1739,
+      "headers": {
+        "Date": "Sat, 05 Sep 2026 15:34:00 GMT",
+        "Content-Type": "application/x-google-protobuf",
+        "Last-Modified": "Sat, 05 Sep 2026 15:33:50 GMT",
+        "Cache-Control": "private"
+      },
+      "receivedAt": "2026-09-05T15:34:00.910262+00:00",
+      "realtime": {
+        "version": "1.0",
+        "incrementality": "FULL_DATASET",
+        "sourceTimestamp": "2026-09-05T15:33:46+00:00",
+        "sourceAgeSeconds": 14.91,
+        "entities": 19,
+        "tripUpdates": 19,
+        "alerts": 0,
+        "tripRelationships": {
+          "SCHEDULED": 8,
+          "REPLACEMENT": 4,
+          "CANCELED": 7
+        },
+        "startDates": {
+          "20260905": 14,
+          "20260906": 5
+        },
+        "exactTripMatches": 3,
+        "unmatchedTripExamples": [
+          "CI2245-SAT-IN.050926.32.2319",
+          "DH2242-SAT-IN.050926.32.2311",
+          "DH2342-OUT-SAT.050926.32.2342",
+          "ES2257-SAT-IN.050926.32.2320",
+          "ML0020-OUT-SAT.060926.64.0020",
+          "ML0020-SAT-IN.060926.64.0050",
+          "ML2250-SAT-IN.050926.32.2320",
+          "ML2320-OUT-SAT.050926.32.2320"
+        ],
+        "stopUpdates": 58,
+        "stopIdsPresent": 58,
+        "stopIdsInStatic": 56,
+        "stopSequencesPresent": 58,
+        "stopRelationships": {
+          "SCHEDULED": 58
+        },
+        "tripTimestampRange": null,
+        "tripTimestampsPresent": 0
+      }
+    },
+    {
+      "file": "mff-0.pb",
+      "url": "https://api.transport.nsw.gov.au/v1/gtfs/realtime/ferries/MFF",
+      "requestedAt": "2026-09-05T15:34:01.214838+00:00",
+      "status": 200,
+      "bytes": 9114,
+      "sha256": "87cf31c265aabcd4e68e21a753fc532dc1731786b6a85cde4b20b25fd09de9fe",
+      "gzipBytes": 1724,
+      "headers": {
+        "Date": "Sat, 05 Sep 2026 15:34:01 GMT",
+        "Content-Type": "application/x-google-protobuf",
+        "Last-Modified": "Wed, 01 Jul 2026 07:55:19 GMT",
+        "Cache-Control": "private"
+      },
+      "receivedAt": "2026-09-05T15:34:01.260641+00:00",
+      "realtime": {
+        "version": "2.0",
+        "incrementality": "FULL_DATASET",
+        "sourceTimestamp": "2026-07-01T07:55:17+00:00",
+        "sourceAgeSeconds": 5729924.26,
+        "entities": 84,
+        "tripUpdates": 84,
+        "alerts": 0,
+        "tripRelationships": {
+          "SCHEDULED": 84
+        },
+        "startDates": {
+          "20260701": 84
+        },
+        "exactTripMatches": 84,
+        "unmatchedTripExamples": [],
+        "stopUpdates": 168,
+        "stopIdsPresent": 168,
+        "stopIdsInStatic": 168,
+        "stopSequencesPresent": 168,
+        "stopRelationships": {
+          "SCHEDULED": 168
+        },
+        "tripTimestampRange": [
+          "2026-07-01T07:51:07+00:00",
+          "2026-07-01T07:55:02+00:00"
+        ],
+        "tripTimestampsPresent": 3
+      }
+    },
+    {
+      "file": "sydneytrains-alerts.pb",
+      "url": "https://api.transport.nsw.gov.au/v2/gtfs/alerts/sydneytrains",
+      "requestedAt": "2026-09-05T15:34:01.561940+00:00",
+      "status": 200,
+      "bytes": 132335,
+      "sha256": "2dfdf224514348a74c85bf1ce6c88e239db5603db95f11be2b00daeca21bb248",
+      "gzipBytes": 15328,
+      "headers": {
+        "Date": "Sat, 05 Sep 2026 15:34:01 GMT",
+        "Content-Type": "application/octet-stream",
+        "Cache-Control": "public, max-age=90, s-maxage=90"
+      },
+      "receivedAt": "2026-09-05T15:34:01.831873+00:00",
+      "realtime": {
+        "version": "2.0",
+        "incrementality": "FULL_DATASET",
+        "sourceTimestamp": "2026-09-05T15:32:52+00:00",
+        "sourceAgeSeconds": 69.83,
+        "entities": 64,
+        "tripUpdates": 0,
+        "alerts": 64,
+        "tripRelationships": {},
+        "startDates": {},
+        "exactTripMatches": 0,
+        "unmatchedTripExamples": [],
+        "stopUpdates": 0,
+        "stopIdsPresent": 0,
+        "stopIdsInStatic": 0,
+        "stopSequencesPresent": 0,
+        "stopRelationships": {},
+        "tripTimestampRange": null,
+        "tripTimestampsPresent": 0
+      }
+    },
+    {
+      "file": "nswtrains-alerts.pb",
+      "url": "https://api.transport.nsw.gov.au/v2/gtfs/alerts/nswtrains",
+      "requestedAt": "2026-09-05T15:34:02.136497+00:00",
+      "status": 200,
+      "bytes": 74122,
+      "sha256": "e050c76facf39e51dbee3e9fe2a336182149500deda112cf2efbe53e00405b80",
+      "gzipBytes": 11306,
+      "headers": {
+        "Date": "Sat, 05 Sep 2026 15:34:02 GMT",
+        "Content-Type": "application/octet-stream",
+        "Cache-Control": "public, max-age=90, s-maxage=90"
+      },
+      "receivedAt": "2026-09-05T15:34:02.518611+00:00",
+      "realtime": {
+        "version": "2.0",
+        "incrementality": "FULL_DATASET",
+        "sourceTimestamp": "2026-09-05T15:33:05+00:00",
+        "sourceAgeSeconds": 57.52,
+        "entities": 75,
+        "tripUpdates": 0,
+        "alerts": 75,
+        "tripRelationships": {},
+        "startDates": {},
+        "exactTripMatches": 0,
+        "unmatchedTripExamples": [],
+        "stopUpdates": 0,
+        "stopIdsPresent": 0,
+        "stopIdsInStatic": 0,
+        "stopSequencesPresent": 0,
+        "stopRelationships": {},
+        "tripTimestampRange": null,
+        "tripTimestampsPresent": 0
+      }
+    },
+    {
+      "file": "metro-alerts.pb",
+      "url": "https://api.transport.nsw.gov.au/v2/gtfs/alerts/metro",
+      "requestedAt": "2026-09-05T15:34:02.823249+00:00",
+      "status": 200,
+      "bytes": 16904,
+      "sha256": "a8f8fbd248ece3813e2702957c689cdcacf445e609604527bf15027f4cc3cae6",
+      "gzipBytes": 3175,
+      "headers": {
+        "Date": "Sat, 05 Sep 2026 15:34:02 GMT",
+        "Content-Type": "application/octet-stream",
+        "Cache-Control": "public, max-age=90, s-maxage=90"
+      },
+      "receivedAt": "2026-09-05T15:34:02.900383+00:00",
+      "realtime": {
+        "version": "2.0",
+        "incrementality": "FULL_DATASET",
+        "sourceTimestamp": "2026-09-05T15:32:44+00:00",
+        "sourceAgeSeconds": 78.9,
+        "entities": 6,
+        "tripUpdates": 0,
+        "alerts": 6,
+        "tripRelationships": {},
+        "startDates": {},
+        "exactTripMatches": 0,
+        "unmatchedTripExamples": [],
+        "stopUpdates": 0,
+        "stopIdsPresent": 0,
+        "stopIdsInStatic": 0,
+        "stopSequencesPresent": 0,
+        "stopRelationships": {},
+        "tripTimestampRange": null,
+        "tripTimestampsPresent": 0
+      }
+    },
+    {
+      "file": "ferries-alerts.pb",
+      "url": "https://api.transport.nsw.gov.au/v2/gtfs/alerts/ferries",
+      "requestedAt": "2026-09-05T15:34:03.206127+00:00",
+      "status": 200,
+      "bytes": 1855,
+      "sha256": "735958e94d5fbde93d1a0b3258f9c0110da9ea8403713f124f4a6c1998e57968",
+      "gzipBytes": 739,
+      "headers": {
+        "Date": "Sat, 05 Sep 2026 15:34:03 GMT",
+        "Content-Type": "application/octet-stream",
+        "Cache-Control": "public, max-age=90, s-maxage=90"
+      },
+      "receivedAt": "2026-09-05T15:34:03.311266+00:00",
+      "realtime": {
+        "version": "2.0",
+        "incrementality": "FULL_DATASET",
+        "sourceTimestamp": "2026-09-05T15:33:24+00:00",
+        "sourceAgeSeconds": 39.31,
+        "entities": 2,
+        "tripUpdates": 0,
+        "alerts": 2,
+        "tripRelationships": {},
+        "startDates": {},
+        "exactTripMatches": 0,
+        "unmatchedTripExamples": [],
+        "stopUpdates": 0,
+        "stopIdsPresent": 0,
+        "stopIdsInStatic": 0,
+        "stopSequencesPresent": 0,
+        "stopRelationships": {},
+        "tripTimestampRange": null,
+        "tripTimestampsPresent": 0
+      }
+    },
+    {
+      "file": "sydneytrains-1.pb",
+      "url": "https://api.transport.nsw.gov.au/v2/gtfs/realtime/sydneytrains",
+      "requestedAt": "2026-09-05T15:34:23.616902+00:00",
+      "status": 200,
+      "bytes": 78638,
+      "sha256": "c9d71de3d81370b2ea908c00fd33575c97cb29c14161bedca0e38cda8e2f46de",
+      "gzipBytes": 19182,
+      "headers": {
+        "Date": "Sat, 05 Sep 2026 15:34:23 GMT",
+        "Content-Type": "application/octet-stream",
+        "Cache-Control": "private"
+      },
+      "receivedAt": "2026-09-05T15:34:23.748764+00:00",
+      "realtime": {
+        "version": "2.0",
+        "incrementality": "FULL_DATASET",
+        "sourceTimestamp": "2026-09-05T15:34:16+00:00",
+        "sourceAgeSeconds": 7.75,
+        "entities": 306,
+        "tripUpdates": 306,
+        "alerts": 0,
+        "tripRelationships": {
+          "SCHEDULED": 148,
+          "REPLACEMENT": 88,
+          "CANCELED": 68,
+          "ADDED": 2
+        },
+        "startDates": {
+          "": 306
+        },
+        "exactTripMatches": 252,
+        "unmatchedTripExamples": [
+          "NY86.1396.160.64.R.6.91975234",
+          "73BS.1396.160.64.M.4.90985003",
+          "162T.1396.160.64.A.8.90990152",
+          "152W.1396.160.64.A.8.90987226",
+          "163T.1396.160.64.A.8.90985276",
+          "154V.1396.160.64.A.8.90986413",
+          "163V.1396.160.64.A.8.90985277",
+          "73BT.1396.160.64.M.4.90984884"
+        ],
+        "stopUpdates": 1376,
+        "stopIdsPresent": 1376,
+        "stopIdsInStatic": 1376,
+        "stopSequencesPresent": 0,
+        "stopRelationships": {
+          "SCHEDULED": 1348,
+          "SKIPPED": 28
+        },
+        "tripTimestampRange": [
+          "2026-09-04T14:24:52+00:00",
+          "2026-09-05T15:34:16+00:00"
+        ],
+        "tripTimestampsPresent": 306
+      }
+    },
+    {
+      "file": "nswtrains-1.pb",
+      "url": "https://api.transport.nsw.gov.au/v1/gtfs/realtime/nswtrains",
+      "requestedAt": "2026-09-05T15:34:24.054276+00:00",
+      "status": 200,
+      "bytes": 74480,
+      "sha256": "c54d970365f49004b33df5e2004591a245124f537c63d4289ea59086e7d90c4d",
+      "gzipBytes": 23137,
+      "headers": {
+        "Date": "Sat, 05 Sep 2026 15:34:24 GMT",
+        "Content-Type": "application/x-google-protobuf",
+        "Last-Modified": "Sat, 05 Sep 2026 15:34:06 GMT",
+        "Cache-Control": "private"
+      },
+      "receivedAt": "2026-09-05T15:34:24.216426+00:00",
+      "realtime": {
+        "version": "1.0",
+        "incrementality": "FULL_DATASET",
+        "sourceTimestamp": "2026-09-05T15:33:46+00:00",
+        "sourceAgeSeconds": 38.22,
+        "entities": 177,
+        "tripUpdates": 177,
+        "alerts": 0,
+        "tripRelationships": {
+          "SCHEDULED": 167,
+          "REPLACEMENT": 2,
+          "CANCELED": 8
+        },
+        "startDates": {
+          "20260905": 83,
+          "20260906": 94
+        },
+        "exactTripMatches": 169,
+        "unmatchedTripExamples": [
+          "SP44.692026.ADDED",
+          "ST21.592026.ADDED",
+          "ST22.592026.ADDED",
+          "ST23.592026.ADDED",
+          "ST24.592026.ADDED",
+          "ST24.692026.ADDED",
+          "WT27.692026.ADDED",
+          "WT28.592026.ADDED"
+        ],
+        "stopUpdates": 1989,
+        "stopIdsPresent": 1989,
+        "stopIdsInStatic": 1989,
+        "stopSequencesPresent": 1989,
+        "stopRelationships": {
+          "NO_DATA": 31,
+          "SCHEDULED": 1947,
+          "SKIPPED": 11
+        },
+        "tripTimestampRange": [
+          "2026-09-05T12:11:27+00:00",
+          "2026-09-05T15:33:31+00:00"
+        ],
+        "tripTimestampsPresent": 12
+      }
+    },
+    {
+      "file": "metro-1.pb",
+      "url": "https://api.transport.nsw.gov.au/v2/gtfs/realtime/metro",
+      "requestedAt": "2026-09-05T15:34:24.521688+00:00",
+      "status": 200,
+      "bytes": 19575,
+      "sha256": "5e6287c695e05e5f30dc76646671f052702369a9770d50dee63ac0615ac54cb4",
+      "gzipBytes": 5509,
+      "headers": {
+        "Date": "Sat, 05 Sep 2026 15:34:24 GMT",
+        "Content-Type": "application/x-google-protobuf",
+        "Last-Modified": "Sat, 05 Sep 2026 15:34:22 GMT",
+        "Cache-Control": "private"
+      },
+      "receivedAt": "2026-09-05T15:34:24.746102+00:00",
+      "realtime": {
+        "version": "1.0",
+        "incrementality": "FULL_DATASET",
+        "sourceTimestamp": "2026-09-05T15:34:18+00:00",
+        "sourceAgeSeconds": 6.75,
+        "entities": 24,
+        "tripUpdates": 24,
+        "alerts": 0,
+        "tripRelationships": {
+          "SCHEDULED": 10,
+          "ADDED": 11,
+          "REPLACEMENT": 3
+        },
+        "startDates": {
+          "20260905": 24
+        },
+        "exactTripMatches": 13,
+        "unmatchedTripExamples": [
+          "M1-O-CEN_UP-CUD_DN-1-20260905-142928:X",
+          "M1-O-CEN_UP-CUD_DN-1-20260905-145926:X",
+          "M1-O-CEN_UP-CUD_DN-1-20260905-152942:X",
+          "M1-O-CEN_UP-CUD_DN-1-20260905-143925:X",
+          "M1-O-CEN_UP-CUD_DN-1-20260905-144928:X",
+          "M1-I-WLO_DN-SYD_UP-1-20260905-151713:X",
+          "M1-I-WLO_DN-SYD_UP-1-20260905-152730:X",
+          "M1-O-CEN_UP-CUD_DN-1-20260905-141927:X"
+        ],
+        "stopUpdates": 431,
+        "stopIdsPresent": 431,
+        "stopIdsInStatic": 431,
+        "stopSequencesPresent": 431,
+        "stopRelationships": {
+          "SCHEDULED": 428,
+          "SKIPPED": 3
+        },
+        "tripTimestampRange": [
+          "2026-09-05T14:21:34+00:00",
+          "2026-09-05T15:33:52+00:00"
+        ],
+        "tripTimestampsPresent": 24
+      }
+    },
+    {
+      "file": "ferries-1.pb",
+      "url": "https://api.transport.nsw.gov.au/v1/gtfs/realtime/ferries/sydneyferries",
+      "requestedAt": "2026-09-05T15:34:25.046535+00:00",
+      "status": 200,
+      "bytes": 4312,
+      "sha256": "2eb6c1c7ecccc9b70dc8fb2d5003ee69b60b44dc0f9ccb3f523d271e6ad11b74",
+      "gzipBytes": 1738,
+      "headers": {
+        "Date": "Sat, 05 Sep 2026 15:34:25 GMT",
+        "Content-Type": "application/x-google-protobuf",
+        "Last-Modified": "Sat, 05 Sep 2026 15:34:20 GMT",
+        "Cache-Control": "private"
+      },
+      "receivedAt": "2026-09-05T15:34:25.107722+00:00",
+      "realtime": {
+        "version": "1.0",
+        "incrementality": "FULL_DATASET",
+        "sourceTimestamp": "2026-09-05T15:34:17+00:00",
+        "sourceAgeSeconds": 8.11,
+        "entities": 19,
+        "tripUpdates": 19,
+        "alerts": 0,
+        "tripRelationships": {
+          "SCHEDULED": 8,
+          "REPLACEMENT": 4,
+          "CANCELED": 7
+        },
+        "startDates": {
+          "20260905": 14,
+          "20260906": 5
+        },
+        "exactTripMatches": 3,
+        "unmatchedTripExamples": [
+          "CI2245-SAT-IN.050926.32.2319",
+          "DH2242-SAT-IN.050926.32.2311",
+          "DH2342-OUT-SAT.050926.32.2342",
+          "ES2257-SAT-IN.050926.32.2320",
+          "ML0020-OUT-SAT.060926.64.0020",
+          "ML0020-SAT-IN.060926.64.0050",
+          "ML2250-SAT-IN.050926.32.2320",
+          "ML2320-OUT-SAT.050926.32.2320"
+        ],
+        "stopUpdates": 58,
+        "stopIdsPresent": 58,
+        "stopIdsInStatic": 56,
+        "stopSequencesPresent": 58,
+        "stopRelationships": {
+          "SCHEDULED": 58
+        },
+        "tripTimestampRange": null,
+        "tripTimestampsPresent": 0
+      }
+    },
+    {
+      "file": "mff-1.pb",
+      "url": "https://api.transport.nsw.gov.au/v1/gtfs/realtime/ferries/MFF",
+      "requestedAt": "2026-09-05T15:34:25.412963+00:00",
+      "status": 200,
+      "bytes": 9114,
+      "sha256": "87cf31c265aabcd4e68e21a753fc532dc1731786b6a85cde4b20b25fd09de9fe",
+      "gzipBytes": 1724,
+      "headers": {
+        "Date": "Sat, 05 Sep 2026 15:34:25 GMT",
+        "Content-Type": "application/x-google-protobuf",
+        "Last-Modified": "Wed, 01 Jul 2026 07:55:19 GMT",
+        "Cache-Control": "private"
+      },
+      "receivedAt": "2026-09-05T15:34:25.462215+00:00",
+      "realtime": {
+        "version": "2.0",
+        "incrementality": "FULL_DATASET",
+        "sourceTimestamp": "2026-07-01T07:55:17+00:00",
+        "sourceAgeSeconds": 5729948.46,
+        "entities": 84,
+        "tripUpdates": 84,
+        "alerts": 0,
+        "tripRelationships": {
+          "SCHEDULED": 84
+        },
+        "startDates": {
+          "20260701": 84
+        },
+        "exactTripMatches": 84,
+        "unmatchedTripExamples": [],
+        "stopUpdates": 168,
+        "stopIdsPresent": 168,
+        "stopIdsInStatic": 168,
+        "stopSequencesPresent": 168,
+        "stopRelationships": {
+          "SCHEDULED": 168
+        },
+        "tripTimestampRange": [
+          "2026-07-01T07:51:07+00:00",
+          "2026-07-01T07:55:02+00:00"
+        ],
+        "tripTimestampsPresent": 3
+      }
+    }
+  ]
+}

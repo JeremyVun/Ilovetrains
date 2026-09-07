@@ -52,7 +52,7 @@ fun DetailScreen(state: AppState, actions: UiActions) {
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             BoardRow(journey, board, state.now, detail = true,
-                figureOverride = directionFigureFor(journey, state.now))
+                figureOverride = if (board?.isLive(state.now) == true && !journey.retained) directionFigureFor(journey, state.now) else null)
             JourneySteps(journey, state.now)
             Spacer(Modifier.height(12.dp))
         }

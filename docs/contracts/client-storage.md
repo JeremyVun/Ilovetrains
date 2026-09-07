@@ -1,6 +1,6 @@
 # Contract: Client-side storage & trip prediction
 
-Web personal state lives in `localStorage`; Android uses private atomic files.
+Web personal state lives in `localStorage`; Android and iOS use private atomic files.
 The personal document is never uploaded. A departures request carries only its station pair and current
 mode allow-list; that request is stateless and creates no server-side profile.
 This is a product guarantee, not an implementation detail — see PROJECT.md
@@ -16,9 +16,18 @@ explicit encoding; it accepts API ISO timestamps and stores epoch milliseconds.
 Raw coordinates obtained from Android location providers are never serialized.
 Cloud backup and device transfer are excluded.
 
-Android retains trips until the user deletes them. Deletion removes the trip's
-view history, cached boards, focus and last-answer evidence; completed rides
-remain. The web's ten-trip automatic LRU eviction does not apply. Board files
+Android retains trips until the user deletes them. Swiping a saved trip row
+away, or choosing `Delete trip` from its long-press menu, deletes it at once:
+the trip, its view history, focus and last-answer evidence leave persisted
+state immediately, and completed rides remain. The deletion is reversible from
+the bottom bar for the undo window: 4 s, extended by the accessibility
+recommended timeout. Undo restores the trip at its original position with its
+history, and restores focus, last answer and last trip id only where nothing
+has replaced them. The trip's cached boards are purged when the window ends,
+never earlier, so an undone trip keeps its offline board. One deletion is
+pending at a time; a second commits the first. An app kill during the window
+leaves the trip deleted. The web's ten-trip automatic LRU eviction does not
+apply. Board files
 are keyed by both directed station IDs and canonical modes in the app cache;
 Android may evict them, while personal state and installed timetable generations
 remain in private storage. The focused journey is never dependent on an
@@ -28,6 +37,33 @@ The prediction formula and location/home/ride evidence rules below also bind
 Android. `tools/fixtures/conformance/prediction.json` contains generated web
 outputs tested by both clients. Native schedule and realtime provenance have
 separate lifetimes as defined in [native-data.md](native-data.md).
+
+## iOS storage
+
+Swift `DeviceStore` uses an atomically replaced schema-version-1 Codable document
+in Application Support, with the previous valid document retained for corruption
+recovery. Personal files use iOS file protection and are excluded from iCloud
+backup. Raw location fixes never enter the document. Board caches are keyed by
+directed endpoints and canonical modes, bounded to 64 files; deletion removes
+both directions and every mode variant. A focused journey retains its source in
+personal storage independently of cache eviction.
+
+iOS follows the web ten-trip LRU policy. A saved trip is deleted by swiping its
+row (a short swipe reveals `Delete`, a full swipe commits) or from its context
+menu, under the same rule as Android: immediate removal from persisted state,
+a 4 s undo window on the bottom bar without an accessibility extension, cache
+purge deferred to the end of the window, and one pending deletion at a time.
+The ten-trip cap is applied after a restore with the normal eviction rule.
+History, home votes, recent choices and completed rides keep the same caps and
+evidence rules. The focused exact service
+and its alternative journeys can carry separate `BoardData` sources: refreshing
+a cancellation must not renew an alternative's age. Focus visibility follows
+mode preferences while its stored state survives a temporary mode exclusion.
+Native expiry restores scheduled times and static platform baselines, as bound
+by [native-data.md](native-data.md).
+
+The same generated prediction and row cases run in XCTest. Native anonymous
+telemetry is disabled; explicit feedback drafts remain only in controller memory.
 
 ## localStorage schema
 
@@ -100,7 +136,8 @@ read/write atomic and migration simple):
 - `history` is capped at 500 events, oldest evicted.
 - `trips` is capped at 10. Adding an eleventh evicts the least recently viewed
   saved trip (creation time breaks a never-viewed tie). This is the web
-  management policy; deletion becomes swipe-to-delete in the native app.
+  management policy; native deletion is defined under "Android storage" and
+  "iOS storage" above.
 - `preferences` is optional. Omitted fields preserve the existing behaviour:
   System appearance, location enabled, no manual home and all served modes
   enabled. `appearance` accepts only `system`, `light` and `dark`;
@@ -386,6 +423,11 @@ is no clock rule anywhere in this.
 A fix arriving after the cached paint re-runs `locate` only when the selection
 was predicted, never over an explicit tap. Trip rows stay ordered by
 `rankTrips`, with the header's trip first.
+
+Android first-run setup asks for location once and prefills From when granted.
+That setup fix casts no home vote. Selecting or clearing an origin prevents a
+later fix from overriding the field; saving the chosen origin gives the normal
+first-trip home fallback. See [Android differences](android-deviations.md).
 
 ### The no-`here` branch: today's formula, unchanged
 
