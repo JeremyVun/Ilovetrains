@@ -370,14 +370,26 @@ final class ControllerTests: XCTestCase {
 
     func testAFailedRealtimeFetchDoesNotRestartTheFollowedJourneysRequest() async throws {
         let fixture = departedFocus()
-        let (_, model) = try await networkedModel(data: fixture.data, arrival: fixture.stale + 300_000, delay: .seconds(3))
+        // Nothing answers while the realtime task decides, so a second request can only be a restart.
+        let (_, model) = try await networkedModel(data: fixture.data, arrival: fixture.stale + 300_000, delay: .seconds(20))
         StubbedDepartures.requests = []
         model.resume()
-        try await Task.sleep(for: .milliseconds(2_500))
+        try await plannerOpened(model)
+        try await Task.sleep(for: .milliseconds(500))
         let focusRequests = StubbedDepartures.requests.filter { $0.query?.contains("at=") == true }
         XCTAssertEqual(focusRequests.count, 1, "asked more than once before any answer: \(StubbedDepartures.requests.map(\.absoluteString))")
         model.pause()
         StubbedDepartures.delay = .zero
+    }
+
+    /// The shared refresh only reaches its board decision once the bundled timetable is open.
+    private func plannerOpened(_ model: TrainViewModel) async throws {
+        let opening = model.state.timetableStatus
+        for _ in 0..<3000 {
+            if model.state.timetableStatus != opening { return }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTFail("The bundled timetable never opened")
     }
 
     /// The overlay only runs once the bundled timetable is open, which is seconds on a cold simulator.
