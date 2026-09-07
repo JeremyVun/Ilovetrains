@@ -50,7 +50,7 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         }
         viewModelScope.launch {
             data = store.load(); stations = runCatching { store.stations() }.getOrDefault(emptyList())
-            settleFocus(); syncPersonal(); choosePrediction()
+            syncPersonal(); choosePrediction()
             mutable.value = mutable.value.copy(ready = true, screen = if (data.trips.isEmpty()) Screen.Setup else Screen.Home, stations = stations)
             refresh()
             refreshSharedData()
@@ -100,10 +100,10 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         mutable.value = mutable.value.copy(now = System.currentTimeMillis())
         refreshLoop = viewModelScope.launch {
             var ticks = 0
-            if (mutable.value.ready) { settleFocus(); choosePrediction(); refreshSharedData(); refresh(); if (data.useLocation) onSilentLocation?.invoke() }
+            if (mutable.value.ready) { choosePrediction(); refreshSharedData(); refresh(); if (data.useLocation) onSilentLocation?.invoke() }
             while (isActive) {
                 delay(1000); mutable.value = mutable.value.copy(now = System.currentTimeMillis())
-                if (++ticks % 30 == 0 && mutable.value.ready) { settleFocus(); refreshSharedData(); refresh() }
+                if (++ticks % 30 == 0 && mutable.value.ready) { refreshSharedData(); refresh() }
                 else if (data.focus != null && mutable.value.now >= data.focus!!.journey.effectiveArrival && !mutable.value.focusComplete) settleFocus()
             }
         }
@@ -137,7 +137,7 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
                             source = if (updated.live) "live" else "schedule", offline = !updated.live,
                             serverStale = false))
                         data = data.copy(focus = if (updated.live) refreshed else focus.lastKnown())
-                        persist(); syncPersonal()
+                        persist(); settleFocus()
                     }
                 }
                 if (now - lastTimetableCheck > 6 * 3_600_000) {
@@ -219,7 +219,8 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
     }
     private fun refreshFocus() {
         val focus = data.focus ?: return
-        if (focus.journey.legs.all { it.identity != null }) return
+        // Completion waits for the refresh; a locally identified journey has no refresh to wait for.
+        if (focus.journey.legs.all { it.identity != null }) { settleFocus(); return }
         focusJob?.cancel()
         focusJob = viewModelScope.launch {
             val pair = ends(focus.tripId, focus.reverse) ?: return@launch
@@ -240,15 +241,15 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
             data = data.copy(focus = focus)
             persist()
         }
-        if (now >= focus.journey.effectiveArrival && !focus.journey.cancelled) completeRide(focus)
+        if (!focus.journey.cancelled) settleRide(focus, now >= focus.journey.effectiveArrival)
         if (now > focus.journey.effectiveArrival + 1_800_000) { data = data.copy(focus = null); persist() }
         syncPersonal()
     }
-    private fun completeRide(focus: FocusedJourney) {
-        if (data.rides.any { it.tripId == focus.tripId && it.reverse == focus.reverse && it.departure == focus.journey.departure }) return
-        data = data.copy(rides = (data.rides + Ride(focus.tripId, focus.reverse, focus.journey.departure, focus.journey.effectiveArrival,
-            focus.journey.legs.first().from, focus.journey.legs.last().to)).takeLast(100))
-        persist()
+    private fun completeRide(focus: FocusedJourney) = settleRide(focus, true)
+    private fun settleRide(focus: FocusedJourney, arrived: Boolean) {
+        val rides = data.rides.settled(focus, arrived)
+        if (rides === data.rides) return
+        data = data.copy(rides = rides); persist()
     }
     fun permission(granted: Boolean, denied: Boolean) { mutable.value = mutable.value.copy(locationGranted = granted, locationDenied = denied) }
     fun location(value: Fix) {
@@ -455,4 +456,17 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
     private fun Journey.scheduledOnly() = copy(legs = legs.map {
         it.copy(estimatedDeparture = null, estimatedArrival = null, cancelled = false)
     })
+}
+
+/** The ride ledger for a focused journey, judged from the arrival its last refresh left behind.
+    A ride recorded from an arrival that has since moved takes the new one, and one that has not
+    happened yet is withdrawn: an expected finish is not evidence of arrival (client-storage.md). */
+internal fun List<Ride>.settled(focus: FocusedJourney, arrived: Boolean): List<Ride> {
+    val arrival = focus.journey.effectiveArrival
+    val index = indexOfFirst { it.tripId == focus.tripId && it.reverse == focus.reverse && it.departure == focus.journey.departure }
+    if (index < 0) return if (!arrived) this else (this + Ride(focus.tripId, focus.reverse, focus.journey.departure, arrival,
+        focus.journey.legs.first().from, focus.journey.legs.last().to)).takeLast(100)
+    if (arrival <= this[index].arrival) return this
+    return if (arrived) mapIndexed { i, ride -> if (i == index) ride.copy(arrival = arrival) else ride }
+    else filterIndexed { i, _ -> i != index }
 }
