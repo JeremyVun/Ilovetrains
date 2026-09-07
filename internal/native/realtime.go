@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	realtimeLifetime = 90 * time.Second
-	tripTimestampAge = 90 * time.Second
+	realtimeLifetime     = 90 * time.Second
+	scheduledObservation = 10 * time.Minute
+	timestampClockSkew   = 5 * time.Second
 )
 
 func NormalizeRealtime(source string, body []byte, receivedAt time.Time, dates *ServiceDates) (Snapshot, Representation, RealtimeCounts, error) {
@@ -100,7 +101,7 @@ func NormalizeRealtime(source string, body []byte, receivedAt time.Time, dates *
 		}
 		if raw.Timestamp != nil && raw.GetTimestamp() != 0 {
 			value := time.Unix(int64(raw.GetTimestamp()), 0).UTC()
-			if value.Before(headerTime.Add(-tripTimestampAge)) || value.After(headerTime.Add(5*time.Second)) {
+			if !usableObservation(status, value, headerTime) {
 				counts.Stale++
 				continue
 			}
@@ -131,6 +132,15 @@ func NormalizeRealtime(source string, body []byte, receivedAt time.Time, dates *
 	}
 	representation, err := encodeSnapshot(snapshot)
 	return snapshot, representation, counts, err
+}
+
+// A cancellation, replacement, addition or unscheduled run stays true for the rest of its
+// service day; only a delay prediction decays.
+func usableObservation(status string, timestamp, header time.Time) bool {
+	if timestamp.After(header.Add(timestampClockSkew)) {
+		return false
+	}
+	return status != "scheduled" || !timestamp.Before(header.Add(-scheduledObservation))
 }
 
 func earliestStopTime(update *gtfs.TripUpdate) time.Time {

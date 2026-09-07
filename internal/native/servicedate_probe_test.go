@@ -132,6 +132,26 @@ func TestOldCancellationLandsOnTheDayTheServiceRan(t *testing.T) {
 	}
 }
 
+func TestEveningCancellationStaysOnTodaysMorningInstance(t *testing.T) {
+	dates := testServiceDates(t, map[string]tripCalendar{
+		"sydneytrains\x00commuter": {firstDepartureSecs: 16200, startDate: 20260901, endDate: 20261031, weekdays: 0b0011111},
+	})
+	header := sydneyTime(t, 2026, time.September, 8, 17, 0)
+	cancelled := gtfs.TripDescriptor_CANCELED
+	entity := &gtfs.FeedEntity{Id: proto.String("c"), TripUpdate: &gtfs.TripUpdate{
+		Trip:      &gtfs.TripDescriptor{TripId: proto.String("commuter"), ScheduleRelationship: &cancelled},
+		Timestamp: proto.Uint64(uint64(header.Add(-9 * time.Hour).Unix())),
+	}}
+	snapshot, _, counts, err := NormalizeRealtime("sydneytrains", probeFeed(t, header, entity), header, dates)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Mon-Fri 04:30 trip, cancellation seen at Tuesday 17:00: %+v -> %+v", counts, snapshot.Updates)
+	if counts.Accepted != 1 || snapshot.Updates[0].ServiceDate != "20260908" {
+		t.Fatalf("an evening republish must stay on Tuesday, not reach Wednesday's 04:30: %+v", snapshot.Updates)
+	}
+}
+
 func TestResolveWindowsAndPrecedence(t *testing.T) {
 	dates := testServiceDates(t, map[string]tripCalendar{
 		"sydneytrains\x00noon":  {firstDepartureSecs: 43200, startDate: 20260901, endDate: 20261031, weekdays: everyDayMask},
@@ -355,6 +375,7 @@ func TestCaptureClassification(t *testing.T) {
 		runningCandidates                   int
 		earliestStop                        time.Time
 		timestampAge                        time.Duration
+		hasTimestamp                        bool
 	}
 	var rows []row
 	for _, entity := range feed.Entity {
@@ -398,7 +419,7 @@ func TestCaptureClassification(t *testing.T) {
 		}
 		r.offsetHours = nearest.Hours()
 		if raw.Timestamp != nil {
-			r.timestampAge = header.Sub(time.Unix(int64(raw.GetTimestamp()), 0))
+			r.timestampAge, r.hasTimestamp = header.Sub(time.Unix(int64(raw.GetTimestamp()), 0)), true
 		}
 		rows = append(rows, r)
 	}
@@ -438,6 +459,38 @@ func TestCaptureClassification(t *testing.T) {
 		t.Logf("  %-6s %-11s cands=%d offset=%+.2fh tsAge=%s", r.rule, r.status, r.runningCandidates, r.offsetHours, r.timestampAge.Round(time.Second))
 	}
 	t.Logf("ambiguous decided by stop rule: %d (header rule alone would resolve %d); nearest-start offset range %.2fh..%.2fh", ambiguousWithStop, ambiguousStopRuleButHeaderWouldResolve, minOffset, maxOffset)
+
+	t.Log("resolved rows: trip timestamp age against the header, by relationship")
+	ageBuckets := map[string]int{}
+	for _, r := range rows {
+		if r.outcome != "resolved" {
+			continue
+		}
+		band := "older than 7h"
+		switch {
+		case !r.hasTimestamp:
+			band = "no timestamp"
+		case r.timestampAge < -5*time.Second:
+			band = "ahead of the header"
+		case r.timestampAge <= 90*time.Second:
+			band = "<=90s"
+		case r.timestampAge <= 10*time.Minute:
+			band = "<=10m"
+		case r.timestampAge <= time.Hour:
+			band = "<=1h"
+		case r.timestampAge <= 7*time.Hour:
+			band = "<=7h"
+		}
+		ageBuckets[fmt.Sprintf("%-11s %s", r.status, band)]++
+	}
+	keys = keys[:0]
+	for k := range ageBuckets {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		t.Logf("  %-36s %d", k, ageBuckets[k])
+	}
 
 	t.Log("resolved rows: rule, offset distribution")
 	buckets := map[string]int{}
