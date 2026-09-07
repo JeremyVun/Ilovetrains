@@ -212,10 +212,13 @@ final class ControllerTests: XCTestCase {
         fixture.data.focus!.journey.legs[0].identity = identity
         fixture.data.focus!.board.journeys[0].legs[0].identity = identity
         let (store, model) = try await networkedModel(data: fixture.data, arrival: fixture.stale + 300_000)
+        XCTAssertFalse(model.state.focusComplete, "nothing has asked yet")
+        model.resume()
         XCTExpectFailure("refreshFocus settles a locally identified journey at once; its refresh is the realtime overlay in refreshSharedData") {
             XCTAssertFalse(model.state.focusComplete, "settled from the stored snapshot without waiting for the overlay")
         }
-        let persisted = await store.load()
+        var persisted = await store.load()
+        for _ in 0..<50 where persisted.rides.isEmpty { try await Task.sleep(for: .milliseconds(10)); persisted = await store.load() }
         XCTExpectFailure("the stale ride is written from the snapshot") {
             XCTAssertEqual(persisted.rides, [])
         }
@@ -247,7 +250,8 @@ final class ControllerTests: XCTestCase {
         XCTExpectFailure("the natives judge arrival from the clock alone, so the later-moved arrival withdraws the fix completion") {
             XCTAssertTrue(model.state.focusComplete, "location-based completion should be unchanged")
         }
-        let persisted = await store.load()
+        var persisted = await store.load()
+        for _ in 0..<50 where !persisted.rides.isEmpty { try await Task.sleep(for: .milliseconds(10)); persisted = await store.load() }
         XCTExpectFailure("the row is withdrawn") { XCTAssertEqual(persisted.rides.count, 1) }
         model.pause()
     }
@@ -258,11 +262,13 @@ final class ControllerTests: XCTestCase {
         expired.data.focus!.journey.legs[0].estimatedArrival = late
         expired.data.focus!.board.journeys[0].legs[0].estimatedArrival = late
         let (store, model) = try await networkedModel(data: expired.data, arrival: late)
+        model.resume()
         try await settled(store) { $0.focus == nil && $0.rides.map(\.arrival) == [late] }
         model.pause()
 
         let cancelled = departedFocus()
         let (cancelledStore, cancelledModel) = try await networkedModel(data: cancelled.data, arrival: cancelled.stale, cancelled: true)
+        cancelledModel.resume()
         for _ in 0..<50 where cancelledModel.state.focus?.journey.cancelled != true { try await Task.sleep(for: .milliseconds(10)) }
         XCTAssertTrue(cancelledModel.state.focus?.journey.cancelled == true, "the stub cancelled the leg")
         XCTAssertFalse(cancelledModel.state.focusComplete)
