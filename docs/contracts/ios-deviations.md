@@ -42,6 +42,9 @@ iOS implementation requested on 2026-09-07.
   shift to avoid overlap and stay within the device, while service-time coordinates
   stay proportional. Each transfer station sits beneath its dwell midpoint,
   clamped within the device and wrapped or stacked when names collide.
+- The promoted Detail row is plain content, not a disabled button. Its chips
+  keep their full fill and text colours; cancellation fades the composited
+  journey device once so underlying bars cannot bleed through the labels.
 - Expired or unavailable realtime makes new local plans use scheduled times;
   previously displayed boards and pins retain their last-known observations
   under the [native cache rules](native-data.md#cached-boards-and-departed-services).

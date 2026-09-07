@@ -71,7 +71,28 @@ claim is withdrawn; passing navigation tests did not establish correct pixels.
 Settings spacing/selection marks and the four-second success banner remain
 verified separately.
 
-All three interaction flows passed individually: Board → Detail → pin →
+The journey-line correction in build 4 uses measured chip placement and paints
+all ride/dwell segments before markers. The origin cap and line now share the
+same center (619.5 device px in the direct Home reference, previously 27px
+apart). Platform 5 remains visible on the active transfer. Compact two-change
+rows keep 3/5/13 distinct with 9 device px (3pt) ground separators and separate
+Town Hall/Central label lanes. Three geometry regressions pass without changing
+the proportional service-time coordinates.
+
+Detail also rendered its noninteractive summary as a disabled button. Removing
+that wrapper restores opaque platform chips; cancellation now fades the whole
+composited axis once. The fixed dark/light and two-change Detail captures were
+inspected after this correction, not inferred from the geometry test results.
+Final capture uses a separate iPhone 17 on the same iOS 26.4 runtime and
+402×874pt profile to avoid competing simulator drives from another task.
+The targeted 11-frame pixel comparison was inspected and its intended changes
+accepted into `tools/baselines/ios/`; comparison against those references then
+returned 11 identical frames. Board dark/light remained pixel-identical to the
+previous references. The final report is
+`/tmp/ilovetrains-ios-axis-final/report.html`, with enlarged journey-line crops
+beside it. This validates the selected line states, not every iOS screen.
+
+In build 3, all three interaction flows passed individually: Board → Detail → pin →
 Settings/services, offline Mascot → Kellyville creation/pinning/reopen, and
 feedback keyboard/draft navigation without submission. The initial combined run
 failed with an Xcode duplicate accessibility-loader warning; clean sequential

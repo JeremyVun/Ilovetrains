@@ -94,37 +94,42 @@ struct BoardRow: View {
         let fig = figureOverride ?? figureFor(journey, board: board, now: now)
         let late = minutesBetween(journey.departure, journey.effectiveDeparture) > 0
         let stale = board == nil || board?.offline == true || journey.retained == true || now - (board?.generatedAt ?? 0) > 90_000
-        Button { action?() } label: {
-            HStack(spacing: 14) {
-                VStack(alignment: .trailing, spacing: 4) {
-                    HStack(alignment: .lastTextBaseline, spacing: 2) {
-                        Text(fig.value).font(.system(size: fig.value.count >= 5 ? 28 : 40, weight: .ultraLight)).tracking(-1.5)
-                        if !fig.unit.isEmpty { Text(fig.unit).font(.system(size: 12, weight: .medium)) }
-                    }.foregroundStyle(figureColor(fig, late: late, stale: stale)).tabular().lineLimit(1)
-                    TrainLabel(text: fig.provenance, color: (late && !fig.past || journey.cancelled) ? colors.warning : colors.ink3,
-                               size: 9, alignment: .trailing, lines: fig.provenance == "Last known" ? 2 : 1)
-                        .frame(minHeight: fig.provenance == "Last known" ? 24 : 12)
-                }.frame(width: detail ? 69 : 72, alignment: .trailing)
-                VStack(alignment: .leading, spacing: 0) {
-                    HStack(alignment: .lastTextBaseline, spacing: 7) {
-                        Text(clockTime(journey.effectiveDeparture)).foregroundStyle(late && journey.realtime ? colors.warning : journey.cancelled ? colors.ink3 : colors.ink)
-                            .strikethrough(journey.cancelled)
-                        if late && journey.effectiveDeparture != journey.departure {
-                            Text(clockTime(journey.departure)).font(.system(size: 13, weight: .light)).foregroundStyle(colors.ink3).strikethrough()
-                        }
-                        Spacer()
-                        Text(clockTime(journey.effectiveArrival)).font(.system(size: 16, weight: .light)).foregroundStyle(colors.ink3).strikethrough(journey.cancelled)
-                        if journey.cancelled { TrainLabel(text: "Cancelled", color: colors.warning, size: 9) }
-                    }.font(.system(size: 18, weight: .light)).tabular()
-                    JourneyAxis(journey: journey).opacity(journey.cancelled ? 0.3 : 1).padding(.top, 6)
-                    Text(journey.legs.first?.headsign.nonEmpty ?? journey.legs.first?.to.shortName ?? "")
-                        .font(.system(size: 13, weight: .light)).foregroundStyle(colors.ink3).lineLimit(1).padding(.top, 6)
-                }.frame(maxWidth: .infinity)
-            }
-            .padding(.horizontal, pagePadding).padding(.vertical, 9)
-            .frame(maxWidth: .infinity, minHeight: detail ? 100 : 96).contentShape(Rectangle())
+        let content = HStack(spacing: 14) {
+            VStack(alignment: .trailing, spacing: 4) {
+                HStack(alignment: .lastTextBaseline, spacing: 2) {
+                    Text(fig.value).font(.system(size: fig.value.count >= 5 ? 28 : 40, weight: .ultraLight)).tracking(-1.5)
+                    if !fig.unit.isEmpty { Text(fig.unit).font(.system(size: 12, weight: .medium)) }
+                }.foregroundStyle(figureColor(fig, late: late, stale: stale)).tabular().lineLimit(1)
+                TrainLabel(text: fig.provenance, color: (late && !fig.past || journey.cancelled) ? colors.warning : colors.ink3,
+                           size: 9, alignment: .trailing, lines: fig.provenance == "Last known" ? 2 : 1)
+                    .frame(minHeight: fig.provenance == "Last known" ? 24 : 12)
+            }.frame(width: detail ? 69 : 72, alignment: .trailing)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .lastTextBaseline, spacing: 7) {
+                    Text(clockTime(journey.effectiveDeparture)).foregroundStyle(late && journey.realtime ? colors.warning : journey.cancelled ? colors.ink3 : colors.ink)
+                        .strikethrough(journey.cancelled)
+                    if late && journey.effectiveDeparture != journey.departure {
+                        Text(clockTime(journey.departure)).font(.system(size: 13, weight: .light)).foregroundStyle(colors.ink3).strikethrough()
+                    }
+                    Spacer()
+                    Text(clockTime(journey.effectiveArrival)).font(.system(size: 16, weight: .light)).foregroundStyle(colors.ink3).strikethrough(journey.cancelled)
+                    if journey.cancelled { TrainLabel(text: "Cancelled", color: colors.warning, size: 9) }
+                }.font(.system(size: 18, weight: .light)).tabular()
+                JourneyAxis(journey: journey).compositingGroup()
+                    .opacity(journey.cancelled ? 0.3 : 1).padding(.top, 6)
+                Text(journey.legs.first?.headsign.nonEmpty ?? journey.legs.first?.to.shortName ?? "")
+                    .font(.system(size: 13, weight: .light)).foregroundStyle(colors.ink3).lineLimit(1).padding(.top, 6)
+            }.frame(maxWidth: .infinity)
         }
-        .buttonStyle(.plain).disabled(action == nil)
+        .padding(.horizontal, pagePadding).padding(.vertical, 9)
+        .frame(maxWidth: .infinity, minHeight: detail ? 100 : 96).contentShape(Rectangle())
+        Group {
+            if let action {
+                Button(action: action) { content }.buttonStyle(.plain)
+            } else {
+                content
+            }
+        }
         .accessibilityLabel("\(clockTime(journey.effectiveDeparture)) to \(clockTime(journey.effectiveArrival)), \(journey.legs.first?.headsign ?? "service")")
         .accessibilityIdentifier("service-\(Int(journey.departure))")
         TrainRule()
