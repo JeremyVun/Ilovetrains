@@ -221,8 +221,13 @@ snapshot. A per-journey retention marker prevents an old row from borrowing
 the freshness of a new board. Retained realtime rows use `LAST KNOWN`, scheduled
 rows use `SCHEDULED`, and offline views keep absolute clocks without live
 countdowns. Pinned snapshots follow the same rule when refresh fails; connectivity
-loss cannot reset a delayed journey to its earlier printed arrival. These are
-native exceptions to the web's stale-row treatment (owner ruling, 2026-09-07).
+loss cannot reset a delayed journey to its earlier printed arrival. A focus
+routed from the local timetable is refreshed by the realtime overlay alone: an
+online board without a matching journey leaves it as it is, and the overlay
+marks it `LAST KNOWN` on the first run that finds no live update for it, rather
+than waiting out its board's freshness. A matching online journey takes the
+focus over, and the overlay stops refreshing it. These are native exceptions to
+the web's stale-row treatment (owner ruling, 2026-09-07).
 
 ## Sydney Trains realtime coverage gap
 
