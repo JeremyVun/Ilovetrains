@@ -9,6 +9,8 @@ func clockTime(_ time: Double) -> String {
 func epochNow() -> Double { (Date().timeIntervalSince1970 * 1000).rounded() }
 enum Screen: String, Codable, Sendable { case home, board, detail, setup, settings }
 enum Appearance: String, Codable, CaseIterable, Sendable { case system, dark, light }
+enum TransferLimit: String, Codable, CaseIterable, Sendable { case two, any }
+let transferLimitFlagKey = "transferLimit"
 
 struct AppState {
     var ready = false
@@ -25,6 +27,8 @@ struct AppState {
     var refreshing = false
     var appearance: Appearance = .system
     var enabledModes = allModes
+    var transferLimit: TransferLimit = .two
+    var flags: [String: Bool] = [:]
     var useLocation = true
     var locationGranted = false
     var locationDenied = false
@@ -48,6 +52,7 @@ struct AppState {
     var message: String?
     var undoAvailable = false
     var version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
+    var transferLimitOffered: Bool { flags[transferLimitFlagKey] == true }
     var selectedTrip: SavedTrip? { trips.first { $0.id == selectedTripId } }
     var shownBoard: BoardData? { screen == .home ? homeBoard ?? board : board }
 }

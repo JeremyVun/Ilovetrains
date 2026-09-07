@@ -36,7 +36,10 @@ iOS implementation requested on 2026-09-07.
   packages must be republished and downloaded to plan beyond that date.
 - Settings uses 72pt minimum personal rows with 10pt vertical padding. Service
   choices show only `On`/`Off`; appearance keeps the selected checkmark without
-  an underline. Journey lines round only their final destination end by 3pt,
+  an underline. The `Transfer limit` row, shown inside Services only while the
+  `transferLimit` flag is on, is one of those 72pt rows without its icon
+  column, so it stands taller than the web row it ports; its words, values,
+  action mark and behaviour are the web's. Journey lines round only their final destination end by 3pt,
   preserving square transfer joins (owner ruling, 2026-09-07).
 - The shared journey-line layout measures origin and transfer chips before
   placement. Caps, markers and ride/dwell bars share a vertical center. Bars

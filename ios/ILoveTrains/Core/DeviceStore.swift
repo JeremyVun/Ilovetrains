@@ -143,6 +143,8 @@ struct UserData: Codable, Equatable, Sendable {
     var lastAnswer: LastAnswer?
     var appearance: Appearance
     var modes: Set<String>
+    var transferLimit: TransferLimit
+    var flags: [String: Bool]
     var useLocation: Bool
     var home: Station?
     var recentFrom: [Station]
@@ -159,6 +161,8 @@ struct UserData: Codable, Equatable, Sendable {
         lastAnswer: LastAnswer? = nil,
         appearance: Appearance = .system,
         modes: Set<String> = allModes,
+        transferLimit: TransferLimit = .two,
+        flags: [String: Bool] = [:],
         useLocation: Bool = true,
         home: Station? = nil,
         recentFrom: [Station] = [],
@@ -174,6 +178,8 @@ struct UserData: Codable, Equatable, Sendable {
         self.lastAnswer = lastAnswer
         self.appearance = appearance
         self.modes = modes
+        self.transferLimit = transferLimit
+        self.flags = flags
         self.useLocation = useLocation
         self.home = home
         self.recentFrom = recentFrom
@@ -182,7 +188,7 @@ struct UserData: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case schemaVersion, trips, history, rides, votes, lastTripId, lastReverse, focus, lastAnswer
-        case appearance, modes, useLocation, home, recentFrom, recentTo
+        case appearance, modes, transferLimit, flags, useLocation, home, recentFrom, recentTo
     }
 
     init(from decoder: Decoder) throws {
@@ -204,6 +210,8 @@ struct UserData: Codable, Equatable, Sendable {
         } else {
             modes = allModes
         }
+        transferLimit = (try? container.decodeIfPresent(TransferLimit.self, forKey: .transferLimit)) ?? .two
+        flags = Self.lossyFlags(container)
         useLocation = (try? container.decodeIfPresent(Bool.self, forKey: .useLocation)) ?? true
         home = try? container.decodeIfPresent(Station.self, forKey: .home)
         recentFrom = Self.recent(Self.lossyArray(container, forKey: .recentFrom))
@@ -225,6 +233,8 @@ struct UserData: Codable, Equatable, Sendable {
         try container.encodeIfPresent(value.lastAnswer, forKey: .lastAnswer)
         try container.encode(value.appearance, forKey: .appearance)
         try container.encode(value.modes, forKey: .modes)
+        try container.encode(value.transferLimit, forKey: .transferLimit)
+        try container.encode(value.flags, forKey: .flags)
         try container.encode(value.useLocation, forKey: .useLocation)
         try container.encodeIfPresent(value.home, forKey: .home)
         try container.encode(value.recentFrom, forKey: .recentFrom)
@@ -258,6 +268,24 @@ struct UserData: Codable, Equatable, Sendable {
         if let focus = value.focus, !tripIDs.contains(focus.tripId) { value.focus = nil }
         if let answer = value.lastAnswer, !tripIDs.contains(answer.tripId) { value.lastAnswer = nil }
         return value
+    }
+
+    var capped: Bool { flags[transferLimitFlagKey] == true && transferLimit == .two }
+    var requestTransferLimit: Int? { capped ? 2 : nil }
+    var offlineTransferBound: Int { flags[transferLimitFlagKey] == true && transferLimit == .any ? 4 : 2 }
+    func withinTransferLimit(_ journey: Journey) -> Bool { !capped || journey.legs.count <= 3 }
+    func withinTransferLimit(_ board: BoardData) -> BoardData {
+        var value = board
+        value.journeys = board.journeys.filter(withinTransferLimit)
+        return value
+    }
+
+    private static func lossyFlags(_ container: KeyedDecodingContainer<CodingKeys>) -> [String: Bool] {
+        guard let raw = try? container.decodeIfPresent([String: JSONValue].self, forKey: .flags) else { return [:] }
+        return raw.compactMapValues { value in
+            guard case let .bool(flag) = value else { return nil }
+            return flag
+        }
     }
 
     private static func lossyArray<T: Decodable>(

@@ -24,6 +24,19 @@ struct SettingsLocationPresentation: Equatable {
     }
 }
 
+struct SettingsTransferLimitPresentation: Equatable {
+    let subtitle: String
+    let mark: String
+    let next: TransferLimit
+
+    init(limit: TransferLimit) {
+        switch limit {
+        case .two: subtitle = "Up to 2"; mark = "NO LIMIT"; next = .any
+        case .any: subtitle = "No limit"; mark = "UP TO 2"; next = .two
+        }
+    }
+}
+
 struct SettingsView: View {
     @ObservedObject var model: TrainViewModel
     @State private var page: Page = .main
@@ -113,6 +126,12 @@ private struct SettingsMain: View {
         TrainLabel(text: model.state.enabledModes.isEmpty ? "No services selected. Turn one on to see trips." : "Trips use chosen services only.",
                    color: model.state.enabledModes.isEmpty ? colors.warning : colors.ink3, lines: 3)
             .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8)
+        if model.state.transferLimitOffered {
+            personalRow(title: "Transfer limit", value: transferLimitPresentation.subtitle,
+                        state: transferLimitPresentation.mark, id: "transfer-limit-setting", markColor: colors.ink) {
+                model.setTransferLimit(transferLimitPresentation.next)
+            }
+        }
 
         Spacer().frame(height: 22); settingsSection("Appearance")
         HStack(spacing: 0) {
@@ -133,6 +152,9 @@ private struct SettingsMain: View {
                                      granted: model.state.locationGranted,
                                      denied: model.state.locationDenied)
     }
+    private var transferLimitPresentation: SettingsTransferLimitPresentation {
+        SettingsTransferLimitPresentation(limit: model.state.transferLimit)
+    }
     private var homeValue: String {
         guard let home = model.state.home else { return "Automatic" }
         return model.state.homeIsManual ? home.shortName : "Automatic — \(home.shortName)"
@@ -140,13 +162,13 @@ private struct SettingsMain: View {
     private func settingsSection(_ text: String) -> some View {
         VStack(spacing: 7) { TrainLabel(text: text).frame(maxWidth: .infinity, alignment: .leading); TrainRule() }.padding(.top, 14)
     }
-    private func personalRow(icon: String, title: String, value: String, state: String, id: String,
+    private func personalRow(icon: String? = nil, title: String, value: String, state: String, id: String,
                              warning: Bool = false, markColor: Color? = nil, selected: Bool? = nil,
                              action: @escaping () -> Void) -> some View {
         VStack(spacing: 0) {
             Button(action: action) {
                 HStack(spacing: 12) {
-                    Image(systemName: icon).font(.system(size: 23, weight: .light)).foregroundStyle(colors.ink2).frame(width: 28)
+                    if let icon { Image(systemName: icon).font(.system(size: 23, weight: .light)).foregroundStyle(colors.ink2).frame(width: 28) }
                     VStack(alignment: .leading, spacing: 4) {
                         Text(title).font(.system(size: 17, weight: .regular)).foregroundStyle(colors.ink)
                         Text(value).font(.system(size: 12, weight: .light)).foregroundStyle(warning ? colors.warning : colors.ink2)
