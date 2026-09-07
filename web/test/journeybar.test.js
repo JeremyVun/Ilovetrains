@@ -1,8 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import { journeyBarSpec, journeyBarHtml, journeyDeviceHtml, journeyVars, axisSignature } from '../js/journeybar.js';
 import { ferryJourneys, mixedJourneys, transferJourneys } from './fixture.js';
+
+const css = readFileSync(fileURLToPath(new URL('../app.css', import.meta.url)), 'utf8');
 
 test('the journey bar is one exact percentage time axis', () => {
   const spec = journeyBarSpec(transferJourneys()[0]);
@@ -62,10 +66,27 @@ test('every filled part of the device paints the fill role', () => {
 
   assert.equal(journeyVars(spec), '--stem:var(--line-fill-T9);--stem2:var(--line-fill-T4);'
     + '--chipink:var(--ink);--chipink2:var(--ink);');
-  assert.match(device.html, /class="sy-r a leg-0"[^>]*background:var\(--line-fill-T9\)/);
+  assert.match(device.html, /class="sy-r a leg-0"[^>]*><span class="sy-rp"[^>]*background:var\(--line-fill-T9\)/);
   assert.match(device.html, /class="sy-p a"[^>]*background:var\(--line-fill-T9\)/);
   assert.match(device.html, /class="sy-p b"[^>]*background:var\(--line-fill-T4\)/);
   assert.doesNotMatch(device.html, /background:var\(--line-T[0-9]\)/, 'no bare-text token on a fill');
+});
+
+test('transfer chips keep their axis anchors without border or shadow masks', () => {
+  const shared = /\.sy-bar \.sy-p \{([\s\S]*?)\n\}/.exec(css)?.[1] || '';
+  const alight = /\.sy-bar \.sy-p\.a \{([^}]*)\}/.exec(css)?.[1] || '';
+  const board = /\.sy-bar \.sy-p\.b \{([^}]*)\}/.exec(css)?.[1] || '';
+  const clamped = /\.sy-row \.sy-p\[data-clamped="1"\] \{([^}]*)\}/.exec(css)?.[1] || '';
+  const html = journeyBarHtml(journeyBarSpec(transferJourneys()[0]), { caps: true });
+
+  assert.doesNotMatch(shared, /border-left/);
+  assert.doesNotMatch(alight, /border-left/);
+  assert.doesNotMatch(board, /border-left/);
+  assert.doesNotMatch(clamped, /box-shadow/);
+  assert.match(html, /class="sy-r a leg-0"[^>]*style="left:0%;width:[^"]+"><span class="sy-rp"/);
+  assert.match(html, /class="sy-r b leg-1"[^>]*style="left:[^"]+"><span class="sy-rp"/);
+  assert.match(html, /class="sy-p a"[^>]*style="right:/);
+  assert.match(html, /class="sy-p b"[^>]*style="left:/);
 });
 
 /* A tight change is painted on its own dwell alone; a comfortable second

@@ -41,8 +41,8 @@ final class BoardRetentionTests: XCTestCase {
         XCTAssertEqual(result.journeys.map(\.key), [t9.key])
         XCTAssertEqual(result.journeys[0].effectiveDeparture, t9.effectiveDeparture)
         XCTAssertEqual(retainedHomeJourney(result, now: reopened)?.key, t9.key)
-        XCTAssertEqual(figureFor(result.journeys[0], board: result, now: reopened).provenance, "Last known")
-        XCTAssertEqual(figureFor(result.journeys[0], board: result, now: reopened).value, "")
+        XCTAssertEqual(figureFor(result.journeys[0], board: result, now: reopened).provenance, "Ago")
+        XCTAssertEqual(figureFor(result.journeys[0], board: result, now: reopened).value, "5")
         XCTAssertEqual(try JSONDecoder().decode(BoardData.self, from: JSONEncoder().encode(result)), result)
     }
 
@@ -66,7 +66,7 @@ final class BoardRetentionTests: XCTestCase {
         XCTAssertEqual(result.journeys[0].retained, true)
         XCTAssertEqual(nextHomeJourney(result, now: now + 9 * 60_000)?.key, later.key)
         XCTAssertNil(retainedHomeJourney(result, now: now + 9 * 60_000))
-        XCTAssertEqual(figureFor(result.journeys[0], board: result, now: now + 9 * 60_000).provenance, "Last known")
+        XCTAssertEqual(figureFor(result.journeys[0], board: result, now: now + 9 * 60_000).provenance, "Ago")
     }
 
     func testFreshExactObservationOverridesSavedEstimate() throws {
@@ -132,6 +132,46 @@ final class BoardRetentionTests: XCTestCase {
         let decoded = try JSONDecoder().decode(BoardData.self, from: encoded)
         XCTAssertNil(decoded.homeJourneyKey)
         XCTAssertNil(decoded.journeys[0].retained)
+    }
+
+    func testEarlierMergePreservesObservationsAndLetsCurrentRowsWin() {
+        let old = shiftedT9(departure: now - 60 * 60_000, arrival: now - 30 * 60_000)
+        var observed = old
+        observed.legs[0].estimatedArrival = observed.arrival + 5 * 60_000
+        var current = observed
+        current.legs[0].estimatedArrival = observed.arrival + 7 * 60_000
+        let expired = shiftedT9(departure: now - 25 * 60 * 60_000, arrival: now - 24 * 60 * 60_000)
+
+        let rows = mergeEarlierJourneys([observed, expired], current: [current], cutoff: now - 86_400_000)
+
+        XCTAssertEqual(rows, [current])
+        XCTAssertEqual(rows[0].effectiveArrival, current.effectiveArrival)
+        XCTAssertTrue(rows[0].realtime)
+    }
+
+    func testFailedFocusObservationKeepsLastKnownBoardAndAcceptsFreshAlternatives() {
+        let oldAlternatives = BoardData(from: townHall, to: rhodes, journeys: [t9], generatedAt: now - 60_000, source: "schedule", offline: true)
+        let next = shiftedT9(departure: now + 30 * 60_000, arrival: now + 55 * 60_000)
+        let newAlternatives = BoardData(from: townHall, to: rhodes, journeys: [next], generatedAt: now + 1, source: "schedule", offline: true)
+        let focus = FocusedJourney(tripId: "trip", reverse: false, journey: t9, board: previous, alternatives: oldAlternatives)
+
+        let result = focusAfterRefresh(focus, update: FocusUpdate(journey: t9.scheduledOnly()), alternatives: newAlternatives)
+
+        XCTAssertEqual(result.journey.effectiveArrival, t9.effectiveArrival)
+        XCTAssertEqual(result.journey.retained, true)
+        XCTAssertEqual(result.board.generatedAt, previous.generatedAt)
+        XCTAssertTrue(result.board.offline)
+        XCTAssertEqual(result.alternatives, newAlternatives)
+    }
+
+    func testFailedAlternativePlanRetainsPreviousAlternatives() {
+        let oldAlternatives = BoardData(from: townHall, to: rhodes, journeys: [t9], generatedAt: now - 60_000, source: "schedule", offline: true)
+        let focus = FocusedJourney(tripId: "trip", reverse: false, journey: t9, board: previous, alternatives: oldAlternatives)
+
+        let result = focusAfterRefresh(focus, update: FocusUpdate(journey: t9, observedAt: now + 1, live: true), alternatives: nil)
+
+        XCTAssertEqual(result.alternatives, oldAlternatives)
+        XCTAssertEqual(result.board.generatedAt, now + 1)
     }
 
     @MainActor

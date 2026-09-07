@@ -50,8 +50,8 @@ const rowCases = [
   { name: 'departing realtime service', offset: 0, realtime: true },
   { name: 'departing scheduled service', offset: 0, realtime: false },
   { name: 'rounded hour figure', offset: 100, realtime: true },
-  { name: 'expired realtime shows absolute clocks', offset: 5, realtime: true, age: 91 },
-  { name: 'network failure suppresses countdown', offset: 5, realtime: true, offline: true },
+  { name: 'expired realtime keeps figure and absolute clocks', offset: 5, realtime: true, age: 91 },
+  { name: 'network failure keeps countdown', offset: 5, realtime: true, offline: true },
   { name: 'scheduled past register', offset: -12, realtime: false, past: true },
   { name: 'cancelled past service', offset: -12, realtime: true, cancelled: true, past: true },
 ].map(c => {

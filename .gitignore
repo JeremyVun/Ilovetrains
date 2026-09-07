@@ -1,5 +1,6 @@
 .env
-.claude/
+.claude/*
+!.claude/skills/
 .DS_Store
 .gtfs/
 __pycache__/

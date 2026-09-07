@@ -54,6 +54,27 @@ final class OfflinePackageStoreTests: XCTestCase {
         XCTAssertEqual(selected(store), old)
     }
 
+    func testMalformedZipArchivesAreRejectedBeforeWritingDatabase() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let archive = directory.appendingPathComponent("package.zip")
+        let destination = directory.appendingPathComponent("timetable.sqlite3")
+        let malformed = [
+            Data(),
+            zip(name: "other.sqlite3"),
+            zip(flags: 1),
+            zip(entries: 2),
+            zip(localName: "other.sqlite3")
+        ]
+
+        for data in malformed {
+            try data.write(to: archive)
+            XCTAssertThrowsError(try OfflineZip.extractDatabase(from: archive, to: destination))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+        }
+    }
+
     private func selected(_ store: OfflinePackageStore) -> String? {
         for data in store.manifests() {
             guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -68,5 +89,64 @@ final class OfflinePackageStoreTests: XCTestCase {
 
     private func manifest(_ hash: String) -> Data {
         Data("{\"schemaVersion\":1,\"packages\":[{\"sha256\":\"\(hash)\"}]}".utf8)
+    }
+
+    private func zip(
+        name: String = "timetable.sqlite3",
+        flags: UInt16 = 0,
+        entries: UInt16 = 1,
+        localName: String? = nil
+    ) -> Data {
+        let centralName = Data(name.utf8)
+        let localName = Data((localName ?? name).utf8)
+        var data = Data()
+        data.appendLE(UInt32(0x0403_4b50))
+        data.appendLE(UInt16(20))
+        data.appendLE(flags)
+        data.appendLE(UInt16(8))
+        data.appendLE(UInt16(0))
+        data.appendLE(UInt16(0))
+        data.appendLE(UInt32(0))
+        data.appendLE(UInt32(0))
+        data.appendLE(UInt32(0))
+        data.appendLE(UInt16(localName.count))
+        data.appendLE(UInt16(0))
+        data.append(localName)
+        let centralOffset = data.count
+        data.appendLE(UInt32(0x0201_4b50))
+        data.appendLE(UInt16(20))
+        data.appendLE(UInt16(20))
+        data.appendLE(flags)
+        data.appendLE(UInt16(8))
+        data.appendLE(UInt16(0))
+        data.appendLE(UInt16(0))
+        data.appendLE(UInt32(0))
+        data.appendLE(UInt32(0))
+        data.appendLE(UInt32(0))
+        data.appendLE(UInt16(centralName.count))
+        data.appendLE(UInt16(0))
+        data.appendLE(UInt16(0))
+        data.appendLE(UInt16(0))
+        data.appendLE(UInt16(0))
+        data.appendLE(UInt32(0))
+        data.appendLE(UInt32(0))
+        data.append(centralName)
+        let centralSize = data.count - centralOffset
+        data.appendLE(UInt32(0x0605_4b50))
+        data.appendLE(UInt16(0))
+        data.appendLE(UInt16(0))
+        data.appendLE(entries)
+        data.appendLE(entries)
+        data.appendLE(UInt32(centralSize))
+        data.appendLE(UInt32(centralOffset))
+        data.appendLE(UInt16(0))
+        return data
+    }
+}
+
+private extension Data {
+    mutating func appendLE<T: FixedWidthInteger>(_ value: T) {
+        var littleEndian = value.littleEndian
+        append(Data(bytes: &littleEndian, count: MemoryLayout<T>.size))
     }
 }

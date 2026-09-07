@@ -10,7 +10,8 @@ struct HomeView: View {
             let alternatives = focus.alternatives ?? focus.board
             if focus.journey.cancelled, model.state.now < focus.journey.effectiveDeparture,
                let replacement = alternatives.journeys.first(where: {
-                   !$0.cancelled && $0.effectiveDeparture > focus.journey.effectiveDeparture
+                   journeyAllowed($0, modes: model.state.enabledModes) && !$0.cancelled
+                       && $0.effectiveDeparture > focus.journey.effectiveDeparture
                }) {
                 return HomePresentation(
                     journey: replacement,
@@ -54,7 +55,7 @@ struct HomeView: View {
                 SmartLoadingHeader(model: model, board: board)
             } else if model.state.totalTrips > 0 {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text(model.state.message ?? "No trips match your selected services.")
+                    Text("No trips match your selected services.")
                         .font(.system(size: 20, weight: .light)).foregroundStyle(colors.ink2)
                     Button("Change settings", action: model.openSettings)
                         .buttonStyle(TrainTextButtonStyle(colors: colors)).accessibilityIdentifier("change-settings")
@@ -143,7 +144,11 @@ private struct SmartHeader: View {
     private var pinned: Bool { focused && focus?.pinned == true }
     private var departed: Bool { focused && model.state.now >= journey.effectiveDeparture }
     private var complete: Bool { model.state.focusComplete || model.state.now >= journey.effectiveArrival }
-    private var late: Bool { minutesBetween(journey.departure, journey.effectiveDeparture) > 0 }
+    private var late: Bool {
+        focused ? focusJourneyIsLate(journey, board: board, now: model.state.now)
+            : minutesBetween(journey.departure, journey.effectiveDeparture) > 0
+    }
+    private var statusWarning: Bool { status == "Cancelled" || status == "Running late" }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -152,12 +157,12 @@ private struct SmartHeader: View {
                     Button(action: model.unpinJourney) {
                         HStack(spacing: 5) {
                             if status == "Pinned" { Image(systemName: "pin.fill").font(.system(size: 12)) }
-                            TrainLabel(text: status, color: (journey.cancelled || late) ? colors.warning : colors.ink2, size: 11)
+                            TrainLabel(text: status, color: statusWarning ? colors.warning : colors.ink2, size: 11)
                             if status != "Pinned" { Text("·").foregroundStyle(colors.ink3); Image(systemName: "pin.fill").font(.system(size: 12)); TrainLabel(text: "Pinned", color: colors.ink2, size: 11) }
                         }.frame(minHeight: 44)
                     }.buttonStyle(.plain).accessibilityIdentifier("unpin-home")
                 } else {
-                    TrainLabel(text: status, color: (journey.cancelled || late) ? colors.warning : colors.ink2, size: 11)
+                    TrainLabel(text: status, color: statusWarning ? colors.warning : colors.ink2, size: 11)
                 }
                 Spacer(); FreshnessView(board: board, now: model.state.now)
             }.padding(.horizontal, pagePadding).frame(minHeight: pinned ? 44 : 22)
@@ -165,9 +170,9 @@ private struct SmartHeader: View {
             HStack(alignment: .top, spacing: 14) {
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(alignment: .lastTextBaseline, spacing: 2) {
-                        Text(displayFigure.value).font(.system(size: displayFigure.value.count > 3 ? 50 : 64, weight: .ultraLight))
+                        Text(displayFigure.value).font(.system(size: figureUsesCompactType(displayFigure) ? 50 : 64, weight: .ultraLight))
                             .tracking(-2).foregroundStyle(late ? colors.warning : colors.ink).lineLimit(1).minimumScaleFactor(0.7)
-                        Text(displayFigure.unit).font(.system(size: 16)).foregroundStyle(colors.ink2)
+                        Text(displayFigure.unit).font(.system(size: 12, weight: .medium)).foregroundStyle(colors.ink2)
                     }.tabular()
                     if !displayFigure.provenance.lowercased().contains("scheduled"), !displayFigure.provenance.isEmpty {
                         TrainLabel(text: displayFigure.provenance, color: (late || journey.cancelled) ? colors.warning : colors.ink3)
@@ -206,8 +211,8 @@ private struct SmartHeader: View {
                 TrainRule().padding(.horizontal, pagePadding)
                 Button { model.openJourney(next.journey) } label: {
                     HStack(spacing: 8) {
-                        TrainLabel(text: "Next \(modeName(next.journey.mode))", size: 9).frame(width: 96, alignment: .leading)
-                        Text(nextFigure(next.journey, board: next.board)).font(.system(size: 17, weight: .light)).foregroundStyle(colors.ink).tabular()
+                        TrainLabel(text: "Next \(serviceModeName(next.journey.mode))", size: 9).frame(width: 96, alignment: .leading)
+                        Text(nextServiceFigure(next.journey, board: next.board, now: model.state.now)).font(.system(size: 17, weight: .light)).foregroundStyle(colors.ink).tabular()
                         Spacer()
                         Text("\(clockTime(next.journey.effectiveDeparture)) → \(clockTime(next.journey.effectiveArrival))")
                             .font(.system(size: 15, weight: .light)).foregroundStyle(colors.ink3).tabular()
@@ -227,29 +232,25 @@ private struct SmartHeader: View {
     }
 
     private var status: String {
-        if complete && focused { return "Trip over" }
-        if journey.cancelled && focused || (cancelledLeadTime != nil && focus != nil) { return "Cancelled" }
-        if departed && focused && late { return "Running late" }
-        if focused && late { return "\(minutesBetween(journey.departure, journey.effectiveDeparture)) min late" }
-        if departed && focused { return "Running" }
-        if pinned { return "Pinned" }
+        if cancelledLeadTime != nil && focus != nil { return "Cancelled" }
+        if focused, let focus { return focusStatus(focus, now: model.state.now, complete: complete) }
         if let retained = retainedHeaderStatus(board: board, journey: journey, hasFocus: focus != nil, now: model.state.now) {
             return retained
         }
         if let distance = model.state.distanceMetres, distance <= 200 { return "At \(first.from.shortName)" }
         if let distance = model.state.distanceMetres { return "\(distanceText(distance)) to \(first.from.shortName)" }
-        return "Next \(modeName(first.mode))"
+        return "Next \(genericModeName(first.mode))"
     }
 
     private var displayFigure: Figure {
-        if departed && !complete && journey.retained != true && board.isLive(model.state.now) {
+        if departed && !complete {
             return directionFigureFor(journey, now: model.state.now) ?? figureFor(journey, board: board, now: model.state.now)
         }
         return figureFor(journey, board: board, now: model.state.now)
     }
 
     private var instruction: String {
-        if let cancelledLeadTime { return "\(clockTime(cancelledLeadTime)) cancelled · next \(modeName(first.mode))" }
+        if let cancelledLeadTime { return "\(clockTime(cancelledLeadTime)) cancelled · next \(genericModeName(first.mode))" }
         if complete { return "The journey has finished" }
         if departed { return focusedInstruction(journey, now: model.state.now) }
         return first.headsign.isEmpty ? first.to.shortName : first.headsign
@@ -258,15 +259,10 @@ private struct SmartHeader: View {
     private var nextJourney: (journey: Journey, board: BoardData)? {
         let source = alternatives ?? board
         return source.journeys.first { candidate in
-            !candidate.cancelled && candidate.effectiveDeparture > journey.effectiveDeparture &&
+            journeyAllowed(candidate, modes: model.state.enabledModes) && !candidate.cancelled
+                && candidate.effectiveDeparture > journey.effectiveDeparture &&
             !(candidate.departure == journey.departure && candidate.legs.first?.line == journey.legs.first?.line)
         }.map { (journey: $0, board: source) }
-    }
-
-    private func nextFigure(_ journey: Journey, board: BoardData) -> String {
-        guard !board.offline, journey.retained != true, model.state.now - board.generatedAt <= 90_000, journey.realtime else { return "" }
-        let minutes = minutesBetween(model.state.now, journey.effectiveDeparture)
-        return minutes > 99 ? "\(Int(Double(minutes) / 60))H" : "\(minutes) min"
     }
 
     private func endpoint(_ station: String, _ time: String, arrival: Bool) -> some View {
@@ -300,14 +296,25 @@ private struct SavedTripRow: View {
                 }.frame(width: 15, height: 52)
                 VStack(spacing: 6) {
                     HStack(spacing: 6) {
-                        LineChip(line: lines[0], mode: lines[0].hasPrefix("F") ? "ferry" : "train", height: 20, horizontalPadding: 5)
+                        if let first = lines.first {
+                            LineChip(line: first, mode: first.hasPrefix("F") ? "ferry" : "train", height: 20, horizontalPadding: 5)
+                        }
                         Text(trip.from.shortName).lineLimit(2)
                         Text("→").foregroundStyle(colors.ink3)
-                        if lines.count > 1 { LineChip(line: lines.last!, mode: lines.last!.hasPrefix("F") ? "ferry" : "train", height: 20, horizontalPadding: 5) }
+                        if lines.count > 1, let last = lines.last {
+                            LineChip(line: last, mode: last.hasPrefix("F") ? "ferry" : "train", height: 20, horizontalPadding: 5)
+                        }
                         Text(trip.to.shortName).lineLimit(2)
                     }.font(.system(size: 19, weight: .light)).foregroundStyle(colors.ink).frame(maxWidth: .infinity, alignment: .leading)
                     HStack(spacing: 8) {
-                        TrainLabel(text: summary, color: highlighted ? colors.ink2 : colors.ink3, lines: 2)
+                        if justAdded {
+                            (Text("Just added").font(.system(size: 12)).italic()
+                             + Text(justAddedDistance.isEmpty ? "" : " · \(justAddedDistance.uppercased())")
+                                .font(.system(size: 10, weight: .semibold)).tracking(1.4))
+                                .foregroundStyle(colors.ink3).lineLimit(2)
+                        } else {
+                            TrainLabel(text: summary, color: highlighted ? colors.ink2 : colors.ink3, lines: 2)
+                        }
                         Spacer(); TrainLabel(text: "Departures", color: colors.ink2); Image(systemName: "chevron.right").font(.system(size: 13)).foregroundStyle(colors.ink3)
                     }
                 }
@@ -325,9 +332,17 @@ private struct SavedTripRow: View {
         }
     }
 
-    private var lines: [String] { trip.lines.isEmpty ? ["T"] : trip.lines }
+    private var lines: [String] { trip.lines }
     private var highlighted: Bool { state.focus?.tripId == trip.id || state.selectedTripId == trip.id }
+    private var justAdded: Bool {
+        state.justAddedTripId == trip.id && state.selectedTripId == trip.id
+            && state.selectionPredicted && state.focus == nil
+    }
+    private var justAddedDistance: String {
+        (state.tripMetadata[trip.id] ?? "").components(separatedBy: " · ").first { $0.hasSuffix(" away") } ?? ""
+    }
     private var summary: String {
+        if justAdded { return ["Just added", justAddedDistance].filter { !$0.isEmpty }.joined(separator: " · ") }
         let status = state.focus.flatMap { focus in
             focus.tripId == trip.id
                 ? savedTripFocusStatus(focus, now: state.now, complete: state.focusComplete)
@@ -339,14 +354,24 @@ private struct SavedTripRow: View {
 }
 
 func savedTripFocusStatus(_ focus: FocusedJourney, now: Millis, complete: Bool) -> String {
-    let suffix = focus.pinned ? " · Pinned" : ""
-    if complete || now >= focus.journey.effectiveArrival { return "Trip over\(suffix)" }
-    if focus.journey.cancelled { return "Cancelled\(suffix)" }
-    if focus.board.isLive(now), minutesBetween(focus.journey.departure, focus.journey.effectiveDeparture) > 0 {
-        return "Running late\(suffix)"
-    }
+    let status = focusStatus(focus, now: now, complete: complete)
+    return focus.pinned && status != "Pinned" ? "\(status) · Pinned" : status
+}
+
+func focusStatus(_ focus: FocusedJourney, now: Millis, complete: Bool) -> String {
+    if complete || now >= focus.journey.effectiveArrival { return "Trip over" }
+    if focus.journey.cancelled { return "Cancelled" }
+    if focusJourneyIsLate(focus.journey, board: focus.board, now: now) { return "Running late" }
     if focus.pinned, now < focus.journey.effectiveDeparture { return "Pinned" }
-    return "Running\(suffix)"
+    return "Running"
+}
+
+func focusJourneyIsLate(_ journey: Journey, board: BoardData, now: Millis) -> Bool {
+    guard board.source == "live", !board.offline, journey.retained != true,
+          (0...90_000).contains(now - board.generatedAt) else { return false }
+    let leg = journey.legs.first { now < $0.effectiveArrival } ?? journey.legs.last
+    guard let leg, leg.estimatedDeparture != nil else { return false }
+    return minutesBetween(leg.departure, leg.effectiveDeparture) > 0
 }
 
 private struct HomeFooter: View {
@@ -381,11 +406,17 @@ struct TrainTextButtonStyle: ButtonStyle {
     }
 }
 
-func modeName(_ mode: String) -> String { mode == "ferry" ? "ferry" : mode == "metro" ? "metro" : "train" }
-private func distanceText(_ metres: Int) -> String {
-    if metres < 1_000 { return "\((metres / 10) * 10) m" }
+func genericModeName(_ mode: String) -> String { mode == "ferry" ? "ferry" : "train" }
+func serviceModeName(_ mode: String) -> String { allModes.contains(mode) ? mode : "service" }
+func nextServiceFigure(_ journey: Journey, board: BoardData, now: Millis) -> String {
+    let figure = figureFor(journey, board: board, now: now)
+    guard !figure.value.isEmpty else { return "" }
+    return figure.unit == "min" ? "\(figure.value) min" : figure.value + figure.unit
+}
+func distanceText(_ metres: Int) -> String {
+    if metres < 1_000 { return "\(max(10, Int((Double(metres) / 10).rounded()) * 10)) m" }
     if metres < 10_000 { return String(format: "%.1f km", Double(metres) / 1_000) }
-    return "\(metres / 1_000) km"
+    return "\(Int((Double(metres) / 1_000).rounded())) km"
 }
 private func focusedInstruction(_ journey: Journey, now: Millis) -> String {
     for (before, after) in zip(journey.legs, journey.legs.dropFirst()) {

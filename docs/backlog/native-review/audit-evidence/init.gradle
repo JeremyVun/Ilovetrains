@@ -1,0 +1,5 @@
+allprojects { p ->
+    p.afterEvaluate {
+        if (p.path == ':app') p.android.sourceSets.test.java.srcDir('/tmp/trains-native-review-audit/code')
+    }
+}

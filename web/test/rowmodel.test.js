@@ -97,7 +97,7 @@ test('a running lead carries no cancellation note', () => {
   assert.equal(m.rows.every((r) => r.note === null), true);
 });
 
-test('stale board: clock times only, departed rows dropped, offline footer', () => {
+test('stale board: figures remain, departed rows drop, offline footer remains', () => {
   const js = baseJourneys();
   const fourHoursAgo = new Date(NOW - 4 * 3600_000).toISOString();
   // Data fetched four hours ago; the first three services have since departed.
@@ -105,7 +105,7 @@ test('stale board: clock times only, departed rows dropped, offline footer', () 
 
   assert.equal(m.stale, true);
   assert.equal(m.rows.length, 4, 'the 22:48 and 23:03 services have departed');
-  assert.equal(m.rows.every((r) => r.figure === ''), true, 'no countdown off stale data');
+  assert.equal(m.rows.every((r) => r.figure !== ''), true, 'stale services retain a figure');
   assert.equal(m.rows.every((r) => r.provenance === 'SCHEDULED'), true);
   assert.equal(m.rows[0].depTime, '23:12');
   assert.equal(m.footer.text, 'Offline · last updated 4 h ago');
@@ -119,7 +119,7 @@ test('staleness threshold is the refresh cadence plus margin', () => {
   assert.equal(fresh.stale, false);
   assert.equal(fresh.rows[0].figure, '3');
   assert.equal(old.stale, true);
-  assert.equal(old.rows[0].figure, '');
+  assert.equal(old.rows[0].figure, '3');
 });
 
 test('a stale cancelled row keeps saying cancelled', () => {
@@ -300,11 +300,11 @@ test('a figure of three characters marks itself wide', () => {
   assert.deepEqual(widths([570]), [{ figure: '10H', wide: true }]);
   assert.deepEqual(widths([0]), [{ figure: 'Now', wide: true }]);
 
-  // A cancelled row's dash and a stale row's empty slot are not wide.
+  // A cancelled row's dash and a stale two-character hour figure are not wide.
   const cancelled = boardModel({ generatedAt: new Date(NOW).toISOString(), journeys: [cancel(at(187))] }, NOW);
   assert.deepEqual(cancelled.rows.map((r) => [r.figure, r.wide]), [['—', false]]);
   const staleBoard = boardModel({ generatedAt: new Date(NOW - 4 * 3600_000).toISOString(), journeys: [at(187)] }, NOW);
-  assert.deepEqual(staleBoard.rows.map((r) => [r.figure, r.wide]), [['', false]]);
+  assert.deepEqual(staleBoard.rows.map((r) => [r.figure, r.wide]), [['3H', false]]);
 });
 
 /* THE INVARIANT (docs/contracts/ui.md): three lines per row, in every state, so no

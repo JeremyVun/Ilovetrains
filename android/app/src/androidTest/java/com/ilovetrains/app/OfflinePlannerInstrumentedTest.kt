@@ -2,14 +2,19 @@ package com.ilovetrains.app
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import android.database.sqlite.SQLiteDatabase
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertThrows
 import org.junit.BeforeClass
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.Instant
 import java.time.LocalDateTime
+import java.io.File
+import java.util.UUID
 
 @RunWith(AndroidJUnit4::class)
 class OfflinePlannerInstrumentedTest {
@@ -66,6 +71,60 @@ class OfflinePlannerInstrumentedTest {
         assertTrue("next-service search took ${elapsedMillis}ms", elapsedMillis < 12_000)
         assertTrue(board.journeys.isNotEmpty())
         assertTrue(board.journeys.all { it.departure >= at })
+    }
+
+    @Test
+    fun wrongApplicationIdFailsDatabaseValidation() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val directory = File(context.cacheDir, "offline-id-${UUID.randomUUID()}")
+        try {
+            val local = OfflinePlanner(context, directory)
+            local.initialize()
+            val manifest = File(directory, "active-manifest.json").readText()
+            val info = OfflinePlanner.parseManifest(org.json.JSONObject(manifest))
+            val invalid = File(directory, "wrong-id.sqlite3")
+            File(directory, "timetable-${info.sha256}.sqlite3").copyTo(invalid)
+            SQLiteDatabase.openDatabase(invalid.path, null, SQLiteDatabase.OPEN_READWRITE).use {
+                it.execSQL("PRAGMA application_id=0")
+            }
+
+            assertFalse(local.validateDatabase(invalid, info))
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun failedCandidateOpenKeepsPreviousPlannerAndActiveGeneration() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val directory = File(context.cacheDir, "offline-open-${UUID.randomUUID()}")
+        val candidateHash = "b".repeat(64)
+        try {
+            val local = OfflinePlanner(
+                context,
+                directory,
+                openDatabase = { path ->
+                    if (path.endsWith("timetable-$candidateHash.sqlite3")) error("injected candidate open failure")
+                    SQLiteDatabase.openDatabase(path, null, SQLiteDatabase.OPEN_READONLY)
+                },
+            )
+            local.initialize()
+            val oldManifest = File(directory, "active-manifest.json").readText()
+            val oldInfo = OfflinePlanner.parseManifest(org.json.JSONObject(oldManifest))
+            val extracted = File(directory, "candidate-$candidateHash.sqlite3")
+            File(directory, "timetable-${oldInfo.sha256}.sqlite3").copyTo(extracted)
+            val candidate = oldInfo.copy(sha256 = candidateHash)
+            val candidateManifest = oldManifest.replace(oldInfo.sha256, candidateHash)
+
+            assertThrows(IllegalStateException::class.java) {
+                local.activateValidatedCandidate(candidate, extracted, candidateManifest)
+            }
+
+            assertEquals(oldManifest, File(directory, "active-manifest.json").readText())
+            assertTrue(local.plan(station("200060", "Central Station", "train"), station("215020", "Parramatta Station", "train"), at, setOf("train")).journeys.isNotEmpty())
+        } finally {
+            directory.deleteRecursively()
+        }
     }
 
     companion object {

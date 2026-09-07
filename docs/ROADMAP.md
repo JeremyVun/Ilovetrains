@@ -80,13 +80,15 @@ the last and make the ports mechanical. Still to build:
 
 ## Native Android and iOS
 Both apps exist (`android/`, `ios/`) and lag the web by one round. Remaining:
-- **Persistent travel tracker** (owner request 2026-09-07): an ongoing
+- **[Persistent travel tracker](backlog/persistent-travel-tracker/design.md)**
+  (owner request 2026-09-07; design/comps opened 2026-09-08): an ongoing
   notification or lock-screen view, like a food-delivery status, showing the
   next change or get-off station, arrival and progress without reopening the
   app. Android system notification rendering (Live Updates where supported)
   and iOS Live Activities. Design foreground/background lifecycle, offline
   labelling, dismissal and journey completion before implementation; the
-  notification must not imply continuous GPS.
+  notification must not imply continuous GPS. Appears automatically when
+  travel mode detects travel; pin-triggered entry is an optional follow-up A/B test.
 - Home-screen widgets, background ride detection and notifications.
   OS-rendered artifacts (icons, widgets) pass through the real renderer
   before a verdict.

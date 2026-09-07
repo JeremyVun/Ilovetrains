@@ -27,6 +27,7 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
     private var explicit = false
     private var generation = 0L
     private var boardJob: Job? = null
+    private var earlierJob: Job? = null
     private var focusJob: Job? = null
     private var historyJob: Job? = null
     private var historyRecorded = false
@@ -43,6 +44,12 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
     var onLocationDisabled: (() -> Unit)? = null
     private var settingsBack = Screen.Home
     private var setupOriginEdited = false
+    private var setupLocationRequested = false
+    private var setupLocationResolved = false
+    private var redirect: FocusedJourney? = null
+    private var redirectTargetId: String? = null
+    private var suppressNextLastAnswer = false
+    private var hasResumed = false
 
     init {
         viewModelScope.launch {
@@ -67,7 +74,9 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         }
     }
     private fun persist() { writes.trySend(data) }
-    private fun message(text: String?) { mutable.value = mutable.value.copy(message = text, undoAvailable = false) }
+    private fun message(text: String?, autoDismiss: Boolean = false) {
+        mutable.value = mutable.value.copy(message = text, messageAutoDismiss = autoDismiss, undoAvailable = false)
+    }
     private fun visibleFocus(): FocusedJourney? = visibleFocus(data, mutable.value.now)
     private fun syncPersonal() {
         val focus = visibleFocus()
@@ -97,6 +106,8 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
     }
     fun resume() {
         if (refreshLoop != null) return
+        if (hasResumed) mutable.value = mutable.value.copy(justAddedTripId = null)
+        hasResumed = true
         mutable.value = mutable.value.copy(now = System.currentTimeMillis())
         refreshLoop = viewModelScope.launch {
             var ticks = 0
@@ -109,8 +120,8 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         }
     }
     fun pause() {
-        refreshLoop?.cancel(); refreshLoop = null; boardJob?.cancel(); focusJob?.cancel(); historyJob?.cancel(); realtimeJob?.cancel(); generation++
-        mutable.value = mutable.value.copy(refreshing = false, distanceMetres = null)
+        refreshLoop?.cancel(); refreshLoop = null; boardJob?.cancel(); earlierJob?.cancel(); focusJob?.cancel(); historyJob?.cancel(); realtimeJob?.cancel(); generation++
+        mutable.value = mutable.value.copy(refreshing = false, distanceMetres = null, nearestStation = null)
         fix = null
     }
     private fun refreshSharedData() {
@@ -125,18 +136,17 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
                     val local = planner.plan(pair.first, pair.second, mutable.value.now - 900_000, modes, 24)
                     if (local.journeys.isNotEmpty()) {
                         val prior = mutable.value.board?.takeIf { it.from.id == pair.first.id && it.to.id == pair.second.id }
-                        publishBoard(mergeBoardResults(prior, local, null, mutable.value.now), request)
+                        publishBoard(mergeBoardResults(prior, local, null, mutable.value.now, requestFailed = false), request)
                     }
                 }
                 data.focus?.takeIf { it.journey.legs.all { l -> l.identity != null } }?.let { focus ->
                     val updated = planner.refreshFocused(focus.journey)
                     if (data.focus?.let { it.tripId == focus.tripId && it.reverse == focus.reverse && it.journey.key == focus.journey.key } == true) {
-                        val refreshed = focus.copy(journey = updated.journey, board = focus.board.copy(
-                            journeys = focus.board.journeys.map { if (it.key == focus.journey.key) updated.journey else it.scheduledOnly() },
-                            generatedAt = updated.observedAt ?: focus.board.generatedAt,
-                            source = if (updated.live) "live" else "schedule", offline = !updated.live,
-                            serverStale = false))
-                        data = data.copy(focus = if (updated.live) refreshed else focus.lastKnown())
+                        val alternatives = planner.plan(focus.board.from, focus.board.to, mutable.value.now - 900_000, AllModes, 24)
+                        if (data.focus?.let { it.tripId == focus.tripId && it.reverse == focus.reverse && it.journey.key == focus.journey.key } != true) {
+                            return@let
+                        }
+                        data = data.copy(focus = focusAfterRefresh(focus, updated, alternatives))
                         persist(); syncPersonal()
                     }
                 }
@@ -151,8 +161,10 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
     }
     override fun refresh() {
         if (!mutable.value.ready) return
-        boardJob?.cancel(); generation++
+        boardJob?.cancel(); earlierJob?.cancel(); generation++
         val request = generation
+        val suppressLastAnswer = suppressNextLastAnswer
+        suppressNextLastAnswer = false
         val pair = ends(); val modes = data.modes.toSet()
         if (pair == null || modes.isEmpty()) {
             mutable.value = mutable.value.copy(board = null, homeBoard = visibleFocus()?.board, refreshing = false)
@@ -185,27 +197,35 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
                 }
                 if (request != generation) return@supervisorScope
                 if (first.second != null && (previous == null || !previous.isLive(mutable.value.now))) {
-                    publishBoard(mergeBoardResults(previous, first.second.takeUnless { first.first }, first.second.takeIf { first.first }, mutable.value.now), request)
+                    publishBoard(mergeBoardResults(previous, first.second.takeUnless { first.first }, first.second.takeIf { first.first },
+                        mutable.value.now, requestFailed = false), request)
                 }
                 val localResult = if (first.first) local.await() else first.second
                 val result = if (first.first) first.second else live.await()
                 if (request != generation) return@supervisorScope
-                val final = mergeBoardResults(previous, localResult, result, mutable.value.now)
+                val final = mergeBoardResults(previous, localResult, result, mutable.value.now, requestFailed = result == null)
                     ?: BoardData(from, to, emptyList(), 0, offline = true, error = "No saved board for this trip yet")
                 publishBoard(final, request)
+                resolveRedirect(final)
                 mutable.value = mutable.value.copy(refreshing = false)
                 runCatching { store.cache(mutable.value.board ?: final, modes) }
-                val liveEvidence = result?.takeIf { it.isLive(mutable.value.now) }
-                val lead = final.journeys.firstOrNull { !it.cancelled && it.effectiveDeparture >= mutable.value.now }
+                val now = mutable.value.now
+                val lead = nextHomeJourney(final, now)
                 if (lead != null && selectedId != null) {
-                    data = data.copy(trips = data.trips.map { if (it.id == selectedId) it.copy(lines = lead.legs.map { leg -> leg.line }.distinct()) else it })
-                    if (data.focus == null && mutable.value.screen == Screen.Home && liveEvidence != null) {
+                    var changed = false
+                    val orderedLines = lead.legs.map { it.line }.distinct()
+                    data = data.copy(trips = data.trips.map {
+                        if (it.id == selectedId && it.lines != orderedLines) { changed = true; it.copy(lines = orderedLines) } else it
+                    })
+                    val evidence = shownLeadEvidence(final, listOfNotNull(result, localResult), now,
+                        suppressLastAnswer || data.focus != null || mutable.value.screen != Screen.Home)
+                    if (evidence != null) {
                         val here = stationHere(data, stations, fix, mutable.value.now)
-                        val liveLead = liveEvidence.journeys.firstOrNull { !it.cancelled && it.effectiveDeparture >= mutable.value.now }
-                        if (liveLead != null) data = data.copy(lastAnswer = LastAnswer(selectedId, reversed, mutable.value.now,
-                            here?.id?.takeIf { fix != null && distanceMetres(fix!!, here) <= 200 }, liveEvidence, liveLead))
+                        data = data.copy(lastAnswer = LastAnswer(selectedId, reversed, mutable.value.now,
+                            here?.id?.takeIf { fix != null && distanceMetres(fix!!, here) <= 200 }, evidence.board, evidence.journey))
+                        changed = true
                     }
-                    persist(); syncPersonal()
+                    if (changed) { persist(); syncPersonal() }
                 }
             }
         }
@@ -227,7 +247,7 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
             val result = try { api.departures(pair.first, pair.second, AllModes, at) } catch (e: CancellationException) { throw e } catch (_: Exception) { null }
             if (data.focus?.journey?.key != focus.journey.key || data.focus?.tripId != focus.tripId || data.focus?.reverse != focus.reverse) return@launch
             val match = result?.journeys?.find { it.key == focus.journey.key }
-            if (match != null) data = data.copy(focus = focus.copy(journey = match, board = result))
+            if (match != null) data = data.copy(focus = focus.copy(journey = match, board = result, alternatives = null))
             else data = data.copy(focus = focus.lastKnown())
             settleFocus(); persist(); syncPersonal()
         }
@@ -250,29 +270,51 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
             focus.journey.legs.first().from, focus.journey.legs.last().to)).takeLast(100))
         persist()
     }
-    fun permission(granted: Boolean, denied: Boolean) { mutable.value = mutable.value.copy(locationGranted = granted, locationDenied = denied) }
+    fun permission(granted: Boolean, denied: Boolean) {
+        mutable.value = mutable.value.copy(locationGranted = granted, locationDenied = denied,
+            setupLocationStatus = if (granted && setupLocationRequested) SetupLocationStatus.Locating else mutable.value.setupLocationStatus)
+    }
     fun location(value: Fix) {
         // A fix can be newer than the last one-second render tick.
         val receivedAt = System.currentTimeMillis()
-        if (!data.useLocation || mutable.value.screen !in setOf(Screen.Home, Screen.Setup) || receivedAt - value.at !in 0..300_000) return
+        if (!data.useLocation || mutable.value.screen !in setOf(Screen.Home, Screen.Setup)) return
+        if (receivedAt - value.at !in 0..300_000) { locationFailed(SetupLocationStatus.Unavailable); return }
         mutable.value = mutable.value.copy(now = receivedAt)
         fix = value
+        val choice = setupLocationChoice(stations, data.modes, value)
+        mutable.value = mutable.value.copy(nearestStation = choice.stations.firstOrNull())
+        if (mutable.value.screen == Screen.Setup) {
+            if (mutable.value.selectingHome) return
+            mutable.value = mutable.value.copy(nearbyStations = choice.stations)
+            if (mutable.value.setupFrom == null && !setupOriginEdited && (setupLocationRequested || (data.trips.isEmpty() && !setupLocationResolved))) {
+                mutable.value = mutable.value.copy(setupFrom = choice.automatic,
+                    setupLocationStatus = when {
+                        choice.automatic != null -> SetupLocationStatus.Idle
+                        choice.stations.isEmpty() -> SetupLocationStatus.NoNearby
+                        else -> SetupLocationStatus.ChooseStation
+                    })
+            }
+            setupLocationRequested = false; setupLocationResolved = true
+            return
+        }
         val here = stationHere(data, stations, fix, mutable.value.now)
         val day = Instant.ofEpochMilli(mutable.value.now).atZone(Sydney).toLocalDate().toString()
-        if (data.trips.isNotEmpty() && here != null && data.votes.none { it.day == day }) { data = data.copy(votes = (data.votes + HomeVote(day, here)).takeLast(7)); persist() }
+        if (shouldCastHomeVote(mutable.value.screen, data.trips.isNotEmpty(), here, data.votes.any { it.day == day })) {
+            data = data.copy(votes = (data.votes + HomeVote(day, requireNotNull(here))).takeLast(7)); persist()
+        }
         val inferred = inferredFocus(data, value, mutable.value.now)
         if (inferred != null) { data = data.copy(focus = inferred); persist() }
         data.focus?.let { f ->
             val destination = ends(f.tripId, f.reverse)?.second
             if (destination != null && mutable.value.now >= f.journey.effectiveArrival - 300_000 && distanceMetres(value, destination) <= 200) completeRide(f)
         }
-        if (data.trips.isEmpty() && !setupOriginEdited && mutable.value.setupFrom == null) mutable.value = mutable.value.copy(setupFrom = here)
         if (!explicit && data.focus == null && here != null) {
             val home = data.home ?: automaticHome(data)
             val fromHere = data.trips.filter { compatible(it, data.modes) }.any { it.from.id == here.id || it.to.id == here.id }
             if (!fromHere && home != null && home.id != here.id && home.modes.any { it in data.modes }) {
                 val trip = SavedTrip(UUID.randomUUID().toString(), here, home)
                 data = data.copy(trips = data.trips + trip); persist()
+                mutable.value = mutable.value.copy(justAddedTripId = trip.id)
             }
         }
         choosePrediction(); syncPersonal()
@@ -281,6 +323,7 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         refresh()
     }
     override fun back() {
+        if (mutable.value.screen == Screen.Setup) cancelSetupLocation()
         historyJob?.cancel()
         val leavingSettings = mutable.value.screen == Screen.Settings
         val screen = when (mutable.value.screen) {
@@ -289,6 +332,7 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
             Screen.Setup -> if (mutable.value.selectingHome) Screen.Settings else Screen.Home
             else -> Screen.Home
         }
+        if (mutable.value.screen == Screen.Setup) { redirect = null; redirectTargetId = null }
         mutable.value = mutable.value.copy(screen = screen, selectingHome = false,
             detail = if (screen == Screen.Detail) mutable.value.detail else null,
             feedbackSucceeded = if (leavingSettings) false else mutable.value.feedbackSucceeded)
@@ -299,9 +343,9 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         val trip = data.trips.find { it.id == id } ?: return
         if (!compatible(trip, data.modes)) return
         explicit = true
-        data = data.copy(lastAnswer = null); persist()
         val direction = if (id == mutable.value.selectedTripId && !reverse) mutable.value.reverse else reverse
-        mutable.value = mutable.value.copy(selectedTripId = id, reverse = direction, screen = Screen.Board, detail = null, receipt = null)
+        mutable.value = mutable.value.copy(selectedTripId = id, reverse = direction, screen = Screen.Board,
+            detail = null, receipt = null, justAddedTripId = null)
         syncPersonal(); historyRecorded = false; scheduleHistory(); refresh()
     }
     private fun scheduleHistory() {
@@ -314,15 +358,11 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
             trips = data.trips.map { if (it.id == id) it.copy(lastViewed = mutable.value.now) else it })
         historyRecorded = true; persist()
     }
-    override fun reverseTrip() {
-        data = data.copy(lastAnswer = null); persist()
-        mutable.value = mutable.value.copy(reverse = !mutable.value.reverse, board = null)
-        explicit = true; historyRecorded = false; scheduleHistory(); refresh()
-    }
     override fun openJourney(journey: Journey) {
         if (mutable.value.screen == Screen.Home) {
-            val source = mutable.value.homeBoard ?: mutable.value.board
-            val focused = visibleFocus()?.takeIf { source?.from?.id == it.board.from.id && source.to.id == it.board.to.id }
+            val focus = visibleFocus()
+            val source = boardForOpenedJourney(focus, mutable.value.homeBoard, mutable.value.board, journey)
+            val focused = focus?.takeIf { source?.from?.id == it.board.from.id && source.to.id == it.board.to.id }
             mutable.value = mutable.value.copy(board = source, selectedTripId = focused?.tripId ?: mutable.value.selectedTripId, reverse = focused?.reverse ?: mutable.value.reverse)
         }
         recordHistory(); mutable.value = mutable.value.copy(screen = Screen.Detail, detail = journey)
@@ -345,9 +385,15 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
             receipt = "You rode out at ${clockTime(focus.journey.effectiveDeparture)}. Here’s the way back.")
         syncPersonal(); refresh()
     }
-    override fun newTrip() { mutable.value = mutable.value.copy(screen = Screen.Setup, setupFrom = visibleFocus()?.takeIf { !it.pinned }?.journey?.legs?.first()?.from, setupTo = null, selectingHome = false) }
-    override fun chooseSetupFrom(station: Station) { setupOriginEdited = true; mutable.value = mutable.value.copy(setupFrom = station) }
-    override fun clearSetupFrom() { setupOriginEdited = true; mutable.value = mutable.value.copy(setupFrom = null, setupTo = null) }
+    override fun newTrip() {
+        cancelSetupLocation(); setupOriginEdited = false; setupLocationResolved = false
+        redirect = visibleFocus()?.takeIf { !it.pinned }
+        redirectTargetId = null
+        mutable.value = mutable.value.copy(screen = Screen.Setup, setupFrom = redirect?.let { redirectOrigin(it, data.trips) },
+            setupTo = null, selectingHome = false)
+    }
+    override fun chooseSetupFrom(station: Station) { setupOriginQueryChanged(); mutable.value = mutable.value.copy(setupFrom = station) }
+    override fun clearSetupFrom() { setupOriginQueryChanged(); mutable.value = mutable.value.copy(setupFrom = null, setupTo = null) }
     override fun chooseSetupTo(station: Station) { mutable.value = mutable.value.copy(setupTo = station) }
     override fun clearSetupTo() { mutable.value = mutable.value.copy(setupTo = null) }
     override fun saveTrip(from: Station, to: Station) {
@@ -359,8 +405,19 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
             recentFrom = (listOf(from) + data.recentFrom.filter { it.id != from.id }).take(3),
             recentTo = (listOf(to) + data.recentTo.filter { it.id != to.id }).take(3), lastTripId = trip.id, lastReverse = reverse)
         persist(); explicit = true; historyRecorded = false
-        mutable.value = mutable.value.copy(screen = Screen.Home, selectedTripId = trip.id, reverse = reverse, setupFrom = null, setupTo = null, board = null, receipt = null)
+        redirectTargetId = redirect?.let { trip.id }
+        mutable.value = mutable.value.copy(screen = if (redirect == null) Screen.Home else Screen.Board,
+            selectedTripId = trip.id, reverse = reverse, setupFrom = null, setupTo = null, board = null, receipt = null)
         syncPersonal(); refresh()
+    }
+    private fun resolveRedirect(board: BoardData) {
+        val old = redirect ?: return
+        val id = mutable.value.selectedTripId?.takeIf { it == redirectTargetId } ?: return
+        redirect = null; redirectTargetId = null
+        val match = board.journeys.firstOrNull { sameDeparture(old.journey, it) } ?: return
+        data = data.copy(focus = FocusedJourney(id, mutable.value.reverse, match, board, pinned = false))
+        mutable.value = mutable.value.copy(screen = Screen.Home)
+        persist(); syncPersonal()
     }
     override fun deleteTrip(id: String) {
         val (remaining, pending) = data.beginDeletion(id) ?: return
@@ -368,14 +425,14 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         data = remaining; pendingDeletion = pending; persist()
         if (mutable.value.selectedTripId == id) { explicit = false; mutable.value = mutable.value.copy(board = null) }
         choosePrediction(); syncPersonal(); refresh()
-        mutable.value = mutable.value.copy(message = deletionMessage(pending.trip), undoAvailable = true)
+        mutable.value = mutable.value.copy(message = deletionMessage(pending.trip), messageAutoDismiss = false, undoAvailable = true)
         undoJob = viewModelScope.launch { delay(undoTimeoutMillis()); expireDeletion() }
     }
     override fun undoDelete() {
         val pending = pendingDeletion ?: return
         undoJob?.cancel(); undoJob = null; pendingDeletion = null
         data = data.restore(pending); persist()
-        mutable.value = mutable.value.copy(message = null, undoAvailable = false)
+        mutable.value = mutable.value.copy(message = null, messageAutoDismiss = false, undoAvailable = false)
         choosePrediction(); syncPersonal(); refresh()
     }
     private fun expireDeletion() {
@@ -399,25 +456,62 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         if (mode !in AllModes) return
         data = data.copy(modes = if (enabled) data.modes + mode else data.modes - mode); persist()
         mutable.value = mutable.value.copy(board = null, homeBoard = null)
-        choosePrediction(); syncPersonal(); refresh()
+        choosePrediction(); syncPersonal(); suppressNextLastAnswer = true; refresh()
     }
     override fun setUseLocation(enabled: Boolean) {
-        data = data.copy(useLocation = enabled); if (!enabled) { fix = null; mutable.value = mutable.value.copy(distanceMetres = null) }
+        data = data.copy(useLocation = enabled)
+        if (!enabled) { cancelSetupLocation(); fix = null; mutable.value = mutable.value.copy(distanceMetres = null, nearestStation = null) }
         persist(); syncPersonal(); if (enabled) onLocationRequest?.invoke() else { onLocationDisabled?.invoke(); choosePrediction(); refresh() }
     }
-    override fun requestLocation() { if (data.useLocation) onLocationRequest?.invoke() }
+    override fun requestLocation() {
+        if (mutable.value.screen == Screen.Setup && !mutable.value.selectingHome && mutable.value.setupFrom == null) {
+            if (mutable.value.setupLocationStatus == SetupLocationStatus.Locating) return
+            setupOriginEdited = false; setupLocationRequested = true
+            mutable.value = mutable.value.copy(setupLocationStatus = SetupLocationStatus.Locating, nearbyStations = emptyList())
+            if (!data.useLocation) { data = data.copy(useLocation = true); persist(); syncPersonal() }
+        }
+        if (data.useLocation) onLocationRequest?.invoke()
+    }
+    fun locationFailed(status: SetupLocationStatus) {
+        if (setupLocationRequested && mutable.value.screen == Screen.Setup && !mutable.value.selectingHome && mutable.value.setupFrom == null) {
+            mutable.value = mutable.value.copy(setupLocationStatus = status)
+            if (status == SetupLocationStatus.Unavailable) { setupLocationRequested = false; setupLocationResolved = true }
+        }
+    }
+    override fun setupOriginQueryChanged() {
+        setupOriginEdited = true
+        cancelSetupLocation()
+    }
+    private fun cancelSetupLocation() {
+        setupLocationRequested = false
+        mutable.value = mutable.value.copy(setupLocationStatus = SetupLocationStatus.Idle, nearbyStations = emptyList())
+        onLocationDisabled?.invoke()
+    }
     override fun chooseHome() { mutable.value = mutable.value.copy(screen = Screen.Setup, selectingHome = true, setupFrom = null, setupTo = null) }
     override fun setHome(station: Station?) { data = data.copy(home = station); persist(); mutable.value = mutable.value.copy(screen = Screen.Settings, selectingHome = false); syncPersonal() }
     override fun earlier() {
+        if (earlierJob?.isActive == true) return
         val board = mutable.value.board ?: return
         val request = generation; val modes = data.modes.toSet()
         val earliest = board.journeys.minOfOrNull { it.departure } ?: mutable.value.now
-        val at = (earliest - 60 * 60_000).coerceAtLeast(mutable.value.now - 24 * 60 * 60_000)
-        viewModelScope.launch {
-            val past = try { initialized.await(); planner.plan(board.from, board.to, at, modes, 30) } catch (e: CancellationException) { throw e } catch (_: Exception) { return@launch }
-            if (request != generation) return@launch
-            val current = mutable.value.board ?: return@launch
-            publishBoard(current.copy(journeys = (current.journeys + past.journeys).distinctBy { it.key }.sortedBy { it.effectiveDeparture }), request)
+        val bound = mutable.value.now - 24 * 60 * 60_000
+        if (earliest <= bound || modes.isEmpty()) return
+        val at = (earliest - 60 * 60_000).coerceAtLeast(bound)
+        earlierJob = viewModelScope.launch {
+            try {
+                val past = supervisorScope {
+                    val online = async { runCatching { api.departures(board.from, board.to, modes, at) } }
+                    val local = async { runCatching { initialized.await(); planner.plan(board.from, board.to, at, modes, 30) } }
+                    val onlineResult = online.await()
+                    if (onlineResult.isSuccess) {
+                        local.cancel()
+                        onlineResult.getOrThrow()
+                    } else local.await().getOrNull() ?: return@supervisorScope null
+                } ?: return@launch
+                if (request != generation || mutable.value.screen != Screen.Board) return@launch
+                val current = mutable.value.board?.takeIf { it.from.id == board.from.id && it.to.id == board.to.id } ?: return@launch
+                publishBoard(current.copy(journeys = mergeEarlier(current.journeys, past.journeys)), request)
+            } catch (e: CancellationException) { throw e }
         }
     }
     override fun updateTimetable() {
@@ -442,17 +536,23 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
             mutable.value = mutable.value.copy(feedbackSubmitting = true, feedbackSucceeded = false, message = null, undoAvailable = false)
             try {
                 api.feedback(text, category)
-                mutable.value = mutable.value.copy(feedbackSucceeded = true)
-                message("Feedback sent. Thank you.")
+                mutable.value = mutable.value.copy(feedbackSucceeded = true, feedbackDraft = "")
+                message("Feedback sent. Thank you.", autoDismiss = true)
             }
             catch (e: CancellationException) { throw e }
             catch (_: Exception) { message("Couldn’t send feedback. Check your connection and try again.") }
             finally { mutable.value = mutable.value.copy(feedbackSubmitting = false) }
         }
     }
+    override fun setFeedbackDraft(text: String) {
+        if (mutable.value.feedbackSubmitting) return
+        mutable.value = mutable.value.copy(feedbackDraft = text, feedbackSucceeded = false)
+    }
+    override fun setFeedbackCategory(category: String) {
+        if (mutable.value.feedbackSubmitting) return
+        if (category in setOf("problem", "suggestion", "other")) {
+            mutable.value = mutable.value.copy(feedbackCategory = category, feedbackSucceeded = false)
+        }
+    }
     override fun dismissMessage() { message(null) }
-
-    private fun Journey.scheduledOnly() = copy(legs = legs.map {
-        it.copy(estimatedDeparture = null, estimatedArrival = null, cancelled = false)
-    })
 }

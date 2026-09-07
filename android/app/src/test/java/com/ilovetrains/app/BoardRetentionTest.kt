@@ -30,8 +30,8 @@ class BoardRetentionTest {
         assertEquals(t9.key, result.journeys.single().key)
         assertEquals(t9.effectiveDeparture, result.journeys.single().effectiveDeparture)
         assertEquals(t9.key, retainedHomeJourney(result, reopened)?.key)
-        assertEquals("Last known", figureFor(result.journeys.single(), result, reopened).provenance)
-        assertEquals("", figureFor(result.journeys.single(), result, reopened).value)
+        assertEquals("Ago", figureFor(result.journeys.single(), result, reopened).provenance)
+        assertEquals("5", figureFor(result.journeys.single(), result, reopened).value)
         assertEquals(result, Wire.board(JSONObject(Wire.board(result).toString())))
     }
 
@@ -43,6 +43,17 @@ class BoardRetentionTest {
         assertTrue(result.journeys.single().retained)
     }
 
+    @Test fun successfulLocalReplanDoesNotRelabelAServerStaleResponseOffline() {
+        val stale = previous.copy(serverStale = true, generatedAt = now - 120_000)
+        val local = previous.copy(source = "schedule", offline = false,
+            journeys = listOf(Journey(t9.legs.map { it.copy(estimatedDeparture = null, estimatedArrival = null) })))
+
+        val result = requireNotNull(mergeBoardResults(stale, local, null, now, requestFailed = false))
+
+        assertTrue(result.serverStale)
+        assertFalse(result.offline)
+    }
+
     @Test fun onlineFutureReplacesCacheButKeepsDepartedTrain() {
         val later = Journey(t9.legs.map { it.copy(departure = now + 20 * 60_000, arrival = now + 45 * 60_000,
             estimatedDeparture = null, estimatedArrival = null) })
@@ -52,7 +63,7 @@ class BoardRetentionTest {
         assertTrue(result.journeys.first().retained)
         assertEquals(later.key, nextHomeJourney(result, now + 9 * 60_000)?.key)
         assertNull(retainedHomeJourney(result, now + 9 * 60_000))
-        assertEquals("Last known", figureFor(result.journeys.first(), result, now + 9 * 60_000).provenance)
+        assertEquals("Ago", figureFor(result.journeys.first(), result, now + 9 * 60_000).provenance)
     }
 
     @Test fun freshObservationOverridesSavedEstimateForSameService() {

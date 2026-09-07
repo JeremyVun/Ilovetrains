@@ -25,6 +25,7 @@
 		4318F31D1B925A5C05C440FAC908ECA0 /* RowConformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AC09C9409003F3D7E4E206C4EDD16B0 /* RowConformanceTests.swift */; };
 		4618AE84BC96A2DFEFF7DE3AC340E07D /* OfflinePackageStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2269C1581DC5132C8800C6E786AD18 /* OfflinePackageStoreTests.swift */; };
 		477DFB7310465CCA4CCD251490C07E7E /* AppFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0D676BD29373C9C0CE8DE3ED663C4A /* AppFlowTests.swift */; };
+		47B5FD364C2A79737D7BF62C /* SetupLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73B4369A697178AEEC2DB791 /* SetupLocation.swift */; };
 		4854ECCE21B41B8C389825908A5D6B16 /* TransitModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 187B2015508A3DA090330C7C6EBDCE0E /* TransitModels.swift */; };
 		4AB02CF596EB25D71EA5F912 /* TinyTrainVisualTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CC7278568D8278D5A06691D /* TinyTrainVisualTests.swift */; };
 		4AB1D15BEDFA009447E7C03D822C1D71 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 369E3C3CE85C8D9794DE25612E6AAD6B /* SettingsView.swift */; };
@@ -106,6 +107,7 @@
 		629298F5116802F5134DF36EE7908FEE /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		649B2E9AB807B9BE4376911329B9D7D4 /* ILoveTrainsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ILoveTrainsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		6AC09C9409003F3D7E4E206C4EDD16B0 /* RowConformanceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RowConformanceTests.swift; sourceTree = "<group>"; };
+		73B4369A697178AEEC2DB791 /* SetupLocation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SetupLocation.swift; path = Core/SetupLocation.swift; sourceTree = "<group>"; };
 		75EE451EE7896A90B5C84525EAC53FC4 /* OfflineRealtime.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflineRealtime.swift; path = Core/OfflineRealtime.swift; sourceTree = "<group>"; };
 		83F3C91479FEF2D83389ECA406538F12 /* stations.json */ = {isa = PBXFileReference; includeInIndex = 1; path = stations.json; sourceTree = "<group>"; };
 		87B509202582DCB9F7B3E40D094D16BB /* OfflineDatabase.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflineDatabase.swift; path = Core/OfflineDatabase.swift; sourceTree = "<group>"; };
@@ -202,6 +204,7 @@
 				369E3C3CE85C8D9794DE25612E6AAD6B /* SettingsView.swift */,
 				EE08B61C43CA96D0168182C2CA0CB8A0 /* SetupView.swift */,
 				1F73A9793884A98DC81A1795D0C3DCA1 /* Theme.swift */,
+				73B4369A697178AEEC2DB791 /* SetupLocation.swift */,
 				AD7BA0C2FE4851DF14492812 /* TinyTrain.swift */,
 			);
 			name = ILoveTrains;
@@ -443,6 +446,7 @@
 				4AB1D15BEDFA009447E7C03D822C1D71 /* SettingsView.swift in Sources */,
 				E071068EEE81F77630384D075D5BC2D0 /* SetupView.swift in Sources */,
 				087732BE6816B598BAF98261817B8962 /* Theme.swift in Sources */,
+				47B5FD364C2A79737D7BF62C /* SetupLocation.swift in Sources */,
 				8B1B2953476A247BE4140F08 /* TinyTrain.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

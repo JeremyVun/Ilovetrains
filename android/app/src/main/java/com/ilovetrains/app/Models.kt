@@ -44,7 +44,14 @@ data class BoardData(val from: Station, val to: Station, val journeys: List<Jour
 }
 enum class Screen { Home, Board, Detail, Setup, Settings }
 enum class Appearance { System, Dark, Light }
-data class FocusedJourney(val tripId: String, val reverse: Boolean, val journey: Journey, val board: BoardData, val pinned: Boolean = true)
+data class FocusedJourney(
+    val tripId: String,
+    val reverse: Boolean,
+    val journey: Journey,
+    val board: BoardData,
+    val pinned: Boolean = true,
+    val alternatives: BoardData? = null,
+)
 data class ViewEvent(val tripId: String, val reverse: Boolean, val at: Long)
 data class Ride(val tripId: String, val reverse: Boolean, val departure: Long, val arrival: Long,
     val from: Station? = null, val to: Station? = null)
@@ -61,10 +68,15 @@ data class AppState(
     val automaticHome: Station? = null, val focusComplete: Boolean = false,
     val stations: List<Station> = emptyList(), val recentFrom: List<Station> = emptyList(), val recentTo: List<Station> = emptyList(),
     val setupFrom: Station? = null, val setupTo: Station? = null, val selectingHome: Boolean = false,
+    val setupLocationStatus: SetupLocationStatus = SetupLocationStatus.Idle,
+    val nearbyStations: List<Station> = emptyList(),
+    val nearestStation: Station? = null, val justAddedTripId: String? = null,
     val timetableStatus: String = "Opening offline timetable", val timetableUpdating: Boolean = false,
     val tripMetadata: Map<String, String> = emptyMap(),
+    val feedbackDraft: String = "", val feedbackCategory: String = "problem",
     val feedbackSubmitting: Boolean = false, val feedbackSucceeded: Boolean = false,
-    val message: String? = null, val undoAvailable: Boolean = false, val version: String = BuildConfig.VERSION_NAME
+    val message: String? = null, val messageAutoDismiss: Boolean = false,
+    val undoAvailable: Boolean = false, val version: String = BuildConfig.VERSION_NAME
 ) {
     val selectedTrip get() = trips.find { it.id == selectedTripId }
     val shownBoard get() = if (screen == Screen.Home) homeBoard ?: board else board
@@ -72,13 +84,13 @@ data class AppState(
 interface UiActions {
     fun back()
     fun openTrip(id: String, reverse: Boolean = false)
-    fun reverseTrip()
     fun openJourney(journey: Journey)
     fun pinJourney(journey: Journey)
     fun unpinJourney()
     fun showReturn()
     fun newTrip()
     fun chooseSetupFrom(station: Station)
+    fun setupOriginQueryChanged() {}
     fun clearSetupFrom()
     fun chooseSetupTo(station: Station)
     fun clearSetupTo()
@@ -95,6 +107,8 @@ interface UiActions {
     fun refresh()
     fun earlier()
     fun updateTimetable()
+    fun setFeedbackDraft(text: String)
+    fun setFeedbackCategory(category: String)
     fun feedback(text: String, category: String = "problem")
     fun dismissMessage()
 }

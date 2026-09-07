@@ -17,6 +17,7 @@ final class TrainViewModel: ObservableObject {
     private var boardTask: Task<Void, Never>?
     private var focusTask: Task<Void, Never>?
     private var historyTask: Task<Void, Never>?
+    private var earlierTask: Task<Void, Never>?
     private var realtimeTask: Task<Void, Never>?
     private var loop: Task<Void, Never>?
     private var writeTask: Task<Void, Never>?
@@ -26,6 +27,10 @@ final class TrainViewModel: ObservableObject {
     private var lastTimetableCheck = 0.0
     private var lastRealtimeAttempt = 0.0
     private var active = false
+    private var setupOriginEdited = false
+    private var setupLocationRequested = false
+    private var setupLocationResolved = false
+    private var suppressNextLastAnswer = false
     private var redirect: FocusedJourney?
     private var redirectTargetId: String?
     private var pendingDeletion: PendingDeletion?
@@ -49,6 +54,7 @@ final class TrainViewModel: ObservableObject {
         #endif
         location.onPermission = { [weak self] granted, denied in self?.state.locationGranted = granted; self?.state.locationDenied = denied }
         location.onFix = { [weak self] in self?.receiveLocation($0) }
+        location.onFailure = { [weak self] in self?.locationFailed($0) }
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--offline") { networkDisabled = true }
         if configureCalibration() { seeded = true; return }
@@ -68,7 +74,7 @@ final class TrainViewModel: ObservableObject {
         refresh()
         do { try await bootstrap?.value; state.timetableStatus = await planner.coverageDescription }
         catch { state.timetableStatus = "Offline timetable unavailable. Download it in Settings." }
-        if active { refreshSharedData(); silentLocation() }
+        if active { refreshSharedData(refreshBoard: false); silentLocation() }
     }
 
     private func persist() {
@@ -101,11 +107,15 @@ final class TrainViewModel: ObservableObject {
         state.homeBoard = focus?.board ?? state.board
     }
     private func choosePrediction() {
-        if explicit, data.trips.contains(where: { $0.id == state.selectedTripId && compatible($0, modes: data.modes) }) { return }
+        if explicit, data.trips.contains(where: { $0.id == state.selectedTripId && compatible($0, modes: data.modes) }) {
+            state.selectionPredicted = false
+            return
+        }
         let focus = currentFocus()
         let selected = focus.map { Selection(tripId: $0.tripId, reverse: $0.reverse) } ?? predict(data: data, stations: state.stations, fix: fix, now: state.now)
         let changed = state.selectedTripId != selected?.tripId || state.reverse != (selected?.reverse ?? false)
         state.selectedTripId = selected?.tripId; state.reverse = selected?.reverse ?? false; state.receipt = selected?.receipt
+        state.selectionPredicted = focus == nil && selected != nil
         if changed { state.board = nil }
     }
     private func ends(id: String? = nil, reverse: Bool? = nil) -> (Station, Station)? {
@@ -119,8 +129,9 @@ final class TrainViewModel: ObservableObject {
         if seeded { return }
         #endif
         guard loop == nil else { return }
+        state.justAddedTripId = nil
         state.now = epochNow(); location.refreshPermission()
-        if state.ready { settleFocus(); choosePrediction(); syncPersonal(); refresh(); refreshSharedData(); silentLocation() }
+        if state.ready { settleFocus(); choosePrediction(); syncPersonal(); refresh(); refreshSharedData(refreshBoard: false); silentLocation() }
         loop = Task { [weak self] in
             var ticks = 0
             while !Task.isCancelled {
@@ -128,19 +139,24 @@ final class TrainViewModel: ObservableObject {
                 guard let self else { return }
                 self.state.now = epochNow(); ticks += 1
                 self.settleFocus()
-                if ticks % 30 == 0, self.state.ready { self.refreshSharedData(); self.refresh() }
+                if ticks % 30 == 0, self.state.ready, !self.refreshSharedData(), self.realtimeTask == nil { self.refresh() }
             }
         }
     }
     func pause() {
         active = false; loop?.cancel(); loop = nil
-        boardTask?.cancel(); focusTask?.cancel(); historyTask?.cancel(); realtimeTask?.cancel(); realtimeTask = nil
+        boardTask?.cancel(); focusTask?.cancel(); historyTask?.cancel(); earlierTask?.cancel(); earlierTask = nil
+        realtimeTask?.cancel(); realtimeTask = nil
         generation += 1; sharedGeneration += 1; state.refreshing = false; state.distanceMetres = nil
-        fix = nil; location.stop()
+        state.earlierLoading = false
+        state.nearestStation = nil; fix = nil; location.stop()
     }
     private func silentLocation() {
         guard data.useLocation, active, state.screen == .home || state.screen == .setup else { return }
-        location.request(prompt: false)
+        // A user-requested lookup may have reached Settings before iOS could ask permission.
+        let resumePermission = setupLocationRequested && !state.locationGranted && !state.locationDenied
+        if setupLocationRequested && (state.locationGranted || resumePermission) { state.setupLocationStatus = .locating }
+        location.request(prompt: resumePermission)
     }
     private var canNetwork: Bool {
         #if DEBUG
@@ -154,10 +170,13 @@ final class TrainViewModel: ObservableObject {
         if seeded { return }
         #endif
         guard state.ready, active else { return }
+        earlierTask?.cancel(); earlierTask = nil; state.earlierLoading = false
         boardTask?.cancel(); generation += 1
         let request = generation; let modes = data.modes; let now = state.now
         guard let pair = ends(), !modes.isEmpty else { state.board = nil; state.refreshing = false; syncPersonal(); refreshFocus(); return }
         let id = state.selectedTripId; let reverse = state.reverse
+        let recordLastAnswer = !suppressNextLastAnswer
+        suppressNextLastAnswer = false
         state.refreshing = true
         boardTask = Task {
             let cached = await store.cached(from: pair.0, to: pair.1, modes: modes)
@@ -188,10 +207,10 @@ final class TrainViewModel: ObservableObject {
             guard request == generation, !Task.isCancelled else { return }
             resolveRedirect(result)
             let liveEvidence = [online, local].compactMap { $0 }.first { $0.isLive(now) }
-            if let lead = result.journeys.first(where: { !$0.cancelled && $0.effectiveDeparture >= now }), let id {
-                if let index = data.trips.firstIndex(where: { $0.id == id }) { data.trips[index].lines = Array(Set(lead.legs.map(\.line))).sorted() }
+            if let lead = result.journeys.first(where: { journeyAllowed($0, modes: modes) && !$0.cancelled && $0.effectiveDeparture >= now }), let id {
+                if let index = data.trips.firstIndex(where: { $0.id == id }) { data.trips[index].lines = orderedLineCodes(lead) }
                 let freshlyObserved = liveEvidence?.journeys.contains { $0.key == lead.key && $0.retained != true } == true
-                if data.focus == nil, state.screen == .home, lead.retained != true, freshlyObserved {
+                if recordLastAnswer, data.focus == nil, state.screen == .home, lead.retained != true, freshlyObserved {
                     let here = stationHere(data: data, stations: state.stations, fix: fix, now: now)
                     let stationId = here.flatMap { station in fix.map { distanceMetres($0, station) <= 200 ? station.id : nil } ?? nil }
                     data.lastAnswer = LastAnswer(tripId: id, reverse: reverse, at: now, stationId: stationId, board: result, journey: lead)
@@ -222,13 +241,19 @@ final class TrainViewModel: ObservableObject {
         }
         syncPersonal()
     }
-    private func refreshSharedData() {
-        guard canNetwork, realtimeTask == nil, state.now - lastRealtimeAttempt >= 25_000 else { return }
+    @discardableResult
+    private func refreshSharedData(refreshBoard: Bool = true) -> Bool {
+        guard canNetwork, realtimeTask == nil, state.now - lastRealtimeAttempt >= 25_000 else { return false }
         lastRealtimeAttempt = state.now
         sharedGeneration += 1
         let sharedRequest = sharedGeneration
         realtimeTask = Task {
-            defer { if sharedRequest == sharedGeneration { realtimeTask = nil } }
+            defer {
+                if sharedRequest == sharedGeneration {
+                    realtimeTask = nil
+                    if refreshBoard, active { refresh() }
+                }
+            }
             do {
                 try await bootstrap?.value
                 try await planner.refreshRealtime(baseURL: api.baseURL)
@@ -238,15 +263,10 @@ final class TrainViewModel: ObservableObject {
                     let alternatives = try? await planner.plan(from: focus.board.from, to: focus.board.to, at: state.now - 900_000, modes: allModes, limit: 24)
                     guard !Task.isCancelled, sharedRequest == sharedGeneration, active else { return }
                     if sameFocus(focus) {
-                        var refreshed = focus; refreshed.journey = update.journey
-                        refreshed.board.journeys = [update.journey]
-                        refreshed.alternatives = alternatives
-                        refreshed.board.generatedAt = update.observedAt ?? focus.board.generatedAt
-                        refreshed.board.source = update.live ? "live" : "schedule"; refreshed.board.offline = !update.live; refreshed.board.serverStale = false
-                        data.focus = update.live ? refreshed : focus.lastKnown(); settleFocus(); persist(); syncPersonal()
+                        data.focus = focusAfterRefresh(focus, update: update, alternatives: alternatives)
+                        settleFocus(); persist(); syncPersonal()
                     }
                 }
-                if state.board?.isLive(state.now) != true { refresh() }
                 if state.now - lastTimetableCheck >= 21_600_000 {
                     lastTimetableCheck = state.now
                     try await planner.update(baseURL: api.baseURL)
@@ -254,6 +274,7 @@ final class TrainViewModel: ObservableObject {
                 }
             } catch { }
         }
+        return true
     }
     private func sameFocus(_ focus: FocusedJourney) -> Bool {
         data.focus.map { $0.tripId == focus.tripId && $0.reverse == focus.reverse && $0.journey.key == focus.journey.key } ?? false
@@ -285,7 +306,10 @@ final class TrainViewModel: ObservableObject {
     }
     private func completeRide(_ focus: FocusedJourney) {
         guard !data.rides.contains(where: { $0.tripId == focus.tripId && $0.reverse == focus.reverse && $0.departure == focus.journey.departure }) else { return }
-        data.rides.append(Ride(tripId: focus.tripId, reverse: focus.reverse, departure: focus.journey.departure, arrival: focus.journey.effectiveArrival, from: focus.journey.legs.first?.from, to: focus.journey.legs.last?.to))
+        let pair = ends(id: focus.tripId, reverse: focus.reverse)
+        data.rides.append(Ride(tripId: focus.tripId, reverse: focus.reverse, departure: focus.journey.departure,
+                               arrival: focus.journey.effectiveArrival, from: pair?.0 ?? focus.journey.legs.first?.from,
+                               to: pair?.1 ?? focus.journey.legs.last?.to))
         data.rides = Array(data.rides.suffix(100)); persist()
     }
     func receiveLocation(_ value: Fix) {
@@ -295,20 +319,34 @@ final class TrainViewModel: ObservableObject {
         let current = epochNow()
         #endif
         state.now = current
-        guard data.useLocation, active, state.screen == .home || state.screen == .setup, (0...300_000).contains(current - value.at) else { return }
+        guard data.useLocation, active, state.screen == .home || state.screen == .setup else { return }
+        guard (0...300_000).contains(current - value.at) else { locationFailed(.unavailable); return }
         fix = value
         let here = stationHere(data: data, stations: state.stations, fix: value, now: current)
+        let choice = setupLocationChoice(stations: state.stations, modes: data.modes, fix: value)
+        state.nearestStation = choice.stations.first
+        if state.screen == .setup {
+            guard !state.selectingHome else { return }
+            state.nearbyStations = choice.stations
+            if state.setupFrom == nil && !setupOriginEdited && (setupLocationRequested || (data.trips.isEmpty && !setupLocationResolved)) {
+                state.setupFrom = choice.automatic
+                state.setupLocationStatus = choice.automatic != nil ? .idle : choice.stations.isEmpty ? .noNearby : .chooseStation
+            }
+            setupLocationRequested = false; setupLocationResolved = true
+            return
+        }
         if state.screen == .home, let here {
             let format = DateFormatter(); format.timeZone = sydneyZone; format.dateFormat = "yyyy-MM-dd"
             let day = format.string(from: Date(timeIntervalSince1970: current / 1000))
             if !data.votes.contains(where: { $0.day == day }) { data.votes.append(HomeVote(day: day, station: here)); data.votes = Array(data.votes.suffix(7)); persist() }
         }
         if let inferred = inferredFocus(data: data, fix: value, now: current) { data.focus = inferred; persist() }
-        if let focus = data.focus, let to = focus.journey.legs.last?.to, current >= focus.journey.effectiveArrival - 300_000, distanceMetres(value, to) <= 200 { completeRide(focus) }
-        if state.screen == .setup, state.setupFrom == nil, !state.selectingHome { state.setupFrom = here }
+        if let focus = data.focus, let to = ends(id: focus.tripId, reverse: focus.reverse)?.1,
+           current >= focus.journey.effectiveArrival - 300_000, distanceMetres(value, to) <= 200 { completeRide(focus) }
         if !explicit, data.focus == nil, let here, let home = data.home ?? automaticHome(data: data), here.id != home.id,
            !data.trips.contains(where: { compatible($0, modes: data.modes) && ($0.from.id == here.id || $0.to.id == here.id) }), !home.modes.isDisjoint(with: data.modes) {
-            addTrip(SavedTrip(id: UUID().uuidString, from: here, to: home, createdAt: current)); persist()
+            let trip = SavedTrip(id: UUID().uuidString, from: here, to: home, createdAt: current)
+            addTrip(trip); state.justAddedTripId = trip.id; persist()
         }
         choosePrediction(); syncPersonal()
         if let origin = currentFocus()?.journey.legs.first?.from ?? ends()?.0 {
@@ -318,6 +356,7 @@ final class TrainViewModel: ObservableObject {
     }
 
     func back() {
+        if state.screen == .setup { cancelSetupLocation() }
         historyTask?.cancel()
         switch state.screen {
         case .detail: state.screen = .board
@@ -332,10 +371,11 @@ final class TrainViewModel: ObservableObject {
     }
     func openTrip(id: String, reverse: Bool = false) {
         guard let trip = data.trips.first(where: { $0.id == id }), compatible(trip, modes: data.modes) else { return }
-        explicit = true; data.lastAnswer = nil; persist()
+        explicit = true
         let direction = id == state.selectedTripId && !reverse ? state.reverse : reverse
         if id != state.selectedTripId || state.reverse != direction { state.board = nil }
         state.selectedTripId = id; state.reverse = direction; state.screen = .board; state.detail = nil; state.receipt = nil
+        state.selectionPredicted = false
         syncPersonal(); historyRecorded = false; scheduleHistory(); refresh()
     }
     private func scheduleHistory() {
@@ -348,10 +388,6 @@ final class TrainViewModel: ObservableObject {
         data.lastTripId = id; data.lastReverse = state.reverse
         if let index = data.trips.firstIndex(where: { $0.id == id }) { data.trips[index].lastViewed = state.now }
         historyRecorded = true; persist()
-    }
-    func reverseTrip() {
-        data.lastAnswer = nil; persist(); state.reverse.toggle(); state.board = nil
-        explicit = true; historyRecorded = false; scheduleHistory(); refresh()
     }
     func openJourney(_ journey: Journey) {
         if state.screen == .home {
@@ -384,19 +420,23 @@ final class TrainViewModel: ObservableObject {
         syncPersonal(); refresh()
     }
     func newTrip() {
+        cancelSetupLocation(); setupLocationResolved = false
         redirect = currentFocus().flatMap { $0.pinned ? nil : $0 }
         redirectTargetId = nil
-        state.screen = .setup; state.setupFrom = redirect?.journey.legs.first?.from; state.setupTo = nil; state.selectingHome = false
+        setupOriginEdited = false
+        state.screen = .setup
+        state.setupFrom = redirect.flatMap { ends(id: $0.tripId, reverse: $0.reverse)?.0 }
+        state.setupTo = nil; state.selectingHome = false
     }
-    func chooseSetupFrom(_ station: Station) { state.setupFrom = station }
-    func clearSetupFrom() { state.setupFrom = nil; state.setupTo = nil }
+    func chooseSetupFrom(_ station: Station) { setupOriginQueryChanged(); state.setupFrom = station }
+    func clearSetupFrom() { setupOriginQueryChanged(); state.setupFrom = nil; state.setupTo = nil }
     func chooseSetupTo(_ station: Station) { state.setupTo = station }
     func clearSetupTo() { state.setupTo = nil }
     private func addTrip(_ trip: SavedTrip) {
         data.trips.append(trip); enforceTripCap()
     }
     func saveTrip(from: Station, to: Station) {
-        guard from.id != to.id, !from.modes.isDisjoint(with: data.modes), !to.modes.isDisjoint(with: data.modes) else { return }
+        guard from.id != to.id else { return }
         let existing = data.trips.first { Set([$0.from.id, $0.to.id]) == Set([from.id, to.id]) }
         let trip = existing ?? SavedTrip(id: UUID().uuidString, from: from, to: to, createdAt: state.now)
         if existing == nil { addTrip(trip) }
@@ -404,17 +444,27 @@ final class TrainViewModel: ObservableObject {
         data.recentFrom = Array(([from] + data.recentFrom.filter { $0.id != from.id }).prefix(3))
         data.recentTo = Array(([to] + data.recentTo.filter { $0.id != to.id }).prefix(3))
         data.lastTripId = trip.id; data.lastReverse = reverse
-        persist(); explicit = true; historyRecorded = false
-        redirectTargetId = redirect == nil ? nil : trip.id
-        state.screen = redirect == nil ? .home : .board; state.selectedTripId = trip.id; state.reverse = reverse
+        persist(); historyRecorded = false
+        let visible = compatible(trip, modes: data.modes)
+        explicit = visible
+        state.selectionPredicted = false
+        redirectTargetId = visible && redirect != nil ? trip.id : nil
+        if visible {
+            state.screen = redirect == nil ? .home : .board; state.selectedTripId = trip.id; state.reverse = reverse
+        } else {
+            redirect = nil; state.screen = .home; state.selectedTripId = nil; state.reverse = false
+        }
         state.setupFrom = nil; state.setupTo = nil; state.board = nil; state.receipt = nil
+        setupOriginEdited = false
+        if !visible { choosePrediction() }
         syncPersonal(); refresh()
     }
     private func resolveRedirect(_ board: BoardData) {
         guard let old = redirect, let id = state.selectedTripId, id == redirectTargetId else { return }
         redirect = nil; redirectTargetId = nil
-        if let lead = old.journey.legs.first, let match = board.journeys.first(where: { $0.legs.first?.line == lead.line && $0.legs.first?.departure == lead.departure }) {
-            data.focus = FocusedJourney(tripId: id, reverse: state.reverse, journey: match, board: board, pinned: false); state.screen = .home
+        if let match = redirectMatch(for: old.journey, in: board.journeys) {
+            data.focus = FocusedJourney(tripId: id, reverse: state.reverse, journey: match, board: board, pinned: false)
+            state.screen = .home; persist(); syncPersonal()
         }
     }
     private func removeTrip(_ id: String) {
@@ -424,7 +474,7 @@ final class TrainViewModel: ObservableObject {
         Task { try? await store.purgeCache(for: pending.trip) }
     }
     private func enforceTripCap() {
-        while data.trips.count > 10, let evicted = data.trips.min(by: { ($0.lastViewed == 0 ? $0.createdAt : $0.lastViewed) < ($1.lastViewed == 0 ? $1.createdAt : $1.lastViewed) }) {
+        while data.trips.count > 10, let evicted = data.leastRecentlyUsedTrip() {
             removeTrip(evicted.id)
         }
     }
@@ -434,7 +484,7 @@ final class TrainViewModel: ObservableObject {
         data = remaining; pendingDeletion = pending; persist()
         if state.selectedTripId == id { explicit = false; state.board = nil }
         choosePrediction(); syncPersonal(); refresh()
-        state.message = deletionMessage(pending.trip); state.undoAvailable = true
+        state.message = deletionMessage(pending.trip); state.messageAutoDismiss = false; state.undoAvailable = true
         let window = undoWindow
         undoTask = Task { [weak self] in
             try? await Task.sleep(for: window)
@@ -456,38 +506,81 @@ final class TrainViewModel: ObservableObject {
         Task { try? await store.purgeCache(for: pending.trip) }
         if state.message == deletionMessage(pending.trip) { show(nil) }
     }
-    private func show(_ message: String?) { state.message = message; state.undoAvailable = false }
+    private func show(_ message: String?, autoDismiss: Bool = false) {
+        state.message = message; state.messageAutoDismiss = message != nil && autoDismiss; state.undoAvailable = false
+    }
     func openSettings() { settingsBack = state.screen; state.screen = .settings; state.feedbackSucceeded = false }
     func setAppearance(_ value: Appearance) { data.appearance = value; persist(); syncPersonal() }
     func setMode(mode: String, enabled: Bool) {
         guard allModes.contains(mode) else { return }
         if enabled { data.modes.insert(mode) } else { data.modes.remove(mode) }
+        suppressNextLastAnswer = true
         persist(); state.board = nil; state.homeBoard = nil; choosePrediction(); syncPersonal(); refresh()
     }
     func setUseLocation(_ enabled: Bool) {
         data.useLocation = enabled
-        if !enabled { fix = nil; state.distanceMetres = nil; location.stop() }
+        if !enabled { cancelSetupLocation(); fix = nil; state.distanceMetres = nil; state.nearestStation = nil; location.stop() }
         persist(); syncPersonal()
         if enabled { requestLocation() } else { choosePrediction(); refresh() }
     }
     func requestLocation() {
+        if state.screen == .setup && state.setupLocationStatus == .servicesDisabled {
+            setupLocationRequested = true
+            #if DEBUG
+            if seeded { state.setupLocationStatus = .locating; return }
+            #endif
+            location.openSettings(); return
+        }
+        if state.screen == .setup && !state.selectingHome && state.setupFrom == nil {
+            guard state.setupLocationStatus != .locating else { return }
+            setupOriginEdited = false; setupLocationRequested = true
+            state.setupLocationStatus = .locating; state.nearbyStations = []
+            if !data.useLocation { data.useLocation = true; persist(); syncPersonal() }
+        }
         guard data.useLocation else { return }
         #if DEBUG
         if seeded { return }
         #endif
         location.request(prompt: true)
     }
-    func chooseHome() { state.screen = .setup; state.selectingHome = true; state.setupFrom = nil; state.setupTo = nil }
+    func locationFailed(_ status: SetupLocationStatus) {
+        guard setupLocationRequested, state.screen == .setup, !state.selectingHome, state.setupFrom == nil else { return }
+        state.setupLocationStatus = status
+        if status == .unavailable { setupLocationRequested = false; setupLocationResolved = true }
+    }
+    func setupOriginQueryChanged() {
+        setupOriginEdited = true
+        cancelSetupLocation()
+    }
+    private func cancelSetupLocation() {
+        setupLocationRequested = false
+        state.setupLocationStatus = .idle; state.nearbyStations = []
+        location.stop()
+    }
+    func chooseHome() { setupOriginEdited = false; state.screen = .setup; state.selectingHome = true; state.setupFrom = nil; state.setupTo = nil }
     func setHome(_ station: Station?) { data.home = station; persist(); state.screen = .settings; state.selectingHome = false; syncPersonal() }
     func earlier() {
-        guard let board = state.board else { return }
+        guard earlierTask == nil, let board = state.board else { return }
         let request = generation, modes = data.modes
         let earliest = board.journeys.map(\.departure).min() ?? state.now
         let at = max(earliest - 3_600_000, state.now - 86_400_000)
         guard earliest > state.now - 86_400_000 else { return }
-        Task {
-            guard let past = try? await planner.plan(from: board.from, to: board.to, at: at, modes: modes, limit: 30), request == generation, var current = state.board else { return }
-            current.journeys = merge(past.journeys.filter { $0.departure >= state.now - 86_400_000 }.map { $0.scheduledOnly() }, current.journeys)
+        state.earlierLoading = true
+        earlierTask = Task {
+            defer {
+                if request == generation { earlierTask = nil; state.earlierLoading = false }
+            }
+            async let local: BoardData? = try? planner.plan(from: board.from, to: board.to, at: at, modes: modes, limit: 30)
+            let online: BoardData?
+            if canNetwork {
+                online = try? await api.departures(from: board.from, to: board.to, modes: modes, at: at)
+            } else {
+                online = nil
+            }
+            let localResult = await local
+            let past = online ?? localResult
+            guard !Task.isCancelled, request == generation, let past, var current = state.board else { return }
+            current.journeys = mergeEarlierJourneys(past.journeys, current: current.journeys, cutoff: state.now - 86_400_000)
             publish(current, request: request)
         }
     }
@@ -509,11 +602,16 @@ final class TrainViewModel: ObservableObject {
         state.feedbackSubmitting = true; state.feedbackSucceeded = false; show(nil)
         Task {
             defer { state.feedbackSubmitting = false }
-            do { try await api.feedback(text: text, category: category); state.feedbackSucceeded = true; feedbackDraft = ""; show("Feedback sent. Thank you.") }
+            do { try await api.feedback(text: text, category: category); state.feedbackSucceeded = true; feedbackDraft = ""; show("Feedback sent. Thank you.", autoDismiss: true) }
             catch { show("Couldn’t send feedback. Check your connection and try again.") }
         }
     }
     func dismissMessage() { show(nil) }
+}
+
+func redirectMatch(for original: Journey, in candidates: [Journey]) -> Journey? {
+    guard let lead = original.legs.first else { return nil }
+    return candidates.first { $0.legs.first?.line == lead.line && $0.legs.first?.departure == lead.departure }
 }
 
 #if DEBUG
@@ -530,6 +628,7 @@ private extension TrainViewModel {
         state.now = now
         if name.contains("active") || name.contains("inferred") { state.now = entry["departedNow"] as? Double ?? now }
         board.generatedAt = state.now
+        if name.contains("server-stale") { board.serverStale = true }
         if name.contains("delayed"), !board.journeys.isEmpty {
             board.journeys[0].legs = board.journeys[0].legs.map { leg in var l = leg; l.estimatedDeparture = l.departure + 360_000; l.estimatedArrival = l.arrival + 360_000; return l }
         }
@@ -537,6 +636,10 @@ private extension TrainViewModel {
         if name.contains("now"), let departure = board.journeys.first?.effectiveDeparture {
             state.now = departure
             board.generatedAt = departure
+        }
+        if name.contains("hours"), let departure = board.journeys.first?.effectiveDeparture {
+            state.now = departure - 187 * 60_000
+            board.generatedAt = state.now
         }
         if name.contains("long"), !board.journeys.isEmpty {
             board.from.name = "North Wollongong Station"
@@ -562,8 +665,10 @@ private extension TrainViewModel {
             board = retainedOfflineBoard(board)
             board.homeJourneyKey = board.journeys.first?.key
         }
-        let trip = SavedTrip(id: "calibration-trip", from: board.from, to: board.to, createdAt: now, lines: Array(Set(board.journeys.first?.legs.map(\.line) ?? [])).sorted())
+        let trip = SavedTrip(id: "calibration-trip", from: board.from, to: board.to, createdAt: now,
+                            lines: board.journeys.first.map(orderedLineCodes) ?? [])
         data.trips = [trip]; data.appearance = name.contains("light") ? .light : .dark
+        if name.contains("unknown-line") { data.trips[0].lines = [] }
         data.lastTripId = trip.id
         if ["settings-off", "settings-off-light"].contains(name) { data.useLocation = false }
         if ["settings-on", "settings-on-light"].contains(name) { state.locationGranted = true }
@@ -578,6 +683,10 @@ private extension TrainViewModel {
             }
         }
         state.selectedTripId = trip.id; state.board = board; state.homeBoard = board
+        if name.contains("just-added") {
+            state.justAddedTripId = trip.id
+            state.selectionPredicted = true
+        }
         if name.contains("pinned") || name.contains("active") || name.contains("inferred"), let journey = board.journeys.first {
             data.focus = FocusedJourney(tripId: trip.id, reverse: false, journey: journey, board: board, pinned: !name.contains("inferred"))
         }
@@ -586,12 +695,43 @@ private extension TrainViewModel {
         }
         if name.contains("detail") || name == "ferry" { state.screen = .detail; state.detail = board.journeys.first }
         else if name.contains("board") { state.screen = .board }
-        else if name.contains("setup") { state.screen = .setup; state.setupFrom = board.from; data.recentTo = [board.to] }
+        else if name.contains("setup") {
+            state.screen = .setup; state.setupFrom = board.from; data.recentTo = [board.to]
+            if name.contains("location") {
+                state.setupFrom = nil; data.trips = []
+                if let url = Bundle.main.url(forResource: "stations", withExtension: "json"),
+                   let bytes = try? Data(contentsOf: url), let rows = try? JSONSerialization.jsonObject(with: bytes) as? [[String: Any]] {
+                    state.stations = rows.compactMap { try? TransitWire.station($0) }
+                }
+                if name.contains("loading") { state.setupLocationStatus = .locating }
+                else if name.contains("denied") { state.setupLocationStatus = .denied; state.locationDenied = true }
+                else if name.contains("failed") { state.setupLocationStatus = .unavailable }
+                else if name.contains("disabled") { state.setupLocationStatus = .servicesDisabled }
+                else if name.contains("empty") { state.setupLocationStatus = .noNearby }
+                else if name.contains("approximate") {
+                    state.setupLocationStatus = .chooseStation
+                    state.nearbyStations = setupLocationChoice(stations: state.stations, modes: allModes,
+                        fix: Fix(lat: -33.873596, lon: 151.206899, at: now, accuracyMetres: 1_000)).stations
+                }
+            }
+        }
         else if name.contains("settings") { state.screen = .settings }
+        if name.contains("nearest") {
+            state.setupFrom = nil
+            state.nearestStation = board.from
+            state.locationGranted = true
+        }
+        if name.contains("feedback") {
+            feedbackDraft = "The platform changed after I opened the app."
+        }
         if name.contains("empty") { data.modes = []; state.board = nil }
-        if name.contains("feedback-success") { state.message = "Feedback sent. Thank you." }
+        if name.contains("feedback-success") {
+            state.message = "Feedback sent. Thank you."
+            state.messageAutoDismiss = true
+        }
         state.ready = true; state.timetableStatus = "5 Sep – 4 Oct 2026"
         syncPersonal()
+        if name.contains("just-added") { state.tripMetadata[trip.id] = "Never ridden · 480 m away" }
         return true
     }
 }

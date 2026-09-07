@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Native review — verified C/D visual evidence</title>
+  <style>
+    :root { color-scheme: light dark; --bg:#f4f2ed; --ink:#1b1b18; --muted:#67655f; --card:#fff; --rule:#d4d0c7; --hold:#8b5214; }
+    @media (prefers-color-scheme:dark) { :root { --bg:#161614; --ink:#f1efe8; --muted:#aaa69c; --card:#211f1b; --rule:#454139; --hold:#f0b35f; } }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui,-apple-system,sans-serif; }
+    main { width:min(1120px,calc(100% - 32px)); margin:36px auto 72px; }
+    h1 { font-size:30px; line-height:1.1; margin:0 0 10px; }
+    h2 { font-size:22px; margin:40px 0 8px; border-top:1px solid var(--rule); padding-top:28px; }
+    h3 { font-size:16px; margin:0 0 6px; }
+    p { margin:6px 0; }
+    .lede,.limit { color:var(--muted); max-width:78ch; }
+    .hold { color:var(--hold); font-weight:650; }
+    .pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; align-items:start; margin-top:18px; }
+    .single { max-width:540px; margin-top:18px; }
+    figure { margin:0; background:var(--card); border:1px solid var(--rule); border-radius:8px; padding:12px; }
+    img { display:block; width:100%; height:auto; background:#111; }
+    figcaption { color:var(--muted); padding-top:9px; font-size:13px; }
+    code { font:12px ui-monospace,SFMono-Regular,monospace; }
+    a { color:inherit; }
+    .tag { display:inline-block; border:1px solid var(--rule); border-radius:999px; padding:2px 8px; margin-right:6px; font-size:12px; color:var(--muted); }
+    @media (max-width:720px) { .pair { grid-template-columns:1fr; } main { width:min(100% - 20px,520px); margin-top:20px; } }
+  </style>
+</head>
+<body><main>
+  <h1>Native review: visual evidence</h1><p><b>No fixes approved.</b> <a href="../../approval-groups.md">Review all approval groups and user impact</a> · <a href="../../audit.md">Read the corrected 64-entry audit</a></p>
+  <p class="lede">Read-only evidence catalog for approval grouping. Every image below is an existing capture from the real web, Android, or iOS renderer. Click any phone image for its full-resolution file. The rejected custom-rendered comps are not used.</p>
+  <p><a href="../../audit-evidence/visual-findings.md">Open the detailed visual source audit</a></p>
+
+  <h2>D1 + D2 — two-change journey axis</h2>
+  <p><span class="tag">Matched fixture</span><span class="tag">Matched clock</span><span class="tag">Real native captures</span></p>
+  <p>Android joins <b>Town Hall · Central</b> into one centred label and draws the second alighting pin <b>12</b>. iOS associates each name with its dwell and suppresses the later alighting pin. The owner has ruled iOS correct.</p>
+  <div class="pair">
+    <figure><a href="images/android-detail-two-change.png"><img src="images/android-detail-two-change.png" alt="Android detail screen for a two-change journey"></a><figcaption>Android baseline: <code>detail-two-change</code>.</figcaption></figure>
+    <figure><a href="images/ios-detail-two-change.png"><img src="images/ios-detail-two-change.png" alt="iOS detail screen for the same two-change journey"></a><figcaption>iOS baseline: the same three-leg calibration journey and clock.</figcaption></figure>
+  </div>
+
+  <h2>D3 — cancelled tight-change treatment</h2>
+  <p><span class="tag">Matched fixture</span><span class="tag">Matched clock</span><span class="tag">Source-confirmed</span></p>
+  <p>Android's source still colours a short dwell by time alone; iOS and web suppress the tight warning when the journey is cancelled. The marker is subtle in these full frames, so source is the decisive proof.</p>
+  <div class="pair">
+    <figure><a href="images/android-detail-cancelled.png"><img src="images/android-detail-cancelled.png" alt="Android cancelled transfer journey"></a><figcaption>Android baseline: cancelled transfer fixture.</figcaption></figure>
+    <figure><a href="images/ios-detail-cancelled.png"><img src="images/ios-detail-cancelled.png" alt="iOS cancelled transfer journey"></a><figcaption>iOS baseline: same fixture and clock.</figcaption></figure>
+  </div>
+
+  <h2>D5 — reachable figure sizing</h2>
+  <p><span class="tag">Matched board</span><span class="tag">Now · 22:48</span><span class="tag">Real native captures</span></p>
+  <p>Android reduces <b>Now</b>; iOS leaves it at the ordinary numeral size. Source also confirms that native width checks ignore the small separate H when evaluating <b>10H</b>. The intended token counts H only for hour figures; ordinary <b>min</b> does not make a numeral wide. Both native renderers already keep H small; the prior large-H image was a comp bug and is excluded.</p>
+  <div class="pair">
+    <figure><a href="images/android-board-now.png"><img src="images/android-board-now.png" alt="Android board with Now figure"></a><figcaption>Android baseline: Central board, Now at 22:48.</figcaption></figure>
+    <figure><a href="images/ios-board-now.png"><img src="images/ios-board-now.png" alt="iOS board with Now figure"></a><figcaption>iOS real capture: same Central board and clock. No 10H runtime frame exists.</figcaption></figure>
+  </div>
+
+  <h2>D8 — Android boarding-chip overhang</h2>
+  <p><span class="tag">Android-only</span><span class="tag">Owner screenshot</span><span class="tag">Source-confirmed</span></p>
+  <p>The blue ride segment begins before the blue <b>5</b> chip because Android offsets the chip without covering the strip. iOS puts the spacing inside a ground-backed marker, so source clears iOS of the same defect.</p>
+  <div class="single"><figure><a href="images/android-board-offline-retained.png"><img src="images/android-board-offline-retained.png" alt="Android retained board showing blue strip before transfer platform 5"></a><figcaption>Android retained-board baseline. No matched iOS retained capture is available; no cross-platform visual comparison is claimed.</figcaption></figure></div>
+
+  <h2>D4 — retained provenance presentation</h2>
+  <p class="hold">Held for a matched retained-state capture and owner choice.</p>
+  <p>iOS visibly wraps <b>LAST KNOWN</b> to two lines. This frame does not show the previously claimed broken row reflow. The available Android retained state uses a different route, delay, clock, and scroll position.</p>
+  <div class="single"><figure><a href="images/ios-board-delayed-retained.png"><img src="images/ios-board-delayed-retained.png" alt="iOS retained board with Last known provenance"></a><figcaption>Real iOS retained-board capture only. Native retained provenance has no web equivalent.</figcaption></figure></div>
+
+  <h2>C9 — web reference for “Just added”</h2>
+  <p><span class="tag">Web renderer</span><span class="tag">Reference only</span></p>
+  <p>Source confirms both native clients omit the once-per-open receipt. This actual web frame shows the contract behavior; no matched native state exists, so it is not a parity comparison.</p>
+  <div class="single"><figure><a href="images/web-home-just-added.png"><img src="images/web-home-just-added.png" alt="Web home screen showing Just added on a saved trip"></a><figcaption>Web baseline: <code>home-just-added</code>.</figcaption></figure></div>
+
+  <h2>C10 — web footer reference</h2>
+  <p class="hold">Held for a board-depth and footer decision.</p>
+  <p>The web's six-row page can truthfully end with its six-service rule. Native requests can contain 10 online or 24 local rows, while current calibration images contain only six. This image documents the web endpoint only; it cannot prove a native fix.</p>
+  <div class="single"><figure><a href="images/web-board-end.png"><img src="images/web-board-end.png" alt="Web board end state"></a><figcaption>Actual web renderer at the end of its six-result page.</figcaption></figure></div>
+
+  <h2>D6 — web feedback focus reference</h2>
+  <p><span class="tag">Web renderer</span><span class="tag">Reference only</span></p>
+  <p>Android source confirms the draft is screen-local and its field has no focus-dependent treatment. This web frame shows the strong rule/label state; navigation retention itself requires behavioral verification during implementation.</p>
+  <div class="single"><figure><a href="images/web-settings-feedback.png"><img src="images/web-settings-feedback.png" alt="Web feedback form with message field focus treatment"></a><figcaption>Authoritative web feedback exemplar. No matching Android field capture exists.</figcaption></figure></div>
+
+  <h2>Evidence deliberately deferred</h2>
+  <p><b>C6 freshness/retention</b> needs matched fresh-live, recent server-stale, aged, failed, schedule-only, and retained states before selecting a fix. <b>C10</b> needs a displayed-slice/footer policy before a native comp can be meaningful. <b>D4</b> needs a matched retained capture if the owner wants convergence. C1, C2, C4, C5, C7, C8, C11, and the source portions of C3/C9 are verified in code but lack valid matched visual artifacts; they are documented in <a href="../../audit-evidence/visual-findings.md">findings.md</a> without fabricated screenshots.</p>
+</main></body>
+</html>

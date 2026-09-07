@@ -14,20 +14,19 @@ final class OfflineRealtimeTests: XCTestCase {
           {"stopId":"B-stop","stopSequence":2,"assignedStopId":"B-new","arrivalMs":\(arrival),"scheduleRelationship":"scheduled"}
         """), expectedSource: "source", now: now)
 
-        let result = realtime.overlay(connection(now), now: now) { _, stop in
+        let result = realtime.overlay([connection(now)], now: now) { _, stop in
             stop == "B-new" ? StopAssignment(platform: "9", stationId: "B") : nil
-        }
+        }.first!
 
-        XCTAssertTrue(result.matched)
-        XCTAssertNil(result.value.estimatedDeparture)
-        XCTAssertEqual(result.value.estimatedArrival, arrival)
-        XCTAssertEqual(result.value.toPlatform, "9")
+        XCTAssertNil(result.estimatedDeparture)
+        XCTAssertEqual(result.estimatedArrival, arrival)
+        XCTAssertEqual(result.toPlatform, "9")
 
         let journey = OfflineRouter().route(
             from: from,
             to: to,
             at: now,
-            connections: [result.value],
+            connections: [result],
             limit: 1
         ).first
         XCTAssertEqual(journey?.legs.first?.toPlatform, "9")
@@ -60,15 +59,15 @@ final class OfflineRealtimeTests: XCTestCase {
         try replacement.accept(json: snapshot(now, status: "replacement", stops: """
           {"stopId":"A-stop","stopSequence":1,"scheduleRelationship":"scheduled"}
         """), expectedSource: "source", now: now)
-        XCTAssertTrue(replacement.overlay(connection(now), now: now) { _, _ in nil }.value.cancelled)
+        XCTAssertTrue(replacement.overlay([connection(now)], now: now) { _, _ in nil }.first!.cancelled)
 
         var assigned = OfflineRealtime()
         try assigned.accept(json: snapshot(now, status: "scheduled", stops: """
           {"stopId":"A-stop","stopSequence":1,"assignedStopId":"other","scheduleRelationship":"scheduled"}
         """), expectedSource: "source", now: now)
-        XCTAssertTrue(assigned.overlay(connection(now), now: now) { _, _ in
+        XCTAssertTrue(assigned.overlay([connection(now)], now: now) { _, _ in
             StopAssignment(platform: "4", stationId: "OTHER")
-        }.value.cancelled)
+        }.first!.cancelled)
 
         var expired = OfflineRealtime()
         XCTAssertFalse(try expired.accept(
@@ -187,7 +186,32 @@ final class OfflineRealtimeTests: XCTestCase {
             expectedSource: "source",
             now: now
         ))
-        XCTAssertTrue(realtime.overlay(connection(now), now: now) { _, _ in nil }.value.cancelled)
+        XCTAssertTrue(realtime.overlay([connection(now)], now: now) { _, _ in nil }.first!.cancelled)
+    }
+
+    func testCapsExpiryAtHeaderAgeAndRejectsFutureHeaders() throws {
+        let now = 1_800_000_000_000.0
+        var realtime = OfflineRealtime()
+        XCTAssertFalse(try realtime.accept(
+            json: snapshot(now - 120_000, status: "scheduled", stops: "", expiresAt: now + 86_400_000),
+            expectedSource: "source",
+            now: now
+        ))
+        XCTAssertFalse(try realtime.accept(
+            json: snapshot(now + 300_001, status: "scheduled", stops: ""),
+            expectedSource: "source",
+            now: now
+        ))
+        XCTAssertThrowsError(try realtime.accept(
+            json: snapshot(now, status: "scheduled", stops: "", headerTimestamp: maximumTransitMillis + 1),
+            expectedSource: "source",
+            now: now
+        ))
+        XCTAssertThrowsError(try realtime.accept(
+            json: snapshot(now, status: "scheduled", stops: "{\"stopId\":\"A-stop\",\"arrivalMs\":\(maximumTransitMillis + 1)}"),
+            expectedSource: "source",
+            now: now
+        ))
     }
 
     func testSkippedStopBlocksBoardingAndAlightingButAllowsThroughTravel() throws {
@@ -217,12 +241,21 @@ final class OfflineRealtimeTests: XCTestCase {
         XCTAssertEqual(router.route(from: from, to: charlie, at: now, connections: connections, limit: 4).count, 1)
         XCTAssertTrue(router.route(from: from, to: to, at: now, connections: connections, limit: 4).isEmpty)
         XCTAssertTrue(router.route(from: to, to: charlie, at: now, connections: connections, limit: 4).isEmpty)
+        XCTAssertTrue(realtime.overlay(Journey(legs: [first.asLeg]), now: now) { _, _ in nil }.value.legs.first!.cancelled)
     }
 
-    private func snapshot(_ header: Millis, status: String, stops: String) -> String {
+    private func snapshot(
+        _ header: Millis,
+        status: String,
+        stops: String,
+        expiresAt: Millis? = nil,
+        headerTimestamp: Millis? = nil
+    ) -> String {
         let stopArray = stops.isEmpty ? "[]" : "[\(stops)]"
+        let expiry = expiresAt ?? header + 90_000
+        let timestamp = headerTimestamp ?? header
         return """
-        {"schemaVersion":1,"source":"source","headerTimestamp":\(header),"generatedAt":\(header + 1_000),"expiresAt":\(header + 90_000),"updates":[{"tripId":"trip","serviceDate":"20260907","status":"\(status)","delaySeconds":60,"stopUpdates":\(stopArray)}]}
+        {"schemaVersion":1,"source":"source","headerTimestamp":\(timestamp),"generatedAt":\(header + 1_000),"expiresAt":\(expiry),"updates":[{"tripId":"trip","serviceDate":"20260907","status":"\(status)","delaySeconds":60,"stopUpdates":\(stopArray)}]}
         """
     }
 

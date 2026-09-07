@@ -36,9 +36,15 @@ final class JourneyAxisLayoutTests: XCTestCase {
             XCTAssertEqual(pin.midY, layout.frames[1].midY)
         }
         for (a, b) in zip(pins, pins.dropFirst()) { XCTAssertGreaterThanOrEqual(b.minX - a.maxX, 3) }
-        XCTAssertEqual(layout.frames[1].width, (272 - 108) * 0.7, accuracy: 0.001)
-        XCTAssertEqual(layout.frames[2].maxX, layout.frames[3].minX, accuracy: 0.001)
-        XCTAssertEqual(layout.frames[4].maxX, layout.frames[5].minX, accuracy: 0.001)
+        XCTAssertEqual(layout.frames[1].maxX, layout.frames[6].maxX - lineChipCornerRadius, accuracy: 0.001)
+        XCTAssertEqual(layout.frames[2].minX, 108 + (272 - 108) * 0.7, accuracy: 0.001)
+        XCTAssertEqual(layout.frames[2].maxX, 108 + (272 - 108) * 0.72, accuracy: 0.001)
+        XCTAssertEqual(layout.frames[4].minX, 108 + (272 - 108) * 0.8, accuracy: 0.001)
+        XCTAssertEqual(layout.frames[4].maxX, 108 + (272 - 108) * 0.81, accuracy: 0.001)
+        XCTAssertGreaterThan(layout.frames[1].maxX, layout.frames[6].minX)
+        XCTAssertLessThan(layout.frames[3].minX, layout.frames[7].maxX)
+        XCTAssertGreaterThan(layout.frames[5].minX, layout.frames[8].minX)
+        XCTAssertLessThan(layout.frames[5].minX, layout.frames[8].maxX)
     }
 
     func testLongTransferNamesWrapAndStackInsideDeviceWithoutChangingAxis() {
@@ -52,5 +58,17 @@ final class JourneyAxisLayoutTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(second.minY - first.maxY, 6)
         XCTAssertGreaterThanOrEqual(layout.size.height, second.maxY)
         XCTAssertEqual(layout.frames[0].width, 136)
+    }
+
+    func testCrowdedMarkerLaneDoesNotDetachTheBaselineRide() {
+        let items: [AxisItem] = [.cap, .ride(0), .dwell(0), .ride(1), .dwell(1), .ride(2),
+                                 .alight(0), .board(0), .board(1)]
+        let sizes = [CGSize(width: 108, height: 22)] + Array(repeating: CGSize.zero, count: 5)
+            + [CGSize(width: 24, height: 22), CGSize(width: 24, height: 22), CGSize(width: 32, height: 22)]
+        let layout = JourneyAxisGeometry(journey: journey([(0, 700), (720, 800), (810, 1000)]),
+            large: false, progress: nil, width: 158, items: items, sizes: sizes)
+
+        XCTAssertGreaterThan(layout.frames[7].minY, 0)
+        XCTAssertEqual(layout.frames[2].maxX, layout.frames[3].minX, accuracy: 0.001)
     }
 }

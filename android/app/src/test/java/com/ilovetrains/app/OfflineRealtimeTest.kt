@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertThrows
 import org.junit.Test
 import java.time.Instant
 
@@ -21,12 +22,11 @@ class OfflineRealtimeTest {
           {"stopId":"B-stop","stopSequence":2,"assignedStopId":"B-new","arrivalMs":$arrival,"scheduleRelationship":"scheduled"}
         """), "source", now)
 
-        val result = realtime.overlay(connection(now)) { _, stop -> if (stop == "B-new") StopAssignment("9", "B") else null }
+        val result = realtime.overlay(listOf(connection(now))) { _, stop -> if (stop == "B-new") StopAssignment("9", "B") else null }.single()
 
-        assertTrue(result.matched)
-        assertNull(result.value.estimatedDeparture)
-        assertEquals(arrival, result.value.estimatedArrival)
-        assertEquals("9", result.value.toPlatform)
+        assertNull(result.estimatedDeparture)
+        assertEquals(arrival, result.estimatedArrival)
+        assertEquals("9", result.toPlatform)
     }
 
     @Test
@@ -37,7 +37,7 @@ class OfflineRealtimeTest {
           {"stopId":"A-stop","stopSequence":1,"scheduleRelationship":"scheduled"}
         """), "source", now)
 
-        assertTrue(realtime.overlay(connection(now)) { _, _ -> null }.value.cancelled)
+        assertTrue(realtime.overlay(listOf(connection(now))) { _, _ -> null }.single().cancelled)
     }
 
     @Test
@@ -91,9 +91,9 @@ class OfflineRealtimeTest {
           {"stopId":"A-stop","stopSequence":1,"assignedStopId":"other","scheduleRelationship":"scheduled"}
         """), "source", now)
 
-        val result = realtime.overlay(connection(now)) { _, _ -> StopAssignment("4", "OTHER") }
+        val result = realtime.overlay(listOf(connection(now))) { _, _ -> StopAssignment("4", "OTHER") }.single()
 
-        assertTrue(result.value.cancelled)
+        assertTrue(result.cancelled)
     }
 
     @Test
@@ -132,13 +132,61 @@ class OfflineRealtimeTest {
         assertFalse(result.legs.single().cancelled)
     }
 
-    private fun snapshot(header: Long, status: String, stops: String): String {
+    @Test
+    fun skippedIntermediateStopKeepsThroughServiceButBlocksEndpoints() {
+        val now = System.currentTimeMillis()
+        val realtime = OfflineRealtime()
+        realtime.accept(snapshot(now, "scheduled", """
+          {"stopId":"A-stop","stopSequence":1,"scheduleRelationship":"scheduled"},
+          {"stopId":"B-stop","stopSequence":2,"scheduleRelationship":"skipped"},
+          {"stopId":"C-stop","stopSequence":3,"scheduleRelationship":"scheduled"}
+        """), "source", now)
+        val first = connection(now)
+        val charlie = Station("C", "Charlie")
+        val second = first.copy(
+            fromSequence = 2, toSequence = 3,
+            fromStopId = "B-stop", toStopId = "C-stop",
+            fromStationId = "B", toStationId = "C", fromStation = to, toStation = charlie,
+            departure = first.arrival + 60_000, arrival = first.arrival + 10 * 60_000,
+        )
+
+        val connections = realtime.overlay(listOf(first, second)) { _, _ -> null }
+        val router = OfflineRouter()
+
+        assertFalse(connections.any(ScheduledConnection::cancelled))
+        assertEquals(1, router.route(from, charlie, now, connections, 4).size)
+        assertTrue(router.route(from, to, now, connections, 4).isEmpty())
+        assertTrue(router.route(to, charlie, now, connections, 4).isEmpty())
+        assertTrue(realtime.overlay(Journey(listOf(first.asLeg))) { _, _ -> null }.value.legs.single().cancelled)
+    }
+
+    @Test
+    fun rejectsOlderFutureAndInvalidRealtimeSnapshotsAndCapsExpiryAtHeaderAge() {
+        val now = System.currentTimeMillis()
+        val excessive = 8_640_000_000_000_001L
+        val realtime = OfflineRealtime()
+        assertTrue(realtime.accept(snapshot(now + 30_000, "cancelled", ""), "source", now))
+        assertFalse(realtime.accept(snapshot(now, "scheduled", ""), "source", now))
+        assertFalse(realtime.accept(snapshot(now - 120_000, "scheduled", "", expiresAt = now + 86_400_000), "source", now))
+        assertFalse(realtime.accept(snapshot(now + 300_001, "scheduled", ""), "source", now))
+        assertThrows(IllegalArgumentException::class.java) {
+            realtime.accept(snapshot(now, "scheduled", "{\"stopId\":\"A-stop\",\"scheduleRelationship\":\"invalid\"}"), "source", now)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            realtime.accept(snapshot(now, "scheduled", "").replaceFirst(Regex("\"headerTimestamp\":\"[^\"]+\""), "\"headerTimestamp\":$excessive"), "source", now)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            realtime.accept(snapshot(now, "scheduled", "{\"stopId\":\"A-stop\",\"arrivalMs\":$excessive}"), "source", now)
+        }
+    }
+
+    private fun snapshot(header: Long, status: String, stops: String, expiresAt: Long = header + 90_000): String {
         val stopArray = if (stops.isBlank()) "[]" else "[$stops]"
         return """{
           "schemaVersion":1,"source":"source",
           "headerTimestamp":"${Instant.ofEpochMilli(header)}",
           "generatedAt":"${Instant.ofEpochMilli(header + 1_000)}",
-          "expiresAt":"${Instant.ofEpochMilli(header + 90_000)}",
+          "expiresAt":"${Instant.ofEpochMilli(expiresAt)}",
           "updates":[{"tripId":"trip","serviceDate":"20260907","status":"$status","delaySeconds":60,"stopUpdates":$stopArray}]
         }"""
     }
@@ -149,4 +197,11 @@ class OfflineRealtimeTest {
         fromStation = from, toStation = to, departure = now + 10 * 60_000, arrival = now + 19 * 60_000,
         pickupType = 0, dropOffType = 0, fromPlatform = "1", toPlatform = "2", line = "T1", mode = "train", headsign = "Bravo",
     )
+
+    private val ScheduledConnection.asLeg: Leg
+        get() = Leg(
+            line, mode, headsign, checkNotNull(fromStation), checkNotNull(toStation), departure, arrival,
+            fromPlatform = fromPlatform, toPlatform = toPlatform,
+            identity = TripIdentity(source, tripId, serviceDate, fromStopId, toStopId, fromSequence, toSequence),
+        )
 }

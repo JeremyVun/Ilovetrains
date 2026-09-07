@@ -52,7 +52,7 @@ test_apk="$project_dir/android/app/build/outputs/apk/androidTest/debug/app-debug
 "$adb" install -r -t "$test_apk" >/dev/null
 "$adb" shell rm -rf /sdcard/Android/data/com.ilovetrains.app/files/calibration
 "$adb" shell am instrument -w \
-  -e class com.ilovetrains.app.UiCalibrationTest \
+  -e class "${INSTRUMENT_CLASS:-com.ilovetrains.app.UiCalibrationTest}" \
   com.ilovetrains.app.test/androidx.test.runner.AndroidJUnitRunner
 "$adb" pull /sdcard/Android/data/com.ilovetrains.app/files/calibration/. "$out" >/dev/null
 count="$(find "$out" -name '*.png' -type f | wc -l | tr -d ' ')"

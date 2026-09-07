@@ -141,7 +141,10 @@ When the flag is off, the trip line remains unchanged and does no animation work
   between the printed clock minutes of that estimate and its schedule. The
   relevant leg is leg 0 before departure and while riding it, and leg *i+1*
   while dwelling before or riding it. `CANCELLED` and `TRIP OVER` outrank late.
-  Otherwise the status is `RUNNING`.
+  A degraded server response still within the freshness window retains this
+  status and its countdown, with the degraded freshness indication. Retained
+  journey evidence cannot borrow a newer board's freshness. Otherwise the
+  status is `RUNNING`.
 - `RUNNING LATE` and `CANCELLED` are in the warning colour, and a late journey
   paints its large countdown in the warning colour too. `LIVE` is a separate
   fact about the data and keeps the live colour however late the journey is.
@@ -177,8 +180,8 @@ When the flag is off, the trip line remains unchanged and does no animation work
 - The next-service candidate is the earliest later effective departure on the
   displayed pair and direction, with every leg enabled and none cancelled.
   Exclude alternate itineraries sharing the lead's first line and scheduled
-  departure. Use the candidate's own pair/source freshness; stale data shows
-  absolute clocks without a countdown. No candidate means no rail, not a claim
+  departure. Keep its countdown visible for stale and offline data, using the
+  candidate's own times and source freshness indication. No candidate means no rail, not a claim
   that no later service exists. The rail disappears once the lead departs.
   Opening its detail never pins it; the detail action performs the pin.
   The detail's first paint retains the tapped rail's response and freshness;
@@ -206,7 +209,10 @@ When the flag is off, the trip line remains unchanged and does no animation work
   itself saved the trip it is showing, that row's sub line reads `Just added`
   in 12px italic in place of `SHOWN ABOVE`, with the distance beside it as
   usual; the mark is gone by the next open. Rows carry both stacked
-  line-colour rules and coloured line-code badges. The web list is capped by
+  line-colour rules and coloured line-code badges for known lines, in journey
+  order. With no known lines, show names and the arrow without an invented
+  badge or colour rule; retain the empty line-column space so names align
+  with other saved trips. The web list is capped by
   the storage contract's ten-trip LRU. Other-row metadata may ellipsise inside
   the remaining track; station names and the `Just added` mark with its
   distance must fit.
@@ -256,10 +262,10 @@ When the flag is off, the trip line remains unchanged and does no animation work
   repeats the full boarding label in its secondary direction. Unknown
   boarding places remain unknown; never infer a numbered wharf from the
   origin name or use a transfer's wharf as the journey origin.
-- Web location permission is requested contextually, never on first load. Android
-  requests it once during initial setup and prefills From when granted, as
-  specified in [android-deviations.md](android-deviations.md). Missing
-  or denied location degrades silently to device history and time.
+- Location permission is requested contextually, never on first load. Native
+  setup requests it after “Use my location” is tapped, with the explicit-action
+  feedback below. Missing or denied location on Home degrades silently to device
+  history and time.
 - The panel that asks for location appears only once the permission state is
   known to be askable; a denied or granted permission never shows it, and it
   never flashes before the query answers.
@@ -280,11 +286,46 @@ When the flag is off, the trip line remains unchanged and does no animation work
   field focused. A filled From stays editable, and the destination results
   before any query are then the saved and recent destinations from that origin,
   newest first, under `YOU SEARCHED BEFORE`.
-- The From results before any query carry one location row, and nothing
+- On web, the From results before any query carry one location row, and nothing
   prompts on load. While the permission is still askable and there is no fix,
   it is `Use my location`, which asks once when tapped and disappears silently
   if the answer is no or names no station. Once a fix exists and From is empty,
   it is a `NEAREST STATION` group holding the single nearest station.
+- Native setup keeps “Use my location” available whenever From is empty and
+  its query is blank, including with an existing permission or disabled app
+  location preference. An explicit tap enables the preference if needed, asks
+  for foreground permission only if undecided, and shows “Finding your location…”
+  in the existing Nearby group. The keyboard closes during the lookup and for
+  nearby choices, leaving the results visible; successful autofill opens it on To.
+  Repeated taps cannot start duplicate requests.
+- A fresh fix (at most five minutes old, never future-dated) selects the nearest
+  station supporting an enabled mode only when reported accuracy is valid and
+  at most 200 m, the station is within 2 km, and the next eligible station is
+  farther away by more than twice the accuracy radius. From fills and To gains
+  keyboard focus. It stays editable and needs no confirmation tap. This applies
+  to explicit requests on both first and additional trips.
+- Otherwise, offer up to three eligible stations in distance order, within
+  2 km plus the accuracy radius (extra radius capped at 3 km; unknown accuracy
+  uses that cap). Never autofill an approximate, unknown-accuracy or ambiguous
+  result. Say “Choose your starting station. Your location isn’t precise enough
+  to pick one.” An empty list says “No stations found nearby. Search for your
+  starting station.”
+- Manual typing, selection or clearing of From cancels pending autofill, and
+  navigation discards setup request intent. A subsequent explicit location tap
+  starts a new attempt. Permission/lookup callbacks cannot erase a query, replace
+  a manual station or move focus after that cancellation. Silent fixes prefill
+  only an untouched first trip before its initial lookup resolves. Once choices
+  or a lookup failure have been shown, a silent fix cannot select From; an
+  explicit retry is required. Pending permission/Settings recovery retains the
+  original request intent. Other setup lookups offer station choices.
+- An explicit lookup timeout/failure says “Couldn’t get your location. Try again
+  or search for a station.” A refusal says “Location permission wasn’t granted.
+  You can search for a station.” Keep retry available when the system can ask
+  again; blocked permission offers “Open Settings”. Disabled device location
+  explains that Location Services must be turned on, while retaining search.
+  Returning from Settings continues the pending lookup when permitted. Errors
+  remain inline rather than opening another modal; all station rows retain
+  their normal minimum tap target and scroll with the setup results.
 - The client sends no station query before three normalized characters. Search
   answers are memoized by trimmed, whitespace-normalized, case-insensitive
   query for the browser session; failures are not memoized.
@@ -345,8 +386,12 @@ When the flag is off, the trip line remains unchanged and does no animation work
   band on Home, results and detail; they never overlap a headsign or instruction.
   Long names clamp to the device width and wrap; intersecting change names use
   separate lines and expand the row. The second change's alighting pin remains
-  hidden on two-change results. Platform labels retain a 3px ground-colour
-  separator even where a short first leg puts the boarding cap beside a pin.
+  hidden on two-change results. Platform chips retain their rounded corners,
+  including the boarding chip's left edge. Rides join the corresponding chip
+  without an exposed overhang or a ground-colour slit. Use the measured chip
+  frame and corner radius to end/start overlapping ride paint inside the chip body; do not
+  add ground-colour masks or spacer strips (owner ruling, 2026-09-08).
+  Temporal anchors and actual dwell gaps remain unchanged.
 - A tight change paints the dwell segment of the journey axis in the warning
   colour, and nothing else: never a ride segment, and never on a cancelled row.
   The row does not name the window; journey detail does.
@@ -393,9 +438,12 @@ When the flag is off, the trip line remains unchanged and does no animation work
   the live response wins for as long as it still shows it as a departure; once
   it has run, the last live copy of it is the past row.
 - No past row shows a departure countdown.
-- Web stale or offline future data drops countdown figures, removes already
-  departed rows, uses absolute clock times, and states
-  `OFFLINE · LAST UPDATED X AGO`. A cached countdown is not presented as live.
+- Future countdowns remain visible on web, Android and iOS for stale,
+  offline, scheduled and retained data (owner ruling, 2026-09-08). Count from
+  the displayed effective departure; use the same Now/minutes/rounded-hours
+  formatting as fresh data. Cancellation keeps its dash. Freshness indicators
+  keep their existing meaning and appearance; a visible countdown does not
+  make cached data live. Web's existing departed-row filtering is unchanged.
   Native boards retain departed rows and the last header answer under the
   [native retention rules](native-data.md#cached-boards-and-departed-services).
 - Scheduled-only numerals are visually quieter and labelled `SCHEDULED`.
@@ -405,7 +453,7 @@ When the flag is off, the trip line remains unchanged and does no animation work
   `<cancelled time> CANCELLED · NEXT TRAIN`.
 - There is no `ON TIME` label. The closed provenance vocabulary is `MIN`,
   `DEPARTING`, `SCHEDULED`, `CANCELLED`, `n MIN LATE`, `AGO`, `TO CHANGE` and
-  `TO GO`; native retained observations also use `LAST KNOWN`. `CANCELLED` and
+  `TO GO`. Retained rows use the same vocabulary. `CANCELLED` and
   `n MIN LATE` are in the warning colour, because each
   names an exception. An ordinary live board countdown
   leaves the provenance label empty because `min` is already on its numeral;
@@ -460,15 +508,19 @@ When the flag is off, the trip line remains unchanged and does no animation work
   not.
 - The screen closes with a heavy rule and the tail — effective arrival time,
   destination and arrival platform — or `JOURNEY CANCELLED` in the warning
-  colour with the time struck. Beneath the tail is the freshness line, and
-  beneath that the 66px action rail `Pin this train` or `Pin this ferry`,
+  colour with the time struck. Freshness appears at the top right beside the
+  Detail back control on all three clients (owner ruling, 2026-09-08), using
+  its existing status copy and colours. The tail is followed by the 66px
+  action rail `Pin this train` or `Pin this ferry`,
   chosen from the first leg (`Unpin this train` or ferry when pinned), which shares its geometry with home's `New trip`
   rail.
 - Once the journey has departed, the promoted row's figure and provenance are
   the directions ladder's, `TO CHANGE` or `TO GO`, and the steps the rider is
   past take the quiet done treatment: secondary ink, no strike. There are no
-  per-leg countdowns. Stale detail keeps absolute clock times but removes live
-  countdown figures.
+  per-leg countdowns. Stale detail keeps numerical figures based on its stored
+  times and preserves the existing stale/offline freshness indication. During
+  a transfer dwell, To change counts to the next leg's effective departure,
+  including offline and retained journeys. Cancelled detail keeps its dash.
 - The journey bar is a percentage time axis: departure is 0%, arrival is 100%,
   and each ride and transfer segment uses its true share of total journey time,
   measured from effective times. There is no minimum visual transfer width.

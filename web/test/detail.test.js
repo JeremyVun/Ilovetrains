@@ -28,10 +28,25 @@ function render(journey, { now = TRANSFER_NOW, focused = false, pinned = false }
 test('the masthead names the station the board is for, and goes back to it', () => {
   const html = render(transferJourneys()[0]);
 
-  assert.match(html, /<button class="sy-home" data-act="board"><span class="g">←<\/span>Rhodes departures<\/button>/);
+  assert.match(html, /<div class="sy-top detail-top">\s*<button class="sy-home" data-act="board"><span class="g">←<\/span>Rhodes departures<\/button>\s*<div class="detail-fresh" data-t="footer"><span class="pulse live"><\/span><span>Updated 0s ago<\/span><\/div>\s*<\/div>/);
   assert.match(html, /<div class="detail-kicker lbl">Journey<\/div>/);
   assert.match(html, /<h1 class="detail-title">Rhodes <em>→<\/em> Bondi Junction<\/h1>/);
   assert.match(html, /<div class="detail-summary" data-summary>1 change · arrives 10:08<\/div>/);
+});
+
+test('offline detail keeps the same freshness copy and dot in the masthead', () => {
+  const journey = transferJourneys()[0];
+  const model = journeyDetail(journey, TRANSFER_NOW, ENDS);
+  const html = detailHtml({
+    ...model,
+    stale: true,
+    row: promotedRow(journey, TRANSFER_NOW, ENDS),
+    footer: { dot: 'stale', text: 'Offline · last updated 4 h ago' }
+  });
+
+  assert.match(html, /<div class="detail-fresh offline" data-t="footer"><span class="pulse stale"><\/span><span>Offline · last updated 4 h ago<\/span><\/div>/);
+  assert.ok(html.indexOf('detail-fresh offline') < html.indexOf('detail-kicker'));
+  assert.equal((html.match(/data-t="footer"/g) || []).length, 1);
 });
 
 test('the promoted row is the board’s row, and is not a tap target', () => {
@@ -128,7 +143,7 @@ test('the tail owns the destination, its time and its platform', () => {
   const html = render(transferJourneys()[0]);
 
   assert.match(html, /<span class="t">10:08<\/span><span class="n">Bondi Junction<\/span><span class="lbl p">Platform 2<\/span>/);
-  assert.match(html, /<div class="detail-fresh" data-t="footer"><span class="pulse live"><\/span>Updated 0s ago<\/div>/);
+  assert.match(html, /<div class="detail-fresh" data-t="footer"><span class="pulse live"><\/span><span>Updated 0s ago<\/span><\/div>/);
 });
 
 /* After departure the steps behind the rider go quiet rather than disappear,
