@@ -261,6 +261,11 @@ Traps:
 - The Android frames are captured by `UiCalibrationTest`, so a new Android
   screen needs a `capture()` there and a row in the table; the iOS and web
   states likewise. A frame the table does not name is not checked.
+- `home-services-filtered` is shot from journeys built on the real clock, so
+  its frame prints the wall time of the run and cannot match a baseline taken
+  at another hour. Its `DIFF` is that clock until `check-settings-browser.js`
+  pins the clock the way `shoot-states.js` does; read the composite and check
+  that only the printed times moved.
 
 ## screenshot.js
 
