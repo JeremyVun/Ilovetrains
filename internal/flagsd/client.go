@@ -13,6 +13,17 @@ const (
 	application = "ilovetrains"
 )
 
+// flagsd keys must match ^[a-z][a-z0-9_.-]*$, so the camel-case names the API
+// publishes are translated here and nowhere else.
+var flagsdKeys = map[string]string{"transferLimit": "transfer_limit"}
+
+func flagsdKey(name string) string {
+	if key, ok := flagsdKeys[name]; ok {
+		return key
+	}
+	return name
+}
+
 type Client struct {
 	sdk *flags.Client
 }
@@ -39,7 +50,7 @@ func New(serviceURL, key, cachePath string) (*Client, error) {
 }
 
 func (c *Client) Bool(key string, def bool) bool {
-	return c.sdk.BoolVariation(key, flags.EvalContext{}, def)
+	return c.sdk.BoolVariation(flagsdKey(key), flags.EvalContext{}, def)
 }
 
 func (c *Client) Version() string { return c.sdk.Version() }

@@ -34,3 +34,12 @@ func TestNewRejectsMissingConfiguration(t *testing.T) {
 		t.Error("New accepted an empty key")
 	}
 }
+
+func TestPublicNamesMapToFlagsdKeys(t *testing.T) {
+	if key := flagsdKey("transferLimit"); key != "transfer_limit" {
+		t.Errorf("flagsdKey(transferLimit) = %q, want transfer_limit", key)
+	}
+	if key := flagsdKey("already.lower"); key != "already.lower" {
+		t.Errorf("flagsdKey passed through as %q", key)
+	}
+}

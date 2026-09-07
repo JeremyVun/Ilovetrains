@@ -56,11 +56,13 @@ generation; the bundled bootstrap serves a new volume immediately.
 
 ## Feature flags
 
-The server reads the `transferLimit` flag from flagsd and republishes the
-evaluated value at `/api/v1/flags`. `FLAGSD_URL` belongs in `config.env` as
-`http://flagsd:8080`; `FLAGSD_KEY` belongs in `secrets.env`. With either unset
-the server logs that flags are disabled and every flag reads `false`, which is
-the behaviour from before the flag existed.
+The server reads the `transfer_limit` flag from flagsd and republishes the
+evaluated value at `/api/v1/flags` under the name every client reads,
+`transferLimit`; flagsd keys must be lower-case, so the adapter translates.
+`FLAGSD_URL` belongs in `config.env` as `http://flagsd:8080`; `FLAGSD_KEY`
+belongs in `secrets.env`. With either unset the server logs that flags are
+disabled and every flag reads `false`, which is the behaviour from before the
+flag existed.
 
 flagsd publishes no ports, so the two stacks meet on an external Docker network
 created once on the host:
@@ -75,7 +77,7 @@ Enable the flag once, in this order:
 
 1. In the admin UI at https://flags.jeremyvun.com, create project
    `ilovetrains` with the single environment `production`.
-2. Create flag `transferLimit`: boolean, public, off.
+2. Create flag `transfer_limit`: boolean, public, off.
 3. Mint a read-only key scoped to `ilovetrains/production`. Its secret is shown
    once and is never read back.
 4. Paste that secret into `../projects/stacks/ilovetrains/secrets.env` as
