@@ -113,8 +113,8 @@
   durable arrival completion against a locally served client.
 - `check-tiny-train.js` — drive the flagged web Easter egg at both phone sizes
   and schemes. Checks local opt-in/out, carriage growth, live redraws,
-  navigation cleanup, reduced motion, control geometry and flag-off pixel
-  equality. Uses captured services and blocks API fetches. With a private static
+  navigation cleanup, reduced motion, fixed trip-line/divider geometry and
+  flag-off pixel equality. Uses captured services and blocks API fetches. With a private static
   server serving `web/`, run `node tools/check-tiny-train.js --url
   http://localhost:8198 --out /tmp/ilovetrains-tiny-train-check`.
 - `check-settings-browser.js` — drive Settings in real Chromium at both phone

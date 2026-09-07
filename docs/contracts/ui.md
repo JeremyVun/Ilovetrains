@@ -59,23 +59,23 @@ and out with `/?tinyTrain=0`; persistence is defined in
 [client-storage.md](client-storage.md#local-preview-flags).
 Android and iOS do not include this preview.
 
-On Home, activating the heavy divider beneath the smart header sends a tiny
-double-decker across it. A pass starts with three carriages; activating it
+On Home, activating the coloured trip line beneath the station names sends a
+tiny double-decker along it. A pass starts with six carriages; activating it
 again during the pass adds a carriage, up to 64 per pass. The drawing has a yellow nose, two rows
 of windows and warm windows in dark appearance. It is silent and never starts
-automatically. The initial pass lasts about two seconds; added carriages extend
+automatically. The initial pass lasts about 2.6 seconds; added carriages extend
 it at the same speed. Reduced motion shows a stationary train for 650ms instead.
 
-The divider's accessible control supports touch, Enter and Space with a
+The trip line's accessible control supports touch, Enter and Space with a
 visible keyboard focus indicator. It preserves surrounding layout and leaves
-departure information and journey actions unobstructed. The train uses the
-blank band above My trips, temporarily placing its track at the bottom of that
-band; when a correction strip sits below the header, the toy sits below that
-strip too. Scrolling My trips away hides its tap target and ends the pass, so
-the target cannot cover a saved-trip row. No game state is saved, and no event
-is sent. Home redraws preserve a passing train; leaving Home, hiding the page
-or disabling the flag ends it. When the flag is off, the divider remains unchanged
-and has no toy control or animation work.
+departure information and journey actions unobstructed. The train runs on the
+existing line without moving it or the divider. Platform labels and the journey
+progress marker paint above the animation. Scrolling My trips leaves the fixed
+header control in place. No game state is saved, and no event is sent.
+Home redraws move the passing train onto the freshly rendered trip line, keeping
+platform and route data current. Leaving Home, hiding the page or disabling the
+flag ends it. A header without a journey has no toy control. When the flag is off,
+the trip line remains unchanged and does no animation work.
 
 ## Web runtime and performance
 

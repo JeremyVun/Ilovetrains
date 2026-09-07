@@ -842,59 +842,44 @@ html[data-theme="light"] .dchip { color:var(--bg) !important; }
 .hm-filtered-empty { padding: 28px 0; color: var(--ink-2); }
 .hm-filtered-empty p { margin: 0 0 16px; font-size: 20px; line-height: 1.4; }
 .hm-filtered-empty .hm-empty-settings { margin-left: 0; }
-/* Off-by-default Home Easter egg; every drawing and control stays in this lane. */
-.tiny-train-lane { position: relative; --tiny-train-offset: 0px; }
+/* The Home trip line is the track; the toy never changes its geometry. */
+.tiny-train-lane { position: relative; }
 
 .tiny-train-trigger {
   position: absolute;
   z-index: 3;
-  top: var(--tiny-train-offset);
+  top: 50%;
   right: 0;
   left: 0;
   height: 44px;
+  transform: translateY(-50%);
   touch-action: manipulation;
 }
 
 .tiny-train-trigger:focus-visible {
   outline: 2px solid var(--ink);
-  outline-offset: -4px;
+  outline-offset: -2px;
 }
 
-.tiny-train-lane-active.hm-rule:not(.tiny-train-after-strip) {
-  background: transparent;
-  opacity: 1;
-}
-
-.tiny-train-stage {
+.tiny-train-lane > .tiny-train-stage {
   position: absolute;
-  z-index: 2;
-  top: var(--tiny-train-offset);
+  z-index: 1;
+  top: -18px;
+  bottom: auto;
   right: 0;
   left: 0;
-  height: 22px;
+  height: 18px;
   overflow: hidden;
   pointer-events: none;
 }
 
-.tiny-train-track {
-  display: none;
-  position: absolute;
-  z-index: 1;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 2px;
-  background: var(--ink);
-  opacity: .85;
-}
-
-.tiny-train-lane-active .tiny-train-track { display: block; }
-.tiny-train-lane-active.tiny-train-after-strip + .hm-strip { border-bottom-color: transparent; }
+/* Platform labels and the real journey marker remain above the drawing. */
+.tiny-train-lane > .sy-mk { z-index: 2; }
 
 .tiny-train-consist {
   position: absolute;
   z-index: 2;
-  top: 2px;
+  top: 0;
   display: inline-flex;
   align-items: flex-start;
   gap: 1px;

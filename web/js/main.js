@@ -52,13 +52,13 @@ const documentStore = storage || { getItem: () => null, setItem: () => {} };
 const trainPreview = tinyTrainPreview(location.hostname, location.search, storage);
 let tinyTrain = trainPreview ?? false;
 let flagsRequest = null;
-let trainRule = null;
+let trainLine = null;
 let removeTrain = null;
 
 function clearTrain() {
   removeTrain?.();
   removeTrain = null;
-  trainRule = null;
+  trainLine = null;
 }
 
 async function refreshFeatureFlags() {
@@ -757,23 +757,19 @@ function renderHome() {
   if (html !== painted.home) {
     const list = state.root.querySelector('[data-t="trip-list"]');
     const scrollTop = list ? list.scrollTop : 0;
-    const trainFocus = trainRule?.contains(document.activeElement) ? document.activeElement : null;
+    const trainFocus = trainLine?.contains(document.activeElement) ? document.activeElement : null;
     state.root.innerHTML = html;
     painted.home = html;
-    if (tinyTrain) {
-      const rule = state.root.querySelector('.hm-rule');
-      if (trainRule && rule) rule.replaceWith(trainRule);
-      else if (rule) {
-        trainRule = rule;
-        removeTrain = attachTinyTrain(rule);
-      }
-      // The same node keeps its passing train through live header updates.
-      trainFocus?.focus({ preventScroll: true });
-    }
     const nextList = state.root.querySelector('[data-t="trip-list"]');
     if (nextList) nextList.scrollTop = scrollTop;
     Home.finishHomeRender(state.root);
-    removeTrain?.refresh?.();
+    const line = state.root.querySelector('.hm-hd .sy-bar');
+    if (tinyTrain && line?.querySelector('[data-seg][data-line-code]')) {
+      if (removeTrain) removeTrain.refresh(line);
+      else removeTrain = attachTinyTrain(line);
+      trainLine = line;
+      trainFocus?.focus({ preventScroll: true });
+    } else clearTrain();
   }
   patchFresh(state.root.querySelector('.hm-fresh .lbl'), freshness);
 }

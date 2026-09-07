@@ -1,7 +1,7 @@
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const START_CARRIAGES = 3;
+const START_CARRIAGES = 6;
 const MAX_CARRIAGES = 64;
-const RUN_MS = 2000;
+const RUN_MS = 2600;
 const REDUCED_MS = 650;
 
 function svgElement(name, attrs = {}) {
@@ -60,8 +60,6 @@ export function attachTinyTrain(host) {
   const stage = document.createElement('span');
   stage.className = 'tiny-train-stage';
   stage.setAttribute('aria-hidden', 'true');
-  stage.append(document.createElement('span'));
-  stage.firstElementChild.className = 'tiny-train-track';
   host.append(stage, trigger);
 
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
@@ -74,30 +72,19 @@ export function attachTinyTrain(host) {
   let trainWidth = 0;
   let carCount = 0;
   let destroyed = false;
-  let scroller = null;
-
-  function scrolled() {
-    const away = Boolean(scroller && scroller.scrollTop > 0);
-    trigger.hidden = away;
-    if (away) clearRun();
-  }
-
-  function refresh() {
-    const nextScroller = host.closest('.home-screen')?.querySelector('.hm-ix') || null;
-    if (nextScroller !== scroller) {
-      scroller?.removeEventListener('scroll', scrolled);
-      scroller = nextScroller;
-      scroller?.addEventListener('scroll', scrolled, { passive: true });
+  function refresh(nextHost = host) {
+    if (nextHost !== host) {
+      const active = Boolean(consist);
+      const reducedRun = host.classList.contains('tiny-train-reduced');
+      host.classList.remove('tiny-train-lane', 'tiny-train-lane-active', 'tiny-train-reduced');
+      host = nextHost;
+      host.classList.add('tiny-train-lane');
+      host.classList.toggle('tiny-train-lane-active', active);
+      host.classList.toggle('tiny-train-reduced', reducedRun);
+      // Move only the toy: the newly rendered journey keeps its live data.
+      host.append(stage, trigger);
     }
-    const strip = host.nextElementSibling?.classList.contains('hm-strip')
-      ? host.nextElementSibling : null;
-    const offset = strip
-      ? host.getBoundingClientRect().height + strip.getBoundingClientRect().height
-      : 0;
-    host.style.setProperty('--tiny-train-offset', `${offset}px`);
-    host.classList.toggle('tiny-train-after-strip', Boolean(strip));
     stageWidth = host.clientWidth;
-    scrolled();
   }
 
   function clearRun() {
@@ -137,7 +124,6 @@ export function attachTinyTrain(host) {
 
   function run() {
     refresh();
-    if (trigger.hidden) return;
     host.classList.add('tiny-train-lane-active');
     consist = document.createElement('span');
     consist.className = 'tiny-train-consist';
@@ -202,12 +188,9 @@ export function attachTinyTrain(host) {
     trigger.removeEventListener('keydown', keyDown);
     document.removeEventListener('visibilitychange', visibilityChanged);
     reduced.removeEventListener('change', motionChanged);
-    scroller?.removeEventListener('scroll', scrolled);
-    scroller = null;
     trigger.remove();
     stage.remove();
-    host.style.removeProperty('--tiny-train-offset');
-    host.classList.remove('tiny-train-lane', 'tiny-train-after-strip');
+    host.classList.remove('tiny-train-lane');
   };
   cleanup.refresh = refresh;
   return cleanup;

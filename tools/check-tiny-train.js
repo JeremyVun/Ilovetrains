@@ -69,21 +69,38 @@ async function check() {
             }
           }
           if (document.documentElement.scrollWidth > innerWidth) throw Error('horizontal overflow');
-          window.trainRuleBefore = document.querySelector('.hm-rule');
+          const line = document.querySelector('.hm-hd .sy-bar');
+          if (button.parentElement !== line) throw Error('control is not on the trip line');
+          if (document.querySelector('.hm-rule .tiny-train-trigger')) throw Error('divider still owns the train');
+          window.trainLineBefore = line;
+          window.trainStageBefore = line.querySelector('.tiny-train-stage');
+          window.trainGeometry = ['.hm-rule', '.hm-hd .sy-bar', '.hm-ix'].map(selector => {
+            const r = document.querySelector(selector).getBoundingClientRect();
+            return { selector, x: r.x, y: r.y, width: r.width, height: r.height };
+          });
           button.click();
+          for (const before of window.trainGeometry) {
+            const after = document.querySelector(before.selector).getBoundingClientRect();
+            for (const axis of ['x', 'y', 'width', 'height']) {
+              if (after[axis] !== before[axis]) throw Error(before.selector + ' jumped on activation');
+            }
+          }
+          const stageBox = window.trainStageBefore.getBoundingClientRect();
+          if (Math.abs(stageBox.bottom - line.getBoundingClientRect().top) > 0.5) throw Error('train is not riding the trip line');
           return { width: box.width, height: box.height };
         })()`);
-        assert.equal(await evaluate(page, 'document.querySelectorAll(".tiny-train-car").length'), 3);
+        assert.equal(await evaluate(page, 'document.querySelectorAll(".tiny-train-car").length'), 6);
         await sleep(450);
         fs.writeFileSync(path.join(out, `${stem}-passing.png`), await screenshot(page));
         await evaluate(page, `(() => {
           document.querySelector('.tiny-train-trigger').click();
-          if (document.querySelectorAll('.tiny-train-car').length !== 4) throw Error('tap did not add a carriage');
+          if (document.querySelectorAll('.tiny-train-car').length !== 7) throw Error('tap did not add a carriage');
           const t = window.__trains;
           t.now = () => ${NOW + 60000};
           t.rerender();
-          if (document.querySelector('.hm-rule') !== window.trainRuleBefore) throw Error('live repaint replaced train');
-          if (document.querySelectorAll('.tiny-train-car').length !== 4) throw Error('live repaint lost carriages');
+          if (document.querySelector('.tiny-train-stage') !== window.trainStageBefore) throw Error('live repaint replaced train');
+          if (document.querySelector('.hm-hd .sy-bar') === window.trainLineBefore) throw Error('live repaint retained stale journey markup');
+          if (document.querySelectorAll('.tiny-train-car').length !== 7) throw Error('live repaint lost carriages');
           for (let i = 0; i < 80; i++) document.querySelector('.tiny-train-trigger').click();
           if (document.querySelectorAll('.tiny-train-car').length > 64) throw Error('unbounded carriage count');
         })()`);
@@ -110,8 +127,9 @@ async function check() {
           const scroller = document.querySelector('.hm-ix');
           const trigger = document.querySelector('.tiny-train-trigger');
           if (scroller.scrollTop <= 0) throw Error('touch did not scroll trips');
-          if (!trigger.hidden) throw Error('scrolled train target covers a trip row');
-          if (document.querySelectorAll('.tiny-train-car').length) throw Error('scroll did not clear train');
+          if (trigger.hidden) throw Error('trip-line control disappeared while only saved trips scrolled');
+          if (document.querySelectorAll('.tiny-train-car').length !== 64) throw Error('trip-list scroll interrupted header train');
+          if (trigger.getBoundingClientRect().bottom > scroller.getBoundingClientRect().top) throw Error('trip-line control overlaps saved trips');
           scroller.querySelector(':scope > div:last-child').remove();
           scroller.scrollTop = 0;
         })()`);
@@ -121,17 +139,17 @@ async function check() {
         await evaluate(page, `(() => { location.hash = '#/settings'; })()`);
         await sleep(100);
         assert.equal(await evaluate(page, '!!document.querySelector(".tiny-train-trigger")'), false);
-        assert.equal(await evaluate(page, 'window.trainRuleBefore.querySelectorAll(".tiny-train-car").length'), 0);
+        assert.equal(await evaluate(page, 'window.trainStageBefore.querySelectorAll(".tiny-train-car").length'), 0);
         await frame(page, { url, width, height, scheme, settle: 400 });
         await ready(page);
         assert.equal(await evaluate(page, '!!document.querySelector(".tiny-train-trigger")'), true, 'opt-in survives plain launch');
         await evaluate(page, 'document.querySelector(".tiny-train-trigger").focus()');
         await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
         await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
-        assert.equal(await evaluate(page, 'document.querySelectorAll(".tiny-train-car").length'), 3, 'Enter starts a train');
+        assert.equal(await evaluate(page, 'document.querySelectorAll(".tiny-train-car").length'), 6, 'Enter starts a train');
         await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 });
         await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 });
-        assert.equal(await evaluate(page, 'document.querySelectorAll(".tiny-train-car").length'), 4, 'Space adds a carriage');
+        assert.equal(await evaluate(page, 'document.querySelectorAll(".tiny-train-car").length'), 7, 'Space adds a carriage');
         await page.send('Emulation.setEmulatedMedia', { features: [
           { name: 'prefers-color-scheme', value: scheme },
           { name: 'prefers-reduced-motion', value: 'reduce' }
