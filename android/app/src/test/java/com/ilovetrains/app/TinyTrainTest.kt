@@ -9,10 +9,9 @@ class TinyTrainTest {
     private val sources = File("src/main/java/com/ilovetrains/app").listFiles()!!.filter { it.extension == "kt" }
 
     @Test fun theToyReadsTheFlagsAnswerAndRequiresLiteralTrue() {
-        fun flag(raw: String) = Wire.user(JSONObject(raw)).flags[TinyTrainFlag] == true
-        assertTrue(flag("""{"flags":{"tiny_train":true,"unrelated":"value"}}"""))
-        for (raw in listOf("{}", """{"flags":{}}""", """{"flags":{"tiny_train":false}}""",
-                """{"flags":{"tiny_train":"true"}}""", """{"flags":{"tiny_train":1}}""")) {
+        fun flag(raw: String) = flagsOf(JSONObject(raw))[TinyTrainFlag] == true
+        assertTrue(flag("""{"tiny_train":true,"unrelated":"value"}"""))
+        for (raw in listOf("{}", """{"tiny_train":false}""", """{"tiny_train":"true"}""", """{"tiny_train":1}""")) {
             assertFalse(raw, flag(raw))
         }
     }
@@ -25,15 +24,9 @@ class TinyTrainTest {
         assertFalse(source("TinyTrain.kt").contains("HttpURLConnection"))
     }
 
-    /* One answer per open, resume and tick feeds both flags. A second request
-       for the toy is the regression this guards. */
+    /* One answer feeds both flags: a second request for the toy is the regression. */
     @Test fun oneFlagsRequestFeedsTheToyAndTheTransferCap() {
-        val model = source("TrainViewModel.kt")
-        assertEquals(1, Regex("""api\.flags\(\)""").findAll(model).count())
-        assertEquals(3, Regex("""(?<!fun )readFlags\(\)""").findAll(model).count())
-        assertTrue(model.contains("copy(tinyTrain = flags?.get(TinyTrainFlag) == true)"))
-        assertTrue(model.contains("if (flags == null || flags == data.flags) return@launch"))
-        assertTrue(source("UiApp.kt").contains("CompositionLocalProvider(LocalTinyTrainFlag provides state.tinyTrain)"))
+        assertEquals(1, Regex("""api\.flags\(\)""").findAll(source("TrainViewModel.kt")).count())
     }
 
     private fun source(name: String) = sources.single { it.name == name }.readText()

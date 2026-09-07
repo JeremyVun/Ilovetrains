@@ -75,8 +75,6 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         }
     }
     private fun persist() { writes.trySend(data) }
-    /* One request per open, resume and 30s tick answers every flag. The toy
-       reads only this answer, so a stored value cannot replay a finished rollout. */
     private fun readFlags() {
         viewModelScope.launch {
             val flags = runCatching { api.flags() }.getOrNull()

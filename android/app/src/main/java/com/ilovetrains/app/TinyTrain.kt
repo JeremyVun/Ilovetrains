@@ -23,8 +23,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.*
 
-/* The view model's one flags answer, never a stored one: the toy stays off
-   until this foreground's own request lands. */
 internal val LocalTinyTrainFlag = staticCompositionLocalOf { false }
 
 @Composable
@@ -39,7 +37,6 @@ internal fun TinyTrainLane(modifier: Modifier = Modifier, flag: Boolean = LocalT
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
             paused = event != Lifecycle.Event.ON_RESUME
-            if (paused) running = false
         }
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
