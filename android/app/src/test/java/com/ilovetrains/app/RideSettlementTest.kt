@@ -45,4 +45,41 @@ class RideSettlementTest {
     @Test fun anUnfinishedJourneyRecordsNothing() {
         assertEquals(emptyList<Ride>(), emptyList<Ride>().settled(focus(now + 60_000), arrived = false))
     }
+
+    @Test fun i2CorrectionNeverDuplicatesAndTheCapHolds() {
+        val filler = (0 until 100).map { Ride("other-$it", false, now - it * 60_000L, now - 1, central, parramatta) }
+        val recorded = filler.settled(focus(now - 60_000), arrived = true)
+        assertEquals(100, recorded.size)
+        assertEquals(1, recorded.count { it.tripId == "work" })
+        val corrected = recorded.settled(focus(now - 30_000), arrived = true)
+        assertEquals(100, corrected.size)
+        assertEquals(1, corrected.count { it.tripId == "work" })
+        assertEquals(now - 30_000, corrected.first { it.tripId == "work" }.arrival)
+        assertSame(corrected, corrected.settled(focus(now - 30_000), arrived = true))
+        val withdrawn = corrected.settled(focus(now + 60_000), arrived = false)
+        assertEquals(99, withdrawn.size)
+        assertEquals(0, withdrawn.count { it.tripId == "work" })
+    }
+
+    @Test fun aRecordedRideTakesAnEarlierRefreshedArrivalThatIsStillPast() {
+        val recorded = emptyList<Ride>().settled(focus(now - 5 * 60_000), arrived = true)
+        assertEquals(now - 6 * 60_000, recorded.settled(focus(now - 6 * 60_000), arrived = true).single().arrival)
+    }
+
+    @Test fun a200mCompletionSurvivesALaterMovedFutureArrivalWhileTheFixIsHeld() {
+        val atDestination = emptyList<Ride>().settled(focus(now + 2 * 60_000), arrived = true)
+        // The held fix is what the caller reads as arrival; the timetable alone cannot withdraw it.
+        val stillThere = atDestination.settled(focus(now + 5 * 60_000), arrived = true)
+        assertEquals(now + 5 * 60_000, stillThere.single().arrival)
+        assertEquals(emptyList<Ride>(), atDestination.settled(focus(now + 5 * 60_000), arrived = false))
+    }
+
+    @Test fun i1AStaleArrivalInThePastRecordsNothingUntilTheRefreshedOneHasPassed() {
+        val stale = focus(now - 60_000)
+        val moved = focus(now + 5 * 60_000)
+        assertEquals(emptyList<Ride>(), emptyList<Ride>().settled(moved, arrived = now >= moved.journey.effectiveArrival))
+        val later = now + 6 * 60_000
+        assertEquals(1, emptyList<Ride>().settled(moved, arrived = later >= moved.journey.effectiveArrival).size)
+        assertEquals(1, emptyList<Ride>().settled(stale, arrived = now >= stale.journey.effectiveArrival).size)
+    }
 }
