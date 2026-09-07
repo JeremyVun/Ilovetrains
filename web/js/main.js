@@ -326,11 +326,8 @@ function refetchEligible() {
   fetchLive();
 }
 
-/* One request per open, foreground return and refresh tick, shared by every
-   flag: the board never waits on it, and the toy stays off until this open's
-   own answer lands so a stored value can never replay a finished rollout. */
 async function loadFlags() {
-  if (flagsRequest) return;
+  if (flagsRequest || document.hidden) return;
   const request = new AbortController();
   flagsRequest = request;
   const timeout = setTimeout(() => request.abort(), FLAGS_TIMEOUT_MS);

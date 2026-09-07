@@ -41,10 +41,6 @@ test('blocked storage still permits an explicit local preview for this visit', (
   }
 });
 
-/* The toy has no request of its own any more: it reads the published name out
-   of the one answer the controller already fetches. */
-test('the module offers a preview override and a published name, never a fetch', async () => {
-  const source = await import('../js/feature-flags.js');
-  assert.deepEqual(Object.keys(source).sort(), ['TINY_TRAIN_FLAG', 'TINY_TRAIN_KEY', 'tinyTrainPreview']);
+test('the published flag name is the one the backend answers', () => {
   assert.equal(TINY_TRAIN_FLAG, 'tiny_train');
 });

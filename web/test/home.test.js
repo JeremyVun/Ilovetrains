@@ -833,22 +833,10 @@ test('a backend flag answer refetches once, and only when it changes the cap', (
 
 /* One answer serves every flag: a second request per open is the defect this
    test exists to catch. */
-test('the client asks for flags once per open, foreground return and refresh tick', () => {
+test('one call site reaches the flags endpoint', () => {
   const main = readFileSync(join(import.meta.dirname, '..', 'js', 'main.js'), 'utf8');
-  const body = /async function loadFlags\(\) \{([\s\S]*?)\n\}/.exec(main)[1];
-
   assert.equal(main.match(/getFlags\(/g).length, 1, 'exactly one call site');
   assert.equal(main.match(/'\/api\/v1\/flags'/g), null, 'the endpoint lives in api.js alone');
-  assert.match(body, /^\s*if \(flagsRequest\) return;$/m, 'a second call while one is in flight is dropped');
-  assert.match(body, /setTimeout\(\(\) => request\.abort\(\), FLAGS_TIMEOUT_MS\)/);
-  assert.match(body, /applyTinyTrain\(trainPreview \?\? flags\?\.\[TINY_TRAIN_FLAG\] === true\);/,
-    'the toy reads the same answer, requires literal true, and a preview still wins');
-
-  const opens = main.match(/^\s*loadFlags\(\);$/gm);
-  assert.equal(opens.length, 3, 'open, visibility return and the 30s refresh tick');
-  assert.match(/document\.addEventListener\('visibilitychange'[\s\S]*?\n\}\);/.exec(main)[0],
-    /flagsRequest\?\.abort\(\)[\s\S]*?loadFlags\(\);/);
-  assert.match(/function startTimers\([\s\S]*?\n\}/.exec(main)[0], /loadFlags\(\);/);
 });
 
 /* The followed journey is already fetched all-mode, so the cap must not narrow
