@@ -57,7 +57,7 @@ fun TrainApp(state: AppState, actions: UiActions) {
                     .heightIn(min = 52.dp).clickable(role = Role.Button, onClick = if (state.undoAvailable) actions::undoDelete else actions::dismissMessage)
                     .padding(horizontal = PagePadding), verticalAlignment = Alignment.CenterVertically) {
                     Text(message, Modifier.weight(1f), color = c.ground, fontSize = 14.sp, fontWeight = FontWeight.Normal,
-                        maxLines = if (state.undoAvailable) 1 else Int.MAX_VALUE, overflow = TextOverflow.Clip)
+                        maxLines = if (state.undoAvailable) 2 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis)
                     Spacer(Modifier.width(12.dp))
                     Label(if (state.undoAvailable) "Undo" else "Dismiss", color = c.ground)
                 }

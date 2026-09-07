@@ -47,7 +47,7 @@ private struct TrainAppContent: View {
                 let undo = model.state.undoAvailable
                 Button(action: undo ? model.undoDelete : model.dismissMessage) {
                     HStack(spacing: 12) {
-                        Text(message).font(.system(size: 14, weight: .regular)).lineLimit(undo ? 1 : nil)
+                        Text(message).font(.system(size: 14, weight: .regular)).lineLimit(undo ? 2 : nil)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         TrainLabel(text: undo ? "Undo" : "Dismiss", color: colors.ground)
                     }

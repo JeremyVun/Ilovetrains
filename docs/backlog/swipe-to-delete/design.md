@@ -148,9 +148,10 @@ reader knows what was rejected.
 `{from}` and `{to}` are the trip's short station names, the same strings the
 row shows. The iOS swipe button and the Android revealed background both say
 `Delete`, the plain verb, matching the existing menu's `Delete trip` without
-the noun because the row itself is the noun. The bar text is truncated to
-one line with the trailing station clipped if a name is too long at the
-largest supported text size.
+the noun because the row itself is the noun. The bar text may wrap to a
+second line at large text sizes and is ellipsised beyond that, so the verb
+survives; a one-line clip dropped the word `deleted` at font scale 1.3 (build
+decision, 2026-09-07).
 
 ### Contracts and comps this item changes
 
