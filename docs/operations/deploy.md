@@ -92,13 +92,15 @@ Runtime configuration:
 Boot never waits for flagsd. With no disk cache, each process starts off until
 its first snapshot. Once synced, the SDK retains the last valid snapshot in
 memory through a flagsd outage; a kill switch update needs a working stream.
-Browsers refresh on foreground and every 30 seconds; a failed browser fetch
-turns the tiny train off and leaves the transfer limit on its stored answer.
+Every client refreshes on foreground and every 30 seconds, in the one request
+all its flags share; a failed fetch turns the tiny train off and leaves the
+transfer limit on its stored answer.
 Evaluation uses fixed context `ilovetrains`, with no
 personal attributes. Read attribution is `svc:ilovetrains` / `ilovetrains-api`.
 
 To turn either feature on, flip its flag in the admin UI at
-https://flags.jeremyvun.com. Clients pick the new value up at their next open.
+https://flags.jeremyvun.com. Clients pick the new value up within a refresh tick
+of an open app, and at the next open otherwise.
 
 The owner created both public flags and supplied the sealed read key. The
 flags stack creates `shared-flags`; ilovetrains joins it externally. Deploy

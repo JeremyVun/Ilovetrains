@@ -140,7 +140,7 @@ final class TrainViewModel: ObservableObject {
         guard loop == nil else { return }
         state.justAddedTripId = nil
         state.now = epochNow(); location.refreshPermission()
-        if state.ready { choosePrediction(); syncPersonal(); refresh(); refreshSharedData(refreshBoard: false); silentLocation() }
+        if state.ready { choosePrediction(); syncPersonal(); refresh(); refreshSharedData(refreshBoard: false); refreshFlags(); silentLocation() }
         loop = Task { [weak self] in
             var ticks = 0
             while !Task.isCancelled {
@@ -148,7 +148,10 @@ final class TrainViewModel: ObservableObject {
                 guard let self else { return }
                 self.state.now = epochNow(); ticks += 1
                 self.settleFocus(judgeClock: self.data.focus?.board.isLive(self.state.now) == true)
-                if ticks % 30 == 0, self.state.ready, !self.refreshSharedData(), self.realtimeTask == nil { self.refresh() }
+                if ticks % 30 == 0, self.state.ready {
+                    self.refreshFlags()
+                    if !self.refreshSharedData(), self.realtimeTask == nil { self.refresh() }
+                }
             }
         }
     }
@@ -541,10 +544,14 @@ final class TrainViewModel: ObservableObject {
         suppressNextLastAnswer = true
         persist(); state.board = nil; state.homeBoard = nil; choosePrediction(); syncPersonal(); refresh()
     }
+    /* One request per open, resume and 30s tick answers every flag. The toy
+       reads only this answer, so a stored value cannot replay a finished rollout. */
     private func refreshFlags() {
         guard canNetwork else { return }
         Task {
-            guard let flags = try? await api.flags(), flags != data.flags else { return }
+            let flags = try? await api.flags()
+            state.tinyTrain = flags?[tinyTrainFlagKey] == true
+            guard let flags, flags != data.flags else { return }
             let wasCapped = data.capped
             data.flags = flags
             if data.capped == wasCapped { persist(); syncPersonal() } else { applyPreferenceChange() }

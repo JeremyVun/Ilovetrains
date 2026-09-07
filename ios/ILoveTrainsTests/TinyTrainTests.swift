@@ -2,8 +2,8 @@ import XCTest
 @testable import ILoveTrains
 
 final class TinyTrainTests: XCTestCase {
-    func testFlagRequiresLiteralTrue() throws {
-        func flag(_ raw: String) throws -> Bool { try JSONDecoder().decode(TinyTrainFlags.self, from: Data(raw.utf8)).tinyTrain }
+    func testTheToyReadsTheFlagsAnswerAndRequiresLiteralTrue() throws {
+        func flag(_ raw: String) throws -> Bool { try TransitWire.flags(Data(raw.utf8))[tinyTrainFlagKey] == true }
         XCTAssertTrue(try flag(#"{"tiny_train":true,"unrelated":"value"}"#))
         for raw in ["{}", #"{"tiny_train":false}"#, #"{"tiny_train":"true"}"#, #"{"tiny_train":1}"#, #"{"tiny_train":null}"#] {
             XCTAssertFalse(try flag(raw), raw)
@@ -28,35 +28,23 @@ final class TinyTrainTests: XCTestCase {
         }
     }
 
-    func testFailedPublicResponsesDisableTheFeature() async {
-        let config = URLSessionConfiguration.ephemeral
-        config.protocolClasses = [TinyTrainProtocol.self]
-        let session = URLSession(configuration: config)
-        defer { session.invalidateAndCancel() }
-        for (status, body, expected) in [(200, #"{"tiny_train":true}"#, true),
-                                          (503, #"{"tiny_train":true}"#, false),
-                                          (200, "invalid JSON", false),
-                                          (200, #"{"tiny_train":"true"}"#, false)] {
-            TinyTrainProtocol.response = (status, body)
-            let value = await fetchTinyTrainFlag(session: session)
-            XCTAssertEqual(value, expected)
+    /* One request per open, resume and tick feeds both flags. A second request
+       for the toy, or a hardcoded host a local server can never drive, is the
+       regression this guards. */
+    func testOnlyTheAPIClientReachesTheFlagsEndpoint() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("ILoveTrains")
+        let sources = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)!
+            .compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" }
+        XCTAssertGreaterThan(sources.count, 10)
+        for source in sources where source.lastPathComponent != "TransitAPI.swift" {
+            XCTAssertFalse(try String(contentsOf: source, encoding: .utf8).contains("/api/v1/flags"), source.lastPathComponent)
         }
+        let model = try String(contentsOf: root.appendingPathComponent("Core/TrainViewModel.swift"), encoding: .utf8)
+        XCTAssertEqual(model.components(separatedBy: "api.flags()").count - 1, 1)
+        XCTAssertEqual(model.components(separatedBy: "refreshFlags()").count - 1, 4, "the definition, the open, the resume and the tick")
+        XCTAssertTrue(model.contains("state.tinyTrain = flags?[tinyTrainFlagKey] == true"))
+        let appView = try String(contentsOf: root.appendingPathComponent("UI/AppView.swift"), encoding: .utf8)
+        XCTAssertTrue(appView.contains(#".environment(\.tinyTrainFlag, model.state.tinyTrain)"#))
     }
-}
-
-private final class TinyTrainProtocol: URLProtocol {
-    static var response = (200, "{}")
-    override class func canInit(with request: URLRequest) -> Bool { true }
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
-    override func startLoading() {
-        XCTAssertEqual(request.url?.absoluteString, "https://ilovetrains.jeremyvun.com/api/v1/flags")
-        XCTAssertEqual(request.httpMethod, "GET")
-        XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Cache-Control"), "no-store")
-        client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: Self.response.0,
-                                                             httpVersion: nil, headerFields: nil)!, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: Data(Self.response.1.utf8))
-        client?.urlProtocolDidFinishLoading(self)
-    }
-    override func stopLoading() {}
 }

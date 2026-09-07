@@ -53,7 +53,9 @@ substitutes for going back.
 ## Tiny train preview
 
 Web/PWA, Android and iOS share an off-by-default Easter egg. Production is
-gated by the evaluated public flag `tiny_train`.
+gated by the evaluated public flag `tiny_train`, read from the one flags request
+each client already makes per open, foreground return and 30-second refresh
+tick, so the toy appears and disappears within a tick of the flag flipping.
 On a local development server only, the browser opts in with `/?tinyTrain=1`
 and out with `/?tinyTrain=0`; persistence is defined in
 [client-storage.md](client-storage.md#local-preview-flags).

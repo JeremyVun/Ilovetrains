@@ -5,7 +5,7 @@ struct TrainAppView: View {
 
     var body: some View {
         TrainTheme(appearance: model.state.appearance) {
-            TrainAppContent(model: model)
+            TrainAppContent(model: model).environment(\.tinyTrainFlag, model.state.tinyTrain)
         }
     }
 }
