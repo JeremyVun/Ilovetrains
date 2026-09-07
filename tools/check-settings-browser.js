@@ -958,7 +958,7 @@ async function runColdBoard(doc, port) {
 async function runHiddenFocus(doc, stations, by, refreshed, port) {
   const profile = path.join(tmp, `hidden-focus-${by}`);
   await run(`hidden-focus-${by}`, doc, hiddenFocusScript(stations, by, refreshed), port, {
-    profile, out: by === 'focus' ? frame('home-390x844-services-filtered.png') || undefined : undefined
+    profile
   });
   await run(`hidden-focus-reload-${by}`, doc, hiddenFocusReloadScript(by, refreshed.id), port, {
     profile, noSeed: true

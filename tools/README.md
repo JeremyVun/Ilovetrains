@@ -125,9 +125,11 @@ accessible actions and focus, and measures equal 56px row heights. Its version
 assertion reads the canonical `web/js/version.js` rather than a fixed string.
 
 The checker first fetches `/js/settings.js` and refuses to run if that server
-is not serving the Settings module. Keep the server alive for the whole run;
-the four initial browser drives run in parallel on `CDP_PORT` through
-`CDP_PORT+3`, and later drives reuse the first port sequentially.
+is not serving the Settings module. Keep the server alive for the whole run.
+The four initial browser drives run in parallel on `CDP_PORT` through
+`CDP_PORT+3`, and later drives reuse the first port sequentially. Each
+calibration filename has one writer so later assertion-only cases cannot
+overwrite the reviewed state.
 
 ## comps/
 
