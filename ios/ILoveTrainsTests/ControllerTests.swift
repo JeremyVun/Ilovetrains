@@ -188,6 +188,111 @@ final class ControllerTests: XCTestCase {
         model.pause()
     }
 
+    /* Review probes. XCTExpectFailure marks the invariants the shipped code does
+       not yet hold, so the suite stays green while the report lists them. */
+    func testProbeFlickerTheTickSettlesFromTheStaleArrivalBeforeASlowRefreshLands() async throws {
+        let fixture = departedFocus()
+        let (store, model) = try await networkedModel(data: fixture.data, arrival: fixture.stale + 300_000, delay: .seconds(3))
+        XCTAssertFalse(model.state.focusComplete)
+        model.resume()
+        try await Task.sleep(for: .milliseconds(1_500))
+        XCTExpectFailure("the one-second tick settles the stale arrival while the refresh is still in flight") {
+            XCTAssertFalse(model.state.focusComplete, "settled before the refresh landed")
+        }
+        try await refreshed(model, arrival: fixture.stale + 300_000)
+        XCTAssertFalse(model.state.focusComplete, "the correction withdraws the ride once the refresh lands")
+        try await settled(store) { $0.rides.isEmpty }
+        model.pause()
+        StubbedDepartures.delay = .zero
+    }
+
+    func testProbeALocallyRoutedFocusSettlesFromItsSnapshotBeforeTheOverlayRefresh() async throws {
+        var fixture = departedFocus()
+        let identity = TripIdentity(source: "sydneytrains", tripId: "T1.42", serviceDate: "2026-09-07", fromStopId: "200060", toStopId: "215020")
+        fixture.data.focus!.journey.legs[0].identity = identity
+        fixture.data.focus!.board.journeys[0].legs[0].identity = identity
+        let (store, model) = try await networkedModel(data: fixture.data, arrival: fixture.stale + 300_000)
+        XCTExpectFailure("refreshFocus settles a locally identified journey at once; its refresh is the realtime overlay in refreshSharedData") {
+            XCTAssertFalse(model.state.focusComplete, "settled from the stored snapshot without waiting for the overlay")
+        }
+        let persisted = await store.load()
+        XCTExpectFailure("the stale ride is written from the snapshot") {
+            XCTAssertEqual(persisted.rides, [])
+        }
+        model.pause()
+    }
+
+    func testProbeA200mCompletionIsWithdrawnByALaterMovedFutureArrival() async throws {
+        let stations = try await DeviceStore(directory: FileManager.default.temporaryDirectory).stations()
+        let a = try XCTUnwrap(stations.first { $0.id == "200060" }), b = try XCTUnwrap(stations.first { $0.id == "215020" })
+        let second = 1000.0
+        let now = (epochNow() / second).rounded() * second
+        let departure = now - 1_500_000, arrival = now + 120_000
+        let journey = Journey(legs: [Leg(line: "T1", mode: "train", headsign: "Parramatta", from: a, to: b, departure: departure, arrival: departure + 1_200_000, estimatedArrival: arrival)])
+        let trip = SavedTrip(id: "trip", from: a, to: b, createdAt: departure)
+        let focus = FocusedJourney(tripId: trip.id, reverse: false, journey: journey,
+                                   board: BoardData(from: a, to: b, journeys: [journey], generatedAt: departure, source: "live"))
+        var data = UserData(trips: [trip], focus: focus)
+        data.useLocation = true
+        let (store, model) = try await networkedModel(data: data, arrival: arrival)
+        model.resume()
+        try await refreshed(model, arrival: arrival)
+        XCTAssertFalse(model.state.focusComplete)
+
+        StubbedDepartures.body = try departuresBody(data, arrival: arrival + 480_000)
+        model.receiveLocation(Fix(lat: b.lat, lon: b.lon, at: epochNow()))
+        XCTAssertTrue(model.state.focusComplete, "the fix at the destination records the ride")
+
+        try await refreshed(model, arrival: arrival + 480_000)
+        XCTExpectFailure("the natives judge arrival from the clock alone, so the later-moved arrival withdraws the fix completion") {
+            XCTAssertTrue(model.state.focusComplete, "location-based completion should be unchanged")
+        }
+        let persisted = await store.load()
+        XCTExpectFailure("the row is withdrawn") { XCTAssertEqual(persisted.rides.count, 1) }
+        model.pause()
+    }
+
+    func testProbeExpiryStillClearsTheFocusAndACancelledJourneyRecordsNoRide() async throws {
+        var expired = departedFocus()
+        let late = expired.stale - 1_800_000 - 120_000
+        expired.data.focus!.journey.legs[0].estimatedArrival = late
+        expired.data.focus!.board.journeys[0].legs[0].estimatedArrival = late
+        let (store, model) = try await networkedModel(data: expired.data, arrival: late)
+        try await settled(store) { $0.focus == nil && $0.rides.map(\.arrival) == [late] }
+        model.pause()
+
+        let cancelled = departedFocus()
+        let (cancelledStore, cancelledModel) = try await networkedModel(data: cancelled.data, arrival: cancelled.stale, cancelled: true)
+        for _ in 0..<50 where cancelledModel.state.focus?.journey.cancelled != true { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertTrue(cancelledModel.state.focus?.journey.cancelled == true, "the stub cancelled the leg")
+        XCTAssertFalse(cancelledModel.state.focusComplete)
+        let persisted = await cancelledStore.load()
+        XCTAssertEqual(persisted.rides, [])
+        cancelledModel.pause()
+    }
+
+    func testProbeI2CorrectionKeepsOneRowAndTheCap() {
+        let a = Station(id: "200060", name: "Central Station"), b = Station(id: "215020", name: "Parramatta Station")
+        let now = epochNow()
+        let journey = Journey(legs: [Leg(line: "T1", mode: "train", headsign: "Parramatta", from: a, to: b, departure: now - 1_500_000, arrival: now - 60_000)])
+        var focus = FocusedJourney(tripId: "trip", reverse: false, journey: journey, board: BoardData(from: a, to: b, journeys: [journey], generatedAt: now, source: "live"))
+        let filler = (0..<100).map { Ride(tripId: "other-\($0)", reverse: false, departure: now - Double($0) * 60_000, arrival: now - 1, from: a, to: b) }
+        let recorded = settledRides(filler, focus: focus, arrived: true)
+        XCTAssertEqual(recorded.count, 100)
+        XCTAssertEqual(recorded.filter { $0.tripId == "trip" }.count, 1)
+        focus.journey.legs[0].estimatedArrival = now - 30_000
+        let corrected = settledRides(recorded, focus: focus, arrived: true)
+        XCTAssertEqual(corrected.count, 100)
+        XCTAssertEqual(corrected.filter { $0.tripId == "trip" }.map(\.arrival), [now - 30_000])
+        XCTAssertEqual(settledRides(corrected, focus: focus, arrived: true), corrected)
+        focus.journey.legs[0].estimatedArrival = now - 90_000
+        XCTExpectFailure("plan text: a moved arrival is taken; the builder guards on later-only") {
+            XCTAssertEqual(settledRides(corrected, focus: focus, arrived: true).filter { $0.tripId == "trip" }.map(\.arrival), [now - 90_000])
+        }
+        focus.journey.legs[0].estimatedArrival = now + 60_000
+        XCTAssertEqual(settledRides(corrected, focus: focus, arrived: false).filter { $0.tripId == "trip" }.count, 0)
+    }
+
     private func refreshed(_ model: TrainViewModel, arrival: Millis) async throws {
         for _ in 0..<300 {
             if model.state.focus?.journey.effectiveArrival == arrival { return }
@@ -210,7 +315,7 @@ final class ControllerTests: XCTestCase {
     }
 
     /// A board carrying the focused journey with the arrival the server now believes.
-    private func departuresBody(_ data: UserData, arrival: Millis) throws -> Data {
+    private func departuresBody(_ data: UserData, arrival: Millis, cancelled: Bool = false) throws -> Data {
         let focus = data.focus!, leg = focus.journey.legs[0]
         let format = ISO8601DateFormatter(); format.formatOptions = [.withInternetDateTime]
         let iso: (Millis) -> String = { format.string(from: Date(timeIntervalSince1970: $0 / 1000)) }
@@ -221,13 +326,15 @@ final class ControllerTests: XCTestCase {
                 "line": ["name": leg.line, "mode": leg.mode], "headsign": leg.headsign,
                 "from": stop(leg.from), "to": stop(leg.to),
                 "departure": ["scheduled": iso(leg.departure), "estimated": iso(leg.departure)],
-                "arrival": ["scheduled": iso(leg.arrival), "estimated": iso(arrival)]
+                "arrival": ["scheduled": iso(leg.arrival), "estimated": iso(arrival)],
+                "cancelled": cancelled
             ]]]]
         ])
     }
 
-    private func networkedModel(data: UserData, arrival: Millis) async throws -> (DeviceStore, TrainViewModel) {
-        StubbedDepartures.body = try departuresBody(data, arrival: arrival)
+    private func networkedModel(data: UserData, arrival: Millis, cancelled: Bool = false, delay: Duration = .zero) async throws -> (DeviceStore, TrainViewModel) {
+        StubbedDepartures.body = try departuresBody(data, arrival: arrival, cancelled: cancelled)
+        StubbedDepartures.delay = delay
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let store = DeviceStore(directory: directory)
         try await store.save(data)
@@ -298,13 +405,19 @@ final class ControllerTests: XCTestCase {
 /// driven with a departure board without touching the network.
 final class StubbedDepartures: URLProtocol {
     static var body = Data()
+    static var delay: Duration = .zero
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
         let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
-        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: StubbedDepartures.body)
-        client?.urlProtocolDidFinishLoading(self)
+        let deliver = { [self] in
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: StubbedDepartures.body)
+            client?.urlProtocolDidFinishLoading(self)
+        }
+        if StubbedDepartures.delay == .zero { deliver() } else {
+            DispatchQueue.global().asyncAfter(deadline: .now() + Double(StubbedDepartures.delay.components.seconds) + Double(StubbedDepartures.delay.components.attoseconds) / 1e18, execute: deliver)
+        }
     }
     override func stopLoading() {}
 }
