@@ -50,6 +50,31 @@ All interactive rows and controls have a tap target of at least 44 logical
 pixels. Back navigation is explicit; labels such as `EDIT` or `DONE` are not
 substitutes for going back.
 
+## Tiny train preview
+
+Web/PWA, Android and iOS share an off-by-default Easter egg. Production is
+gated by the evaluated public flag `tiny_train`.
+On a local development server only, the browser opts in with `/?tinyTrain=1`
+and out with `/?tinyTrain=0`; persistence is defined in
+[client-storage.md](client-storage.md#local-preview-flags).
+
+On Home, activating the coloured trip line beneath the station names sends a
+tiny double-decker along it. Each pass has six carriages; further taps during
+a pass are ignored. The drawing has a yellow nose, two rows of windows and warm windows in dark appearance. It is silent and never starts
+automatically. A pass lasts about 2.6 seconds. Reduced motion shows a stationary
+train for 650ms instead.
+
+The trip line has an accessible “Run a tiny train” button with a 44-point tap
+target. Web also supports Enter and Space with a visible focus indicator. It
+preserves surrounding layout and leaves departure information and journey actions unobstructed. The train runs on the
+existing line without moving it or the divider. Platform labels and the journey
+progress marker paint above the animation. Scrolling My trips leaves the fixed
+header control in place. No game state is saved, and no event is sent.
+Home redraws move the passing train onto the freshly rendered trip line, keeping
+platform and route data current. Leaving Home, backgrounding the client or
+disabling the flag ends it. A header without a journey has no toy control.
+When the flag is off, the trip line remains unchanged and does no animation work.
+
 ## Web runtime and performance
 
 - The web client is a static, dependency-free ES-module PWA with no build

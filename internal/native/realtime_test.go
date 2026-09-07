@@ -2,7 +2,12 @@ package native
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -20,7 +25,8 @@ func realtimeFixture(t *testing.T, timestamp time.Time) []byte {
 	skipped := gtfs.TripUpdate_StopTimeUpdate_SKIPPED
 	sequence := uint32(2)
 	arrival := timestamp.Add(3 * time.Minute).Unix()
-	oldTimestamp := uint64(timestamp.Add(-2 * time.Minute).Unix())
+	staleObservation := uint64(timestamp.Add(-11 * time.Minute).Unix())
+	oldCancellation := uint64(timestamp.Add(-7 * time.Hour).Unix())
 	delay := int32(45)
 	feed := &gtfs.FeedMessage{
 		Header: &gtfs.FeedHeader{GtfsRealtimeVersion: proto.String("2.0"), Incrementality: &full, Timestamp: proto.Uint64(uint64(timestamp.Unix()))},
@@ -40,7 +46,11 @@ func realtimeFixture(t *testing.T, timestamp time.Time) []byte {
 			}}},
 			{Id: proto.String("missing-date"), TripUpdate: &gtfs.TripUpdate{Trip: &gtfs.TripDescriptor{TripId: proto.String("unsafe")}}},
 			{Id: proto.String("old-observation"), TripUpdate: &gtfs.TripUpdate{
-				Trip: &gtfs.TripDescriptor{TripId: proto.String("old-trip"), StartDate: proto.String("20260906")}, Timestamp: &oldTimestamp,
+				Trip: &gtfs.TripDescriptor{TripId: proto.String("old-trip"), StartDate: proto.String("20260906")}, Timestamp: &staleObservation,
+			}},
+			{Id: proto.String("old-cancellation"), TripUpdate: &gtfs.TripUpdate{
+				Trip:      &gtfs.TripDescriptor{TripId: proto.String("trip-3"), StartDate: proto.String("20260906"), ScheduleRelationship: &cancelled},
+				Timestamp: &oldCancellation,
 			}},
 			{Id: proto.String("duplicate-a"), TripUpdate: &gtfs.TripUpdate{Trip: &gtfs.TripDescriptor{TripId: proto.String("duplicate"), StartDate: proto.String("20260906")}}},
 			{Id: proto.String("duplicate-b"), TripUpdate: &gtfs.TripUpdate{Trip: &gtfs.TripDescriptor{TripId: proto.String("duplicate"), StartDate: proto.String("20260906")}}},
@@ -55,15 +65,18 @@ func realtimeFixture(t *testing.T, timestamp time.Time) []byte {
 
 func TestNormalizeRealtimePreservesExactSemantics(t *testing.T) {
 	headerTime := time.Date(2026, 9, 6, 1, 2, 3, 0, time.UTC)
-	snapshot, representation, err := NormalizeRealtime("sydneytrains", realtimeFixture(t, headerTime), headerTime.Add(10*time.Second))
+	snapshot, representation, counts, err := NormalizeRealtime("sydneytrains", realtimeFixture(t, headerTime), headerTime.Add(10*time.Second), nil)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if (counts != RealtimeCounts{Raw: 8, Accepted: 4, Unknown: 1, Stale: 1, Duplicate: 2}) {
+		t.Fatalf("counts = %+v", counts)
 	}
 	if snapshot.ExpiresAt != headerTime.Add(90*time.Second) || snapshot.GeneratedAt != headerTime.Add(10*time.Second) {
 		t.Fatalf("timestamps = %s/%s", snapshot.GeneratedAt, snapshot.ExpiresAt)
 	}
-	if len(snapshot.Updates) != 3 {
-		t.Fatalf("updates = %+v, want 3 safe unique identities", snapshot.Updates)
+	if len(snapshot.Updates) != 4 {
+		t.Fatalf("updates = %+v, want 4 safe unique identities", snapshot.Updates)
 	}
 	if snapshot.Updates[0].TripID != "extra-1" || snapshot.Updates[0].Status != "added" {
 		t.Errorf("added update = %+v", snapshot.Updates[0])
@@ -78,6 +91,10 @@ func TestNormalizeRealtimePreservesExactSemantics(t *testing.T) {
 	if snapshot.Updates[2].Status != "cancelled" {
 		t.Errorf("cancelled update = %+v", snapshot.Updates[2])
 	}
+	republished := snapshot.Updates[3]
+	if republished.Status != "cancelled" || republished.Timestamp == nil || !republished.Timestamp.Equal(headerTime.Add(-7*time.Hour)) {
+		t.Errorf("a seven-hour-old cancellation must survive with its own timestamp: %+v", republished)
+	}
 	if len(representation.JSON) == 0 || len(representation.GZIP) == 0 || representation.ETag == "" {
 		t.Fatal("missing cached representations")
 	}
@@ -91,7 +108,7 @@ func TestNormalizeRealtimeRejectsDifferentialAndMissingTimestamp(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			body, _ := proto.Marshal(&gtfs.FeedMessage{Header: header})
-			if _, _, err := NormalizeRealtime("metro", body, time.Now()); err == nil {
+			if _, _, _, err := NormalizeRealtime("metro", body, time.Now(), nil); err == nil {
 				t.Fatal("accepted unsafe replacement feed")
 			}
 		})
@@ -217,5 +234,195 @@ func TestRealtimeRepeatedBodyKeepsRepresentationStable(t *testing.T) {
 	if second.Representation.ETag != first.Representation.ETag || second.Snapshot.GeneratedAt != first.Snapshot.GeneratedAt {
 		t.Fatalf("identical source changed representation: first=%s/%s second=%s/%s",
 			first.Representation.ETag, first.Snapshot.GeneratedAt, second.Representation.ETag, second.Snapshot.GeneratedAt)
+	}
+}
+
+func datelessFixture(t *testing.T, header time.Time, tripID string, stopTime *int64) []byte {
+	t.Helper()
+	full := gtfs.FeedHeader_FULL_DATASET
+	scheduled := gtfs.TripDescriptor_SCHEDULED
+	trip := &gtfs.TripDescriptor{TripId: proto.String(tripID), ScheduleRelationship: &scheduled}
+	update := &gtfs.TripUpdate{Trip: trip}
+	if stopTime != nil {
+		update.StopTimeUpdate = []*gtfs.TripUpdate_StopTimeUpdate{{
+			StopId: proto.String("stop-1"), Departure: &gtfs.TripUpdate_StopTimeEvent{Time: stopTime},
+		}}
+	}
+	body, err := proto.Marshal(&gtfs.FeedMessage{
+		Header: &gtfs.FeedHeader{GtfsRealtimeVersion: proto.String("2.0"), Incrementality: &full, Timestamp: proto.Uint64(uint64(header.Unix()))},
+		Entity: []*gtfs.FeedEntity{{Id: proto.String("dateless"), TripUpdate: update}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return body
+}
+
+func TestNormalizeRealtimeResolvesUpdatesWithoutAStartDate(t *testing.T) {
+	dates := testServiceDates(t, map[string]tripCalendar{
+		"sydneytrains\x00late": {firstDepartureSecs: 90600, startDate: 20260901, endDate: 20261031, weekdays: 0b1111111},
+	})
+	header := sydneyTime(t, 2026, time.September, 6, 1, 33)
+	snapshot, _, counts, err := NormalizeRealtime("sydneytrains", datelessFixture(t, header, "late", nil), header, dates)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if counts.Accepted != 1 || snapshot.Updates[0].ServiceDate != "20260905" {
+		t.Fatalf("counts = %+v, updates = %+v", counts, snapshot.Updates)
+	}
+
+	_, _, missing, err := NormalizeRealtime("sydneytrains", datelessFixture(t, header, "ghost", nil), header, dates)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if missing.Unknown != 1 || missing.Accepted != 0 {
+		t.Fatalf("counts for an unindexed trip = %+v", missing)
+	}
+}
+
+func TestNormalizeRealtimeKeepsAnExplicitStartDate(t *testing.T) {
+	dates := testServiceDates(t, map[string]tripCalendar{
+		"sydneytrains\x00late": {firstDepartureSecs: 90600, startDate: 20260901, endDate: 20261031, weekdays: 0b1111111},
+	})
+	header := sydneyTime(t, 2026, time.September, 6, 1, 33)
+	body := datelessFixture(t, header, "late", nil)
+	var feed gtfs.FeedMessage
+	if err := proto.Unmarshal(body, &feed); err != nil {
+		t.Fatal(err)
+	}
+	feed.Entity[0].TripUpdate.Trip.StartDate = proto.String("20260906")
+	explicit, err := proto.Marshal(&feed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, _, counts, err := NormalizeRealtime("sydneytrains", explicit, header, dates)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if counts.Accepted != 1 || snapshot.Updates[0].ServiceDate != "20260906" {
+		t.Fatalf("resolution overrode the published start date: %+v", snapshot.Updates)
+	}
+}
+
+func TestNormalizeRealtimeReplaysTheCapturedSydneyTrainsFeed(t *testing.T) {
+	var capture struct {
+		Bytes      int       `json:"bytes"`
+		SHA256     string    `json:"sha256"`
+		ReceivedAt time.Time `json:"receivedAt"`
+	}
+	metadata, err := os.ReadFile(filepath.Join("..", "..", "tools", "fixtures", "gtfs_realtime_sydneytrains_20260906.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(metadata, &capture); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(filepath.Join("..", "..", "tools", "fixtures", "gtfs_realtime_sydneytrains_20260906.pb"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(body) != capture.Bytes || hex.EncodeToString(sum256(body)) != capture.SHA256 {
+		t.Fatal("the captured Sydney Trains feed does not match its recorded hash")
+	}
+	dates, err := LoadServiceDates(filepath.Join("..", "..", "native-data", "bootstrap"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, _, counts, err := NormalizeRealtime("sydneytrains", body, capture.ReceivedAt, dates)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := RealtimeCounts{Raw: 308, Accepted: 129, Unknown: 159, Ambiguous: 0, Stale: 20, Duplicate: 0}
+	if counts != want {
+		t.Fatalf("counts = %+v, want %+v", counts, want)
+	}
+	published := make(map[string]string, len(snapshot.Updates))
+	for _, update := range snapshot.Updates {
+		published[update.TripID] = update.Status
+	}
+	var feed gtfs.FeedMessage
+	if err := proto.Unmarshal(body, &feed); err != nil {
+		t.Fatal(err)
+	}
+	structural := 0
+	for _, entity := range feed.Entity {
+		raw := entity.GetTripUpdate()
+		if raw == nil || raw.Trip == nil {
+			continue
+		}
+		status, _ := tripStatus(raw.Trip.GetScheduleRelationship())
+		if status != "cancelled" && status != "replacement" {
+			continue
+		}
+		if _, indexed := dates.trips["sydneytrains\x00"+raw.Trip.GetTripId()]; !indexed {
+			continue
+		}
+		structural++
+		if published[raw.Trip.GetTripId()] != status {
+			t.Errorf("%s %s is in the index but was not published", status, raw.Trip.GetTripId())
+		}
+	}
+	if structural != 98 {
+		t.Fatalf("indexed cancellations and replacements = %d, want 98", structural)
+	}
+	if capture.ReceivedAt.After(snapshot.ExpiresAt) {
+		t.Fatal("the captured feed was already expired when it was received")
+	}
+	for _, update := range snapshot.Updates {
+		if update.ServiceDate < "20260905" || update.ServiceDate > "20260907" {
+			t.Fatalf("update %s resolved to %q", update.TripID, update.ServiceDate)
+		}
+	}
+}
+
+func sum256(body []byte) []byte {
+	sum := sha256.Sum256(body)
+	return sum[:]
+}
+
+func TestTripTimestampFreshnessByRelationship(t *testing.T) {
+	relationships := map[string]gtfs.TripDescriptor_ScheduleRelationship{
+		"scheduled":   gtfs.TripDescriptor_SCHEDULED,
+		"cancelled":   gtfs.TripDescriptor_CANCELED,
+		"replacement": gtfs.TripDescriptor_REPLACEMENT,
+		"added":       gtfs.TripDescriptor_ADDED,
+		"unscheduled": gtfs.TripDescriptor_UNSCHEDULED,
+	}
+	ages := []struct {
+		name            string
+		offset          time.Duration
+		keepsScheduled  bool
+		keepsStructural bool
+	}{
+		{name: "current", offset: 0, keepsScheduled: true, keepsStructural: true},
+		{name: "five minutes old", offset: -5 * time.Minute, keepsScheduled: true, keepsStructural: true},
+		{name: "eleven minutes old", offset: -11 * time.Minute, keepsStructural: true},
+		{name: "seven hours old", offset: -7 * time.Hour, keepsStructural: true},
+		{name: "six seconds ahead of the header", offset: 6 * time.Second},
+	}
+	header := time.Date(2026, 9, 6, 1, 33, 0, 0, time.UTC)
+	for name, relationship := range relationships {
+		for _, age := range ages {
+			t.Run(name+"/"+age.name, func(t *testing.T) {
+				entity := &gtfs.FeedEntity{Id: proto.String("a"), TripUpdate: &gtfs.TripUpdate{
+					Trip:      &gtfs.TripDescriptor{TripId: proto.String("trip-1"), StartDate: proto.String("20260906"), ScheduleRelationship: &relationship},
+					Timestamp: proto.Uint64(uint64(header.Add(age.offset).Unix())),
+				}}
+				snapshot, _, counts, err := NormalizeRealtime("sydneytrains", probeFeed(t, header, entity), header, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				want := age.keepsStructural
+				if name == "scheduled" {
+					want = age.keepsScheduled
+				}
+				if want != (counts.Accepted == 1) || want == (counts.Stale == 1) {
+					t.Fatalf("counts = %+v, want accepted=%v", counts, want)
+				}
+				if want && !snapshot.Updates[0].Timestamp.Equal(header.Add(age.offset)) {
+					t.Fatalf("timestamp changed on the way to clients: %s", snapshot.Updates[0].Timestamp)
+				}
+			})
+		}
 	}
 }

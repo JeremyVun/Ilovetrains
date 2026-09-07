@@ -7,6 +7,7 @@ FROM golang:1.26-alpine AS build
 WORKDIR /src
 COPY go.mod ./
 COPY go.sum ./
+COPY third_party ./third_party
 COPY cmd ./cmd
 COPY internal ./internal
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/trainsd ./cmd/server

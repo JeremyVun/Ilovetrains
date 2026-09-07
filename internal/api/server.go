@@ -63,9 +63,8 @@ const (
 	bucketSize = 10 * time.Minute
 
 	// settledAge is how far into the past a bucket must be before every journey
-	// in it has departed and what ran can no longer change. A bucket newer than
-	// this can still contain a train that has not left, so it keeps the live
-	// cache policy.
+	// in it has departed. Departure alone does not settle a window: an old
+	// bucket can still hold a train that has not arrived.
 	settledAge = 20 * time.Minute
 
 	// How far a client may page. See departAt: these bound the key space.
@@ -89,20 +88,27 @@ const stopsLimit = 10
 // no per-user state: every response is a pure function of the query string.
 type Server struct {
 	upstream Upstream
-	// Two departure caches, not one: a live window is worth 30 seconds and a
-	// settled past window is worth an hour, and cache.Cache holds one TTL.
+	// cache.Cache holds one TTL, and the hour store is only ever filled by promotion.
 	departures     *cache.Cache[*tfnsw.DeparturesResponse]
 	departuresPast *cache.Cache[*tfnsw.DeparturesResponse]
 	webDir         string
 	loc            *time.Location
 	now            func() time.Time
 	native         *native.Service
+	publicFlags    func() map[string]any
 }
 
 type Option func(*Server)
 
 func WithNative(service *native.Service) Option {
 	return func(server *Server) { server.native = service }
+}
+
+// WithPublicFlags accepts locally evaluated values from the server-side SDK.
+// The provider must filter by the definition's public metadata before returning.
+// No request identity or personal client state participates in evaluation.
+func WithPublicFlags(values func() map[string]any) Option {
+	return func(server *Server) { server.publicFlags = values }
 }
 
 // New returns a server serving the API plus, if webDir exists, the static
@@ -131,6 +137,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/departures", s.handleDepartures)
 	mux.HandleFunc("GET /api/v1/stops", s.handleStops)
+	mux.HandleFunc("GET /api/v1/flags", s.handleFlags)
 	if s.native != nil {
 		mux.HandleFunc("GET /api/v1/timetable/manifest", s.handleTimetableManifest)
 		mux.HandleFunc("GET /api/v1/timetable/packages/{package}", s.handleTimetablePackage)
@@ -203,12 +210,13 @@ func (s *Server) handleDepartures(w http.ResponseWriter, r *http.Request) {
 	// share an entry, and asking for the current bucket explicitly is a
 	// different answer (it echoes `at`) from asking for now.
 	key := from + "|" + to + "|" + strconv.Itoa(limit) + "|" + bucketKey(at) + "|" + modesKey(modes)
-	store, cacheControl := s.departures, departuresCacheControl
-	if settled(at, now) {
-		store, cacheControl = s.departuresPast, departuresPastCacheControl
+	past := settledBucket(at, now)
+	if response, ok := s.departuresPast.Get(key); past && ok {
+		writeData(w, departuresPastCacheControl, false, response)
+		return
 	}
 
-	result, err := store.Do(r.Context(), key, func(ctx context.Context) (*tfnsw.DeparturesResponse, error) {
+	result, err := s.departures.Do(r.Context(), key, func(ctx context.Context) (*tfnsw.DeparturesResponse, error) {
 		if len(modes) == 0 {
 			return s.emptyDepartures(from, to, at, now), nil
 		}
@@ -217,8 +225,20 @@ func (s *Server) handleDepartures(w http.ResponseWriter, r *http.Request) {
 		return s.upstream.DeparturesWithOptions(ctx, from, to, limit, at, tfnsw.DeparturesOptions{Modes: modes})
 	})
 	if err != nil {
+		if response, ok := s.departuresPast.Stale(key); past && ok {
+			writeData(w, departuresPastCacheControl, true, response)
+			return
+		}
 		writeError(w, err)
 		return
+	}
+
+	cacheControl := departuresCacheControl
+	// A stale answer is what upstream could not confirm, so it never becomes
+	// the hour-long copy of a window.
+	if past && !result.Stale && allJourneysArrived(result.Value, now) {
+		s.departuresPast.Put(key, result.Value)
+		cacheControl = departuresPastCacheControl
 	}
 	writeData(w, cacheControl, result.Stale, result.Value)
 }
@@ -245,11 +265,27 @@ func modesKey(modes []tfnsw.Mode) string {
 	return strings.Join(parts, ",")
 }
 
-// settled reports whether a window is far enough in the past that every journey
-// in it has already departed, so the answer can be cached hard. A zero `at` is
-// the live board and never settled.
-func settled(at, now time.Time) bool {
+// A zero `at` is the live board and never a candidate for the hour store.
+func settledBucket(at, now time.Time) bool {
 	return !at.IsZero() && at.Before(now.Add(-settledAge))
+}
+
+// An unreadable arrival is no evidence of one, so it keeps the window live.
+func allJourneysArrived(response *tfnsw.DeparturesResponse, now time.Time) bool {
+	for _, journey := range response.Journeys {
+		if journey.Cancelled {
+			continue
+		}
+		arrival := journey.Arrival.Scheduled
+		if journey.Arrival.Estimated != nil {
+			arrival = *journey.Arrival.Estimated
+		}
+		parsed, err := time.Parse(time.RFC3339, arrival)
+		if err != nil || parsed.After(now) {
+			return false
+		}
+	}
+	return true
 }
 
 // bucketKey renders a window for the cache key. The empty string is "now",

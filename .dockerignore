@@ -2,6 +2,8 @@
 !Dockerfile
 !go.mod
 !go.sum
+!third_party/
+!third_party/**
 !cmd/
 !cmd/**
 !internal/

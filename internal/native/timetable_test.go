@@ -8,8 +8,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -150,7 +152,7 @@ func TestTimetableRefreshPublishesOnlyCompleteCompilerOutput(t *testing.T) {
 	dataDir := t.TempDir()
 	compiler := filepath.Join(t.TempDir(), "compiler.py")
 	script := `
-import hashlib, json, pathlib, sys, zipfile
+import gzip, hashlib, json, pathlib, sys, zipfile
 args = dict(zip(sys.argv[1::2], sys.argv[2::2]))
 out = pathlib.Path(args['--output-dir'])
 out.mkdir(parents=True, exist_ok=True)
@@ -161,11 +163,16 @@ body = draft.read_bytes()
 digest = hashlib.sha256(body).hexdigest()
 package = out / ('timetable-' + digest + '.zip')
 draft.replace(package)
+index = gzip.compress(b'sydneytrains\tlate\t90600\t20260901\t20261031\t127\t\t\n', mtime=0)
+index_digest = hashlib.sha256(index).hexdigest()
+index_name = 'trip-index-' + index_digest + '.tsv.gz'
+(out / index_name).write_bytes(index)
 manifest = {'schemaVersion': 1, 'generatedAt': '2026-09-06T02:00:00Z',
  'expiresAt': '2026-10-06T23:59:59+11:00', 'serviceDateFrom': '20260906',
  'serviceDateTo': '20261006', 'packages': [{'source': 'network', 'schemaVersion': 1,
  'sha256': digest, 'url': '/api/v1/timetable/packages/' + digest + '.zip',
- 'bytes': len(body), 'serviceDateFrom': '20260906', 'serviceDateTo': '20261006'}]}
+ 'bytes': len(body), 'serviceDateFrom': '20260906', 'serviceDateTo': '20261006'}],
+ 'tripIndex': {'name': index_name, 'sha256': index_digest}}
 (out / 'manifest.json').write_text(json.dumps(manifest))
 `
 	if err := os.WriteFile(compiler, []byte(script), 0o644); err != nil {
@@ -198,6 +205,92 @@ manifest = {'schemaVersion': 1, 'generatedAt': '2026-09-06T02:00:00Z',
 		if _, err := os.Stat(filepath.Join(dataDir, "feeds", source+".zip")); err != nil {
 			t.Fatalf("cached %s: %v", source, err)
 		}
+	}
+	if _, err := os.Stat(filepath.Join(dataDir, "packages", current.TripIndex.Name)); err != nil {
+		t.Fatalf("published trip index: %v", err)
+	}
+	if service.timetable.serviceDates().Len() != 1 {
+		t.Fatal("the compiled trip index was not activated with its manifest")
+	}
+	restarted, err := NewService(Config{
+		Fetcher: scheduleFetcher{body: gtfsZipFixture(t)}, DataDir: dataDir,
+		BootstrapDir: bootstrap, CompilerPath: compiler,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restarted.timetable.serviceDates().Len() != 1 {
+		current, _ := os.ReadFile(filepath.Join(dataDir, "current.json"))
+		t.Fatalf("a restart lost the trip index; current.json is %s", current)
+	}
+}
+
+func TestBootstrapTripIndexResolvesDatelessUpdates(t *testing.T) {
+	bootstrap := t.TempDir()
+	writeTestTimetable(t, bootstrap, time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC), []byte("sqlite fixture"))
+	index := writeTestTripIndex(t, bootstrap, []string{"sydneytrains\tlate\t90600\t20260901\t20261031\t127\t\t"})
+	declareTripIndex(t, filepath.Join(bootstrap, "manifest.json"), &index)
+	service, err := NewService(Config{Fetcher: &fakeFetcher{}, DataDir: t.TempDir(), BootstrapDir: bootstrap})
+	if err != nil {
+		t.Fatal(err)
+	}
+	date, outcome := service.timetable.serviceDates().resolve("sydneytrains", "late", sydneyTime(t, 2026, time.September, 6, 1, 33), time.Time{})
+	if outcome != dateResolved || date != "20260905" {
+		t.Fatalf("resolve = %q/%d", date, outcome)
+	}
+	_, representation, err := service.Manifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(representation.JSON), "tripIndex") {
+		t.Fatalf("the server-only trip index reached the published manifest: %s", representation.JSON)
+	}
+}
+
+func TestMissingTripIndexLeavesTheTimetableUsable(t *testing.T) {
+	bootstrap := t.TempDir()
+	writeTestTimetable(t, bootstrap, time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC), []byte("sqlite fixture"))
+	index := writeTestTripIndex(t, bootstrap, []string{"sydneytrains\tlate\t90600\t20260901\t20261031\t127\t\t"})
+	declareTripIndex(t, filepath.Join(bootstrap, "manifest.json"), &index)
+	if err := os.Remove(filepath.Join(bootstrap, index.Name)); err != nil {
+		t.Fatal(err)
+	}
+	var logged []string
+	service, err := NewService(Config{
+		Fetcher: &fakeFetcher{}, DataDir: t.TempDir(), BootstrapDir: bootstrap,
+		Logf: func(format string, args ...any) { logged = append(logged, fmt.Sprintf(format, args...)) },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := service.Manifest(); err != nil {
+		t.Fatal(err)
+	}
+	if service.timetable.serviceDates().Len() != 0 {
+		t.Fatal("a missing trip index produced entries")
+	}
+	if len(logged) != 1 || !strings.Contains(logged[0], index.Name) {
+		t.Fatalf("log = %v", logged)
+	}
+}
+
+func declareTripIndex(t *testing.T, path string, index *TripIndex) {
+	t.Helper()
+	payload, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest Manifest
+	if err := json.Unmarshal(payload, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	manifest.TripIndex = index
+	document, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, document, 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 

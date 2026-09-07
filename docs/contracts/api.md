@@ -40,11 +40,19 @@ cleared; the usual gate then applies and `estimated` comes back `null`, so an
 old row degrades to scheduled-only rather than claiming every train ran exactly
 on time. Both registers are normal and a client must render both.
 
-Cache: a bucket more than 20 minutes in the past is settled — every journey in
-it has departed — and gets `s-maxage=3600, stale-while-revalidate=86400` with a
-matching 1-hour in-memory TTL. Buckets nearer to now, ahead of now, or absent
-keep the live policy. Caching a settled window hard is not only cheap but more
-truthful: the cached copy was taken while the actuals still existed upstream.
+Cache: a window is settled when two things are true — its bucket is more than
+20 minutes in the past, so every journey in it has departed, and every journey
+it returned has arrived, by `estimated` where upstream gives one and
+`scheduled` otherwise, counting a cancelled journey and an empty list as
+arrived. A settled window gets `s-maxage=3600, stale-while-revalidate=86400`
+with a matching 1-hour in-memory TTL. An old bucket whose train is still
+running is not settled: it keeps the live policy and is asked again, so an
+arrival that moves mid-journey reaches the client rather than freezing for the
+hour. Buckets nearer to now, ahead of now, or absent keep the live policy too,
+and an answer served stale on upstream error is never promoted into the
+hour-long store. Caching a settled window hard is not only cheap but more
+truthful: the cached copy was taken while the actuals, as far as upstream
+still had them, existed.
 
 `at` is rejected with `400` when it is unparseable, further than 24 hours in
 the past, or more than 2 hours in the future. This bounds the key space, which
@@ -56,11 +64,12 @@ the bucket, so `now - 24h` exactly is inside the window.
 Paging into the past = requesting earlier buckets; clients dedupe rows across
 pages by (line.name, departure.scheduled). **Where a row appears on both a past
 page and the live board, the live board's copy wins.** A page returns `limit`
-journeys *from* its bucket, not journeys *inside* it, so a settled page whose
+journeys *from* its bucket, not journeys *inside* it, so a past page whose
 station pair runs every 15 minutes reaches over an hour past its own bucket —
-and those rows are held under the settled page's 1-hour cache, so their
-`estimated` can be up to an hour behind. The overlap is a duplicate to resolve,
-never a reason to show a countdown from a past page.
+and such a page is held on the live policy until its last journey has arrived,
+and only then cached hard, so a row still running keeps a current `estimated`.
+The overlap is a duplicate to resolve, never a reason to show a countdown from
+a past page.
 
 Note that `+` means a space in a URL query, so the offset must be
 percent-encoded as `%2B` — the server also accepts the un-encoded spelling,
@@ -362,12 +371,33 @@ realtime fields and fall back to the local schedule. Missing static matches
 and added services stay unmatched locally and trigger the native client's
 online Trip Planner fallback.
 
-An update carrying its own timestamp is omitted when that observation is more
-than 90 seconds behind the feed header or more than five seconds ahead of it.
-An update without its own timestamp inherits the header freshness only when it
-has the explicit service date required above. A repeated byte-identical
+No update is accepted with its own timestamp more than five seconds ahead of
+the feed header. Below that, a `cancelled`, `replacement`, `added` or
+`unscheduled` update is accepted at any age within the snapshot, and a
+`scheduled` update is omitted when its timestamp is more than 10 minutes
+behind the header. An update without its own timestamp inherits the header
+freshness once it has a service date, explicit or resolved as described in
+`native-data.md`. A repeated byte-identical
 upstream body preserves the previous `generatedAt` and ETag even if the
 upstream answers `200` instead of `304`.
+
+## GET /api/v1/flags
+
+Returns only supported, evaluated public flag values, with `Cache-Control:
+no-store`. The current response is `{"tiny_train":false}` unless a
+configured public-values provider evaluates that boolean to true. Missing,
+private, invalid or uninitialized values leave the feature off. No raw rules,
+targets, rollout configuration, service credentials or unknown flags appear in
+this response. One Go SDK client filters definitions by `public` and evaluates
+against a single snapshot before returning values through `api.WithPublicFlags`.
+It syncs through the internal flagsd stream without blocking server startup.
+After initial sync it keeps the last valid in-memory snapshot through service
+outages; a restarted process defaults off until its first sync.
+
+Evaluation is global to the app, with no request identity, saved state,
+location or other personal context. The service worker uses network-only
+delivery, and browsers retain no response across launches. Runtime configuration
+and production provisioning are tracked in [deployment operations](../operations/deploy.md#feature-flags).
 
 ## GET /healthz
 

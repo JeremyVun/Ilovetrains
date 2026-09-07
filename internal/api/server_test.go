@@ -510,12 +510,194 @@ func TestDeparturesSettledWindowIsCachedForAnHour(t *testing.T) {
 			upstream.departureCalls.Load(), departuresTTL+time.Minute)
 	}
 
-	// Past the hour it refetches.
-	server.departuresPast.SetClock(func() time.Time { return time.Now().Add(departuresPastTTL + time.Minute) })
+	// Past the hour it refetches. Both stores age: a settled window that has
+	// left the hour-long store is re-asked through the live one, whose own
+	// fresh entry would otherwise answer for it.
+	expired := func() time.Time { return time.Now().Add(departuresPastTTL + time.Minute) }
+	server.departuresPast.SetClock(expired)
+	server.departures.SetClock(expired)
 	get(t, handler, target)
 	if upstream.departureCalls.Load() != 2 {
 		t.Errorf("upstream calls = %d after %v, want a refetch",
 			upstream.departureCalls.Load(), departuresPastTTL+time.Minute)
+	}
+}
+
+func movingServer(t *testing.T, upstream Upstream, clock *time.Time) (*Server, http.Handler) {
+	t.Helper()
+	server, handler := pinnedServer(t, upstream)
+	now := func() time.Time { return *clock }
+	server.now = now
+	server.departures.SetClock(now)
+	server.departuresPast.SetClock(now)
+	return server, handler
+}
+
+// The shape that froze: timetabled to arrive at testNow, so only the estimate says whether it is in yet.
+func travellingDepartures(arrival time.Time) *tfnsw.DeparturesResponse {
+	response := sampleDepartures()
+	estimated := arrival.Format(time.RFC3339)
+	response.GeneratedAt = testNow.Format(time.RFC3339)
+	response.Journeys[0].Departure = tfnsw.Departure{Scheduled: testNow.Add(-25 * time.Minute).Format(time.RFC3339)}
+	response.Journeys[0].Arrival = tfnsw.Arrival{Scheduled: testNow.Format(time.RFC3339), Estimated: &estimated}
+	return response
+}
+
+func estimatedArrival(t *testing.T, recorder *httptest.ResponseRecorder) string {
+	t.Helper()
+	var body tfnsw.DeparturesResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decoding body %q: %v", recorder.Body.String(), err)
+	}
+	if len(body.Journeys) != 1 || body.Journeys[0].Arrival.Estimated == nil {
+		t.Fatalf("body carries no estimated arrival: %s", recorder.Body)
+	}
+	return *body.Journeys[0].Arrival.Estimated
+}
+
+func TestSettledBucketStaysLiveUntilItsJourneysArrive(t *testing.T) {
+	clock := testNow
+	upstream := &fakeUpstream{departures: travellingDepartures(testNow.Add(5 * time.Minute))}
+	_, handler := movingServer(t, upstream, &clock)
+	target := departuresAt(-25 * time.Minute) // bucket 17:20, 32 minutes back
+
+	first := get(t, handler, target)
+	if first.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", first.Code, first.Body)
+	}
+	if cc := first.Header().Get("Cache-Control"); cc != departuresCacheControl {
+		t.Errorf("Cache-Control = %q, want the live policy %q while the journey runs", cc, departuresCacheControl)
+	}
+
+	moved := testNow.Add(10 * time.Minute)
+	upstream.departures = travellingDepartures(moved)
+	clock = clock.Add(3 * time.Minute)
+
+	second := get(t, handler, target)
+	if got := estimatedArrival(t, second); got != moved.Format(time.RFC3339) {
+		t.Errorf("arrival = %q, want the moved %q", got, moved.Format(time.RFC3339))
+	}
+	if calls := upstream.departureCalls.Load(); calls != 2 {
+		t.Errorf("upstream calls = %d, want 2: a journey still running is asked again", calls)
+	}
+	if cc := second.Header().Get("Cache-Control"); cc != departuresCacheControl {
+		t.Errorf("Cache-Control = %q, want the live policy %q", cc, departuresCacheControl)
+	}
+
+	clock = clock.Add(8 * time.Minute) // 18:03, past the 18:02 arrival
+
+	third := get(t, handler, target)
+	if cc := third.Header().Get("Cache-Control"); cc != departuresPastCacheControl {
+		t.Errorf("Cache-Control = %q, want the past policy %q once the train is in", cc, departuresPastCacheControl)
+	}
+	if calls := upstream.departureCalls.Load(); calls != 3 {
+		t.Fatalf("upstream calls = %d, want 3", calls)
+	}
+
+	fourth := get(t, handler, target)
+	if calls := upstream.departureCalls.Load(); calls != 3 {
+		t.Errorf("upstream calls = %d, want a settled window served from the hour-long store", calls)
+	}
+	if cc := fourth.Header().Get("Cache-Control"); cc != departuresPastCacheControl {
+		t.Errorf("Cache-Control = %q, want %q", cc, departuresPastCacheControl)
+	}
+	if got := estimatedArrival(t, fourth); got != moved.Format(time.RFC3339) {
+		t.Errorf("arrival = %q, want the moved %q", got, moved.Format(time.RFC3339))
+	}
+}
+
+func TestSettledBucketIsCachedHardOnceNothingCanArrive(t *testing.T) {
+	cases := []struct {
+		name  string
+		build func() *tfnsw.DeparturesResponse
+	}{
+		{"every journey arrived", func() *tfnsw.DeparturesResponse {
+			return travellingDepartures(testNow.Add(-5 * time.Minute))
+		}},
+		{"cancelled journey", func() *tfnsw.DeparturesResponse {
+			response := travellingDepartures(testNow.Add(5 * time.Minute))
+			response.Journeys[0].Cancelled = true
+			return response
+		}},
+		{"no journeys at all", func() *tfnsw.DeparturesResponse {
+			response := sampleDepartures()
+			response.Journeys = []tfnsw.Journey{}
+			return response
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			clock := testNow
+			upstream := &fakeUpstream{departures: tc.build()}
+			_, handler := movingServer(t, upstream, &clock)
+			target := departuresAt(-25 * time.Minute)
+
+			got := get(t, handler, target)
+			if got.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200: %s", got.Code, got.Body)
+			}
+			if cc := got.Header().Get("Cache-Control"); cc != departuresPastCacheControl {
+				t.Errorf("Cache-Control = %q, want the past policy %q", cc, departuresPastCacheControl)
+			}
+			clock = clock.Add(time.Minute)
+			get(t, handler, target)
+			if calls := upstream.departureCalls.Load(); calls != 1 {
+				t.Errorf("upstream calls = %d, want 1: the window is settled", calls)
+			}
+		})
+	}
+}
+
+func TestStaleAnswerIsNeverCachedHard(t *testing.T) {
+	clock := testNow
+	upstream := &fakeUpstream{
+		departures:    travellingDepartures(testNow.Add(5 * time.Minute)),
+		errAfterFirst: fmt.Errorf("%w: HTTP 500", tfnsw.ErrUpstream),
+	}
+	_, handler := movingServer(t, upstream, &clock)
+	target := departuresAt(-25 * time.Minute)
+
+	if got := get(t, handler, target); got.Code != http.StatusOK {
+		t.Fatalf("warm-up status = %d: %s", got.Code, got.Body)
+	}
+	clock = clock.Add(9 * time.Minute) // past the arrival, inside the live stale window
+
+	second := get(t, handler, target)
+	if second.Header().Get("X-Data-Stale") != "true" {
+		t.Fatalf("want the stale copy, got %d: %s", second.Code, second.Body)
+	}
+	if cc := second.Header().Get("Cache-Control"); cc != departuresCacheControl {
+		t.Errorf("Cache-Control = %q, want the live policy %q for a stale answer", cc, departuresCacheControl)
+	}
+	get(t, handler, target)
+	if calls := upstream.departureCalls.Load(); calls != 3 {
+		t.Errorf("upstream calls = %d, want a third attempt: a stale answer is not promoted", calls)
+	}
+}
+
+func TestSettledWindowPastItsHourIsServedStaleWhenUpstreamFails(t *testing.T) {
+	clock := testNow
+	upstream := &fakeUpstream{
+		departures:    sampleDepartures(),
+		errAfterFirst: fmt.Errorf("%w: HTTP 500", tfnsw.ErrUpstream),
+	}
+	_, handler := movingServer(t, upstream, &clock)
+	target := departuresAt(-time.Hour)
+
+	if got := get(t, handler, target); got.Header().Get("Cache-Control") != departuresPastCacheControl {
+		t.Fatalf("warm-up Cache-Control = %q, want the past policy", got.Header().Get("Cache-Control"))
+	}
+	clock = clock.Add(departuresPastTTL + time.Minute)
+
+	got := get(t, handler, target)
+	if got.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 from the settled stale window: %s", got.Code, got.Body)
+	}
+	if got.Header().Get("X-Data-Stale") != "true" {
+		t.Error("X-Data-Stale not set on a stale settled window")
+	}
+	if cc := got.Header().Get("Cache-Control"); cc != departuresPastCacheControl {
+		t.Errorf("Cache-Control = %q, want %q", cc, departuresPastCacheControl)
 	}
 }
 

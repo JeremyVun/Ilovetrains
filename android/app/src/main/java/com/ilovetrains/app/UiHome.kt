@@ -188,7 +188,7 @@ private fun SmartHeader(state: AppState, board: BoardData, journey: Journey, can
                 }
             }
         }
-        JourneyAxis(journey, Modifier.fillMaxWidth().padding(horizontal = PagePadding), large = true,
+        JourneyAxis(journey, Modifier.fillMaxWidth().padding(horizontal = PagePadding), large = true, tinyTrain = true,
             showCap = !departed, progress = if (departed && !completed) {
                 ((state.now - journey.effectiveDeparture).toFloat() /
                     (journey.effectiveArrival - journey.effectiveDeparture).coerceAtLeast(1)).coerceIn(0f, 1f)

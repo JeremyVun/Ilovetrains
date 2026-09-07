@@ -67,7 +67,7 @@ telemetry is disabled; explicit feedback drafts remain only in controller memory
 
 ## localStorage schema
 
-Single key `trains.v1` holding one JSON document (single key keeps
+Personal state uses key `trains.v1` holding one JSON document (single key keeps
 read/write atomic and migration simple):
 
 ```json
@@ -210,6 +210,31 @@ read/write atomic and migration simple):
 - A station's optional `location` is captured from `/api/v1/stops` at save
   time. Trips without coordinates are backfilled lazily by stop id. Missing
   coordinates disable only the location term.
+
+## Local preview flags
+
+Production uses server-evaluated public flags from `GET /api/v1/flags`, defaults
+off, and stores no flag response. It fetches after first paint, every 30 seconds
+on timer-driven screens and on foregrounding. Requests time out after three
+seconds; failures disable the feature. Requests send no credentials or personal
+context. The service worker never caches or replays this endpoint.
+
+On `localhost`, `127.0.0.1` or `[::1]` only, opening `/?tinyTrain=1` opts this
+browser into a local preview; `/?tinyTrain=0` opts it out.
+Only the exact query values `1` and `0` are accepted. The override is stored
+under `trains.flags.tinyTrain`, independently of personal state, and applies
+on subsequent local launches. Missing or invalid stored values use the API.
+If storage is unavailable, an explicit query still applies for that page's
+lifetime. Preview overrides are read at startup, so changing one requires a
+reload. Production ignores these query values and this storage key entirely.
+
+Native Home fetches the same evaluated public endpoint independently of timetable
+loading, when its journey header appears or resumes and every 30 seconds while
+visible. Flags remain in memory, default off, and require literal JSON `true`;
+failed requests disable the toy. Leaving Home or backgrounding cancels polling
+and the current animation. Native builds contain no flags SDK key or device
+context. DEBUG iOS calibration can opt in with `--tiny-train`; release builds
+ignore that argument. Toy interactions emit no analytics or API requests.
 
 ## Analytics queue
 

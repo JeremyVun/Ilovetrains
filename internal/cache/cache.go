@@ -97,6 +97,29 @@ func (c *Cache[T]) Do(ctx context.Context, key string, fetch func(context.Contex
 	return zero, fl.err
 }
 
+// Get returns the cached value for key while it is fresh. It never fetches, so
+// a caller can prefer an answer it already has without paying for one.
+func (c *Cache[T]) Get(key string) (T, bool) {
+	value, _, ok := c.fresh(key)
+	return value, ok
+}
+
+// Stale returns any cached value still inside the stale window, fresh or not,
+// for a caller that would otherwise have nothing to serve.
+func (c *Cache[T]) Stale(key string) (T, bool) {
+	value, _, ok := c.stale(key)
+	return value, ok
+}
+
+// Put stores value for key as if it had just been fetched, so a caller can
+// promote a value it obtained elsewhere into a longer-lived store.
+func (c *Cache[T]) Put(key string, value T) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.items[key] = entry[T]{value: value, storedAt: c.now()}
+	c.sweepLocked()
+}
+
 func (c *Cache[T]) fresh(key string) (T, time.Duration, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

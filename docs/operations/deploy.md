@@ -54,6 +54,64 @@ generation; the bundled bootstrap serves a new volume immediately.
    Build the deploy client with `make build` in that repository if required,
    or set `DEPLOYCTL_BIN=agent/deployctl/deployctl`.
 
+## Feature flags
+
+Flag inventory:
+
+| Key | Type | Public | Owner | Default | Removal condition |
+| --- | --- | --- | --- | --- | --- |
+| `tiny_train` | boolean | yes | Jeremy | off | Remove after the owner accepts or retires the Easter egg |
+
+Target project/environment: `ilovetrains` / `prod` (UI label **Production**).
+The label is not the API key: requesting environment `production` returns 404.
+Definition description:
+`Play the tiny train Easter egg beneath the Home header.` Boolean variations
+are `off=false` and `on=true`; initial environment config is disabled with
+`off_variation=off`, empty targets/rules and `fallthrough.variation=on`.
+This is a global UX switch, with no per-device targeting or percentage rollout.
+
+The browser boundary is `GET /api/v1/flags`. The local-only `?tinyTrain=1`
+preview cannot override production. The server uses one shared Go SDK client,
+streaming internal snapshots and evaluating only public definitions locally.
+Keys and raw rules never enter the web bundle. The owner approved vendoring
+on 2026-09-08; the pinned SDK, unchanged evaluator and additive public accessor
+are documented in [third_party/flags](../../third_party/flags/README.md).
+
+Runtime configuration:
+
+| Variable | Value |
+| --- | --- |
+| `FLAGS_URL` | Internal flagsd base URL; unset leaves the feature off |
+| `FLAGS_KEY` | Read-only key scoped to this project and environment; required with `FLAGS_URL` |
+| `FLAGS_PROJECT` | Defaults to `ilovetrains` |
+| `FLAGS_ENV` | Set to `prod`; the code's `production` fallback does not name this project's environment |
+
+Boot never waits for flagsd. With no disk cache, each process starts off until
+its first snapshot. Once synced, the SDK retains the last valid snapshot in
+memory through a flagsd outage; a kill switch update needs a working stream.
+Browsers refresh on foreground and every 30 seconds; a failed browser fetch
+turns the feature off. Evaluation uses fixed context `ilovetrains`, with no
+personal attributes. Read attribution is `svc:ilovetrains` / `ilovetrains-api`.
+
+The owner created both public flags and supplied the sealed read key. The
+transfer-limit implementation is being integrated separately; its flagsd key
+is `transfer_limit`. The flags stack creates `shared-flags`; ilovetrains joins
+it externally. Deploy flags first if that network does not yet exist.
+
+Production configuration is committed in infra `58f5a36`. An owner-authorized
+read-only container probe verified the actual environment key `prod` and a true
+`tiny_train` evaluation (`FALLTHROUGH`). No `.env` files were read or credentials
+printed; the probe used the container's existing process environment.
+
+Version `1.3.1` (source `e4f25d2`, service worker `v47`) deployed on 2026-09-08
+in job `a887f8acc7f488f53f1f22a0def04090`. Image digest:
+`sha256:fce592e8a9a92b6870d3603e969655add807491e813f68fdc64233ae27809898`.
+Production health, version and shell bytes passed HTTP checks, and the public
+endpoint returned `{"tiny_train":true}`. All 342 web tests, the signed Android
+release build and the four size/scheme interaction checks passed. Seven affected
+Home regression frames matched; no baseline changed. The train starts with six
+cars on the coloured trip line; activating it leaves the line and divider fixed.
+
 ## Verify
 
 Check https://ilovetrains.jeremyvun.com/healthz and drive the affected flow on
@@ -70,6 +128,21 @@ the new shell.
 Check cached module content as well as the worker version: old HTTP-cached
 assets can otherwise enter a newly named shell cache. Installation reloads
 all shell requests; the cached controller must match the deployed source.
+
+Check what the realtime refresh actually published. Each source logs one line
+per refresh that changed the feed:
+
+```
+realtime source=sydneytrains raw=308 accepted=129 unknown=159 ambiguous=0 stale=20 duplicate=0 header_age=6s
+```
+
+`grep "realtime source="` shows every source's last count; alert on
+`realtime warning`, which is emitted whenever a non-empty feed publishes
+nothing. A `/data/current.json` compiled without a trip index makes Sydney
+Trains warn (and log `native timetable: manifest declares no trip index` at
+startup) until the next daily timetable refresh rewrites it. A source logs
+nothing when upstream answers 304 or returns a byte-identical feed; its
+snapshot still ages out through `X-Data-Stale`.
 
 Check static response headers too: `/js/main.js` and `/sw.js` must retain
 `Cache-Control: no-store` through the edge. A cold profile must load the app
