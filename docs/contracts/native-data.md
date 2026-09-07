@@ -197,8 +197,9 @@ strong ETag.
 Clients use conditional requests and treat `X-Data-Stale: true` or an
 expired snapshot as scheduled-only. Snapshot expiry is the source header
 timestamp plus 90 seconds. The server polls every upstream feed once a
-minute, so a published snapshot is still fresh when its replacement lands. A
-connection joins only on exact source, trip ID and service date, then stop
+minute; while a feed's header is under 30 seconds old at receipt, its
+snapshot is still fresh when the replacement lands, and the refresh log's
+`header_age` shows that margin. A connection joins only on exact source, trip ID and service date, then stop
 ID and/or sequence. Assigned stop IDs are resolved through the same source's
 stop table. `noData` suppresses a stop estimate and the trip default delay;
 `skipped` prevents boarding or alighting. A replacement trip uses only
