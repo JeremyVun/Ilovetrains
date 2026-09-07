@@ -536,13 +536,14 @@ func movingServer(t *testing.T, upstream Upstream, clock *time.Time) (*Server, h
 }
 
 // travellingDepartures is the shape that froze: a journey that left 25 minutes
-// before testNow, so its bucket is settled-eligible, and arrives at `arrival`.
+// before testNow, timetabled to arrive at testNow and running late to
+// `arrival`, so only the estimate says whether it is in yet.
 func travellingDepartures(arrival time.Time) *tfnsw.DeparturesResponse {
 	response := sampleDepartures()
 	estimated := arrival.Format(time.RFC3339)
 	response.GeneratedAt = testNow.Format(time.RFC3339)
 	response.Journeys[0].Departure = tfnsw.Departure{Scheduled: testNow.Add(-25 * time.Minute).Format(time.RFC3339)}
-	response.Journeys[0].Arrival = tfnsw.Arrival{Scheduled: estimated, Estimated: &estimated}
+	response.Journeys[0].Arrival = tfnsw.Arrival{Scheduled: testNow.Format(time.RFC3339), Estimated: &estimated}
 	return response
 }
 
