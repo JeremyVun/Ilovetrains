@@ -544,8 +544,6 @@ final class TrainViewModel: ObservableObject {
         suppressNextLastAnswer = true
         persist(); state.board = nil; state.homeBoard = nil; choosePrediction(); syncPersonal(); refresh()
     }
-    /* One request per open, resume and 30s tick answers every flag. The toy
-       reads only this answer, so a stored value cannot replay a finished rollout. */
     private func refreshFlags() {
         guard canNetwork else { return }
         Task {

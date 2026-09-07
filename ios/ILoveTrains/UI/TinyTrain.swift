@@ -1,25 +1,12 @@
 import SwiftUI
 
-private struct TinyTrainFlagKey: EnvironmentKey {
-    static let defaultValue = false
-}
-
-extension EnvironmentValues {
-    /* The view model's one flags answer, never a stored one: the toy stays off
-       until this foreground's own request lands. */
-    var tinyTrainFlag: Bool {
-        get { self[TinyTrainFlagKey.self] }
-        set { self[TinyTrainFlagKey.self] = newValue }
-    }
-}
-
 struct TinyTrainLane: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.trainColors) private var colors
-    @Environment(\.tinyTrainFlag) private var flag
     @State private var started: Date?
     @State private var runID = 0
+    var flag = false
     var flagOverride: Bool? = nil
     var onAvailabilityChange: (Bool) -> Void = { _ in }
 

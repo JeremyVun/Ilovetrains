@@ -185,7 +185,7 @@ private struct SmartHeader: View {
             }.padding(.horizontal, pagePadding).padding(.vertical, 10)
 
             JourneyAxis(journey: journey, large: true, showCap: !departed,
-                        progress: departed && !complete ? (model.state.now - journey.effectiveDeparture) / max(1, journey.effectiveArrival - journey.effectiveDeparture) : nil, tinyTrain: true)
+                        progress: departed && !complete ? (model.state.now - journey.effectiveDeparture) / max(1, journey.effectiveArrival - journey.effectiveDeparture) : nil, tinyTrain: model.state.tinyTrain)
                 .padding(.horizontal, pagePadding)
 
             Group {
