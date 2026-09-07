@@ -94,6 +94,7 @@ func newTimetableStore(config Config) (*timetableStore, error) {
 
 func (s *timetableStore) loadServiceDates(manifest Manifest, dirs []string) *ServiceDates {
 	if manifest.TripIndex == nil {
+		s.log("native timetable: manifest declares no trip index, realtime updates without a service date cannot be resolved")
 		return &ServiceDates{}
 	}
 	for _, dir := range dirs {
@@ -189,8 +190,8 @@ func (s *timetableStore) run(ctx context.Context) {
 			return
 		case <-timer.C:
 		}
-		if err := s.refresh(ctx); err != nil && s.logf != nil {
-			s.logf("native timetable refresh: %v", err)
+		if err := s.refresh(ctx); err != nil {
+			s.log("native timetable refresh: %v", err)
 		}
 		select {
 		case <-ctx.Done():
@@ -299,7 +300,11 @@ func (s *timetableStore) refresh(ctx context.Context) error {
 	if err := writeConditions(filepath.Join(s.dataDir, "feed-conditions.json"), nextConditions); err != nil {
 		return err
 	}
-	if err := writeAtomic(filepath.Join(s.dataDir, "current.json"), active.representation.JSON); err != nil {
+	stored, err := json.Marshal(active.manifest)
+	if err != nil {
+		return err
+	}
+	if err := writeAtomic(filepath.Join(s.dataDir, "current.json"), append(stored, '\n')); err != nil {
 		return fmt.Errorf("publish timetable manifest: %w", err)
 	}
 	s.mu.Lock()

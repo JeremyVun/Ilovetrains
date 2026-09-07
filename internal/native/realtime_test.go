@@ -323,7 +323,7 @@ func TestNormalizeRealtimeReplaysTheCapturedSydneyTrainsFeed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := RealtimeCounts{Raw: 308, Accepted: 69, Unknown: 159, Ambiguous: 40, Stale: 40, Duplicate: 0}
+	want := RealtimeCounts{Raw: 308, Accepted: 93, Unknown: 159, Ambiguous: 0, Stale: 56, Duplicate: 0}
 	if counts != want {
 		t.Fatalf("counts = %+v, want %+v", counts, want)
 	}

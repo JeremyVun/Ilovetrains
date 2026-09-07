@@ -212,6 +212,17 @@ manifest = {'schemaVersion': 1, 'generatedAt': '2026-09-06T02:00:00Z',
 	if service.timetable.serviceDates().Len() != 1 {
 		t.Fatal("the compiled trip index was not activated with its manifest")
 	}
+	restarted, err := NewService(Config{
+		Fetcher: scheduleFetcher{body: gtfsZipFixture(t)}, DataDir: dataDir,
+		BootstrapDir: bootstrap, CompilerPath: compiler,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restarted.timetable.serviceDates().Len() != 1 {
+		current, _ := os.ReadFile(filepath.Join(dataDir, "current.json"))
+		t.Fatalf("a restart lost the trip index; current.json is %s", current)
+	}
 }
 
 func TestBootstrapTripIndexResolvesDatelessUpdates(t *testing.T) {

@@ -43,8 +43,7 @@ func probeEntity(id, tripID, startDate string, stopTime *int64) *gtfs.FeedEntity
 	return &gtfs.FeedEntity{Id: proto.String(id), TripUpdate: update}
 }
 
-// I1: an explicit date wins and duplicate detection keys on the resolved (tripId, serviceDate).
-func TestProbeI1DuplicateDetectionUsesResolvedDate(t *testing.T) {
+func TestDuplicateDetectionUsesResolvedDate(t *testing.T) {
 	dates := testServiceDates(t, map[string]tripCalendar{
 		"sydneytrains\x00late": {firstDepartureSecs: 90600, startDate: 20260901, endDate: 20261031, weekdays: everyDayMask},
 	})
@@ -69,9 +68,9 @@ func TestProbeI1DuplicateDetectionUsesResolvedDate(t *testing.T) {
 	}
 }
 
-// I2: DST behaviour. The code uses civil midnight + seconds; GTFS defines times from "noon minus 12h".
-// The two agree for every time after the transition hour and differ by one hour before it on the two DST days.
-func TestProbeI2InstanceStartOnDaylightSavingDays(t *testing.T) {
+// GTFS defines service times from noon minus twelve hours; civil midnight plus seconds differs by an hour
+// only for times inside the transition hour on the two daylight-saving days.
+func TestInstanceStartOnDaylightSavingDays(t *testing.T) {
 	location, _ := time.LoadLocation(sydneyZone)
 	noonMinus12 := func(y int, m time.Month, d int) time.Time {
 		return time.Date(y, m, d, 12, 0, 0, 0, location).Add(-12 * time.Hour)
@@ -113,9 +112,7 @@ func TestProbeI2InstanceStartOnDaylightSavingDays(t *testing.T) {
 	}
 }
 
-// Rule-level risk: a cancellation republished with a fresh timestamp 7h after a Mon-Fri trip began
-// resolves to the NEXT day's instance, because the header window is [-6h, +24h].
-func TestProbeOldCancellationLandsOnTomorrowsInstance(t *testing.T) {
+func TestOldCancellationLandsOnTheDayTheServiceRan(t *testing.T) {
 	dates := testServiceDates(t, map[string]tripCalendar{
 		"sydneytrains\x00weekday": {firstDepartureSecs: 64800, startDate: 20260901, endDate: 20261031, weekdays: 0b0011111},
 	})
@@ -130,13 +127,12 @@ func TestProbeOldCancellationLandsOnTomorrowsInstance(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Logf("Mon-Fri 18:00 trip, cancellation with a current timestamp at Tuesday 01:33: %+v -> %+v", counts, snapshot.Updates)
-	if counts.Accepted != 1 || snapshot.Updates[0].ServiceDate != "20260908" {
-		t.Fatalf("expected the plan's rule to publish this as Tuesday's cancellation: %+v", snapshot.Updates)
+	if counts.Accepted != 1 || snapshot.Updates[0].ServiceDate != "20260907" {
+		t.Fatalf("a republished cancellation must land on Monday's instance, not Tuesday's: %+v", snapshot.Updates)
 	}
 }
 
-// I3: stop rule precedence, window boundaries, no fallback to the header rule.
-func TestProbeI3WindowsAndPrecedence(t *testing.T) {
+func TestResolveWindowsAndPrecedence(t *testing.T) {
 	dates := testServiceDates(t, map[string]tripCalendar{
 		"sydneytrains\x00noon":  {firstDepartureSecs: 43200, startDate: 20260901, endDate: 20261031, weekdays: everyDayMask},
 		"sydneytrains\x00dawn":  {firstDepartureSecs: 21600, startDate: 20260901, endDate: 20261031, weekdays: everyDayMask},
@@ -152,18 +148,17 @@ func TestProbeI3WindowsAndPrecedence(t *testing.T) {
 		want     string
 		outcome  dateOutcome
 	}{
-		{"header rule alone picks tomorrow for a finished noon trip at 23:30", "noon", sep(6, 23, 30), time.Time{}, "20260907", dateResolved},
+		{"a noon trip seen at 23:30 is still today's", "noon", sep(6, 23, 30), time.Time{}, "20260906", dateResolved},
 		{"stop rule overrides: stop at 13:00 today", "noon", sep(6, 23, 30), sep(6, 13, 0), "20260906", dateResolved},
-		{"header exactly 6h after start is inside", "noon", sep(6, 18, 0), time.Time{}, "20260906", dateResolved},
-		{"header 6h+1min after start falls to tomorrow", "noon", sep(6, 18, 1), time.Time{}, "20260907", dateResolved},
-		{"start exactly 24h after header is inside", "noon", sep(6, 12, 0), time.Time{}, "20260906", dateResolved},
+		{"Monday-only: start exactly 24h before header is inside", "mon", sep(8, 12, 0), time.Time{}, "20260907", dateResolved},
+		{"Monday-only: start 24h+1min before header is outside", "mon", sep(8, 12, 1), time.Time{}, "", dateAmbiguous},
+		{"Monday-only: start exactly 24h after header is inside", "mon", sep(6, 12, 0), time.Time{}, "20260907", dateResolved},
 		{"Monday-only: start 24h+1min after header is outside", "mon", sep(6, 11, 59), time.Time{}, "", dateAmbiguous},
-		{"Monday-only: start exactly 24h after header", "mon", sep(6, 12, 0), time.Time{}, "20260907", dateResolved},
 		{"stop exactly 3h after start", "dawn", sep(6, 9, 0), sep(6, 9, 0), "20260906", dateResolved},
-		{"stop 3h+1s after start: no fallback to header rule", "dawn", sep(6, 9, 0), sep(6, 9, 0).Add(time.Second), "", dateAmbiguous},
+		{"stop 3h+1s after start falls back to the header rule", "dawn", sep(6, 9, 0), sep(6, 9, 0).Add(time.Second), "20260906", dateResolved},
 		{"stop 3h before start (early?) is inside", "dawn", sep(6, 3, 0), sep(6, 3, 0), "20260906", dateResolved},
 		{"calendar with no running candidate", "never", sep(6, 12, 0), time.Time{}, "", dateAmbiguous},
-		{"stop time in the far future", "dawn", sep(6, 6, 0), sydneyTime(t, 2050, time.January, 1, 0, 0), "", dateAmbiguous},
+		{"a far-future stop time falls back to the header rule", "dawn", sep(6, 6, 0), sydneyTime(t, 2050, time.January, 1, 0, 0), "20260906", dateResolved},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -175,8 +170,7 @@ func TestProbeI3WindowsAndPrecedence(t *testing.T) {
 	}
 }
 
-// Defect candidate: an update for a running trip longer than 3h that only carries later stops.
-func TestProbeLongTripWithLateStopTimesIsDropped(t *testing.T) {
+func TestLongTripWithLateStopTimesFallsBackToTheHeader(t *testing.T) {
 	dates := testServiceDates(t, map[string]tripCalendar{
 		"sydneytrains\x00ccn": {firstDepartureSecs: 21600, startDate: 20260901, endDate: 20261031, weekdays: everyDayMask},
 	})
@@ -189,12 +183,11 @@ func TestProbeLongTripWithLateStopTimesIsDropped(t *testing.T) {
 	}
 	t.Logf("06:00 daily trip, header 09:25, only stop time 09:31 (3h31 after start): %+v", counts)
 	if counts.Accepted != 1 {
-		t.Errorf("running trip dropped as ambiguous; header rule alone would resolve it (start 3h25 before header)")
+		t.Errorf("a running trip whose only stop time is past the three-hour window must fall back to the header rule")
 	}
 }
 
-// Contract check: an absent trip timestamp with a resolved (not explicit) date inherits header freshness.
-func TestProbeAbsentTimestampWithResolvedDateIsAccepted(t *testing.T) {
+func TestAbsentTimestampWithResolvedDateIsAccepted(t *testing.T) {
 	dates := testServiceDates(t, map[string]tripCalendar{
 		"sydneytrains\x00late": {firstDepartureSecs: 90600, startDate: 20260901, endDate: 20261031, weekdays: everyDayMask},
 	})
@@ -208,8 +201,7 @@ func TestProbeAbsentTimestampWithResolvedDateIsAccepted(t *testing.T) {
 	}
 }
 
-// I4: the served manifest equals the compiler manifest with tripIndex deleted, byte for byte.
-func TestProbeI4ServedManifestIsByteIdenticalWithoutTripIndex(t *testing.T) {
+func TestServedManifestIsByteIdenticalWithoutTripIndex(t *testing.T) {
 	bootstrap := filepath.Join("..", "..", "native-data", "bootstrap")
 	payload, err := os.ReadFile(filepath.Join(bootstrap, "manifest.json"))
 	if err != nil {
@@ -245,62 +237,7 @@ func TestProbeI4ServedManifestIsByteIdenticalWithoutTripIndex(t *testing.T) {
 	t.Logf("served ETag %s", representation.ETag)
 }
 
-// I6: refresh publishes the sidecar, but does a restart from current.json re-activate it?
-func TestProbeI6RestartAfterRefreshKeepsTheTripIndex(t *testing.T) {
-	dataDir := t.TempDir()
-	compiler := filepath.Join(t.TempDir(), "compiler.py")
-	script := `
-import gzip, hashlib, json, pathlib, sys, zipfile
-args = dict(zip(sys.argv[1::2], sys.argv[2::2]))
-out = pathlib.Path(args['--output-dir'])
-out.mkdir(parents=True, exist_ok=True)
-draft = out / 'draft.zip'
-with zipfile.ZipFile(draft, 'w') as archive:
-    archive.writestr('timetable.sqlite3', b'compiled sqlite')
-body = draft.read_bytes()
-digest = hashlib.sha256(body).hexdigest()
-package = out / ('timetable-' + digest + '.zip')
-draft.replace(package)
-index = gzip.compress(b'sydneytrains\tlate\t90600\t20260901\t20261031\t127\t\t\n', mtime=0)
-index_digest = hashlib.sha256(index).hexdigest()
-index_name = 'trip-index-' + index_digest + '.tsv.gz'
-(out / index_name).write_bytes(index)
-manifest = {'schemaVersion': 1, 'generatedAt': '2026-09-06T02:00:00Z',
- 'expiresAt': '2026-10-06T23:59:59+11:00', 'serviceDateFrom': '20260906',
- 'serviceDateTo': '20261006', 'packages': [{'source': 'network', 'schemaVersion': 1,
- 'sha256': digest, 'url': '/api/v1/timetable/packages/' + digest + '.zip',
- 'bytes': len(body), 'serviceDateFrom': '20260906', 'serviceDateTo': '20261006'}],
- 'tripIndex': {'name': index_name, 'sha256': index_digest}}
-(out / 'manifest.json').write_text(json.dumps(manifest))
-`
-	if err := os.WriteFile(compiler, []byte(script), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	config := Config{Fetcher: scheduleFetcher{body: gtfsZipFixture(t)}, DataDir: dataDir, CompilerPath: compiler, Now: func() time.Time { return time.Date(2026, 9, 6, 2, 0, 0, 0, time.UTC) }}
-	service, err := NewService(config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := service.RefreshTimetable(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	if service.timetable.serviceDates().Len() != 1 {
-		t.Fatal("index not active after refresh")
-	}
-	current, _ := os.ReadFile(filepath.Join(dataDir, "current.json"))
-	t.Logf("current.json: %s", current)
-
-	restarted, err := NewService(config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := restarted.timetable.serviceDates().Len(); got != 1 {
-		t.Errorf("after restart from current.json the trip index has %d entries, want 1 (current.json has tripIndex: %v)", got, strings.Contains(string(current), "tripIndex"))
-	}
-}
-
-// I6: an old current.json without tripIndex still loads (empty index).
-func TestProbeI6OldCurrentJSONWithoutTripIndexLoads(t *testing.T) {
+func TestOldCurrentJSONWithoutTripIndexLoads(t *testing.T) {
 	dataDir := t.TempDir()
 	writeTestTimetable(t, dataDir, time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC), []byte("sqlite fixture"))
 	if err := os.Rename(filepath.Join(dataDir, "manifest.json"), filepath.Join(dataDir, "current.json")); err != nil {
@@ -318,8 +255,7 @@ func TestProbeI6OldCurrentJSONWithoutTripIndexLoads(t *testing.T) {
 	}
 }
 
-// I5 (store path): a corrupt sidecar next to a valid manifest degrades to an empty index with one log line.
-func TestProbeI5CorruptSidecarDegradesWithWarning(t *testing.T) {
+func TestCorruptSidecarDegradesWithWarning(t *testing.T) {
 	bootstrap := t.TempDir()
 	writeTestTimetable(t, bootstrap, time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC), []byte("sqlite fixture"))
 	index := writeTestTripIndex(t, bootstrap, []string{"sydneytrains\tlate\t90600\t20260901\t20261031\t127\t\t"})
@@ -339,8 +275,7 @@ func TestProbeI5CorruptSidecarDegradesWithWarning(t *testing.T) {
 	}
 }
 
-// I7: the index pointer is stable across calls (loaded once).
-func TestProbeI7IndexLoadedOnce(t *testing.T) {
+func TestIndexLoadedOnce(t *testing.T) {
 	bootstrap := filepath.Join("..", "..", "native-data", "bootstrap")
 	started := time.Now()
 	service, err := NewService(Config{Fetcher: &fakeFetcher{}, DataDir: t.TempDir(), BootstrapDir: bootstrap})
@@ -353,8 +288,7 @@ func TestProbeI7IndexLoadedOnce(t *testing.T) {
 	}
 }
 
-// Memory: current representation versus an interned-calendar alternative.
-func TestProbeMemoryOfTripIndex(t *testing.T) {
+func TestMemoryOfTripIndex(t *testing.T) {
 	bootstrap := filepath.Join("..", "..", "native-data", "bootstrap")
 	heap := func() uint64 {
 		runtime.GC()
@@ -398,8 +332,7 @@ func TestProbeMemoryOfTripIndex(t *testing.T) {
 	runtime.KeepAlive(table)
 }
 
-// Capture replay: classify every Sydney Trains update by rule, offset and outcome.
-func TestProbeCaptureClassification(t *testing.T) {
+func TestCaptureClassification(t *testing.T) {
 	body, err := os.ReadFile(filepath.Join("..", "..", "tools", "fixtures", "gtfs_realtime_sydneytrains_20260906.pb"))
 	if err != nil {
 		t.Fatal(err)
@@ -532,7 +465,7 @@ func abs(d time.Duration) time.Duration {
 	return d
 }
 
-func TestProbeCaptureStopShapes(t *testing.T) {
+func TestCaptureStopShapes(t *testing.T) {
 	body, _ := os.ReadFile(filepath.Join("..", "..", "tools", "fixtures", "gtfs_realtime_sydneytrains_20260906.pb"))
 	var feed gtfs.FeedMessage
 	if err := proto.Unmarshal(body, &feed); err != nil {

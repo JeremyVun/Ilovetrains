@@ -19,7 +19,7 @@ import (
 const (
 	sydneyZone         = "Australia/Sydney"
 	stopTimeWindow     = 3 * time.Hour
-	headerWindowBefore = 6 * time.Hour
+	headerWindowBefore = 24 * time.Hour
 	headerWindowAfter  = 24 * time.Hour
 )
 
@@ -29,6 +29,7 @@ const (
 	dateResolved dateOutcome = iota
 	dateUnknown
 	dateAmbiguous
+	dateNoInstance
 )
 
 type tripCalendar struct {
@@ -83,7 +84,6 @@ func loadTripIndex(path, digest string) (*ServiceDates, error) {
 	}
 	dates := &ServiceDates{trips: make(map[string]tripCalendar), location: location}
 	scanner := bufio.NewScanner(reader)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1<<20)
 	line := 0
 	for scanner.Scan() {
 		line++
@@ -182,10 +182,17 @@ func (s *ServiceDates) resolve(source, tripID string, header, stopTime time.Time
 			start: time.Date(day.Year(), day.Month(), day.Day(), 0, 0, int(calendar.firstDepartureSecs), 0, s.location),
 		})
 	}
+	date, outcome := "", dateNoInstance
 	if !stopTime.IsZero() {
-		return nearestInstance(candidates, stopTime, stopTimeWindow, stopTimeWindow)
+		date, outcome = nearestInstance(candidates, stopTime, stopTimeWindow, stopTimeWindow)
 	}
-	return nearestInstance(candidates, header, headerWindowBefore, headerWindowAfter)
+	if outcome == dateNoInstance {
+		date, outcome = nearestInstance(candidates, header, headerWindowBefore, headerWindowAfter)
+	}
+	if outcome == dateNoInstance {
+		return "", dateAmbiguous
+	}
+	return date, outcome
 }
 
 func nearestInstance(candidates []serviceInstance, target time.Time, before, after time.Duration) (string, dateOutcome) {
@@ -206,7 +213,10 @@ func nearestInstance(candidates []serviceInstance, target time.Time, before, aft
 			tied = true
 		}
 	}
-	if best == "" || tied {
+	switch {
+	case best == "":
+		return "", dateNoInstance
+	case tied:
 		return "", dateAmbiguous
 	}
 	return best, dateResolved

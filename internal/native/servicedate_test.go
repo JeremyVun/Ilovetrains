@@ -42,6 +42,7 @@ func TestResolveServiceDatePicksTheRunningInstance(t *testing.T) {
 		"sydneytrains\x00special": {firstDepartureSecs: 21600, startDate: 20260901, endDate: 20260902, weekdays: 0,
 			added: []int32{20260906}},
 		"sydneytrains\x00overnight": {firstDepartureSecs: 95400, startDate: 20260901, endDate: 20261031, weekdays: everyDay},
+		"sydneytrains\x00noon":      {firstDepartureSecs: 43200, startDate: 20260901, endDate: 20261031, weekdays: everyDay},
 	})
 
 	cases := []struct {
@@ -69,11 +70,16 @@ func TestResolveServiceDatePicksTheRunningInstance(t *testing.T) {
 			header: sydneyTime(t, 2026, time.September, 6, 5, 30), want: "20260906"},
 		{name: "daylight saving does not move the service day", trip: "overnight",
 			header: sydneyTime(t, 2026, time.October, 4, 3, 40), want: "20261003"},
-		{name: "an instance outside the header window is ambiguous", trip: "saturday",
-			header: sydneyTime(t, 2026, time.September, 6, 1, 33), outcome: dateAmbiguous},
-		{name: "a stop time far from every instance is ambiguous", trip: "morning",
+		{name: "an instance more than a day before the header is ambiguous", trip: "saturday",
+			header: sydneyTime(t, 2026, time.September, 6, 7, 0), outcome: dateAmbiguous},
+		{name: "a stop time far from every instance falls back to the header", trip: "morning",
 			header:   sydneyTime(t, 2026, time.September, 6, 1, 33),
+			stopTime: sydneyTime(t, 2026, time.September, 6, 15, 0), want: "20260906"},
+		{name: "a stop time far from every instance whose header is also outside stays ambiguous", trip: "saturday",
+			header:   sydneyTime(t, 2026, time.September, 6, 7, 0),
 			stopTime: sydneyTime(t, 2026, time.September, 6, 15, 0), outcome: dateAmbiguous},
+		{name: "a trip exactly twelve hours from both neighbouring instances is ambiguous", trip: "noon",
+			header: sydneyTime(t, 2026, time.September, 6, 0, 0), outcome: dateAmbiguous},
 		{name: "a trip absent from the index is unknown", trip: "ghost",
 			header: sydneyTime(t, 2026, time.September, 6, 1, 33), outcome: dateUnknown},
 	}
