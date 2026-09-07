@@ -60,7 +60,8 @@ final class TrainViewModel: ObservableObject {
     private func start() async {
         data = await store.load()
         state.stations = (try? await store.stations()) ?? []
-        settleFocus(); choosePrediction(); syncPersonal()
+        if !canNetwork { settleFocus() }
+        choosePrediction(); syncPersonal()
         if let pair = ends(), let cached = await store.cached(from: pair.0, to: pair.1, modes: data.modes) {
             publish(retainedOfflineBoard(cached), request: generation)
         }
@@ -120,7 +121,7 @@ final class TrainViewModel: ObservableObject {
         #endif
         guard loop == nil else { return }
         state.now = epochNow(); location.refreshPermission()
-        if state.ready { settleFocus(); choosePrediction(); syncPersonal(); refresh(); refreshSharedData(); silentLocation() }
+        if state.ready { choosePrediction(); syncPersonal(); refresh(); refreshSharedData(); silentLocation() }
         loop = Task { [weak self] in
             var ticks = 0
             while !Task.isCancelled {
@@ -259,7 +260,9 @@ final class TrainViewModel: ObservableObject {
         data.focus.map { $0.tripId == focus.tripId && $0.reverse == focus.reverse && $0.journey.key == focus.journey.key } ?? false
     }
     private func refreshFocus() {
-        guard let focus = data.focus, !focus.journey.legs.allSatisfy({ $0.identity != nil }), canNetwork else { return }
+        guard let focus = data.focus else { return }
+        // Completion waits for the refresh; a local journey or a phone that cannot ask has none to wait for.
+        guard !focus.journey.legs.allSatisfy({ $0.identity != nil }), canNetwork else { settleFocus(); return }
         focusTask?.cancel()
         focusTask = Task {
             guard let pair = ends(id: focus.tripId, reverse: focus.reverse) else { return }
@@ -278,15 +281,16 @@ final class TrainViewModel: ObservableObject {
         if !focus.board.isLive(state.now), focus.journey.retained != true, focus.journey.realtime || focus.journey.cancelled {
             focus = focus.lastKnown(); data.focus = focus; changed = true
         }
-        if state.now >= focus.journey.effectiveArrival, !focus.journey.cancelled { completeRide(focus) }
+        if !focus.journey.cancelled { settleRide(focus, arrived: state.now >= focus.journey.effectiveArrival) }
         if state.now > focus.journey.effectiveArrival + 1_800_000 { data.focus = nil; changed = true }
         if changed { persist() }
         syncPersonal()
     }
-    private func completeRide(_ focus: FocusedJourney) {
-        guard !data.rides.contains(where: { $0.tripId == focus.tripId && $0.reverse == focus.reverse && $0.departure == focus.journey.departure }) else { return }
-        data.rides.append(Ride(tripId: focus.tripId, reverse: focus.reverse, departure: focus.journey.departure, arrival: focus.journey.effectiveArrival, from: focus.journey.legs.first?.from, to: focus.journey.legs.last?.to))
-        data.rides = Array(data.rides.suffix(100)); persist()
+    private func completeRide(_ focus: FocusedJourney) { settleRide(focus, arrived: true) }
+    private func settleRide(_ focus: FocusedJourney, arrived: Bool) {
+        let rides = settledRides(data.rides, focus: focus, arrived: arrived)
+        guard rides != data.rides else { return }
+        data.rides = rides; persist()
     }
     func receiveLocation(_ value: Fix) {
         #if DEBUG
@@ -514,6 +518,22 @@ final class TrainViewModel: ObservableObject {
         }
     }
     func dismissMessage() { show(nil) }
+}
+
+/// The ride ledger for a focused journey, judged from the arrival its last refresh left behind.
+/// A ride recorded from an arrival that has since moved takes the new one, and one that has not
+/// happened yet is withdrawn: an expected finish is not evidence of arrival (client-storage.md).
+func settledRides(_ rides: [Ride], focus: FocusedJourney, arrived: Bool) -> [Ride] {
+    let arrival = focus.journey.effectiveArrival
+    guard let index = rides.firstIndex(where: { $0.tripId == focus.tripId && $0.reverse == focus.reverse && $0.departure == focus.journey.departure }) else {
+        guard arrived else { return rides }
+        return Array((rides + [Ride(tripId: focus.tripId, reverse: focus.reverse, departure: focus.journey.departure,
+                                    arrival: arrival, from: focus.journey.legs.first?.from, to: focus.journey.legs.last?.to)]).suffix(100))
+    }
+    guard arrival > rides[index].arrival else { return rides }
+    var settled = rides
+    if arrived { settled[index].arrival = arrival } else { settled.remove(at: index) }
+    return settled
 }
 
 #if DEBUG

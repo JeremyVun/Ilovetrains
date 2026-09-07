@@ -146,6 +146,103 @@ final class ControllerTests: XCTestCase {
         model.pause()
     }
 
+    /* The stale-arrival defect: start and resume settled the focus from the stored
+       snapshot, so an expected arrival that had passed was recorded as a real one. */
+    func testResumeRecordsNoRideUntilTheRefreshedArrivalLands() async throws {
+        let fixture = departedFocus()
+        let (store, model) = try await networkedModel(data: fixture.data, arrival: fixture.stale + 300_000)
+        XCTAssertFalse(model.state.focusComplete, "opening settled the focus before asking anyone")
+
+        model.resume()
+        XCTAssertFalse(model.state.focusComplete, "resume settled the focus before the refresh landed")
+
+        try await refreshed(model, arrival: fixture.stale + 300_000)
+        XCTAssertFalse(model.state.focusComplete)
+        let persisted = await store.load()
+        XCTAssertEqual(persisted.rides, [])
+        model.pause()
+    }
+
+    func testARefreshedArrivalWithdrawsARideRecordedFromTheStaleOne() async throws {
+        let fixture = departedFocus(rides: true)
+        let (store, model) = try await networkedModel(data: fixture.data, arrival: fixture.stale + 300_000)
+        XCTAssertTrue(model.state.focusComplete)
+
+        model.resume()
+        try await refreshed(model, arrival: fixture.stale + 300_000)
+
+        XCTAssertFalse(model.state.focusComplete, "the train has not arrived yet")
+        try await settled(store) { $0.rides.isEmpty }
+        model.pause()
+    }
+
+    func testARefreshConfirmingTheArrivalRecordsAndCorrectsTheRide() async throws {
+        let fixture = departedFocus(rides: true)
+        let (store, model) = try await networkedModel(data: fixture.data, arrival: fixture.stale + 60_000)
+
+        model.resume()
+        try await refreshed(model, arrival: fixture.stale + 60_000)
+
+        XCTAssertTrue(model.state.focusComplete)
+        try await settled(store) { $0.rides.map(\.arrival) == [fixture.stale + 60_000] }
+        model.pause()
+    }
+
+    private func refreshed(_ model: TrainViewModel, arrival: Millis) async throws {
+        for _ in 0..<300 {
+            if model.state.focus?.journey.effectiveArrival == arrival { return }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTFail("The focused journey never took the refreshed arrival")
+    }
+
+    private func departedFocus(rides: Bool = false) -> (data: UserData, stale: Millis) {
+        let second = 1000.0
+        let now = (epochNow() / second).rounded() * second
+        let departure = now - 1_500_000, arrival = now - 120_000
+        let a = Station(id: "200060", name: "Central Station"), b = Station(id: "215020", name: "Parramatta Station")
+        let journey = Journey(legs: [Leg(line: "T1", mode: "train", headsign: "Parramatta", from: a, to: b, departure: departure, arrival: arrival)])
+        let trip = SavedTrip(id: "trip", from: a, to: b, createdAt: departure)
+        let focus = FocusedJourney(tripId: trip.id, reverse: false, journey: journey,
+                                   board: BoardData(from: a, to: b, journeys: [journey], generatedAt: departure, source: "live"))
+        let ride = Ride(tripId: trip.id, reverse: false, departure: departure, arrival: arrival, from: a, to: b)
+        return (UserData(trips: [trip], rides: rides ? [ride] : [], focus: focus), arrival)
+    }
+
+    /// A board carrying the focused journey with the arrival the server now believes.
+    private func departuresBody(_ data: UserData, arrival: Millis) throws -> Data {
+        let focus = data.focus!, leg = focus.journey.legs[0]
+        let format = ISO8601DateFormatter(); format.formatOptions = [.withInternetDateTime]
+        let iso: (Millis) -> String = { format.string(from: Date(timeIntervalSince1970: $0 / 1000)) }
+        let stop: (Station) -> [String: Any] = { ["id": $0.id, "name": $0.name] }
+        return try JSONSerialization.data(withJSONObject: [
+            "from": stop(leg.from), "to": stop(leg.to), "generatedAt": iso(epochNow()),
+            "journeys": [["legDetail": [[
+                "line": ["name": leg.line, "mode": leg.mode], "headsign": leg.headsign,
+                "from": stop(leg.from), "to": stop(leg.to),
+                "departure": ["scheduled": iso(leg.departure), "estimated": iso(leg.departure)],
+                "arrival": ["scheduled": iso(leg.arrival), "estimated": iso(arrival)]
+            ]]]]
+        ])
+    }
+
+    private func networkedModel(data: UserData, arrival: Millis) async throws -> (DeviceStore, TrainViewModel) {
+        StubbedDepartures.body = try departuresBody(data, arrival: arrival)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let store = DeviceStore(directory: directory)
+        try await store.save(data)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubbedDepartures.self]
+        var api = TransitAPI(); api.baseURL = "http://departures.invalid"; api.session = URLSession(configuration: configuration)
+        let model = TrainViewModel(store: store, api: api)
+        for _ in 0..<300 {
+            if model.state.ready { return (store, model) }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTFail("Controller did not load saved state")
+        return (store, model)
+    }
+
     private func settled(_ store: DeviceStore, _ check: @escaping (UserData) -> Bool) async throws {
         for _ in 0..<200 {
             if check(await store.load()) { return }
@@ -195,4 +292,19 @@ final class ControllerTests: XCTestCase {
         return (UserData(trips: [trip], focus: FocusedJourney(tripId: trip.id, reverse: false, journey: original, board: observed, alternatives: scheduled)), next)
     }
 
+}
+
+/// Answers every request through the injected session, so the controller can be
+/// driven with a departure board without touching the network.
+final class StubbedDepartures: URLProtocol {
+    static var body = Data()
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: StubbedDepartures.body)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
 }
