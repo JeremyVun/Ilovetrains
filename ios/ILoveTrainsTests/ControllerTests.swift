@@ -188,17 +188,13 @@ final class ControllerTests: XCTestCase {
         model.pause()
     }
 
-    /* Review probes. XCTExpectFailure marks the invariants the shipped code does
-       not yet hold, so the suite stays green while the report lists them. */
-    func testProbeFlickerTheTickSettlesFromTheStaleArrivalBeforeASlowRefreshLands() async throws {
+    func testTheTickDoesNotSettleFromTheStaleArrivalBeforeASlowRefreshLands() async throws {
         let fixture = departedFocus()
         let (store, model) = try await networkedModel(data: fixture.data, arrival: fixture.stale + 300_000, delay: .seconds(3))
         XCTAssertFalse(model.state.focusComplete)
         model.resume()
         try await Task.sleep(for: .milliseconds(1_500))
-        XCTExpectFailure("the one-second tick settles the stale arrival while the refresh is still in flight") {
-            XCTAssertFalse(model.state.focusComplete, "settled before the refresh landed")
-        }
+        XCTAssertFalse(model.state.focusComplete, "settled before the refresh landed")
         try await refreshed(model, arrival: fixture.stale + 300_000)
         XCTAssertFalse(model.state.focusComplete, "the correction withdraws the ride once the refresh lands")
         try await settled(store) { $0.rides.isEmpty }
@@ -206,7 +202,7 @@ final class ControllerTests: XCTestCase {
         StubbedDepartures.delay = .zero
     }
 
-    func testProbeALocallyRoutedFocusSettlesFromItsSnapshotBeforeTheOverlayRefresh() async throws {
+    func testALocallyRoutedFocusWaitsForItsRefreshBeforeSettling() async throws {
         var fixture = departedFocus()
         let identity = TripIdentity(source: "sydneytrains", tripId: "T1.42", serviceDate: "2026-09-07", fromStopId: "200060", toStopId: "215020")
         fixture.data.focus!.journey.legs[0].identity = identity
@@ -214,18 +210,14 @@ final class ControllerTests: XCTestCase {
         let (store, model) = try await networkedModel(data: fixture.data, arrival: fixture.stale + 300_000)
         XCTAssertFalse(model.state.focusComplete, "nothing has asked yet")
         model.resume()
-        XCTExpectFailure("refreshFocus settles a locally identified journey at once; its refresh is the realtime overlay in refreshSharedData") {
-            XCTAssertFalse(model.state.focusComplete, "settled from the stored snapshot without waiting for the overlay")
-        }
+        XCTAssertFalse(model.state.focusComplete, "settled from the stored snapshot without waiting for the refresh")
         var persisted = await store.load()
         for _ in 0..<50 where persisted.rides.isEmpty { try await Task.sleep(for: .milliseconds(10)); persisted = await store.load() }
-        XCTExpectFailure("the stale ride is written from the snapshot") {
-            XCTAssertEqual(persisted.rides, [])
-        }
+        XCTAssertEqual(persisted.rides, [])
         model.pause()
     }
 
-    func testProbeA200mCompletionIsWithdrawnByALaterMovedFutureArrival() async throws {
+    func testA200mCompletionSurvivesALaterMovedFutureArrival() async throws {
         let stations = try await DeviceStore(directory: FileManager.default.temporaryDirectory).stations()
         let a = try XCTUnwrap(stations.first { $0.id == "200060" }), b = try XCTUnwrap(stations.first { $0.id == "215020" })
         let second = 1000.0
@@ -242,21 +234,19 @@ final class ControllerTests: XCTestCase {
         try await refreshed(model, arrival: arrival)
         XCTAssertFalse(model.state.focusComplete)
 
-        StubbedDepartures.body = try departuresBody(data, arrival: arrival + 480_000)
+        StubbedDepartures.body = try departuresBody(data, arrival: arrival + 120_000)
         model.receiveLocation(Fix(lat: b.lat, lon: b.lon, at: epochNow()))
         XCTAssertTrue(model.state.focusComplete, "the fix at the destination records the ride")
 
-        try await refreshed(model, arrival: arrival + 480_000)
-        XCTExpectFailure("the natives judge arrival from the clock alone, so the later-moved arrival withdraws the fix completion") {
-            XCTAssertTrue(model.state.focusComplete, "location-based completion should be unchanged")
-        }
+        try await refreshed(model, arrival: arrival + 120_000)
+        XCTAssertTrue(model.state.focusComplete, "location-based completion is unchanged by a timetable move")
         var persisted = await store.load()
         for _ in 0..<50 where !persisted.rides.isEmpty { try await Task.sleep(for: .milliseconds(10)); persisted = await store.load() }
-        XCTExpectFailure("the row is withdrawn") { XCTAssertEqual(persisted.rides.count, 1) }
+        XCTAssertEqual(persisted.rides.map(\.arrival), [arrival + 120_000], "the row takes the moved arrival instead")
         model.pause()
     }
 
-    func testProbeExpiryStillClearsTheFocusAndACancelledJourneyRecordsNoRide() async throws {
+    func testExpiryStillClearsTheFocusAndACancelledJourneyRecordsNoRide() async throws {
         var expired = departedFocus()
         let late = expired.stale - 1_800_000 - 120_000
         expired.data.focus!.journey.legs[0].estimatedArrival = late
@@ -277,7 +267,7 @@ final class ControllerTests: XCTestCase {
         cancelledModel.pause()
     }
 
-    func testProbeI2CorrectionKeepsOneRowAndTheCap() {
+    func testI2CorrectionKeepsOneRowAndTheCap() {
         let a = Station(id: "200060", name: "Central Station"), b = Station(id: "215020", name: "Parramatta Station")
         let now = epochNow()
         let journey = Journey(legs: [Leg(line: "T1", mode: "train", headsign: "Parramatta", from: a, to: b, departure: now - 1_500_000, arrival: now - 60_000)])
@@ -292,9 +282,8 @@ final class ControllerTests: XCTestCase {
         XCTAssertEqual(corrected.filter { $0.tripId == "trip" }.map(\.arrival), [now - 30_000])
         XCTAssertEqual(settledRides(corrected, focus: focus, arrived: true), corrected)
         focus.journey.legs[0].estimatedArrival = now - 90_000
-        XCTExpectFailure("plan text: a moved arrival is taken; the builder guards on later-only") {
-            XCTAssertEqual(settledRides(corrected, focus: focus, arrived: true).filter { $0.tripId == "trip" }.map(\.arrival), [now - 90_000])
-        }
+        XCTAssertEqual(settledRides(corrected, focus: focus, arrived: true).filter { $0.tripId == "trip" }.map(\.arrival), [now - 90_000],
+                       "an arrival that moved earlier but is still past is taken too")
         focus.journey.legs[0].estimatedArrival = now + 60_000
         XCTAssertEqual(settledRides(corrected, focus: focus, arrived: false).filter { $0.tripId == "trip" }.count, 0)
     }

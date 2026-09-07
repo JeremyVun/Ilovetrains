@@ -134,16 +134,14 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
                     val updated = try { planner.refreshFocused(focus.journey) }
                         catch (e: CancellationException) { throw e } catch (_: Exception) { null }
                     if (data.focus?.let { it.tripId == focus.tripId && it.reverse == focus.reverse && it.journey.key == focus.journey.key } == true) {
-                        if (updated != null) {
-                            val refreshed = focus.copy(journey = updated.journey, board = focus.board.copy(
+                        if (updated != null && updated.live) {
+                            data = data.copy(focus = focus.copy(journey = updated.journey, board = focus.board.copy(
                                 journeys = focus.board.journeys.map { if (it.key == focus.journey.key) updated.journey else it.scheduledOnly() },
                                 generatedAt = updated.observedAt ?: focus.board.generatedAt,
-                                source = if (updated.live) "live" else "schedule", offline = !updated.live,
-                                serverStale = false))
-                            data = data.copy(focus = if (updated.live) refreshed else focus.lastKnown())
+                                source = "live", offline = false, serverStale = false)))
                             persist()
                         }
-                        settleFocus()
+                        settleFocus(judgeClock = updated?.live == true)
                     }
                 }
                 if (now - lastTimetableCheck > 6 * 3_600_000) {
@@ -237,7 +235,7 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
             settleFocus(); persist(); syncPersonal()
         }
     }
-    private fun settleFocus() {
+    private fun settleFocus(judgeClock: Boolean = true) {
         val now = mutable.value.now
         var focus = data.focus ?: return
         if (!focus.board.isLive(now) && !focus.journey.retained && (focus.journey.realtime || focus.journey.cancelled)) {
@@ -245,7 +243,7 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
             data = data.copy(focus = focus)
             persist()
         }
-        if (!focus.journey.cancelled) settleRide(focus, now >= focus.journey.effectiveArrival || arrivedByFix(focus, now))
+        if (!focus.journey.cancelled) settleRide(focus, (judgeClock && now >= focus.journey.effectiveArrival) || arrivedByFix(focus, now))
         if (now > focus.journey.effectiveArrival + 1_800_000) { data = data.copy(focus = null); persist() }
         syncPersonal()
     }
@@ -271,10 +269,7 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         if (data.trips.isNotEmpty() && here != null && data.votes.none { it.day == day }) { data = data.copy(votes = (data.votes + HomeVote(day, here)).takeLast(7)); persist() }
         val inferred = inferredFocus(data, value, mutable.value.now)
         if (inferred != null) { data = data.copy(focus = inferred); persist() }
-        data.focus?.let { f ->
-            val destination = ends(f.tripId, f.reverse)?.second
-            if (destination != null && mutable.value.now >= f.journey.effectiveArrival - 300_000 && distanceMetres(value, destination) <= 200) settleRide(f, arrived = true)
-        }
+        data.focus?.let { f -> if (arrivedByFix(f, mutable.value.now)) settleRide(f, arrived = true) }
         if (data.trips.isEmpty() && !setupOriginEdited && mutable.value.setupFrom == null) mutable.value = mutable.value.copy(setupFrom = here)
         if (!explicit && data.focus == null && here != null) {
             val home = data.home ?: automaticHome(data)
