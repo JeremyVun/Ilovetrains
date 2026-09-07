@@ -80,7 +80,7 @@ Verify gate:
   `focus.js` are in `SHELL`.
 - Done marker: delete `arrival-cache-reproduction.go.txt`.
 
-Done: ☐
+Done: ☑ 2026-09-08 (backend merged 2026-09-07; clients merged after two Fable rounds and integration with the native-review and transfer-cap landings)
 
 ## Phase 2 — Sydney Trains service-date resolver
 
