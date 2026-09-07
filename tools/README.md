@@ -282,7 +282,10 @@ Traps:
   `ILoveTrains.app` on the shared simulator mid-run, so an iOS frame can be a
   photograph of somebody else's build. Before believing an iOS `DIFF`, check
   that your `ios/build/.../ILoveTrains.app` is newer than the peer's drive and
-  that the test log names the tests your branch added.
+  that the test log names the tests your branch added. The regression tool
+  never rebuilds that app: a stale one shoots old code with no error, and the
+  Settings frame's version string is the tell (2026-09-08: a 1.2.4 build shot
+  a 1.4.0 tree and reported the new row missing).
 - The Android drive runs only `UiCalibrationTest#captureCanonicalScreens`
   (`INSTRUMENT_CLASS` on `shoot-android.sh`); the class's other tests assert
   behaviour and are the build gate's job. The iOS drive caps the settle at two
