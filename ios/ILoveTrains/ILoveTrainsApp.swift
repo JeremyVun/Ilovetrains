@@ -10,7 +10,7 @@ struct ILoveTrainsApp: App {
             TrainAppView(model: model)
                 .preferredColorScheme(model.state.appearance == .system ? nil : model.state.appearance == .dark ? .dark : .light)
                 .onChange(of: scenePhase) { _, phase in
-                    if phase == .active { model.resume() } else { model.pause() }
+                    if phase == .active { model.resume() } else if phase == .background { model.pause() }
                 }
                 .onAppear { if scenePhase == .active { model.resume() } }
         }

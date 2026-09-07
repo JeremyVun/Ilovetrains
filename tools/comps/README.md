@@ -164,8 +164,11 @@ with 18px gaps, and a row does not wrap — keep a row inside a 1400px screen
 (five plain, three `z`, or two `zz`), and split a longer comparison into
 `h3`-only sections, or the owner never sees the figures past the right edge.
 
-A zoom shot from the manifest is addressed by its bare name; one made from the
-CLI is addressed by its file basename, which carries the `zoom-` prefix.
+Every zoom, from the manifest or the CLI, is addressed by its file basename,
+which carries the `zoom-` prefix (`zoom-<out>`): `shoot.js` keys `report.zooms`
+by that name. A bare name does not error; `sheet.js` falls back to
+`shots/<name>.png` and ships a broken image, so check every `src` in the built
+sheet resolves.
 
 ## The data-attribute vocabulary
 

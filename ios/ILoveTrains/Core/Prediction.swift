@@ -5,12 +5,14 @@ struct Fix: Codable, Equatable, Sendable {
     var lon: Double
     var at: Millis
     var speed: Double?
+    var accuracyMetres: Double?
 
-    init(lat: Double, lon: Double, at: Millis, speed: Double? = nil) {
+    init(lat: Double, lon: Double, at: Millis, speed: Double? = nil, accuracyMetres: Double? = nil) {
         self.lat = lat
         self.lon = lon
         self.at = at
         self.speed = speed
+        self.accuracyMetres = accuracyMetres
     }
 }
 
@@ -98,6 +100,13 @@ func stationHere(data: UserData, stations: [Station], fix: Fix?, now: Millis) ->
         ?? nearest(eligible, within: 200)
         ?? nearest(saved, within: 2_000)
         ?? nearest(eligible, within: 2_000)
+}
+
+func nearestStation(stations: [Station], fix: Fix, within metres: Double = 2_000) -> Station? {
+    stations.map { ($0, distanceMetres(fix, $0)) }
+        .filter { $0.1 <= metres }
+        .min { $0.1 < $1.1 }?
+        .0
 }
 
 func predict(data: UserData, stations: [Station], fix: Fix?, now: Millis) -> Selection? {

@@ -10,7 +10,7 @@ struct BoardView: View {
             if let board = model.state.board {
                 boardBody(board)
             } else {
-                TrainLabel(text: model.state.refreshing ? "Opening timetable" : model.state.message ?? "Timetable unavailable")
+                TrainLabel(text: model.state.refreshing ? "Opening timetable" : "Timetable unavailable")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
@@ -97,7 +97,7 @@ struct BoardRow: View {
         let content = HStack(spacing: 14) {
             VStack(alignment: .trailing, spacing: 4) {
                 HStack(alignment: .lastTextBaseline, spacing: 2) {
-                    Text(fig.value).font(.system(size: fig.value.count >= 5 ? 28 : 40, weight: .ultraLight)).tracking(-1.5)
+                    Text(fig.value).font(.system(size: figureUsesCompactType(fig) ? 28 : 40, weight: .ultraLight)).tracking(-1.5)
                     if !fig.unit.isEmpty { Text(fig.unit).font(.system(size: 12, weight: .medium)) }
                 }.foregroundStyle(figureColor(fig, late: late, stale: stale)).tabular().lineLimit(1)
                 TrainLabel(text: fig.provenance, color: (late && !fig.past || journey.cancelled) ? colors.warning : colors.ink3,

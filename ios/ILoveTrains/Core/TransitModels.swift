@@ -3,6 +3,11 @@ import Foundation
 typealias Millis = Double
 
 let allModes: Set<String> = ["train", "metro", "ferry"]
+let maximumTransitMillis: Millis = 8_640_000_000_000_000
+
+func validTransitMillis(_ value: Millis) -> Bool {
+    value.isFinite && abs(value) <= maximumTransitMillis
+}
 
 struct Station: Codable, Equatable, Sendable, Identifiable, Hashable {
     var id: String
@@ -137,6 +142,26 @@ struct Journey: Codable, Equatable, Sendable, Identifiable, Hashable {
         self.retained = retained
     }
 
+    private enum CodingKeys: String, CodingKey { case legs, retained }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        legs = try container.decode([Leg].self, forKey: .legs)
+        retained = try container.decodeIfPresent(Bool.self, forKey: .retained)
+        guard !legs.isEmpty, legs.allSatisfy({ leg in
+            [leg.departure, leg.arrival, leg.estimatedDeparture, leg.estimatedArrival]
+                .compactMap { $0 }.allSatisfy(validTransitMillis)
+        }) else {
+            throw DecodingError.dataCorruptedError(forKey: .legs, in: container, debugDescription: "Journey needs legs with safe timestamps")
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(legs, forKey: .legs)
+        try container.encodeIfPresent(retained, forKey: .retained)
+    }
+
     var key: String {
         legs.map { "\($0.line):\(Self.keyMillis($0.departure))" }.joined(separator: "|")
     }
@@ -158,6 +183,21 @@ struct Journey: Codable, Equatable, Sendable, Identifiable, Hashable {
         guard value.isFinite, abs(value) < 9_000_000_000_000_000_000 else { return value.description }
         return String(Int64(value.rounded()))
     }
+}
+
+func journeyAllowed(_ journey: Journey, modes: Set<String>) -> Bool {
+    !journey.legs.isEmpty && journey.legs.allSatisfy { modes.contains($0.mode) }
+}
+
+func orderedLineCodes(_ journey: Journey) -> [String] {
+    var seen = Set<String>()
+    return journey.legs.map(\.line).filter { !$0.isEmpty && seen.insert($0).inserted }
+}
+
+func mergeEarlierJourneys(_ earlier: [Journey], current: [Journey], cutoff: Millis) -> [Journey] {
+    var rows = Dictionary(earlier.filter { $0.departure >= cutoff }.map { ($0.key, $0) }, uniquingKeysWith: { _, last in last })
+    current.forEach { rows[$0.key] = $0 }
+    return rows.values.sorted { $0.effectiveDeparture < $1.effectiveDeparture }
 }
 
 struct BoardData: Codable, Equatable, Sendable {
@@ -314,6 +354,22 @@ struct FocusUpdate: Equatable, Sendable {
         self.observedAt = observedAt
         self.live = live
     }
+}
+
+func focusAfterRefresh(_ focus: FocusedJourney, update: FocusUpdate, alternatives: BoardData?) -> FocusedJourney {
+    var result = focus
+    if update.live {
+        result.journey = update.journey
+        result.board.journeys = [update.journey]
+        result.board.generatedAt = update.observedAt ?? focus.board.generatedAt
+        result.board.source = "live"
+        result.board.offline = false
+        result.board.serverStale = false
+    } else {
+        result = focus.lastKnown()
+    }
+    if let alternatives { result.alternatives = alternatives }
+    return result
 }
 
 private extension String {

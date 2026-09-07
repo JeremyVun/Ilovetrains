@@ -131,7 +131,7 @@ function browserPrelude() {
       for (let i = 0; i < 80; i += 1) { const answer = read(); if (answer) return answer; await sleep(25); }
       throw new Error(message);
     };
-    const t = window.__trains;
+    const t = await waitFor(() => window.__trains, 'app test seam did not load');
   `;
 }
 
@@ -452,7 +452,26 @@ function focusFreshnessScript() {
 }
 
 function serviceEligibilityScript(stations) {
-  const freshTrain = { generatedAt: new Date(nowMs).toISOString(), journeys: [train] };
+  const calibrationNow = Date.parse('2026-09-07T21:46:01+10:00');
+  const calibrationDeparture = '2026-09-07T22:05:00+10:00';
+  const calibrationArrival = '2026-09-07T22:40:00+10:00';
+  const calibrationTrain = structuredClone(train);
+  calibrationTrain.departure = {
+    ...calibrationTrain.departure,
+    scheduled: calibrationDeparture,
+    estimated: calibrationDeparture
+  };
+  calibrationTrain.arrival = {
+    ...calibrationTrain.arrival,
+    scheduled: calibrationArrival,
+    estimated: calibrationArrival
+  };
+  calibrationTrain.legDetail[0].departure = { ...calibrationTrain.departure };
+  calibrationTrain.legDetail[0].arrival = { ...calibrationTrain.arrival };
+  const freshTrain = {
+    generatedAt: '2026-09-07T21:45:00+10:00',
+    journeys: [calibrationTrain]
+  };
   return `(async () => {
     ${browserPrelude()}
     const stations = ${JSON.stringify(stations)};
@@ -519,6 +538,7 @@ function serviceEligibilityScript(stations) {
       'late fix restored filtered trip rows');
 
     // Finish on a deterministic fresh answer for the calibration frame.
+    t.now = () => ${calibrationNow};
     t.state.selection = { tripId: 'train-trip', direction: 'forward' };
     t.state.body = ${JSON.stringify(freshTrain)};
     t.state.fix = null;
@@ -887,7 +907,13 @@ function feedbackFrameScript() {
     const textarea = await waitFor(() => document.querySelector('[data-role="feedback-message"]'), 'feedback form did not render');
     textarea.value = 'The platform changed after I opened the app.';
     textarea.dispatchEvent(new Event('input', { bubbles: true }));
-    textarea.focus();
+    history.replaceState(null, '', '#/settings');
+    t.route();
+    history.replaceState(null, '', '#/settings/feedback');
+    t.route();
+    const restored = await waitFor(() => document.querySelector('[data-role="feedback-message"]'), 'feedback form did not return');
+    assert(restored.value.includes('platform changed'), 'feedback frame lost its draft across navigation');
+    restored.focus();
   })()`;
 }
 
@@ -1154,9 +1180,21 @@ try {
     assert([...document.querySelectorAll('.st-mode:not([disabled])')].every((el) => el.getAttribute('aria-pressed') === 'false'),
       'all-off did not leave every served mode off');
   `), firstPort, { out: frame('settings-390x844-all-off.png') || undefined });
-  await run('feedback-frame', visualSeed, feedbackFrameScript(), firstPort, {
-    out: frame('settings-390x844-feedback.png') || undefined
-  });
+  await Promise.all([
+    run('feedback-frame-dark-390', visualSeed, feedbackFrameScript(), firstPort, {
+      out: frame('settings-390x844-feedback.png') || undefined
+    }),
+    run('feedback-frame-light-390', visualSeed, feedbackFrameScript(), firstPort + 1, {
+      media: 'prefers-color-scheme:light', out: frame('settings-390x844-feedback-light.png') || undefined
+    }),
+    run('feedback-frame-dark-412', visualSeed, feedbackFrameScript(), firstPort + 2, {
+      size: '412x732', out: frame('settings-412x732-feedback.png') || undefined
+    }),
+    run('feedback-frame-light-412', visualSeed, feedbackFrameScript(), firstPort + 3, {
+      size: '412x732', media: 'prefers-color-scheme:light',
+      out: frame('settings-412x732-feedback-light.png') || undefined
+    })
+  ]);
   await run('permission-prompt', visualSeed, geometryScript(`
     const row = document.querySelector('.st-location-row');
     assert(row?.querySelector('.st-value')?.textContent.trim() === 'Location needs permission', 'prompt state not explained');

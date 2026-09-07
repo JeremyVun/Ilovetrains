@@ -29,7 +29,7 @@ export function nextService(journeys, lead, nowMs, stale = false) {
   const arrival = arrivalMs(candidate);
   return {
     journey: candidate, key: journeyKey(candidate), label: `Next ${vehicle}`,
-    figure: stale ? '' : countdownFigure(minutesUntil(departureMs(candidate), nowMs)),
+    figure: countdownFigure(minutesUntil(departureMs(candidate), nowMs)),
     depTime: clock(departureMs(candidate)), arrTime: arrival === null ? '—' : clock(arrival), stale
   };
 }

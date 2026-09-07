@@ -51,12 +51,144 @@ final class ControllerTests: XCTestCase {
     func testTenTripLRUEvictsUnviewedOldestAndPreservesRides() async throws {
         let a = Station(id: "a", name: "A")
         let trips = (0..<10).map { SavedTrip(id: "trip-\($0)", from: a, to: Station(id: "stop-\($0)", name: "Stop \($0)"), createdAt: Double($0 + 1), lastViewed: $0 == 0 ? epochNow() : 0) }
-        let (_, model) = try await model(data: UserData(trips: trips))
+        let history = [ViewEvent(tripId: "trip-0", reverse: false, at: epochNow())]
+        let (_, model) = try await model(data: UserData(trips: trips, history: history))
         model.saveTrip(from: a, to: Station(id: "new", name: "New"))
         XCTAssertEqual(model.state.totalTrips, 10)
         XCTAssertTrue(model.state.trips.contains { $0.id == "trip-0" })
         XCTAssertFalse(model.state.trips.contains { $0.id == "trip-1" })
         XCTAssertTrue(model.state.trips.contains { $0.to.id == "new" })
+        model.pause()
+    }
+
+    func testOpeningAnotherTripPreservesShownAnswerEvidence() async throws {
+        let now = epochNow()
+        let a = Station(id: "a", name: "A")
+        let b = Station(id: "b", name: "B")
+        let c = Station(id: "c", name: "C")
+        let first = SavedTrip(id: "first", from: a, to: b)
+        let second = SavedTrip(id: "second", from: a, to: c)
+        let journey = Journey(legs: [Leg(line: "T1", mode: "train", headsign: "B", from: a, to: b, departure: now + 60_000, arrival: now + 600_000)])
+        let board = BoardData(from: a, to: b, journeys: [journey], generatedAt: now, source: "live")
+        let answer = LastAnswer(tripId: first.id, reverse: false, at: now, stationId: a.id, board: board, journey: journey)
+        let (store, model) = try await model(data: UserData(trips: [first, second], lastAnswer: answer))
+
+        model.openTrip(id: second.id)
+
+        let restored = await store.load()
+        XCTAssertEqual(restored.lastAnswer, answer)
+        model.pause()
+    }
+
+    func testLateLocationCannotRefillClearedSetupOrigin() async throws {
+        let (_, model) = try await model(data: UserData())
+        let central = try XCTUnwrap(model.state.stations.first { $0.id == "200060" })
+        let townHall = try XCTUnwrap(model.state.stations.first { $0.id == "200070" })
+        model.resume()
+        model.chooseSetupFrom(central)
+        model.clearSetupFrom()
+
+        model.receiveLocation(Fix(lat: townHall.lat, lon: townHall.lon, at: epochNow()))
+
+        XCTAssertNil(model.state.setupFrom)
+        XCTAssertEqual(model.state.nearestStation?.id, townHall.id)
+        model.pause()
+    }
+
+    func testArrivalCompletionUsesTheSavedDirectionalEndpoint() async throws {
+        let now = epochNow()
+        let savedFrom = Station(id: "from", name: "From", lat: -33.884, lon: 151.206)
+        let savedTo = Station(id: "to", name: "To", lat: -33.8173, lon: 151.0053)
+        let wireFrom = Station(id: "from", name: "From")
+        let wireTo = Station(id: "to", name: "To")
+        let trip = SavedTrip(id: "trip", from: savedFrom, to: savedTo)
+        let journey = Journey(legs: [Leg(
+            line: "T1", mode: "train", headsign: "To", from: wireFrom, to: wireTo,
+            departure: now - 600_000, arrival: now + 240_000
+        )])
+        let board = BoardData(from: savedFrom, to: savedTo, journeys: [journey], generatedAt: now, source: "live")
+        let focus = FocusedJourney(tripId: trip.id, reverse: false, journey: journey, board: board, pinned: false)
+        let (store, model) = try await model(data: UserData(trips: [trip], focus: focus))
+        model.resume()
+
+        model.receiveLocation(Fix(lat: savedTo.lat, lon: savedTo.lon, at: epochNow()))
+
+        XCTAssertTrue(model.state.focusComplete)
+        try await settled(store) { $0.rides.count == 1 }
+        let restored = await store.load()
+        let ride = try XCTUnwrap(restored.rides.first)
+        XCTAssertEqual(ride.from, savedFrom)
+        XCTAssertEqual(ride.to, savedTo)
+        model.pause()
+    }
+
+    func testAutoCreatedPairIsMarkedJustAddedUntilNextResume() async throws {
+        let central = Station(id: "200060", name: "Central Station", lat: -33.8832, lon: 151.2067, modes: ["train"])
+        let parramatta = Station(id: "215020", name: "Parramatta Station", lat: -33.8173, lon: 151.0053, modes: ["train"])
+        let townHall = Station(id: "200070", name: "Town Hall Station", lat: -33.8736, lon: 151.2069, modes: ["train"])
+        let (_, model) = try await model(data: UserData(trips: [SavedTrip(id: "existing", from: central, to: parramatta)]))
+        model.resume()
+
+        model.receiveLocation(Fix(lat: townHall.lat, lon: townHall.lon, at: epochNow()))
+
+        let added = try XCTUnwrap(model.state.justAddedTripId)
+        XCTAssertEqual(model.state.selectedTripId, added)
+        XCTAssertTrue(model.state.selectionPredicted)
+        XCTAssertNil(model.state.focus)
+        model.pause()
+        model.resume()
+        XCTAssertNil(model.state.justAddedTripId)
+        model.pause()
+    }
+
+    func testIncompatiblePairCanBeSavedAndStaysHiddenUntilEnabled() async throws {
+        let from = Station(id: "wharf-a", name: "Wharf A", modes: ["ferry"])
+        let to = Station(id: "wharf-b", name: "Wharf B", modes: ["ferry"])
+        let (store, model) = try await model(data: UserData(modes: ["train"]))
+
+        model.saveTrip(from: from, to: to)
+
+        XCTAssertEqual(model.state.totalTrips, 1)
+        XCTAssertTrue(model.state.trips.isEmpty)
+        XCTAssertNil(model.state.selectedTripId)
+        XCTAssertNil(model.state.board)
+        try await settled(store) { $0.trips.count == 1 }
+        let restored = await store.load()
+        XCTAssertEqual(restored.trips.count, 1)
+        model.setMode(mode: "ferry", enabled: true)
+        XCTAssertEqual(model.state.trips.count, 1)
+        model.pause()
+    }
+
+    func testRedirectMatchesFirstLineAndScheduledDepartureOnly() {
+        let from = Station(id: "a", name: "A")
+        let to = Station(id: "b", name: "B")
+        let original = Journey(legs: [Leg(line: "T1", mode: "train", headsign: "B", from: from, to: to, departure: 10_000, arrival: 20_000)])
+        let sameDepartureWrongLine = Journey(legs: [Leg(line: "T2", mode: "train", headsign: "B", from: from, to: to, departure: 10_000, arrival: 20_000)])
+        let delayedMatch = Journey(legs: [Leg(
+            line: "T1", mode: "train", headsign: "B", from: from, to: to,
+            departure: 10_000, arrival: 20_000, estimatedDeparture: 15_000
+        )])
+
+        XCTAssertEqual(redirectMatch(for: original, in: [sameDepartureWrongLine, delayedMatch]), delayedMatch)
+        XCTAssertNil(redirectMatch(for: original, in: [sameDepartureWrongLine]))
+    }
+
+    func testRedirectSetupUsesLocatedSavedDirectionalOrigin() async throws {
+        let savedFrom = Station(id: "a", name: "A", lat: -33.86, lon: 151.21)
+        let savedTo = Station(id: "b", name: "B", lat: -33.81, lon: 151.00)
+        let wireFrom = Station(id: "a", name: "A")
+        let wireTo = Station(id: "b", name: "B")
+        let trip = SavedTrip(id: "trip", from: savedFrom, to: savedTo)
+        let journey = Journey(legs: [Leg(line: "T1", mode: "train", headsign: "A", from: wireTo, to: wireFrom, departure: epochNow() + 60_000, arrival: epochNow() + 600_000)])
+        let board = BoardData(from: savedTo, to: savedFrom, journeys: [journey], generatedAt: epochNow(), source: "live")
+        let focus = FocusedJourney(tripId: trip.id, reverse: true, journey: journey, board: board, pinned: false)
+        let (_, model) = try await model(data: UserData(trips: [trip], focus: focus))
+
+        model.newTrip()
+
+        XCTAssertEqual(model.state.setupFrom, savedTo)
+        XCTAssertNotEqual(model.state.setupFrom, wireTo)
         model.pause()
     }
 
@@ -69,9 +201,10 @@ final class ControllerTests: XCTestCase {
         let observedAt = epochNow()
         XCTAssertGreaterThan(observedAt, renderTick)
 
-        model.receiveLocation(Fix(lat: townHall.lat, lon: townHall.lon, at: observedAt))
+        model.receiveLocation(Fix(lat: townHall.lat, lon: townHall.lon, at: observedAt, accuracyMetres: 50))
 
-        XCTAssertEqual(model.state.setupFrom?.id, townHall.id)
+        XCTAssertEqual(model.state.nearestStation?.id, townHall.id)
+        XCTAssertTrue(model.state.nearbyStations.contains { $0.id == townHall.id })
         XCTAssertGreaterThanOrEqual(model.state.now, observedAt)
         model.pause()
     }
@@ -465,6 +598,82 @@ final class ControllerTests: XCTestCase {
             try await Task.sleep(for: .milliseconds(10))
         }
         XCTFail("Persisted state did not settle")
+    }
+
+    func testExplicitLocationFillsAdditionalTripAndCanBeUsedAfterClearing() async throws {
+        let (_, model) = try await model(data: UserData(trips: makeFocus().0.trips))
+        model.resume(); model.seeded = true; model.location.stop()
+        model.newTrip()
+        let station = try XCTUnwrap(model.state.stations.first { $0.id == "200070" })
+        let fix = Fix(lat: station.lat, lon: station.lon, at: model.state.now, accuracyMetres: 50)
+        model.receiveLocation(fix)
+        XCTAssertNil(model.state.setupFrom, "Silent lookup must not change an additional trip")
+        model.requestLocation()
+        XCTAssertEqual(model.state.setupLocationStatus, .locating)
+        model.receiveLocation(fix)
+        XCTAssertEqual(model.state.setupFrom?.id, station.id)
+        model.clearSetupFrom()
+        model.requestLocation()
+        model.receiveLocation(fix)
+        XCTAssertEqual(model.state.setupFrom?.id, station.id, "A new tap supersedes the earlier clear")
+        model.pause()
+    }
+
+    func testTypingCancelsExplicitLocationAndLateFailure() async throws {
+        let (_, model) = try await model(data: UserData())
+        model.resume(); model.seeded = true; model.location.stop()
+        let station = try XCTUnwrap(model.state.stations.first { $0.id == "200070" })
+        model.requestLocation()
+        model.setupOriginQueryChanged()
+        model.receiveLocation(Fix(lat: station.lat, lon: station.lon, at: model.state.now, accuracyMetres: 50))
+        model.locationFailed(.unavailable)
+        XCTAssertNil(model.state.setupFrom)
+        XCTAssertEqual(model.state.setupLocationStatus, .idle)
+        model.pause()
+    }
+
+    func testFailedAndApproximateLocationHaveRecoverableStates() async throws {
+        let (_, model) = try await model(data: UserData())
+        model.resume(); model.seeded = true; model.location.stop()
+        let station = try XCTUnwrap(model.state.stations.first { $0.id == "200070" })
+        model.requestLocation(); model.locationFailed(.unavailable)
+        XCTAssertEqual(model.state.setupLocationStatus, .unavailable)
+        model.requestLocation()
+        model.receiveLocation(Fix(lat: station.lat, lon: station.lon, at: model.state.now, accuracyMetres: 1_000))
+        XCTAssertNil(model.state.setupFrom)
+        XCTAssertEqual(model.state.setupLocationStatus, .chooseStation)
+        XCTAssertFalse(model.state.nearbyStations.isEmpty)
+        model.receiveLocation(Fix(lat: station.lat, lon: station.lon, at: model.state.now, accuracyMetres: 25))
+        XCTAssertNil(model.state.setupFrom, "A later silent fix cannot replace an offered station choice")
+        model.chooseSetupFrom(station)
+        XCTAssertEqual(model.state.setupFrom?.id, station.id)
+        model.clearSetupFrom(); model.requestLocation()
+        model.receiveLocation(Fix(lat: 0, lon: 0, at: model.state.now, accuracyMetres: 50))
+        XCTAssertEqual(model.state.setupLocationStatus, .noNearby)
+        model.requestLocation()
+        model.receiveLocation(Fix(lat: station.lat, lon: station.lon, at: model.state.now - 300_001, accuracyMetres: 50))
+        XCTAssertEqual(model.state.setupLocationStatus, .unavailable)
+        model.pause()
+    }
+
+    func testLocationConfidenceHonoursAccuracyAmbiguityAndModes() {
+        let central = Station(id: "central", name: "Central", lat: -33.8832, lon: 151.2067, modes: ["train"])
+        let townHall = Station(id: "town-hall", name: "Town Hall", lat: -33.8736, lon: 151.2069, modes: ["train"])
+        let ferry = Station(id: "ferry", name: "Wharf", lat: central.lat, lon: central.lon, modes: ["ferry"])
+        let stations = [townHall, ferry, central]
+        func choice(_ accuracy: Double?) -> SetupLocationChoice {
+            setupLocationChoice(stations: stations, modes: ["train"],
+                fix: Fix(lat: central.lat, lon: central.lon, at: 1, accuracyMetres: accuracy))
+        }
+        XCTAssertEqual(choice(50).automatic, central)
+        for accuracy: Double? in [nil, 1_000, -1, .nan] {
+            XCTAssertNil(choice(accuracy).automatic)
+            XCTAssertEqual(choice(accuracy).stations, [central, townHall])
+        }
+        let ambiguous = setupLocationChoice(stations: stations, modes: allModes,
+            fix: Fix(lat: central.lat, lon: central.lon, at: 1, accuracyMetres: 50))
+        XCTAssertNil(ambiguous.automatic)
+        XCTAssertTrue(setupLocationChoice(stations: stations, modes: allModes, fix: Fix(lat: 0, lon: 0, at: 1, accuracyMetres: 50)).stations.isEmpty)
     }
 
     private func assertLocationPresentation(useLocation: Bool, granted: Bool, denied: Bool,

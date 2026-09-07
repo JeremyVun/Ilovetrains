@@ -1,5 +1,11 @@
 import SwiftUI
 
+#if DEBUG
+private let settingsFeedbackCalibration = ProcessInfo.processInfo.arguments.contains { $0.contains("settings-feedback") }
+#else
+private let settingsFeedbackCalibration = false
+#endif
+
 enum SettingsLocationAction: Equatable {
     case turnOn, allow, openSettings, turnOff
 }
@@ -26,7 +32,7 @@ struct SettingsLocationPresentation: Equatable {
 
 struct SettingsView: View {
     @ObservedObject var model: TrainViewModel
-    @State private var page: Page = .main
+    @State private var page: Page = settingsFeedbackCalibration ? .feedback : .main
     @State private var homeQuery = ""
     private enum Page { case main, feedback }
 
@@ -55,7 +61,8 @@ struct SettingsView: View {
                                               enabled: !model.feedbackDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !model.state.feedbackSubmitting) {
             model.feedback(text: model.feedbackDraft.trimmingCharacters(in: .whitespacesAndNewlines), category: model.feedbackCategory)
         })) {
-            FeedbackContent(category: $model.feedbackCategory, message: $model.feedbackDraft)
+            FeedbackContent(category: $model.feedbackCategory, message: $model.feedbackDraft,
+                            submitting: model.state.feedbackSubmitting)
         }
         .onChange(of: model.state.feedbackSucceeded) { _, succeeded in if succeeded { model.feedbackDraft = "" } }
     }
@@ -226,15 +233,15 @@ private struct HomePickerContent: View {
     @Binding var query: String
     @Environment(\.trainColors) private var colors
     private var results: [Station] {
-        guard query.count >= 2 else { return [] }
+        guard query.count >= 3 else { return [] }
         return model.state.stations.map { ($0, fuzzyScore($0.name, query)) }.filter { $0.1 > 0 }.sorted { $0.1 > $1.1 }.prefix(8).map(\.0)
     }
     var body: some View {
         TrainLabel(text: "Home station").frame(maxWidth: .infinity, alignment: .leading).padding(.top, 16)
         TextField("Station name", text: $query).font(.system(size: 20)).frame(minHeight: 52).accessibilityIdentifier("home-station-search")
         TrainRule()
-        if query.count == 1 { Text("Type at least two letters.").font(.system(size: 14)).foregroundStyle(colors.ink2).frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 14) }
-        if query.count >= 2 && results.isEmpty { Text("No matching stations.").font(.system(size: 14)).foregroundStyle(colors.warning).frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 14) }
+        if (1...2).contains(query.count) { Text("Type at least three letters.").font(.system(size: 14)).foregroundStyle(colors.ink2).frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 14) }
+        if query.count >= 3 && results.isEmpty { Text("No matching stations.").font(.system(size: 14)).foregroundStyle(colors.warning).frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 14) }
         if !results.isEmpty { TrainLabel(text: "Matches").frame(maxWidth: .infinity, alignment: .leading).padding(.top, 18).padding(.bottom, 4) }
         ForEach(results) { station in
             Button { model.setHome(station) } label: {
@@ -249,6 +256,7 @@ private struct HomePickerContent: View {
 private struct FeedbackContent: View {
     @Binding var category: String
     @Binding var message: String
+    let submitting: Bool
     @Environment(\.trainColors) private var colors
     @FocusState private var focused: Bool
     var body: some View {
@@ -258,17 +266,18 @@ private struct FeedbackContent: View {
                 Button { category = value } label: {
                     VStack(spacing: 4) { TrainLabel(text: value, color: category == value ? colors.ink : colors.ink3); TrainLabel(text: category == value ? "●" : "○", color: category == value ? colors.ink : colors.ink3) }
                         .frame(maxWidth: .infinity, minHeight: 56)
-                }.buttonStyle(.plain).accessibilityIdentifier("feedback-\(value)").accessibilityAddTraits(category == value ? .isSelected : [])
+                }.buttonStyle(.plain).disabled(submitting).accessibilityIdentifier("feedback-\(value)").accessibilityAddTraits(category == value ? .isSelected : [])
             }
         }; TrainRule()
         TrainLabel(text: "Message", color: focused ? colors.ink : colors.ink3).frame(maxWidth: .infinity, alignment: .leading).padding(.top, 16)
         ZStack(alignment: .topLeading) {
             if message.isEmpty { Text("What happened?").font(.system(size: 18)).foregroundStyle(colors.ink3).padding(.top, 9) }
             TextEditor(text: $message).scrollContentBackground(.hidden).font(.system(size: 18, weight: .light)).foregroundStyle(colors.ink)
-                .focused($focused).padding(.horizontal, -5).accessibilityIdentifier("feedback-message")
+                .focused($focused).disabled(submitting).padding(.horizontal, -5).accessibilityIdentifier("feedback-message")
         }.frame(minHeight: 150)
         TrainRule(heavy: focused)
         Text("Don’t include personal details.").font(.system(size: 14, weight: .light)).foregroundStyle(colors.ink2)
             .frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 14)
+        .onAppear { if settingsFeedbackCalibration { focused = true } }
     }
 }

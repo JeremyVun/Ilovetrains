@@ -6,7 +6,7 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.*
 
-data class Fix(val lat: Double, val lon: Double, val at: Long, val speed: Double? = null)
+data class Fix(val lat: Double, val lon: Double, val at: Long, val speed: Double? = null, val accuracyMetres: Double? = null)
 data class Selection(val tripId: String, val reverse: Boolean, val receipt: String? = null)
 fun distanceMetres(a: Fix, b: Station): Double {
     if (b.lat == 0.0 && b.lon == 0.0) return Double.POSITIVE_INFINITY
@@ -81,9 +81,11 @@ fun inferredFocus(data: UserData, fix: Fix, now: Long): FocusedJourney? {
     if (data.rides.any { it.tripId == trip.id && it.reverse == last.reverse && it.departure == j.departure }) return null
     if (now !in j.effectiveDeparture..(j.effectiveArrival + 1_800_000) || last.stationId != from.id || j.effectiveDeparture - last.at !in 0..900_000) return null
     val left = distanceMetres(fix, from)
-    val toward = left >= 1000 && distanceMetres(fix, to) <= distanceMetres(Fix(from.lat, from.lon, now), to) - 1000
+    val span = distanceMetres(Fix(from.lat, from.lon, now), to)
+    if (!left.isFinite() || !span.isFinite()) return null
+    val toward = left >= 1000 && distanceMetres(fix, to) <= span - 1000
     val fast = (fix.speed ?: 0.0) >= 8 && left >= 200
-    return if (left.isFinite() && (toward || fast)) FocusedJourney(trip.id, last.reverse, j, last.board, false) else null
+    return if (toward || fast) FocusedJourney(trip.id, last.reverse, j, last.board, false) else null
 }
 
 fun savedTripMetadata(data: UserData, fix: Fix?, selectedTripId: String?, selectedReverse: Boolean, now: Long): Map<String, String> {

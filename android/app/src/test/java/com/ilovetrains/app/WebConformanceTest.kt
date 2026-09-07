@@ -27,6 +27,10 @@ class WebConformanceTest {
                 val selection = expected.optJSONObject("selection")
                 assertEquals(case.getString("name"), selection?.getString("tripId"), actual?.tripId)
                 assertEquals(case.getString("name"), selection?.getBoolean("reverse"), actual?.reverse)
+                val withoutLocation = predict(data.copy(useLocation = false), stations, fix, now)
+                val expectedWithoutLocation = expected.optJSONObject("noLocation")
+                assertEquals(case.getString("name"), expectedWithoutLocation?.getString("tripId"), withoutLocation?.tripId)
+                assertEquals(case.getString("name"), expectedWithoutLocation?.let { it.getString("direction") == "reverse" }, withoutLocation?.reverse)
                 assertEquals(case.getString("name"), expected.stringOrNull("home"), automaticHome(data)?.id)
                 expected.getJSONArray("scores").readEach { score ->
                     assertEquals(case.getString("name"), score.getDouble("value"), historyScore(data.history, score.getString("tripId"), score.getBoolean("reverse"), now), 1e-12)

@@ -10,7 +10,12 @@ struct DetailView: View {
             let pinned = focused && model.state.focus?.pinned == true
             VStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 0) {
-                    BackControl(label: "\(first.from.shortName) departures", action: model.back)
+                    HStack {
+                        BackControl(label: "\(first.from.shortName) departures", action: model.back)
+                            .fixedSize(horizontal: true, vertical: false)
+                        Spacer(minLength: 8)
+                        FreshnessView(board: model.state.board, now: model.state.now)
+                    }
                     TrainLabel(text: "Journey").padding(.top, 2)
                     (Text(first.from.shortName) + Text(" → ").foregroundColor(colors.ink3) + Text(last.to.shortName))
                         .font(.system(size: 29, weight: .light)).tracking(-0.72).lineLimit(3).minimumScaleFactor(0.75).padding(.top, 6)
@@ -25,7 +30,7 @@ struct DetailView: View {
                     ScrollView {
                         LazyVStack(spacing: 0) {
                             BoardRow(journey: journey, board: model.state.board, now: model.state.now, detail: true,
-                                     figureOverride: model.state.board?.isLive(model.state.now) == true && journey.retained != true
+                                     figureOverride: !journey.cancelled
                                         ? directionFigureFor(journey, now: model.state.now) : nil)
                             JourneySteps(journey: journey, now: model.state.now)
                             Spacer().frame(height: 12)
@@ -43,13 +48,12 @@ struct DetailView: View {
                         TrainLabel(text: last.cancelled ? "Journey cancelled" : platformText(last.toPlatform, mode: last.mode, full: true) ?? "Arrive",
                                    color: last.cancelled ? colors.warning : colors.ink3, lines: 2)
                     }.frame(minHeight: 52)
-                    FreshnessView(board: model.state.board, now: model.state.now).frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .padding(.horizontal, pagePadding)
                 .fixedSize(horizontal: false, vertical: true)
                 .layoutPriority(1)
                 if pinned || (!focused && !journey.cancelled) {
-                    ActionRail(text: pinned ? "Unpin this \(modeName(first.mode))" : "Pin this \(modeName(first.mode))", minHeight: 66) {
+                    ActionRail(text: pinned ? "Unpin this \(genericModeName(first.mode))" : "Pin this \(genericModeName(first.mode))", minHeight: 66) {
                         if pinned { model.unpinJourney() } else { model.pinJourney(journey) }
                     }
                     .fixedSize(horizontal: false, vertical: true)
@@ -59,7 +63,7 @@ struct DetailView: View {
         } else {
             VStack(alignment: .leading, spacing: 24) {
                 BackControl(label: "Departures", action: model.back)
-                Text(model.state.message ?? "Journey unavailable").font(.system(size: 18)).foregroundStyle(colors.ink2)
+                Text("Journey unavailable").font(.system(size: 18)).foregroundStyle(colors.ink2)
                 Spacer()
             }.padding(.horizontal, pagePadding)
         }

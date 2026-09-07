@@ -21,7 +21,6 @@ data class UserData(
 )
 
 internal fun JSONObject.stringOrNull(key: String): String? = if (isNull(key)) null else optString(key).takeIf { it.isNotBlank() }
-internal fun JSONObject.longOrNull(key: String): Long? = if (isNull(key)) null else optLong(key).takeIf { it > 0 }
 internal fun <T> JSONArray?.readEach(read: (JSONObject) -> T): List<T> = if (this == null) emptyList() else (0 until length()).mapNotNull { i -> runCatching { read(getJSONObject(i)) }.getOrNull() }
 internal fun <T> List<T>.jsonEach(write: (T) -> JSONObject) = JSONArray(map(write))
 
@@ -33,7 +32,12 @@ object Wire {
         val modes = o.optJSONArray("modes")?.let { a -> (0 until a.length()).map { a.getString(it) }.toSet() } ?: AllModes
         return Station(o.getString("id"), o.getString("name"), loc?.optDouble("lat", 0.0) ?: 0.0, loc?.optDouble("lon", 0.0) ?: 0.0, modes)
     }
-    private fun epoch(o: JSONObject, key: String) = o.opt(key)?.let { if (it is Number) it.toLong() else runCatching { Instant.parse(it.toString()).toEpochMilli() }.getOrNull() }
+    private fun epoch(o: JSONObject, key: String): Long? {
+        val value = o.opt(key) ?: return null
+        val millis = if (value is Number) value.toDouble()
+            else runCatching { Instant.parse(value.toString()).toEpochMilli().toDouble() }.getOrNull() ?: return null
+        return millis.takeIf { it.isFinite() && kotlin.math.abs(it) <= 8_640_000_000_000_000.0 }?.toLong()
+    }
     fun journey(j: Journey): JSONObject = JSONObject().put("retained", j.retained).put("legDetail", j.legs.jsonEach { l ->
         JSONObject().put("line", JSONObject().put("name", l.line).put("mode", l.mode)).put("headsign", l.headsign)
             .put("from", station(l.from).put("platform", l.fromPlatform)).put("to", station(l.to).put("platform", l.toPlatform))
@@ -72,7 +76,9 @@ object Wire {
         o.optJSONArray("lines")?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: emptyList())
     private fun focus(f: FocusedJourney) = JSONObject().put("tripId", f.tripId).put("reverse", f.reverse)
         .put("journey", journey(f.journey)).put("board", board(f.board)).put("pinned", f.pinned)
-    private fun focus(o: JSONObject) = FocusedJourney(o.getString("tripId"), o.optBoolean("reverse"), journey(o.getJSONObject("journey")), board(o.getJSONObject("board")), o.optBoolean("pinned", true))
+        .put("alternatives", f.alternatives?.let(::board))
+    private fun focus(o: JSONObject) = FocusedJourney(o.getString("tripId"), o.optBoolean("reverse"), journey(o.getJSONObject("journey")), board(o.getJSONObject("board")), o.optBoolean("pinned", true),
+        o.optJSONObject("alternatives")?.let { runCatching { board(it) }.getOrNull() })
     fun user(d: UserData) = JSONObject().put("schemaVersion", 1).put("trips", d.trips.jsonEach(::trip))
         .put("history", d.history.jsonEach { JSONObject().put("tripId", it.tripId).put("reverse", it.reverse).put("at", it.at) })
         .put("rides", d.rides.jsonEach { ride -> JSONObject().put("tripId", ride.tripId).put("reverse", ride.reverse)

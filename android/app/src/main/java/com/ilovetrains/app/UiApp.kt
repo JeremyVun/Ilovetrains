@@ -10,13 +10,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
-private const val FeedbackSuccessMessage = "Feedback sent. Thank you."
 private const val FeedbackSuccessTimeoutMillis = 4_000L
 
 @Composable
@@ -24,7 +24,7 @@ fun TrainApp(state: AppState, actions: UiActions) {
     TrainTheme(state.appearance) {
         val c = LocalTrainColors.current
         val accessibilityManager = LocalAccessibilityManager.current
-        Box(Modifier.fillMaxSize().background(c.ground).windowInsetsPadding(WindowInsets.safeDrawing)) {
+        Box(Modifier.fillMaxSize().background(c.ground).testTag("train-app-root").windowInsetsPadding(WindowInsets.safeDrawing)) {
             if (!state.ready) {
                 Box(Modifier.fillMaxSize().padding(PagePadding), contentAlignment = Alignment.CenterStart) {
                     Column {
@@ -41,8 +41,8 @@ fun TrainApp(state: AppState, actions: UiActions) {
                 Screen.Settings -> SettingsScreen(state, actions)
             }
             state.message?.takeIf { state.ready }?.let { message ->
-                LaunchedEffect(message, accessibilityManager) {
-                    if (message == FeedbackSuccessMessage) {
+                LaunchedEffect(message, state.messageAutoDismiss, accessibilityManager) {
+                    if (state.messageAutoDismiss) {
                         val timeout = accessibilityManager?.calculateRecommendedTimeoutMillis(
                             originalTimeoutMillis = FeedbackSuccessTimeoutMillis,
                             containsIcons = false,

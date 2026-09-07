@@ -31,13 +31,13 @@ test('next service skips the same first train and cancellations, ordered by effe
   assert.equal(nextService([next], null, at('09:21')), null);
 });
 
-test('next service mode and stale times describe the second service itself', () => {
+test('next service mode and stale figure describe the second service itself', () => {
   const [lead, next] = transferJourneys();
   for (const mode of ['train', 'metro', 'ferry', '']) {
     next.legDetail[0].line.mode = mode;
     const result = nextService([next], lead, at('09:21'), true);
     assert.equal(result.label, `Next ${mode || 'service'}`);
-    assert.equal(result.figure, '');
+    assert.equal(result.figure, '18');
     assert.deepEqual([result.depTime, result.arrTime], ['09:39', '10:22']);
   }
 });
@@ -53,7 +53,7 @@ test('a pinned header takes its next service and freshness from its own pair', (
       focusSource: { stale: true, freshness: 'Offline', dot: 'stale' }
     });
   assert.equal(model.following.journey, journeys[1]);
-  assert.equal(model.following.figure, '');
+  assert.equal(model.following.figure, '18');
   assert.deepEqual(model.selected, HOME_SELECTION);
   const html = homeHtml(model);
   assert.match(html, /data-next-service/);
@@ -124,6 +124,27 @@ test('directions follows the closed state ladder on one journey', () => {
   const done = directionsModel(journey, at('10:11'));
   assert.deepEqual([done.figure, done.provenance, done.phase], ['3', 'AGO', 'done']);
   assert.equal(done.showBoardingPlatform, false);
+});
+
+test('stale directions retain figures across the state ladder', () => {
+  const journey = transferJourneys()[0];
+  const states = [
+    ['09:21', '3', ''],
+    ['09:33', '18', 'TO CHANGE'],
+    ['09:53', '5', 'TO CHANGE'],
+    ['10:01', '7', 'TO GO'],
+    ['10:11', '3', 'AGO']
+  ];
+  for (const [time, figure, provenance] of states) {
+    const model = directionsModel(journey, at(time), { stale: true });
+    assert.deepEqual([model.figure, model.provenance], [figure, provenance]);
+  }
+  const replacement = directionsModel(transferJourneys()[1], at('09:21'), {
+    stale: true,
+    cancelledTime: '09:24'
+  });
+  assert.equal(replacement.figure, '18');
+  assert.match(replacement.instruction, /CANCELLED · NEXT TRAIN/);
 });
 
 test('a trip becomes over at effective arrival, not at an arbitrary UI age', () => {
@@ -317,7 +338,7 @@ test('a stale candidate replacement does not inherit fresh focus provenance', ()
     });
 
   assert.equal(model.directions.depTime, '09:39');
-  assert.equal(model.directions.figure, '');
+  assert.equal(model.directions.figure, '18');
   assert.deepEqual([model.freshness, model.dot], ['Offline', 'stale']);
 });
 

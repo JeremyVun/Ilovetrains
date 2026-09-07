@@ -25,6 +25,14 @@ to future native design. They no longer block web work or Settings.
   split into its own item: `../realtime-replacements/design.md`.
 - Findings 1 and 3, the Sydney Trains service-date gate and the 90-second
   trip-timestamp gate, and the empty-snapshot logging gap remain here.
+- Service-date look-back widened from 6 to 24 hours (2026-09-07, on phase 2's
+  replay evidence) so structural updates for trips earlier in the service day
+  still resolve. The phase 2 acceptance gate is the measured chain, not the
+  miscounted ≥200; see `build_plan.md`.
+- Service-date look-ahead narrowed from 24 to 3 hours (2026-09-07, on the
+  look-ahead measurement: Sydney Trains publishes at most 0.9 hours ahead)
+  so an evening republish of a morning cancellation cannot land on
+  tomorrow's instance.
 
 ## Current owner ruling — 2026-09-06
 

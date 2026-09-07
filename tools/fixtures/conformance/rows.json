@@ -730,10 +730,10 @@
     }
   },
   {
-    "name": "expired realtime shows absolute clocks",
+    "name": "expired realtime keeps figure and absolute clocks",
     "sourceFixture": "departures_pyrmont_doublebay.json journey 0",
     "syntheticDelta": {
-      "name": "expired realtime shows absolute clocks",
+      "name": "expired realtime keeps figure and absolute clocks",
       "offset": 5,
       "realtime": true,
       "age": 91
@@ -827,7 +827,7 @@
       ]
     },
     "expected": {
-      "figure": "",
+      "figure": "5",
       "provenance": "SCHEDULED",
       "depTime": "10:05",
       "arrTime": "11:08",
@@ -835,10 +835,10 @@
     }
   },
   {
-    "name": "network failure suppresses countdown",
+    "name": "network failure keeps countdown",
     "sourceFixture": "departures_pyrmont_doublebay.json journey 0",
     "syntheticDelta": {
-      "name": "network failure suppresses countdown",
+      "name": "network failure keeps countdown",
       "offset": 5,
       "realtime": true,
       "offline": true
@@ -932,7 +932,7 @@
       ]
     },
     "expected": {
-      "figure": "",
+      "figure": "5",
       "provenance": "SCHEDULED",
       "depTime": "10:05",
       "arrTime": "11:08",

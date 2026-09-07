@@ -226,7 +226,6 @@ export function directionsModel(value, nowMs, opts = {}) {
   const elapsed = depMs === null ? 0
     : Math.floor(nowMs / 60000) - Math.floor(depMs / 60000);
   const at = depMs === null ? 0 : Math.max(0, Math.min(1, elapsed / total));
-  const stale = Boolean(opts.stale);
   const cancelledIndex = legs.findIndex((leg) => leg.cancelled === true);
   const cancelled = cancelledIndex >= 0 ? legs[cancelledIndex]
     : (journey && journey.cancelled ? first : null);
@@ -270,7 +269,7 @@ export function directionsModel(value, nowMs, opts = {}) {
   if (!ridingCancelled && (opts.cancelledTime || cancelled)) {
     model.warn = true;
     model.tight = false;
-    model.figure = depMs === null || stale ? '' : countdownFigure(minutesUntil(depMs, nowMs));
+    model.figure = depMs === null ? '' : countdownFigure(minutesUntil(depMs, nowMs));
     model.provenance = '';
     model.instruction = `${opts.cancelledTime || model.depTime} CANCELLED · NEXT ${firstWords.vehicle.toUpperCase()}`;
     return model;
@@ -284,7 +283,7 @@ export function directionsModel(value, nowMs, opts = {}) {
   if (nowMs >= arrMs || opts.arrived) {
     model.phase = 'done';
     model.progress = { at: 1, phase: 'done' };
-    model.figure = stale ? '' : countdownFigure(Math.max(0, -minutesUntil(arrMs, nowMs)));
+    model.figure = countdownFigure(Math.max(0, -minutesUntil(arrMs, nowMs)));
     model.provenance = 'AGO';
     model.instruction = `You arrived at ${model.to}.`;
     model.showBoardingPlatform = false;
@@ -293,7 +292,7 @@ export function directionsModel(value, nowMs, opts = {}) {
   }
   if (nowMs < depMs) {
     const minutes = minutesUntil(depMs, nowMs);
-    model.figure = stale ? '' : countdownFigure(minutes);
+    model.figure = countdownFigure(minutes);
     model.provenance = departureDelay > 0
       ? `${departureDelay} MIN LATE`
       : first.departure && first.departure.estimated ? '' : 'SCHEDULED';
@@ -314,7 +313,7 @@ export function directionsModel(value, nowMs, opts = {}) {
     const next = changes[i];
     if (legArrival !== null && nowMs < legArrival) {
       const hasChange = Boolean(next);
-      model.figure = stale ? '' : countdownFigure(minutesUntil(legArrival, nowMs));
+      model.figure = countdownFigure(minutesUntil(legArrival, nowMs));
       model.provenance = hasChange ? 'TO CHANGE' : 'TO GO';
       const destination = boardingLabel(legs[i].to && legs[i].to.platform,
         legs[i].line && legs[i].line.mode);
@@ -325,7 +324,7 @@ export function directionsModel(value, nowMs, opts = {}) {
       break;
     }
     if (next && next.departureMs !== null && nowMs < next.departureMs) {
-      model.figure = stale ? '' : countdownFigure(minutesUntil(next.departureMs, nowMs));
+      model.figure = countdownFigure(minutesUntil(next.departureMs, nowMs));
       model.provenance = 'TO CHANGE';
       model.instruction = `Change at ${next.toStation}`
         + (next.toLabel ? ` · ${next.toLabel}` : '');

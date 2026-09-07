@@ -1,7 +1,105 @@
 import XCTest
+import CoreLocation
 
 final class AppFlowTests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
+
+    @MainActor
+    func testLocationPermissionGrantFillsOriginAndFocusesDestination() {
+        XCUIDevice.shared.location = XCUILocation(location: CLLocation(coordinate: CLLocationCoordinate2D(latitude: -33.8736, longitude: 151.2069), altitude: 0, horizontalAccuracy: 25, verticalAccuracy: 25, timestamp: Date()))
+        defer { XCUIDevice.shared.location = nil }
+        let app = XCUIApplication()
+        app.resetAuthorizationStatus(for: .location)
+        app.launchArguments = ["--offline"]
+        app.launchEnvironment["ILOVETRAINS_TEST_DOMAIN"] = UUID().uuidString
+        app.launch()
+        let action = app.buttons["use-location"]
+        XCTAssertTrue(action.waitForExistence(timeout: 10))
+        let system = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        XCTAssertFalse(system.buttons["Allow While Using App"].exists, "Launch must not ask permission")
+        action.tap()
+        let allow = system.buttons["Allow While Using App"]
+        XCTAssertTrue(allow.waitForExistence(timeout: 5))
+        allow.tap()
+        let destination = app.textFields["to-station-search"]
+        XCTAssertTrue(destination.waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["from-station"].label.contains("Town Hall"))
+        destination.typeText("Mascot")
+        XCTAssertTrue(app.buttons["station-202010"].waitForExistence(timeout: 5), "To receives keyboard input immediately")
+        app.buttons["from-station"].tap()
+        let retry = app.buttons["use-location"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 5)); retry.tap()
+        XCTAssertTrue(destination.waitForExistence(timeout: 20), "The explicit action still works after clearing From")
+        app.terminate(); app.resetAuthorizationStatus(for: .location)
+    }
+
+    @MainActor
+    func testLocationPermissionDenialKeepsManualSearchAvailable() {
+        XCUIDevice.shared.location = XCUILocation(location: CLLocation(coordinate: CLLocationCoordinate2D(latitude: -33.8736, longitude: 151.2069), altitude: 0, horizontalAccuracy: 25, verticalAccuracy: 25, timestamp: Date()))
+        defer { XCUIDevice.shared.location = nil }
+        let app = XCUIApplication()
+        app.resetAuthorizationStatus(for: .location)
+        app.launchArguments = ["--offline"]
+        app.launchEnvironment["ILOVETRAINS_TEST_DOMAIN"] = UUID().uuidString
+        app.launch()
+        XCTAssertTrue(app.buttons["use-location"].waitForExistence(timeout: 10))
+        app.buttons["use-location"].tap()
+        let deny = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Don’t Allow"]
+        XCTAssertTrue(deny.waitForExistence(timeout: 5)); deny.tap()
+        XCTAssertTrue(app.staticTexts["location-message"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["use-location"].label, "Open Settings")
+        let origin = app.textFields["from-station-search"]
+        origin.tap(); origin.typeText("Mascot")
+        XCTAssertTrue(app.buttons["station-202010"].waitForExistence(timeout: 5))
+        app.buttons["station-202010"].tap()
+        XCTAssertTrue(app.textFields["to-station-search"].waitForExistence(timeout: 5))
+        app.terminate(); app.resetAuthorizationStatus(for: .location)
+    }
+
+    @MainActor
+    func testPendingLocationResumesAfterBackground() {
+        XCUIDevice.shared.location = XCUILocation(location: CLLocation(coordinate: CLLocationCoordinate2D(latitude: -33.873596, longitude: 151.206899), altitude: 0, horizontalAccuracy: 25, verticalAccuracy: 25, timestamp: Date()))
+        defer { XCUIDevice.shared.location = nil }
+        let app = XCUIApplication()
+        app.resetAuthorizationStatus(for: .location)
+        app.launchArguments = ["--offline"]
+        app.launchEnvironment["ILOVETRAINS_TEST_DOMAIN"] = UUID().uuidString
+        app.launch()
+        XCTAssertTrue(app.buttons["use-location"].waitForExistence(timeout: 10))
+        app.buttons["use-location"].tap()
+        let allow = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Allow While Using App"]
+        XCTAssertTrue(allow.waitForExistence(timeout: 5))
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        XCTAssertTrue(allow.waitForExistence(timeout: 5)); allow.tap()
+        XCTAssertTrue(app.textFields["to-station-search"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["from-station"].label.contains("Town Hall"))
+        app.terminate(); app.resetAuthorizationStatus(for: .location)
+    }
+
+    @MainActor
+    func testLocationRecoveryStatesRemainActionable() {
+        let app = XCUIApplication()
+        for state in ["failed", "empty", "denied", "disabled", "approximate"] {
+            app.launchArguments = ["--calibration", "setup-location-" + state]
+            app.launch()
+            let action = app.buttons["use-location"]
+            XCTAssertTrue(action.waitForExistence(timeout: 5))
+            XCTAssertGreaterThanOrEqual(action.frame.height, 44)
+            XCTAssertTrue(app.staticTexts["location-message"].exists)
+            if state == "approximate" {
+                let station = app.buttons["station-200070"]
+                XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+                XCTAssertTrue(station.isHittable); station.tap()
+                XCTAssertTrue(app.textFields["to-station-search"].waitForExistence(timeout: 5))
+            } else {
+                action.tap()
+                XCTAssertTrue(app.descendants(matching: .any)["location-progress"].waitForExistence(timeout: 5))
+                XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+            }
+            app.terminate()
+        }
+    }
 
     @MainActor
     func testBoardDetailPinAndSettingsFlow() {

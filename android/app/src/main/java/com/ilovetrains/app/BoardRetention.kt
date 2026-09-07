@@ -25,9 +25,15 @@ fun nextHomeJourney(board: BoardData, now: Long): Journey? = retainedHomeJourney
     ?: board.journeys.firstOrNull { it.effectiveDeparture >= now }
 
 /** Online answers own future services. A failed request cannot erase a saved service. */
-internal fun mergeBoardResults(previous: BoardData?, local: BoardData?, online: BoardData?, now: Long): BoardData? {
+internal fun mergeBoardResults(
+    previous: BoardData?,
+    local: BoardData?,
+    online: BoardData?,
+    now: Long,
+    requestFailed: Boolean = online == null,
+): BoardData? {
     val base = online ?: local?.takeIf { it.isLive(now) && it.journeys.isNotEmpty() }
-        ?: previous?.takeIf { it.journeys.isNotEmpty() }?.copy(offline = true)
+        ?: previous?.takeIf { it.journeys.isNotEmpty() }?.copy(offline = previous.offline || requestFailed)
         ?: local ?: return null
     val prior = previous?.takeIf { it.from.id == base.from.id && it.to.id == base.to.id }
     val rows = linkedMapOf<String, Journey>()

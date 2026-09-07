@@ -12,7 +12,7 @@
  *     departure board is only as good as its freshness.
  *
  * The client already treats an old board honestly: `rowmodel.js` reads
- * `generatedAt`, and past STALE_MS it drops the countdowns, keeps the clock
+ * `generatedAt`, and past STALE_MS it keeps the timetable figures and clock
  * times, drops departed rows and dims the board. A response replayed from this
  * cache carries its original `generatedAt`, so it lands in exactly that
  * treatment — the worker cannot make stale data look live. When there is no
@@ -23,7 +23,7 @@
  * Bump VERSION on every deploy that changes any file in SHELL.
  */
 
-const VERSION = 'v49';
+const VERSION = 'v51';
 const SHELL_CACHE = 'shell-' + VERSION;
 const DATA_CACHE = 'data-' + VERSION;
 

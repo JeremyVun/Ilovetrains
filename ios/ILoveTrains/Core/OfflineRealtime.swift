@@ -190,42 +190,6 @@ struct OfflineRealtime {
     }
 
     func overlay(
-        _ connection: ScheduledConnection,
-        now: Millis = Date().timeIntervalSince1970 * 1_000,
-        assignment: (String, String) -> StopAssignment?
-    ) -> RealtimeResult<ScheduledConnection> {
-        guard let snapshot = freshSnapshot(connection.source, now: now),
-              let update = snapshot.updates[Self.key(connection.tripId, connection.serviceDate)] else {
-            return RealtimeResult(value: connection)
-        }
-        let from = update.stopUpdates.first { $0.matches(id: connection.fromStopId, sequence: connection.fromSequence) }
-        let to = update.stopUpdates.first { $0.matches(id: connection.toStopId, sequence: connection.toSequence) }
-        let delay = update.delaySeconds.map { Millis($0) * 1_000 }
-        let departure = from?.scheduleRelationship == "noData" ? nil
-            : from?.departureMs
-                ?? from?.departureDelaySeconds.map { connection.departure + Millis($0) * 1_000 }
-                ?? delay.map { connection.departure + $0 }
-        let arrival = to?.scheduleRelationship == "noData" ? nil
-            : to?.arrivalMs
-                ?? to?.arrivalDelaySeconds.map { connection.arrival + Millis($0) * 1_000 }
-                ?? delay.map { connection.arrival + $0 }
-        let fromAssignment = from?.assignedStopId.flatMap { assignment(connection.source, $0) }
-        let toAssignment = to?.assignedStopId.flatMap { assignment(connection.source, $0) }
-        var value = connection
-        value.estimatedDeparture = departure
-        value.estimatedArrival = arrival
-        if from?.scheduleRelationship == "skipped" { value.pickupType = 1 }
-        if to?.scheduleRelationship == "skipped" { value.dropOffType = 1 }
-        value.fromPlatform = fromAssignment?.platform ?? connection.fromPlatform
-        value.toPlatform = toAssignment?.platform ?? connection.toPlatform
-        value.cancelled = update.status == "cancelled"
-            || (update.status == "replacement" && (from == nil || to == nil))
-            || fromAssignment.map { $0.stationId != connection.fromStationId } == true
-            || toAssignment.map { $0.stationId != connection.toStationId } == true
-        return RealtimeResult(value: value, observedAt: snapshot.headerTimestamp, matched: true)
-    }
-
-    func overlay(
         _ journey: Journey,
         now: Millis = Date().timeIntervalSince1970 * 1_000,
         assignment: (String, String) -> StopAssignment?
@@ -290,13 +254,15 @@ struct OfflineRealtime {
             guard updates[key] == nil else { throw OfflineCoreError.invalidRealtime }
             updates[key] = update
         }
+        let headerTimestamp = wire.headerTimestamp.value
         let snapshot = Snapshot(
             source: wire.source,
-            headerTimestamp: wire.headerTimestamp.value,
-            expiresAt: wire.expiresAt.value,
+            headerTimestamp: headerTimestamp,
+            expiresAt: min(wire.expiresAt.value, headerTimestamp + Self.maximumSnapshotAge),
             updates: updates
         )
-        guard snapshot.expiresAt > now else { return false }
+        guard snapshot.headerTimestamp <= now + Self.maximumFutureHeaderAge,
+              snapshot.expiresAt > now else { return false }
         if let current = snapshots[expectedSource], current.headerTimestamp > snapshot.headerTimestamp { return false }
         snapshots[expectedSource] = snapshot
         return true
@@ -323,6 +289,9 @@ struct OfflineRealtime {
     private static func key(_ tripId: String, _ serviceDate: String) -> String {
         "\(tripId)\0\(serviceDate)"
     }
+
+    private static let maximumSnapshotAge: Millis = 90_000
+    private static let maximumFutureHeaderAge: Millis = 5 * 60_000
 
     private static func fetch(baseURL: String, source: String, etag: String?) async throws -> FetchResult {
         guard var components = URLComponents(string: baseURL) else { throw OfflineCoreError.insecureURL }
@@ -355,6 +324,7 @@ struct FlexibleMillis: Decodable, Sendable {
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         if let number = try? container.decode(Double.self) {
+            guard validTransitMillis(number) else { throw OfflineCoreError.invalidTimestamp }
             value = number
             return
         }
@@ -365,7 +335,9 @@ struct FlexibleMillis: Decodable, Sendable {
         guard let date = fractional.date(from: text) ?? basic.date(from: text) else {
             throw OfflineCoreError.invalidTimestamp
         }
-        value = date.timeIntervalSince1970 * 1_000
+        let timestamp = date.timeIntervalSince1970 * 1_000
+        guard validTransitMillis(timestamp) else { throw OfflineCoreError.invalidTimestamp }
+        value = timestamp
     }
 }
 

@@ -1256,7 +1256,7 @@ async function states() {
     board('cancelled', departuresBody({ journeys: cancelled })),
     board('scheduled-only', departuresBody({ journeys: scheduled })),
 
-    // Four hours old: the figures go, the clock times stay, the board dims.
+    // Four hours old: figures and clocks stay; freshness uses the stale treatment.
     board('stale', departuresBody({ generatedAt: '2026-08-31T18:45:00+10:00' })),
     // Twenty minutes past its generation: two services have left, so the list
     // closes upward and the four that remain distribute down the frame.
@@ -1265,7 +1265,7 @@ async function states() {
     // Caught mid-dissolve: the 22:48 service has just left, its row is fading
     // and the list is about to close upward during its transition. The board is
     // generated at 22:48:30 so advancing the clock to 22:49 departs one service
-    // without also making the board stale (which would withhold every figure).
+    // without also changing the board's freshness treatment.
     board('dissolve', departuresBody({ generatedAt: '2026-08-31T22:48:30+10:00' }), {
       // No sleep: screenshot.js's own 120ms settle lands the capture around
       // half way through the 240ms fade, which is the only moment it exists.
@@ -2133,7 +2133,7 @@ function pageScript(state) {
         if (fill !== '#F99D1C') problems.push('light ' + code + ' fills ' + fill + ', not #F99D1C');
         if (bare !== '#A46204') problems.push('light ' + code + ' bare text is ' + bare + ', not #A46204');
       }
-      for (const filled of document.querySelectorAll('.sy-cap[data-line-code],.sy-p[data-line-code],.dchip[data-line-code],.sy-r[data-line-code]')) {
+      for (const filled of document.querySelectorAll('.sy-cap[data-line-code],.sy-p[data-line-code],.dchip[data-line-code],.sy-rp[data-line-code]')) {
         if (filled.dataset.lineCode !== 'T1' && filled.dataset.lineCode !== 'BMT') continue;
         const paint = getComputedStyle(filled);
         if (paint.backgroundColor !== 'rgb(249, 157, 28)') {
@@ -2276,10 +2276,43 @@ function pageScript(state) {
     }
     if (expect.platformSeparator) {
       const pins = [...document.querySelectorAll('.hm-hd .sy-p')];
-      const ground = getComputedStyle(document.body).backgroundColor;
-      if (!pins.length || pins.some((pin) => px(getComputedStyle(pin).borderLeftWidth) < 3
-          || getComputedStyle(pin).borderLeftColor !== ground)) {
-        problems.push('a transfer platform lacks the 3px ground-colour separator');
+      const boarding = pins.filter((pin) => pin.classList.contains('b'));
+      const alighting = pins.filter((pin) => pin.classList.contains('a'));
+      if (!boarding.length || !alighting.length) {
+        problems.push('the transfer platform pair is incomplete');
+      }
+      if (pins.some((pin) => px(getComputedStyle(pin).borderLeftWidth) !== 0)) {
+        problems.push('a transfer platform has an artificial border separator');
+      }
+      if (pins.some((pin) => getComputedStyle(pin).boxShadow !== 'none')) {
+        problems.push('a transfer platform has an artificial shadow mask');
+      }
+      for (const platform of pins) {
+        const index = Number(platform.dataset.transferIndex);
+        const arriving = platform.dataset.pin === 'a';
+        const ride = document.querySelector('.hm-hd .leg-' + (arriving ? index : index + 1));
+        if (!ride || !platform.getClientRects().length) continue;
+        const paint = ride.querySelector('.sy-rp');
+        if (!paint) {
+          problems.push('a logical ride segment has no independent paint layer');
+          continue;
+        }
+        const rideBox = ride.getBoundingClientRect();
+        const platformBox = platform.getBoundingClientRect();
+        const style = getComputedStyle(platform);
+        const radius = Math.min(platformBox.width / 2,
+          px(arriving ? style.borderTopRightRadius : style.borderTopLeftRadius));
+        const interiorStart = platformBox.left + radius;
+        const interiorEnd = platformBox.right - radius;
+        const expected = arriving
+          ? rideBox.right - Math.max(interiorStart, Math.min(interiorEnd, rideBox.right))
+          : Math.max(interiorStart, Math.min(interiorEnd, rideBox.left)) - rideBox.left;
+        const paintStyle = getComputedStyle(paint);
+        const actual = px(arriving ? paintStyle.right : paintStyle.left);
+        if (!near(actual, expected)) {
+          problems.push((arriving ? 'arriving' : 'departing') + ' ride paint inset is '
+            + round(actual) + 'px, not ' + round(expected) + 'px from the measured platform frame');
+        }
       }
     }
     if (expect.sideBySideSpines) {
@@ -2652,6 +2685,19 @@ function pageScript(state) {
     }
     const ftr = document.querySelector('[data-t="footer"]');
     if (ftr && ftr.scrollWidth > ftr.clientWidth) problems.push('footer truncated');
+    const detailTop = document.querySelector('.detail-top');
+    if (ftr && detailTop) {
+      const freshBox = ftr.getBoundingClientRect();
+      const topBox = detailTop.getBoundingClientRect();
+      const backBox = detailTop.querySelector('.sy-home')?.getBoundingClientRect();
+      const kickerBox = document.querySelector('.detail-kicker')?.getBoundingClientRect();
+      const overlapsBack = backBox && freshBox.left < backBox.right && freshBox.right > backBox.left
+        && freshBox.top < backBox.bottom && freshBox.bottom > backBox.top;
+      if (!detailTop.contains(ftr)) problems.push('detail freshness is outside the masthead');
+      if (!near(freshBox.right, topBox.right)) problems.push('detail freshness is not right aligned');
+      if (overlapsBack) problems.push('detail freshness overlaps the back control');
+      if (kickerBox && freshBox.bottom > kickerBox.top + 0.5) problems.push('detail freshness overlaps the route heading');
+    }
     // Wherever it ends up, the freshness line is in the frame.
     if (ftr && ftr.getBoundingClientRect().bottom > innerHeight + 0.5) {
       problems.push('the footer is below the frame');

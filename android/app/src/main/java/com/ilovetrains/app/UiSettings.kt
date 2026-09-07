@@ -14,8 +14,8 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalDensity
@@ -34,20 +34,15 @@ private enum class LocationSettingsState { Off, Ask, Blocked, On }
 @Composable
 fun SettingsScreen(state: AppState, actions: UiActions) {
     var page by remember { mutableStateOf(SettingsPage.Main) }
-    var feedbackCategory by rememberSaveable { mutableStateOf("problem") }
-    var feedbackMessage by rememberSaveable { mutableStateOf("") }
-    LaunchedEffect(state.feedbackSucceeded) {
-        if (state.feedbackSucceeded) feedbackMessage = ""
-    }
     when {
         state.selectingHome -> HomePicker(state, actions)
         page == SettingsPage.Feedback -> FeedbackScreen(
             state = state,
             actions = actions,
-            category = feedbackCategory,
-            message = feedbackMessage,
-            onCategoryChange = { feedbackCategory = it },
-            onMessageChange = { feedbackMessage = it },
+            category = state.feedbackCategory,
+            message = state.feedbackDraft,
+            onCategoryChange = actions::setFeedbackCategory,
+            onMessageChange = actions::setFeedbackDraft,
             onBack = { page = SettingsPage.Main },
         )
         else -> SettingsMain(state, actions) { page = SettingsPage.Feedback }
@@ -240,8 +235,8 @@ private fun SecondaryRow(name: String, value: String, onClick: (() -> Unit)?, en
 private fun HomePicker(state: AppState, actions: UiActions) {
     val c = LocalTrainColors.current
     var query by remember { mutableStateOf("") }
-    val results = remember(query, state.stations) { if (query.length < 2) emptyList() else state.stations
-        .map { it to settingsFuzzyScore(it.name, query) }.filter { it.second > 0 }.sortedByDescending { it.second }.take(8).map { it.first } }
+    val results = remember(query, state.stations) { if (query.length < 3) emptyList() else state.stations
+        .map { it to stationFuzzyScore(it.name, query) }.filter { it.second > 0 }.sortedByDescending { it.second }.take(8).map { it.first } }
     SettingsShell("Home station", "Settings", actions::back,
         rail = if (state.homeIsManual) { { ActionRail("Use automatic home", { actions.setHome(null) }) } } else null) {
         Label("Home station", Modifier.padding(top = 16.dp))
@@ -251,8 +246,8 @@ private fun HomePicker(state: AppState, actions: UiActions) {
                 if (query.isEmpty()) Text("Station name", color = c.ink3, fontSize = 20.sp, fontWeight = FontWeight.Light)
                 inner()
             } }); Rule()
-        if (query.length == 1) Text("Type at least two letters.", color = c.ink2, fontSize = 14.sp, modifier = Modifier.padding(vertical = 14.dp))
-        if (query.length >= 2 && results.isEmpty()) Text("No matching stations.", color = c.warning, fontSize = 14.sp, modifier = Modifier.padding(vertical = 14.dp))
+        if (query.length in 1..2) Text("Type at least three letters.", color = c.ink2, fontSize = 14.sp, modifier = Modifier.padding(vertical = 14.dp))
+        if (query.length >= 3 && results.isEmpty()) Text("No matching stations.", color = c.warning, fontSize = 14.sp, modifier = Modifier.padding(vertical = 14.dp))
         if (results.isNotEmpty()) Label("Matches", Modifier.padding(top = 18.dp, bottom = 4.dp))
         results.forEach { station -> StationSettingsResult(station) { actions.setHome(station) } }
     }
@@ -272,32 +267,28 @@ private fun FeedbackScreen(state: AppState, actions: UiActions, category: String
                            onCategoryChange: (String) -> Unit, onMessageChange: (String) -> Unit,
                            onBack: () -> Unit) {
     val c = LocalTrainColors.current
+    var messageFocused by remember { mutableStateOf(false) }
     SettingsShell("Send feedback", "Settings", onBack,
         rail = { ActionRail(if (state.feedbackSubmitting) "Sending…" else "Send feedback",
             { actions.feedback(message.trim(), category) }, enabled = message.isNotBlank() && !state.feedbackSubmitting) }) {
         SettingsSection("Category")
         Row(Modifier.fillMaxWidth()) {
             listOf("problem", "suggestion", "other").forEach { value ->
-                Column(Modifier.weight(1f).heightIn(min = 56.dp).clickable(role = Role.RadioButton) { onCategoryChange(value) },
+                Column(Modifier.weight(1f).heightIn(min = 56.dp)
+                    .clickable(enabled = !state.feedbackSubmitting, role = Role.RadioButton) { onCategoryChange(value) },
                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     Label(value, color = if (category == value) c.ink else c.ink3)
                     Label(if (category == value) "●" else "○", color = if (category == value) c.ink else c.ink3)
                 }
             }
         }; Rule()
-        Label("Message", Modifier.padding(top = 16.dp))
-        BasicTextField(message, onMessageChange, Modifier.fillMaxWidth().heightIn(min = 150.dp).padding(top = 9.dp),
+        Label("Message", Modifier.padding(top = 16.dp), color = if (messageFocused) c.ink else c.ink3)
+        BasicTextField(message, onMessageChange, Modifier.fillMaxWidth().heightIn(min = 150.dp).padding(top = 9.dp)
+            .onFocusChanged { messageFocused = it.isFocused },
+            enabled = !state.feedbackSubmitting,
             textStyle = androidx.compose.ui.text.TextStyle(c.ink, 18.sp, FontWeight.Light, lineHeight = 26.sp), cursorBrush = SolidColor(c.ink),
             decorationBox = { inner -> Box(Modifier.fillMaxSize()) { if (message.isEmpty()) Text("What happened?", color = c.ink3, fontSize = 18.sp); inner() } })
-        Rule(heavy = true)
+        Rule(heavy = messageFocused)
         Text("Don’t include personal details.", color = c.ink2, fontSize = 14.sp, fontWeight = FontWeight.Light, modifier = Modifier.padding(vertical = 14.dp))
     }
-}
-
-private fun settingsFuzzyScore(value: String, query: String): Int {
-    val h = value.lowercase(); val n = query.trim().lowercase(); val direct = h.indexOf(n)
-    if (direct >= 0) return 10_000 - direct * 10 - h.length
-    var at = 0; var gaps = 0
-    n.forEach { ch -> val next = h.indexOf(ch, at); if (next < 0) return 0; gaps += next - at; at = next + 1 }
-    return 1_000 - gaps * 10 - h.length
 }

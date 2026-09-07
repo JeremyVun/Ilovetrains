@@ -7,10 +7,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -22,7 +27,7 @@ fun DetailScreen(state: AppState, actions: UiActions) {
     if (journey == null || journey.legs.isEmpty()) {
         Column(Modifier.fillMaxSize().padding(horizontal = PagePadding)) {
             BackButton("Departures", actions::back)
-            Text(state.message ?: "Journey unavailable", color = c.ink2, fontSize = 18.sp, modifier = Modifier.padding(top = 24.dp))
+            Text("Journey unavailable", color = c.ink2, fontSize = 18.sp, modifier = Modifier.padding(top = 24.dp))
         }
         return
     }
@@ -32,7 +37,11 @@ fun DetailScreen(state: AppState, actions: UiActions) {
     val pinned = focused && state.focus?.pinned == true
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxWidth().padding(horizontal = PagePadding)) {
-            BackButton("${first.from.shortName} departures", actions::back)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                BackButton("${first.from.shortName} departures", actions::back)
+                Spacer(Modifier.weight(1f))
+                Freshness(board, state.now, Modifier.testTag("detail-freshness"))
+            }
             Label("Journey", Modifier.padding(top = 2.dp))
             Text(buildAnnotatedString {
                 append(first.from.shortName)
@@ -52,7 +61,7 @@ fun DetailScreen(state: AppState, actions: UiActions) {
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             BoardRow(journey, board, state.now, detail = true,
-                figureOverride = if (board?.isLive(state.now) == true && !journey.retained) directionFigureFor(journey, state.now) else null)
+                figureOverride = if (!journey.cancelled) directionFigureFor(journey, state.now) else null)
             JourneySteps(journey, state.now)
             Spacer(Modifier.height(12.dp))
         }
@@ -68,7 +77,6 @@ fun DetailScreen(state: AppState, actions: UiActions) {
                 Label(if (last.cancelled) "Journey cancelled" else platformText(last.toPlatform, last.mode, true) ?: "Arrive",
                     color = if (last.cancelled) c.warning else c.ink3)
             }
-            Freshness(board, state.now)
         }
         if (pinned || !focused && !journey.cancelled) ActionRail(
             if (pinned) "Unpin this ${first.modeNameDetail()}" else "Pin this ${first.modeNameDetail()}",
@@ -95,7 +103,15 @@ private fun JourneySteps(journey: Journey, now: Long) {
                     Text(if (cancelled) clockTime(after.effectiveDeparture) else "$wait min",
                         color = if (wait < 5 || cancelled) c.warning else c.ink2, fontSize = 17.sp,
                         fontWeight = FontWeight.Light, textDecoration = if (cancelled) TextDecoration.LineThrough else null)
-                    Label(if (cancelled) "Cancelled" else "Change", color = if (wait < 5 || cancelled) c.warning else c.ink3, size = 9)
+                    val label = if (cancelled) "CANCELLED" else "CHANGE"
+                    val style = TextStyle(fontSize = 9.sp, fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 1.44.sp, lineHeight = 12.15.sp)
+                    val measuredWidth = rememberTextMeasurer().measure(label, style, softWrap = false).size.width
+                    val columnWidth = with(LocalDensity.current) { 69.dp.roundToPx() }
+                    val scale = minOf(1f, (columnWidth - 1).toFloat() / measuredWidth.coerceAtLeast(1))
+                    Text(label, color = if (wait < 5 || cancelled) c.warning else c.ink3,
+                        style = style.copy(fontSize = 9.sp * scale, letterSpacing = 1.44.sp * scale,
+                            lineHeight = 12.15.sp * scale), maxLines = 1, softWrap = false)
                 }
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
@@ -125,8 +141,9 @@ private fun DetailStep(time: String, station: String, platform: String?, leg: Le
                        heavyDivider: Boolean = false) {
     val c = LocalTrainColors.current
     Row(Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(horizontal = PagePadding), verticalAlignment = Alignment.CenterVertically) {
-        Text(time, Modifier.width(69.dp), color = if (leg.cancelled) c.ink3 else c.ink2,
-            fontSize = 17.sp, fontWeight = FontWeight.Light, textDecoration = if (leg.cancelled) TextDecoration.LineThrough else null)
+        Text(time, Modifier.width(69.dp).testTag("detail-step-time"), color = if (leg.cancelled) c.ink3 else c.ink2,
+            fontSize = 17.sp, fontWeight = FontWeight.Light, textAlign = TextAlign.End,
+            textDecoration = if (leg.cancelled) TextDecoration.LineThrough else null)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(station, color = if (done || leg.cancelled) c.ink2 else c.ink, fontSize = 17.sp,
