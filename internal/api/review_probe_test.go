@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"sync"
 	"testing"
 	"time"
@@ -37,7 +38,7 @@ func TestProbeBucketExactlyTwentyMinutesOldStaysLive(t *testing.T) {
 	clock := bucket.Add(settledAge)
 	upstream := &fakeUpstream{departures: arrivedDepartures()}
 	server, handler := movingServer(t, upstream, &clock)
-	target := "/api/v1/departures?from=200060&to=215020&at=" + bucket.Format("2006-01-02T15:04:05%2B07:00")
+	target := "/api/v1/departures?from=200060&to=215020&at=" + url.QueryEscape(bucket.Format(time.RFC3339))
 
 	got := get(t, handler, target)
 	if got.Code != http.StatusOK {
