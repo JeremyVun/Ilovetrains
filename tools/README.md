@@ -73,6 +73,13 @@
   trip/sequence consistency. It does not interpret TfNSW protobuf extensions,
   resolve duplicate operators, or prove routing semantics. A successful parse
   is not evidence that a feed is fresh or correctly joined.
+- `diagnose-realtime.go` — replay a captured feed through the current Go
+  normalizer: `go run tools/diagnose-realtime.go /tmp/trains-gtfs-<name>`.
+  Requires `capture.json` and verifies protobuf hashes before decoding them.
+  Reports accepted counts, missing dates, timestamp rejections and capture-time
+  freshness. Its separately labelled placeholder-date experiment only isolates
+  the next rejection gate; it does not resolve service instances or save an
+  altered feed. No credentials or network requests are used.
 - `fixtures/` — raw TfNSW responses from probes; golden inputs for backend
   mapping tests. Re-run the probe to refresh; note refresh date in commits.
   The three `departures_*.json` files are mapped public-API captures from
