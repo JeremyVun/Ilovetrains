@@ -73,7 +73,7 @@ class OfflinePlanner(context: Context) {
         }
     }
 
-    suspend fun plan(from: Station, to: Station, at: Long, modes: Set<String>, limit: Int = 12): BoardData = withContext(Dispatchers.IO) {
+    suspend fun plan(from: Station, to: Station, at: Long, modes: Set<String>, limit: Int = 12, maxTransfers: Int = 2): BoardData = withContext(Dispatchers.IO) {
         mutex.withLock {
             ensureOpen()
             val active = checkNotNull(activePackage)
@@ -95,9 +95,9 @@ class OfflinePlanner(context: Context) {
                     assignments.getOrPut("$source\u0000$stopId") { assignmentFor(db, source, stopId) }
                 }.sortedWith(compareBy<ScheduledConnection> { it.effectiveDeparture }.thenBy { it.tripKey }.thenBy { it.fromSequence }) else scheduled
             }
-            var routed = router.route(from, to, at, connections(INITIAL_HORIZON_HOURS), limit)
+            var routed = router.route(from, to, at, connections(INITIAL_HORIZON_HOURS), limit, maxTransfers)
             if (routed.isEmpty() || routed.any(::hasLongWait)) {
-                routed = router.route(from, to, at, connections(MAX_HORIZON_HOURS), limit)
+                routed = router.route(from, to, at, connections(MAX_HORIZON_HOURS), limit, maxTransfers)
             }
             var observedAt: Long? = null
             var matched = false

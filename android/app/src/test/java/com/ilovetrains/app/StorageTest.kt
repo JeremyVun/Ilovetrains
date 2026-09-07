@@ -28,6 +28,34 @@ class StorageTest {
         assertEquals(1_788_645_600_000L, board.generatedAt)
     }
 
+    @Test fun transferLimitAndFlagsSurviveRestartAndFallBackToTheCap() {
+        val chosen = UserData(transferLimit = TransferLimit.Any, flags = mapOf("transferLimit" to true))
+        val restored = Wire.user(JSONObject(Wire.user(chosen).toString()))
+        assertEquals(chosen, restored)
+        assertEquals(TransferLimit.Any, restored.transferLimit)
+        assertEquals(mapOf("transferLimit" to true), restored.flags)
+
+        assertEquals(TransferLimit.Two, Wire.user(JSONObject(Wire.user(UserData()).toString())).transferLimit)
+        assertEquals(TransferLimit.Two, Wire.user(JSONObject("{}")).transferLimit)
+        assertEquals(TransferLimit.Two, Wire.user(JSONObject("""{"transferLimit":"three"}""")).transferLimit)
+        assertEquals(TransferLimit.Any, Wire.user(JSONObject("""{"transferLimit":"any"}""")).transferLimit)
+        assertTrue(Wire.user(JSONObject("{}")).flags.isEmpty())
+        assertTrue(Wire.user(JSONObject("""{"flags":"on"}""")).flags.isEmpty())
+        assertEquals(mapOf("transferLimit" to false),
+            Wire.user(JSONObject("""{"flags":{"transferLimit":false,"other":"yes","count":2}}""")).flags)
+    }
+
+    @Test fun cappedNeedsBothTheFlagAndThePreferenceAndBoundsOfflineRouting() {
+        val on = mapOf("transferLimit" to true)
+        assertTrue(UserData(flags = on).capped)
+        assertFalse(UserData(flags = on, transferLimit = TransferLimit.Any).capped)
+        assertFalse(UserData().capped)
+        assertFalse(UserData(transferLimit = TransferLimit.Any).capped)
+        assertEquals(2, UserData(flags = on).offlineMaxTransfers)
+        assertEquals(4, UserData(flags = on, transferLimit = TransferLimit.Any).offlineMaxTransfers)
+        assertEquals(2, UserData(transferLimit = TransferLimit.Any).offlineMaxTransfers)
+    }
+
     @Test fun completedRideEndpointEvidenceSurvivesRestart() {
         val a = Station("a", "A"); val b = Station("b", "B")
         val ride = Ride("deleted-trip", true, 1_000, 2_000, b, a)

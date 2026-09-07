@@ -54,6 +54,7 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
             mutable.value = mutable.value.copy(ready = true, screen = if (data.trips.isEmpty()) Screen.Setup else Screen.Home, stations = stations)
             refresh()
             refreshSharedData()
+            readFlags()
             if (data.useLocation) onSilentLocation?.invoke()
         }
         viewModelScope.launch {
@@ -67,8 +68,21 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         }
     }
     private fun persist() { writes.trySend(data) }
+    private fun readFlags() {
+        viewModelScope.launch {
+            val flags = runCatching { api.flags() }.getOrNull() ?: return@launch
+            if (flags == data.flags) return@launch
+            val before = data.capped
+            data = data.copy(flags = flags); persist()
+            if (data.capped != before) {
+                mutable.value = mutable.value.copy(board = null, homeBoard = null)
+                choosePrediction(); syncPersonal(); refresh()
+            } else syncPersonal()
+        }
+    }
     private fun message(text: String?) { mutable.value = mutable.value.copy(message = text, undoAvailable = false) }
     private fun visibleFocus(): FocusedJourney? = visibleFocus(data, mutable.value.now)
+        ?.takeIf { it.journey.withinTransferCap(data.capped) }?.let { it.copy(board = it.board.withinTransferCap(data.capped)) }
     private fun syncPersonal() {
         val focus = visibleFocus()
         val selection = mutable.value.selectedTripId
@@ -79,6 +93,7 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         mutable.value = mutable.value.copy(trips = ranked, totalTrips = data.trips.size, focus = focus,
             focusComplete = focus?.let { f -> data.rides.any { it.tripId == f.tripId && it.reverse == f.reverse && it.departure == f.journey.departure } } == true,
             appearance = data.appearance, enabledModes = data.modes, useLocation = data.useLocation,
+            transferLimit = if (data.flags[TransferLimitFlag] == true) data.transferLimit else null,
             home = data.home ?: automaticHome(data), automaticHome = automaticHome(data), homeIsManual = data.home != null,
             recentFrom = data.recentFrom, recentTo = data.recentTo,
             tripMetadata = savedTripMetadata(data, fix, mutable.value.selectedTripId, mutable.value.reverse, mutable.value.now),
@@ -122,7 +137,7 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
                 initialized.await(); planner.refreshRealtime(api.baseUrl)
                 val request = generation; val pair = ends(); val modes = data.modes.toSet()
                 if (pair != null && modes.isNotEmpty() && mutable.value.board?.isLive(mutable.value.now) != true) {
-                    val local = planner.plan(pair.first, pair.second, mutable.value.now - 900_000, modes, 24)
+                    val local = planner.plan(pair.first, pair.second, mutable.value.now - 900_000, modes, 24, data.offlineMaxTransfers)
                     if (local.journeys.isNotEmpty()) {
                         val prior = mutable.value.board?.takeIf { it.from.id == pair.first.id && it.to.id == pair.second.id }
                         publishBoard(mergeBoardResults(prior, local, null, mutable.value.now), request)
@@ -162,7 +177,7 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         mutable.value = mutable.value.copy(refreshing = true)
         boardJob = viewModelScope.launch {
             val (from, to) = pair
-            val cached = store.cached(from, to, modes)
+            val cached = store.cached(from, to, modes)?.withinTransferCap(data.capped)
             if (request != generation) return@launch
             val previous = mutable.value.board?.takeIf { it.from.id == from.id && it.to.id == to.id } ?: cached
             if (mutable.value.board !== previous) {
@@ -170,12 +185,12 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
             }
             supervisorScope {
                 val local = async {
-                    try { initialized.await(); planner.plan(from, to, mutable.value.now - 15 * 60_000, modes, 24) }
+                    try { initialized.await(); planner.plan(from, to, mutable.value.now - 15 * 60_000, modes, 24, data.offlineMaxTransfers) }
                     catch (e: CancellationException) { throw e }
                     catch (_: Exception) { null }
                 }
                 val live = async {
-                    try { api.departures(from, to, modes) }
+                    try { api.departures(from, to, modes, transferLimit = if (data.capped) 2 else null) }
                     catch (e: CancellationException) { throw e }
                     catch (_: Exception) { null }
                 }
@@ -224,7 +239,7 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         focusJob = viewModelScope.launch {
             val pair = ends(focus.tripId, focus.reverse) ?: return@launch
             val at = focus.journey.departure.takeIf { it < mutable.value.now }
-            val result = try { api.departures(pair.first, pair.second, AllModes, at) } catch (e: CancellationException) { throw e } catch (_: Exception) { null }
+            val result = try { api.focusedDepartures(pair.first, pair.second, at) } catch (e: CancellationException) { throw e } catch (_: Exception) { null }
             if (data.focus?.journey?.key != focus.journey.key || data.focus?.tripId != focus.tripId || data.focus?.reverse != focus.reverse) return@launch
             val match = result?.journeys?.find { it.key == focus.journey.key }
             if (match != null) data = data.copy(focus = focus.copy(journey = match, board = result))
@@ -260,7 +275,7 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         val here = stationHere(data, stations, fix, mutable.value.now)
         val day = Instant.ofEpochMilli(mutable.value.now).atZone(Sydney).toLocalDate().toString()
         if (data.trips.isNotEmpty() && here != null && data.votes.none { it.day == day }) { data = data.copy(votes = (data.votes + HomeVote(day, here)).takeLast(7)); persist() }
-        val inferred = inferredFocus(data, value, mutable.value.now)
+        val inferred = inferredFocus(data, value, mutable.value.now)?.takeIf { it.journey.withinTransferCap(data.capped) }
         if (inferred != null) { data = data.copy(focus = inferred); persist() }
         data.focus?.let { f ->
             val destination = ends(f.tripId, f.reverse)?.second
@@ -401,6 +416,11 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         mutable.value = mutable.value.copy(board = null, homeBoard = null)
         choosePrediction(); syncPersonal(); refresh()
     }
+    override fun setTransferLimit(value: TransferLimit) {
+        data = data.copy(transferLimit = value); persist()
+        mutable.value = mutable.value.copy(board = null, homeBoard = null)
+        choosePrediction(); syncPersonal(); refresh()
+    }
     override fun setUseLocation(enabled: Boolean) {
         data = data.copy(useLocation = enabled); if (!enabled) { fix = null; mutable.value = mutable.value.copy(distanceMetres = null) }
         persist(); syncPersonal(); if (enabled) onLocationRequest?.invoke() else { onLocationDisabled?.invoke(); choosePrediction(); refresh() }
@@ -414,7 +434,7 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         val earliest = board.journeys.minOfOrNull { it.departure } ?: mutable.value.now
         val at = (earliest - 60 * 60_000).coerceAtLeast(mutable.value.now - 24 * 60 * 60_000)
         viewModelScope.launch {
-            val past = try { initialized.await(); planner.plan(board.from, board.to, at, modes, 30) } catch (e: CancellationException) { throw e } catch (_: Exception) { return@launch }
+            val past = try { initialized.await(); planner.plan(board.from, board.to, at, modes, 30, data.offlineMaxTransfers) } catch (e: CancellationException) { throw e } catch (_: Exception) { return@launch }
             if (request != generation) return@launch
             val current = mutable.value.board ?: return@launch
             publishBoard(current.copy(journeys = (current.journeys + past.journeys).distinctBy { it.key }.sortedBy { it.effectiveDeparture }), request)

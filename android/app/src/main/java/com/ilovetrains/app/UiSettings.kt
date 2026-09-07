@@ -127,6 +127,10 @@ private fun SettingsMain(state: AppState, actions: UiActions, feedback: () -> Un
         Label(if (state.enabledModes.isEmpty()) "No services selected. Turn one on to see trips."
             else "Trips use chosen services only.", Modifier.padding(top = 8.dp),
             color = if (state.enabledModes.isEmpty()) c.warning else c.ink3, maxLines = 3)
+        state.transferLimit?.let { limit ->
+            SettingsPersonalRow(null, "Transfer limit", limit.label, limit.other.label,
+                { actions.setTransferLimit(limit.other) }, primaryState = true)
+        }
 
         Spacer(Modifier.height(22.dp)); SettingsSection("Appearance")
         Row(Modifier.fillMaxWidth()) {
@@ -152,7 +156,7 @@ private fun SettingsSection(text: String) {
 }
 
 @Composable
-private fun SettingsPersonalRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, value: String,
+private fun SettingsPersonalRow(icon: androidx.compose.ui.graphics.vector.ImageVector?, title: String, value: String,
                                 state: String, onClick: () -> Unit, valueWarning: Boolean = false,
                                 primaryState: Boolean = false, toggleState: ToggleableState? = null) {
     val c = LocalTrainColors.current
@@ -163,7 +167,7 @@ private fun SettingsPersonalRow(icon: androidx.compose.ui.graphics.vector.ImageV
         }
         .clickable(role = Role.Button, onClick = onClick)
         .padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, Modifier.size(23.dp), c.ink2); Spacer(Modifier.width(12.dp))
+        if (icon != null) { Icon(icon, null, Modifier.size(23.dp), c.ink2); Spacer(Modifier.width(12.dp)) }
         Column(Modifier.weight(1f)) {
             Text(title, color = c.ink, fontSize = 17.sp, fontWeight = FontWeight.Normal)
             Text(value, color = if (valueWarning) c.warning else c.ink2, fontSize = 12.sp,

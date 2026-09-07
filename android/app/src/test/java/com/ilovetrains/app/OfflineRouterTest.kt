@@ -100,6 +100,26 @@ class OfflineRouterTest {
     }
 
     @Test
+    fun threeChangeRouteAppearsOnlyWhenTheCallerRaisesTheTransferBound() {
+        val delta = Station("D", "Delta Station")
+        val echo = Station("E", "Echo Station")
+        val minute = 60_000L
+        val chain = listOf(
+            connection("one", alpha, central, 0, 10 * minute),
+            connection("two", central, delta, 16 * minute, 26 * minute),
+            connection("three", delta, echo, 32 * minute, 42 * minute),
+            connection("four", echo, bravo, 48 * minute, 58 * minute),
+        )
+
+        assertTrue(OfflineRouter().route(alpha, bravo, 0, chain, 12).isEmpty())
+        assertTrue(OfflineRouter().route(alpha, bravo, 0, chain, 12, maxTransfers = 2).isEmpty())
+
+        val uncapped = OfflineRouter().route(alpha, bravo, 0, chain, 12, maxTransfers = 4).single()
+        assertEquals(listOf("one", "two", "three", "four"), uncapped.legs.map { it.identity?.tripId })
+        assertEquals(4, uncapped.legs.size)
+    }
+
+    @Test
     fun gtfsCivilTimesHandleSpringDstAndAfterMidnightService() {
         assertEquals(
             Instant.parse("2026-10-03T16:30:00Z").toEpochMilli(),
