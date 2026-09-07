@@ -520,15 +520,16 @@ from <home>.`); a `usual` leap prints no receipt, because it explains itself.
 capped at 100 and deduplicated by trip, direction and `scheduledDeparture`;
 `departedAt` and `arrivedAt` retain the effective times. Completion is decided
 only after that arrival has had its chance to move: a refresh applies its
-journey to the focus before the ride is settled, and a client that cannot reach
-the network settles from the snapshot it holds. A ride whose arrival a later
-refresh moves takes the new `arrivedAt`, and is withdrawn when the refreshed
-arrival has not happened yet, which leaves the trip no longer over; a fix
-within 200 m still records the ride before the timetable agrees. A ride stores
-both endpoint snapshots so later trip edits or deletion do not rewrite the
-evidence. Completed rides therefore survive deletion or LRU eviction of their
-saved-trip entry; prediction history and cached boards do not. They are what
-the last-ridden line and the reverse receipt cite.
+journey to the focus before the ride is settled, and a client that cannot
+reach the network settles from the snapshot it holds. A ride takes the
+`arrivedAt` a refresh moves it to, earlier or later, once the journey has
+arrived, and is withdrawn when the refreshed arrival is still ahead and no fix
+places the phone at the destination, which leaves the trip no longer over; a
+fix within 200 m still records the ride before the timetable agrees. A ride
+stores both endpoint snapshots so later trip edits or deletion do not rewrite
+the evidence. Completed rides therefore survive deletion or LRU eviction of
+their saved-trip entry; prediction history and cached boards do not. They are
+what the last-ridden line and the reverse receipt cite.
 
 A focused trip is OVER once `now` is later than its effective arrival, or once
 a fix places the phone within 200 m of the destination from `A − 5 min`. Home
