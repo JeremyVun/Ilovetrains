@@ -181,6 +181,8 @@ struct JourneyAxis: View {
     var large = false
     var showCap = true
     var progress: Double? = nil
+    var tinyTrain = false
+    @State private var trainEnabled = false
     @Environment(\.trainColors) private var colors
 
     var body: some View {
@@ -204,6 +206,9 @@ struct JourneyAxis: View {
                             .layoutValue(key: AxisItemKey.self, value: .dwell(index))
                     }
                 }
+                if tinyTrain {
+                    TinyTrainLane(onAvailabilityChange: { trainEnabled = $0 }).layoutValue(key: AxisItemKey.self, value: .tinyTrain)
+                }
                 ForEach(Array(journey.legs.dropLast().enumerated()), id: \.offset) { index, leg in
                     let next = journey.legs[index + 1]
                     if journey.legs.count <= 2 || index == 0,
@@ -225,7 +230,7 @@ struct JourneyAxis: View {
                         .layoutValue(key: AxisItemKey.self, value: .progress)
                 }
             }
-            .accessibilityElement(children: .ignore)
+            .accessibilityElement(children: trainEnabled ? .contain : .ignore)
             .accessibilityLabel("Journey from \(first.from.shortName) to \(journey.legs.last?.to.shortName ?? first.to.shortName)")
         }
     }

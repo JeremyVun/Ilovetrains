@@ -253,7 +253,14 @@ on subsequent local launches. Missing or invalid stored values use the API.
 If storage is unavailable, an explicit query still applies for that page's
 lifetime. Preview overrides are read at startup, so changing one requires a
 reload. Production ignores these query values and this storage key entirely.
-Toy interactions emit no analytics or API requests.
+
+Native Home fetches the same evaluated public endpoint independently of timetable
+loading, when its journey header appears or resumes and every 30 seconds while
+visible. Flags remain in memory, default off, and require literal JSON `true`;
+failed requests disable the toy. Leaving Home or backgrounding cancels polling
+and the current animation. Native builds contain no flags SDK key or device
+context. DEBUG iOS calibration can opt in with `--tiny-train`; release builds
+ignore that argument. Toy interactions emit no analytics or API requests.
 
 ## Analytics queue
 

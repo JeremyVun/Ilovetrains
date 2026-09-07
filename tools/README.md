@@ -112,7 +112,7 @@
 - `check-controller-lifecycle.js` — browser-check repeated home fixes and
   durable arrival completion against a locally served client.
 - `check-tiny-train.js` — drive the flagged web Easter egg at both phone sizes
-  and schemes. Checks local opt-in/out, carriage growth, live redraws,
+  and schemes. Checks local opt-in/out, ignored repeat taps, live redraws,
   navigation cleanup, reduced motion, fixed trip-line/divider geometry and
   flag-off pixel equality. Uses captured services and blocks API fetches. With a private static
   server serving `web/`, run `node tools/check-tiny-train.js --url
