@@ -23,8 +23,12 @@ import java.util.zip.ZipInputStream
 
 data class FocusedRefresh(val journey: Journey, val observedAt: Long?, val live: Boolean)
 
-class OfflinePlanner(context: Context) {
-    private data class PackageInfo(
+class OfflinePlanner(
+    context: Context,
+    private val directory: File = File(context.applicationContext.noBackupFilesDir, "timetable"),
+    private val openDatabase: (String) -> SQLiteDatabase = { path -> SQLiteDatabase.openDatabase(path, null, SQLiteDatabase.OPEN_READONLY) },
+) {
+    internal data class PackageInfo(
         val sha256: String,
         val url: String,
         val bytes: Long,
@@ -37,9 +41,12 @@ class OfflinePlanner(context: Context) {
     private data class StopRef(val stopId: String, val stationId: String, val platform: String?)
     private data class TripRef(val source: String, val tripId: String, val route: RouteRef, val headsign: String)
     private data class RouteRef(val line: String, val mode: String)
+    private data class References(
+        val stopsById: Map<Int, StopRef>,
+        val tripsById: Map<Int, TripRef>,
+    )
 
     private val appContext = context.applicationContext
-    private val directory = File(appContext.noBackupFilesDir, "timetable")
     private val packageStore = OfflinePackageStore(directory)
     private val mutex = Mutex()
     private val updateMutex = Mutex()
@@ -150,14 +157,7 @@ class OfflinePlanner(context: Context) {
                 require(digest.equals(candidate.sha256, true)) { "Timetable package hash mismatch" }
                 extractDatabase(download, extracted)
                 require(validateDatabase(extracted, candidate)) { "Timetable package failed validation" }
-                mutex.withLock {
-                    val previous = activePackage?.sha256
-                    database?.close()
-                    database = null
-                    packageStore.activate(extracted, manifestText, candidate.sha256)
-                    open(candidate)
-                    packageStore.retain(candidate.sha256, previous)
-                }
+                mutex.withLock { activateValidatedCandidate(candidate, extracted, manifestText) }
             } finally {
                 download.delete()
                 extracted.delete()
@@ -188,13 +188,41 @@ class OfflinePlanner(context: Context) {
     }
 
     private fun open(info: PackageInfo) {
-        database?.close()
-        database = SQLiteDatabase.openDatabase(packageStore.database(info.sha256).path, null, SQLiteDatabase.OPEN_READONLY)
-        activePackage = info
-        scheduleCache = null
-        stationsById = loadStations(checkNotNull(database))
-        loadReferences(checkNotNull(database))
-        coverageDescription = coverage(info.serviceDateFrom, info.serviceDateTo)
+        val opened = openDatabase(packageStore.database(info.sha256).path)
+        try {
+            val stations = loadStations(opened)
+            val references = loadReferences(opened)
+            database?.close()
+            database = opened
+            activePackage = info
+            scheduleCache = null
+            stationsById = stations
+            stopsById = references.stopsById
+            tripsById = references.tripsById
+            coverageDescription = coverage(info.serviceDateFrom, info.serviceDateTo)
+        } catch (error: Throwable) {
+            opened.close()
+            throw error
+        }
+    }
+
+    internal fun activateValidatedCandidate(candidate: PackageInfo, extracted: File, manifest: String) {
+        val previous = activePackage?.sha256
+        val previousManifest = previous?.let { sha ->
+            packageStore.manifests().firstOrNull { stored ->
+                runCatching { parseManifest(JSONObject(stored)).sha256 == sha }.getOrDefault(false)
+            }
+        }
+        packageStore.activate(extracted, manifest, candidate.sha256)
+        try {
+            open(candidate)
+        } catch (error: Throwable) {
+            if (previous != null && previousManifest != null) {
+                packageStore.activate(packageStore.database(previous), previousManifest, previous)
+            }
+            throw error
+        }
+        packageStore.retain(candidate.sha256, previous)
     }
 
     private fun cachedConnections(db: SQLiteDatabase, at: Long, horizonHours: Int): List<ScheduledConnection> {
@@ -205,16 +233,17 @@ class OfflinePlanner(context: Context) {
         return readConnections(db, at, horizonHours).also { scheduleCache = ScheduleCache(at, serviceDate, horizonHours, it) }
     }
 
-    private fun validateDatabase(file: File, info: PackageInfo): Boolean {
+    internal fun validateDatabase(file: File, info: PackageInfo): Boolean {
         if (!file.isFile) return false
         return runCatching {
             SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+                val applicationId = db.rawQuery("PRAGMA application_id", null).use { cursor -> cursor.moveToFirst(); cursor.getInt(0) }
                 val version = db.rawQuery("PRAGMA user_version", null).use { cursor -> cursor.moveToFirst(); cursor.getInt(0) }
                 val integrity = db.rawQuery("PRAGMA quick_check", null).use { cursor -> cursor.moveToFirst(); cursor.getString(0) }
                 val metadata = db.rawQuery("SELECT key,value FROM meta WHERE key IN ('service_date_from','service_date_to')", null).use { cursor ->
                     buildMap { while (cursor.moveToNext()) put(cursor.getString(0), cursor.getString(1)) }
                 }
-                version == 1 && integrity == "ok" && metadata["service_date_from"] == info.serviceDateFrom && metadata["service_date_to"] == info.serviceDateTo
+                applicationId == APPLICATION_ID && version == 1 && integrity == "ok" && metadata["service_date_from"] == info.serviceDateFrom && metadata["service_date_to"] == info.serviceDateTo
             }
         }.getOrDefault(false)
     }
@@ -316,7 +345,7 @@ class OfflinePlanner(context: Context) {
         }
     }
 
-    private fun loadReferences(db: SQLiteDatabase) {
+    private fun loadReferences(db: SQLiteDatabase): References {
         val sources = db.rawQuery("SELECT id,name FROM sources", null).use { cursor ->
             buildMap { while (cursor.moveToNext()) put(cursor.getInt(0), cursor.getString(1)) }
         }
@@ -328,12 +357,12 @@ class OfflinePlanner(context: Context) {
                 }
             }
         }
-        stopsById = db.rawQuery("SELECT id,stop_id,station_id,platform FROM stops", null).use { cursor ->
+        val stops = db.rawQuery("SELECT id,stop_id,station_id,platform FROM stops", null).use { cursor ->
             buildMap(cursor.count) {
                 while (cursor.moveToNext()) put(cursor.getInt(0), StopRef(cursor.getString(1), cursor.getString(2), if (cursor.isNull(3)) null else cursor.getString(3)))
             }
         }
-        tripsById = db.rawQuery("SELECT id,source,trip_id,route,headsign FROM trips", null).use { cursor ->
+        val trips = db.rawQuery("SELECT id,source,trip_id,route,headsign FROM trips", null).use { cursor ->
             buildMap(cursor.count) {
                 while (cursor.moveToNext()) {
                     val source = sources[cursor.getInt(1)] ?: continue
@@ -342,6 +371,7 @@ class OfflinePlanner(context: Context) {
                 }
             }
         }
+        return References(stops, trips)
     }
 
     private fun fastEpochBase(serviceDate: LocalDate): Long? {
@@ -360,25 +390,6 @@ class OfflinePlanner(context: Context) {
         arrayOf(source, stopId),
     ).use { cursor ->
         if (!cursor.moveToFirst()) null else StopAssignment(if (cursor.isNull(0)) null else cursor.getString(0), cursor.getString(1))
-    }
-
-    private fun parseManifest(json: JSONObject): PackageInfo {
-        require(json.getInt("schemaVersion") == 1)
-        val packages = json.getJSONArray("packages")
-        val candidates = List(packages.length()) { packages.getJSONObject(it) }.filter { it.getString("source") == "network" }
-        require(candidates.size == 1)
-        val item = candidates.single()
-        require(item.getInt("schemaVersion") == 1)
-        val sha = item.getString("sha256")
-        require(sha.matches(Regex("[0-9a-f]{64}")))
-        return PackageInfo(
-            sha256 = sha,
-            url = item.getString("url"),
-            bytes = item.getLong("bytes"),
-            serviceDateFrom = item.getString("serviceDateFrom"),
-            serviceDateTo = item.getString("serviceDateTo"),
-            generatedAt = parseTime(json.get("generatedAt")),
-        )
     }
 
     private fun fetch(url: URL, limit: Int): ByteArray {
@@ -478,20 +489,53 @@ class OfflinePlanner(context: Context) {
         return "${LocalDate.parse(from, COMPACT_DATE).format(formatter)}–${LocalDate.parse(to, COMPACT_DATE).format(formatter)}"
     }
 
-    private fun parseTime(value: Any): Long = when (value) {
-        is Number -> value.toLong()
-        is String -> Instant.parse(value).toEpochMilli()
-        else -> error("Invalid manifest timestamp")
-    }
-
     companion object {
         private val COMPACT_DATE = DateTimeFormatter.BASIC_ISO_DATE
         private const val MAX_DATABASE_BYTES = 300L * 1024 * 1024
+        private const val APPLICATION_ID = 0x494c5452
+        private const val MAX_EPOCH_MILLIS = 8_640_000_000_000_000.0
         private const val INITIAL_HORIZON_HOURS = 6
         private const val MAX_HORIZON_HOURS = 30
 
         internal fun gtfsEpochMillis(serviceDate: LocalDate, seconds: Int): Long =
             LocalDateTime.of(serviceDate, LocalTime.MIDNIGHT).plusSeconds(seconds.toLong()).atZone(Sydney).toInstant().toEpochMilli()
+
+        internal fun parseManifest(json: JSONObject): PackageInfo {
+            require(json.getInt("schemaVersion") == 1)
+            val packages = json.getJSONArray("packages")
+            val candidates = List(packages.length()) { packages.getJSONObject(it) }.filter { it.getString("source") == "network" }
+            require(candidates.size == 1)
+            val item = candidates.single()
+            require(item.getInt("schemaVersion") == 1)
+            val sha = item.getString("sha256")
+            require(sha.matches(Regex("[0-9a-f]{64}")))
+            val from = item.getString("serviceDateFrom")
+            val to = item.getString("serviceDateTo")
+            require(item.getLong("bytes") in 0..MAX_DATABASE_BYTES)
+            require(from.matches(Regex("\\d{8}")))
+            require(to.matches(Regex("\\d{8}")))
+            require(runCatching { LocalDate.parse(from, COMPACT_DATE) }.isSuccess)
+            require(runCatching { LocalDate.parse(to, COMPACT_DATE) }.isSuccess)
+            require(from <= to)
+            return PackageInfo(
+                sha256 = sha,
+                url = item.getString("url"),
+                bytes = item.getLong("bytes"),
+                serviceDateFrom = from,
+                serviceDateTo = to,
+                generatedAt = parseTime(json.get("generatedAt")),
+            )
+        }
+
+        private fun parseTime(value: Any): Long {
+            val timestamp = when (value) {
+                is Number -> value.toDouble()
+                is String -> Instant.parse(value).toEpochMilli().toDouble()
+                else -> error("Invalid manifest timestamp")
+            }
+            require(timestamp.isFinite() && kotlin.math.abs(timestamp) <= MAX_EPOCH_MILLIS)
+            return timestamp.toLong()
+        }
 
         internal fun scheduledFocusBaseline(journey: Journey, platform: (String, String) -> String?): Journey = Journey(journey.legs.map { leg ->
             val identity = leg.identity ?: return@map leg.copy(estimatedDeparture = null, estimatedArrival = null, cancelled = false)

@@ -18,6 +18,7 @@ struct AppState {
     var trips: [SavedTrip] = []
     var totalTrips = 0
     var selectedTripId: String?
+    var selectionPredicted = false
     var reverse = false
     var board: BoardData?
     var homeBoard: BoardData?
@@ -43,6 +44,10 @@ struct AppState {
     var recentTo: [Station] = []
     var setupFrom: Station?
     var setupTo: Station?
+    var setupLocationStatus: SetupLocationStatus = .idle
+    var nearbyStations: [Station] = []
+    var nearestStation: Station?
+    var justAddedTripId: String?
     var selectingHome = false
     var timetableStatus = "Opening offline timetable"
     var timetableUpdating = false
@@ -50,7 +55,9 @@ struct AppState {
     var feedbackSubmitting = false
     var feedbackSucceeded = false
     var message: String?
+    var messageAutoDismiss = false
     var undoAvailable = false
+    var earlierLoading = false
     var version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
     var transferLimitOffered: Bool { flags[transferLimitFlagKey] == true }
     var selectedTrip: SavedTrip? { trips.first { $0.id == selectedTripId } }

@@ -80,6 +80,23 @@ struct JourneyAxisGeometry {
                 edge = boxes[index].minX - 3
             }
         }
+        for (index, item) in items.enumerated() {
+            guard case .ride(let leg) = item else { continue }
+            let logicalStart = boxes[index].minX
+            let logicalEnd = boxes[index].maxX
+            let board = items.firstIndex(of: .board(leg - 1)).map { boxes[$0] }.flatMap { $0.minY == 0 ? $0 : nil }
+            let alight = items.firstIndex(of: .alight(leg)).map { boxes[$0] }.flatMap { $0.minY == 0 ? $0 : nil }
+            let paintedStart = board.map { marker -> CGFloat in
+                let inset = min(lineChipCornerRadius, marker.width / 2)
+                return min(marker.maxX - inset, max(marker.minX + inset, logicalStart))
+            } ?? logicalStart
+            let paintedEnd = alight.map { marker -> CGFloat in
+                let inset = min(lineChipCornerRadius, marker.width / 2)
+                return min(marker.maxX - inset, max(marker.minX + inset, logicalEnd))
+            } ?? logicalEnd
+            boxes[index].origin.x = paintedStart
+            boxes[index].size.width = max(0, paintedEnd - paintedStart)
+        }
         let markerBottom = max(chipHeight, pins.map { boxes[$0].maxY }.max() ?? 0)
         var placed: [CGRect] = []
         for index in labels {

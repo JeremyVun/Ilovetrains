@@ -44,13 +44,19 @@ enum TransitError: Error { case unavailable, invalid }
 
 enum TransitWire {
     static func epoch(_ value: Any?) -> Double? {
-        if let number = value as? NSNumber { return number.doubleValue.rounded() }
+        if let number = value as? NSNumber {
+            let result = number.doubleValue.rounded()
+            return validTransitMillis(result) ? result : nil
+        }
         guard let string = value as? String else { return nil }
         let format = ISO8601DateFormatter()
         format.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = format.date(from: string) { return (date.timeIntervalSince1970 * 1000).rounded() }
+        if let date = format.date(from: string) {
+            let result = (date.timeIntervalSince1970 * 1000).rounded()
+            return validTransitMillis(result) ? result : nil
+        }
         format.formatOptions = [.withInternetDateTime]
-        return format.date(from: string).map { ($0.timeIntervalSince1970 * 1000).rounded() }
+        return format.date(from: string).map { ($0.timeIntervalSince1970 * 1000).rounded() }.flatMap { validTransitMillis($0) ? $0 : nil }
     }
     static func boolean(_ value: Any?) -> Bool? {
         // JSON numbers also bridge to NSNumber and cast to Bool, so ask for the boolean type itself.

@@ -136,6 +136,64 @@ final class StorageTests: XCTestCase {
         let files = try FileManager.default.contentsOfDirectory(at: directory.appendingPathComponent("boards"), includingPropertiesForKeys: nil)
         XCTAssertLessThanOrEqual(files.count, 64)
     }
+
+    func testEqualSaveDoesNotCreateARecoveryCopy() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = DeviceStore(directory: directory)
+        let data = UserData(trips: [SavedTrip(id: "trip", from: Station(id: "a", name: "A"), to: Station(id: "b", name: "B"))])
+
+        try await store.save(data)
+        try await store.save(data)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("personal-v1.backup.json").path))
+        let restored = await store.load()
+        XCTAssertEqual(restored, data)
+    }
+
+    func testMalformedPersistedJourneysAreRejectedWithoutLosingValidTrips() throws {
+        let from = Station(id: "a", name: "A")
+        let to = Station(id: "b", name: "B")
+        let journey = Journey(legs: [Leg(line: "T1", mode: "train", headsign: "B", from: from, to: to, departure: -1_000, arrival: 20_000)])
+        let board = BoardData(from: from, to: to, journeys: [journey], generatedAt: 1)
+        let source = UserData(
+            trips: [SavedTrip(id: "trip", from: from, to: to)],
+            focus: FocusedJourney(tripId: "trip", reverse: false, journey: journey, board: board)
+        )
+        var raw = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(source)) as? [String: Any])
+        var focus = try XCTUnwrap(raw["focus"] as? [String: Any])
+        var malformedJourney = try XCTUnwrap(focus["journey"] as? [String: Any])
+        malformedJourney["legs"] = []
+        focus["journey"] = malformedJourney
+        raw["focus"] = focus
+
+        let recovered = try JSONDecoder().decode(UserData.self, from: JSONSerialization.data(withJSONObject: raw))
+        XCTAssertEqual(recovered.trips.map(\.id), ["trip"])
+        XCTAssertNil(recovered.focus)
+
+        var huge = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(journey)) as? [String: Any])
+        var legs = try XCTUnwrap(huge["legs"] as? [[String: Any]])
+        legs[0]["departure"] = 1e20
+        huge["legs"] = legs
+        XCTAssertThrowsError(try JSONDecoder().decode(Journey.self, from: JSONSerialization.data(withJSONObject: huge)))
+        XCTAssertEqual(try JSONDecoder().decode(Journey.self, from: JSONEncoder().encode(journey)), journey)
+    }
+
+    func testTripCapUsesLatestHistoryThenCreationInsteadOfLegacyLastViewed() {
+        let from = Station(id: "a", name: "A")
+        let trips = (0..<11).map { SavedTrip(
+            id: "trip-\($0)", from: from, to: Station(id: "to-\($0)", name: "To \($0)"),
+            createdAt: Double($0), lastViewed: $0 == 0 ? 1e12 : 0
+        ) }
+        let normalized = UserData(
+            trips: trips,
+            history: [ViewEvent(tripId: "trip-0", reverse: false, at: 100)]
+        ).normalized()
+
+        XCTAssertEqual(normalized.trips.count, 10)
+        XCTAssertTrue(normalized.trips.contains { $0.id == "trip-0" })
+        XCTAssertFalse(normalized.trips.contains { $0.id == "trip-1" })
+    }
 }
 
 private func temporaryDirectory() -> URL {

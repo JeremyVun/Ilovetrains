@@ -11,8 +11,9 @@ import { boardingCapLabel } from './journey.js';
 export function detailHtml(model) {
   return `
 <div class="sy-mast">
-  <div class="sy-top">
+  <div class="sy-top detail-top">
     <button class="sy-home" data-act="board"><span class="g">←</span>${esc(model.from)} departures</button>
+    <div class="detail-fresh${model.stale ? ' offline' : ''}" data-t="footer"><span class="pulse ${esc(model.footer.dot)}"></span><span>${esc(model.footer.text)}</span></div>
   </div>
   <div class="detail-kicker lbl">Journey</div>
   <h1 class="detail-title">${esc(model.from)} <em>→</em> ${esc(model.to)}</h1>
@@ -24,7 +25,6 @@ export function detailHtml(model) {
   <div class="detail-steps">${model.steps.map(stepHtml).join('')}</div>
 </div>
 ${tailHtml(model.arrival)}
-<div class="detail-fresh${model.stale ? ' offline' : ''}" data-t="footer"><span class="pulse ${esc(model.footer.dot)}"></span>${esc(model.footer.text)}</div>
 ${railHtml(model)}`;
 }
 

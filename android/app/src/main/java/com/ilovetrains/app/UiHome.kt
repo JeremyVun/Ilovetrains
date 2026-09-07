@@ -28,6 +28,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -43,25 +46,31 @@ fun HomeScreen(state: AppState, actions: UiActions) {
     val c = LocalTrainColors.current
     val board = state.homeBoard ?: state.board
     val focusJourney = state.focus?.journey
+    val alternatives = state.focus?.alternatives ?: board
     val retainedJourney = retainedHomeJourney(board, state.now)
-    val firstFuture = retainedJourney ?: board?.journeys?.firstOrNull { it.effectiveDeparture >= state.now }
+    val firstFuture = retainedJourney ?: board?.journeys?.firstOrNull {
+        journeyAllowed(it, state.enabledModes) && it.effectiveDeparture >= state.now
+    }
     val firstRunning = retainedJourney?.takeUnless { it.cancelled }
-        ?: board?.journeys?.firstOrNull { !it.cancelled && it.effectiveDeparture >= state.now }
+        ?: board?.journeys?.firstOrNull { journeyAllowed(it, state.enabledModes) && !it.cancelled && it.effectiveDeparture >= state.now }
     val focusReplacement = focusJourney?.takeIf { it.cancelled && state.now < it.effectiveDeparture }?.let { cancelled ->
-        board?.journeys?.firstOrNull { !it.cancelled && it.effectiveDeparture > cancelled.effectiveDeparture }
+        alternatives?.journeys?.firstOrNull {
+            journeyAllowed(it, state.enabledModes) && !it.cancelled && it.effectiveDeparture > cancelled.effectiveDeparture
+        }
     }
     val journey = focusReplacement ?: focusJourney ?: firstRunning ?: firstFuture
+    val displayBoard = if (focusReplacement != null) alternatives else state.focus?.board ?: board
     val cancelledLeadTime = when {
         focusReplacement != null -> focusJourney?.effectiveDeparture
         focusJourney == null && firstFuture?.cancelled == true && firstRunning != null -> firstFuture.effectiveDeparture
         else -> null
     }
     Column(Modifier.fillMaxSize()) {
-        if (journey != null && board != null) SmartHeader(state, board, journey, cancelledLeadTime, actions)
+        if (journey != null && displayBoard != null) SmartHeader(state, displayBoard, alternatives, journey, cancelledLeadTime, actions)
         else if (state.trips.isNotEmpty()) SmartLoadingHeader(state, board, actions)
         else if (state.totalTrips > 0) {
             Column(Modifier.fillMaxWidth().padding(horizontal = PagePadding, vertical = 28.dp)) {
-                Text(state.message ?: "No trips match your selected services.", color = c.ink2,
+                Text("No trips match your selected services.", color = c.ink2,
                     fontSize = 20.sp, fontWeight = FontWeight.Light, lineHeight = 28.sp)
                 Label("Change settings", Modifier.heightIn(min = 44.dp).clickable(role = Role.Button, onClick = actions::openSettings)
                     .wrapContentHeight(Alignment.CenterVertically), color = c.ink)
@@ -108,7 +117,8 @@ private fun SmartLoadingHeader(state: AppState, board: BoardData?, actions: UiAc
 }
 
 @Composable
-private fun SmartHeader(state: AppState, board: BoardData, journey: Journey, cancelledLeadTime: Long?, actions: UiActions) {
+private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardData?, journey: Journey,
+                        cancelledLeadTime: Long?, actions: UiActions) {
     val c = LocalTrainColors.current
     val fig = figureFor(journey, board, state.now)
     val first = journey.legs.first()
@@ -117,19 +127,15 @@ private fun SmartHeader(state: AppState, board: BoardData, journey: Journey, can
     val explicitlyPinned = focused && focus?.pinned == true
     val departed = focused && state.now >= journey.effectiveDeparture
     val completed = state.focusComplete || state.now >= journey.effectiveArrival
-    val directionFigure = if (departed && !completed && !journey.retained && board.isLive(state.now)) {
+    val directionFigure = if (departed && !completed) {
         directionFigureFor(journey, state.now) ?: fig
     } else fig
     val late = minutesBetween(journey.departure, journey.effectiveDeparture) > 0
+    val focusState = focus?.let { focusStatus(it, state.now, state.focusComplete) }
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().heightIn(min = if (explicitlyPinned) 44.dp else 22.dp).padding(horizontal = PagePadding), verticalAlignment = Alignment.CenterVertically) {
             val status = when {
-                completed && focused -> "Trip over"
-                (journey.cancelled && focused) || cancelledLeadTime != null && focus != null -> "Cancelled"
-                departed && focused && late -> "Running late"
-                focused && late -> "${minutesBetween(journey.departure, journey.effectiveDeparture)} min late"
-                departed && focused -> "Running"
-                explicitlyPinned -> "Pinned"
+                focusState != null -> focusState.text
                 journey.retained && board.offline && state.now >= journey.effectiveDeparture -> "Last shown"
                 state.distanceMetres != null && state.distanceMetres <= 200 -> "At ${first.from.shortName}"
                 state.distanceMetres != null -> "${distanceText(state.distanceMetres)} to ${first.from.shortName}"
@@ -142,7 +148,7 @@ private fun SmartHeader(state: AppState, board: BoardData, journey: Journey, can
                     Icon(Icons.Filled.PushPin, null, Modifier.size(12.dp), tint = c.ink2)
                     Spacer(Modifier.width(5.dp)); Label("Pinned", color = c.ink2, size = 11)
                 } else {
-                    Label(status, color = if (journey.cancelled || late) c.warning else c.ink2, size = 11)
+                Label(status, color = if (focusState?.warning == true || journey.cancelled || late && !focused) c.warning else c.ink2, size = 11)
                     if (explicitlyPinned) {
                         Label(" · ", color = c.ink3, size = 11)
                         Icon(Icons.Filled.PushPin, null, Modifier.size(12.dp), tint = c.ink2)
@@ -159,8 +165,7 @@ private fun SmartHeader(state: AppState, board: BoardData, journey: Journey, can
                     Text(directionFigure.value, color = if (late) c.warning else c.ink,
                         modifier = Modifier.testTag("home-primary-figure"),
                         fontSize = when {
-                            directionFigure.value.equals("NOW", ignoreCase = true) -> 36.sp
-                            directionFigure.value.length > 3 -> 50.sp
+                            wideFigure(directionFigure) -> 50.sp
                             else -> 64.sp
                         },
                         lineHeight = 58.sp, fontWeight = FontWeight(250), letterSpacing = (-2).sp,
@@ -220,7 +225,9 @@ private fun SmartHeader(state: AppState, board: BoardData, journey: Journey, can
             }
         }
         if (!departed) {
-            board.journeys.firstOrNull { candidate -> !candidate.cancelled && candidate.effectiveDeparture > journey.effectiveDeparture &&
+            val following = alternatives ?: board
+            following.journeys.firstOrNull { candidate -> journeyAllowed(candidate, state.enabledModes) &&
+                !candidate.cancelled && candidate.effectiveDeparture > journey.effectiveDeparture &&
                 !(candidate.departure == journey.departure && candidate.legs.firstOrNull()?.line == journey.legs.firstOrNull()?.line) }?.let { next ->
                 Rule(Modifier.padding(horizontal = PagePadding))
                 Row(Modifier.fillMaxWidth().heightIn(min = 44.dp).padding(horizontal = PagePadding)
@@ -228,9 +235,7 @@ private fun SmartHeader(state: AppState, board: BoardData, journey: Journey, can
                     val nextMode = next.legs.firstOrNull()?.mode
                     Label("Next ${when (nextMode) { "ferry" -> "ferry"; "metro" -> "metro"; "train" -> "train"; else -> "service" }}",
                         Modifier.width(96.dp), size = 9)
-                    val m = minutesBetween(state.now, next.effectiveDeparture)
-                    val nextFigure = if (board.offline || state.now - board.generatedAt > 90_000 || !next.realtime) ""
-                        else if (m > 99) "${(m / 60f).toInt()}H" else "$m min"
+                    val nextFigure = nextServiceFigure(next, following, state.now)
                     Text(nextFigure, color = c.ink,
                         fontSize = 17.sp, fontWeight = FontWeight.Light)
                     Spacer(Modifier.weight(1f))
@@ -256,12 +261,17 @@ private fun SmartHeader(state: AppState, board: BoardData, journey: Journey, can
 @Composable
 private fun SavedTripRow(trip: SavedTrip, state: AppState, actions: UiActions, modifier: Modifier = Modifier) {
     val c = LocalTrainColors.current
-    val largeText = LocalDensity.current.fontScale > 1.15f
     var showActions by remember(trip.id) { mutableStateOf(false) }
     val focused = state.focus?.tripId == trip.id
     val shown = state.selectedTripId == trip.id
-    val lines = trip.lines.ifEmpty { listOf("T") }
-    val stacked = lines.size > 1 && trip.from.shortName.length + trip.to.shortName.length > 26
+    val lines = trip.lines
+    val highlighted = focused || shown
+    val metadata = state.tripMetadata[trip.id].orEmpty()
+    val status = state.focus?.takeIf { it.tripId == trip.id }
+        ?.let { savedTripFocusStatus(it, state.now, state.focusComplete) }
+        ?: if (shown) "Shown above" else ""
+    val summary = listOf(status, metadata).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "Saved trip" }
+    val justAdded = state.justAddedTripId == trip.id && shown && state.focus == null
     // Plain remember: the lazy list's saved state would bring an undone row back already dismissed.
     val dismissState = remember(trip.id) { SwipeToDismissBoxState(SwipeToDismissBoxValue.Settled, positionalThreshold = { it * 0.5f }) }
     SwipeToDismissBox(dismissState, backgroundContent = {
@@ -272,71 +282,50 @@ private fun SavedTripRow(trip: SavedTrip, state: AppState, actions: UiActions, m
         onDismiss = { actions.deleteTrip(trip.id) }) {
     Column(Modifier.fillMaxWidth().background(c.ground).padding(horizontal = PagePadding)) {
     Box(Modifier.fillMaxWidth()) {
-    Row(Modifier.fillMaxWidth().heightIn(min = if (stacked) 92.dp else 72.dp)
+    Row(Modifier.fillMaxWidth().heightIn(min = 72.dp)
         .semantics { customActions = listOf(CustomAccessibilityAction("Trip actions") { showActions = true; true }) }
         .combinedClickable(role = Role.Button, onClick = { actions.openTrip(trip.id) }, onLongClick = { showActions = true })
         .padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Row(Modifier.width(15.dp).height(if (stacked) 72.dp else 52.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(Modifier.width(15.dp).height(52.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             lines.take(3).forEach { code ->
                 Box(Modifier.width(3.dp).fillMaxHeight().background(lineColor(code, if (code.startsWith("F")) "ferry" else "train", c, true)))
             }
         }
         Spacer(Modifier.width(13.dp))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-            if (stacked) {
-                val firstCode = lines.first()
-                val lastCode = lines.last()
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                lines.firstOrNull()?.let { firstCode ->
                     LineChip(firstCode, if (firstCode.startsWith("F")) "ferry" else "train", firstCode,
                         Modifier.padding(end = 6.dp), height = 20.dp, horizontalPadding = 5.dp)
-                    Text(trip.from.shortName, color = c.ink, fontSize = 19.sp, lineHeight = 22.sp,
-                        fontWeight = FontWeight.Light, letterSpacing = (-.28).sp)
                 }
-                Row(Modifier.fillMaxWidth().padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("→", Modifier.width(51.dp), color = c.ink3, fontSize = 19.sp,
-                        fontWeight = FontWeight.Light, textAlign = TextAlign.Center)
+                Text(trip.from.shortName, Modifier.weight(1f, fill = false), color = c.ink, fontSize = 19.sp,
+                    lineHeight = 22.sp, fontWeight = FontWeight.Light, letterSpacing = (-.28).sp,
+                    maxLines = 2, overflow = TextOverflow.Clip)
+                Text("  →  ", color = c.ink3, fontSize = 19.sp, fontWeight = FontWeight.Light)
+                if (lines.size > 1) {
+                    val lastCode = lines.last()
                     LineChip(lastCode, if (lastCode.startsWith("F")) "ferry" else "train", lastCode,
                         Modifier.padding(end = 6.dp), height = 20.dp, horizontalPadding = 5.dp)
-                    Text(trip.to.shortName, color = c.ink, fontSize = 19.sp, lineHeight = 22.sp,
-                        fontWeight = FontWeight.Light, letterSpacing = (-.28).sp)
                 }
-            } else {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    val firstCode = lines.first()
-                    LineChip(firstCode, if (firstCode.startsWith("F")) "ferry" else "train", firstCode,
-                        Modifier.padding(end = 6.dp), height = 20.dp, horizontalPadding = 5.dp)
-                    Text(trip.from.shortName, Modifier.weight(trip.from.shortName.length.coerceAtLeast(1).toFloat()),
-                        color = c.ink, fontSize = 19.sp, lineHeight = 22.sp, fontWeight = FontWeight.Light,
-                        letterSpacing = (-.28).sp, maxLines = 2, overflow = TextOverflow.Clip)
-                    Text("  →  ", color = c.ink3, fontSize = 19.sp, fontWeight = FontWeight.Light)
-                    if (lines.size > 1) {
-                        val lastCode = lines.last()
-                        LineChip(lastCode, if (lastCode.startsWith("F")) "ferry" else "train", lastCode,
-                            Modifier.padding(end = 6.dp), height = 20.dp, horizontalPadding = 5.dp)
-                    }
-                    Text(trip.to.shortName, Modifier.weight(trip.to.shortName.length.coerceAtLeast(1).toFloat()),
-                        color = c.ink, fontSize = 19.sp, lineHeight = 22.sp, fontWeight = FontWeight.Light,
-                        letterSpacing = (-.28).sp, maxLines = 2, overflow = TextOverflow.Clip)
-                }
+                Text(trip.to.shortName, Modifier.weight(1f, fill = false), color = c.ink, fontSize = 19.sp,
+                    lineHeight = 22.sp, fontWeight = FontWeight.Light, letterSpacing = (-.28).sp,
+                    maxLines = 2, overflow = TextOverflow.Clip)
             }
-            val stateText = when { focused && state.focus?.pinned == true -> "Running · Pinned"; focused -> "Running"; shown -> "Shown above"; else -> "" }
-            val metadata = state.tripMetadata[trip.id].orEmpty()
-            val summary = listOf(stateText, metadata).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "Saved trip" }
-            if (largeText) {
-                Label(summary, Modifier.fillMaxWidth().padding(top = 6.dp),
-                    color = if (focused || shown) c.ink2 else c.ink3, maxLines = 3)
-                Row(Modifier.fillMaxWidth().padding(top = 3.dp), horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Label("Departures", color = c.ink2)
-                    Chevron()
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (justAdded) {
+                    val distance = justAddedDistance(metadata)
+                    Text(buildAnnotatedString {
+                        withStyle(SpanStyle(fontSize = 12.sp, fontStyle = FontStyle.Italic,
+                            fontWeight = FontWeight.Normal, letterSpacing = 0.sp)) { append("Just added") }
+                        if (distance.isNotEmpty()) append(" · ${distance.uppercase(java.util.Locale.ENGLISH)}")
+                    }, Modifier.weight(1f), color = c.ink3, fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold, letterSpacing = 1.4.sp, maxLines = 2)
+                } else {
+                    Label(summary, Modifier.weight(1f), color = if (highlighted) c.ink2 else c.ink3, maxLines = 2)
                 }
-            } else {
-                Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Label(summary, Modifier.weight(1f), color = if (focused || shown) c.ink2 else c.ink3, maxLines = 2)
-                    Spacer(Modifier.width(8.dp))
-                    Label("Departures", color = c.ink2)
-                    Chevron()
-                }
+                Spacer(Modifier.width(8.dp))
+                Label("Departures", color = c.ink2)
+                Chevron()
             }
         }
     }
@@ -372,7 +361,6 @@ private fun HomeFooter(actions: UiActions) {
 }
 
 private fun Leg.modeName() = if (mode.equals("ferry", true)) "ferry" else "train"
-private fun distanceText(metres: Int): String = if (metres < 1000) "${(metres / 10) * 10} m" else if (metres < 10_000) "${"%.1f".format(metres / 1000f)} km" else "${metres / 1000} km"
 private fun focusedInstruction(journey: Journey, now: Long): String {
     journey.legs.zipWithNext().forEach { (before, after) ->
         if (now < before.effectiveArrival) {
@@ -391,5 +379,5 @@ private fun focusedInstruction(journey: Journey, now: Long): String {
 }
 private fun placeClause(raw: String?, mode: String): String {
     val p = platformText(raw, mode, full = true) ?: return ""
-    return " · ${if (mode == "ferry" && !p.startsWith("Wharf", true)) "Wharf " else if (mode != "ferry" && !p.startsWith("Platform", true)) "Platform " else ""}$p"
+    return " · $p"
 }

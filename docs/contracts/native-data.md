@@ -118,8 +118,9 @@ Queensland border.
 
 `OfflinePlanner.initialize()` installs or recovers a validated generation.
 `plan(from,to,at,modes,limit)` runs on `Dispatchers.IO`, scans active service
-connections for the prior, current and following Sydney service days, and
-handles GTFS times beyond 24:00. GTFS times are converted as Sydney civil time,
+connections for the prior, current and two following Sydney service dates,
+bounded by the request's planning horizon, and handles GTFS times beyond 24:00.
+GTFS times are converted as Sydney civil time,
 including daylight-saving transitions, rather than adding elapsed seconds to
 midnight.
 
@@ -205,10 +206,16 @@ expired snapshot as scheduled-only. Snapshot expiry is the source header
 timestamp plus 90 seconds. The server polls every upstream feed once a
 minute; while a feed's header is under 30 seconds old at receipt, its
 snapshot is still fresh when the replacement lands, and the refresh log's
-`header_age` shows that margin. A connection joins only on exact source, trip ID and service date, then stop
+`header_age` shows that margin. Native clients cap the supplied expiry at
+header plus 90 seconds, reject headers more than five minutes ahead of receipt,
+and do not replace a newer source header with an older one. Decoded timestamps
+must be finite and within the shared client Date range.
+A connection joins only on exact source, trip ID and service date, then stop
 ID and/or sequence. Assigned stop IDs are resolved through the same source's
 stop table. `noData` suppresses a stop estimate and the trip default delay;
-`skipped` prevents boarding or alighting. A replacement trip uses only
+`skipped` prevents boarding or alighting while allowing an already-boarded
+passenger to traverse that stop. A skipped focused endpoint cancels the journey.
+A replacement trip uses only
 static connections whose two stops remain explicitly present in its update.
 Added or unscheduled trips without a static stop pattern cannot be routed
 locally and remain the online fallback's responsibility.
@@ -244,11 +251,14 @@ so the header does not describe it as the next train.
 
 Retained observations keep their departure, arrival, delay and cancellation
 snapshot. A per-journey retention marker prevents an old row from borrowing
-the freshness of a new board. Retained realtime rows use `LAST KNOWN`, scheduled
-rows use `SCHEDULED`, and offline views keep absolute clocks without live
-countdowns. Pinned snapshots follow the same rule when refresh fails; connectivity
-loss cannot reset a delayed journey to its earlier printed arrival. These are
-native exceptions to the web's stale-row treatment (owner ruling, 2026-09-07).
+the freshness of a new board. Departed services keep an elapsed figure and `AGO`
+even when retained or offline, matching web; beyond 99 minutes the figure uses
+rounded hours with a small H. Future rows always keep the standard numerical
+countdown, including retained observations and failed refreshes (owner ruling,
+2026-09-08, shared with web). The existing delay or scheduled label may accompany
+the number; `LAST KNOWN` never replaces it. Freshness indicators remain unchanged.
+Pinned snapshots follow the same rule; connectivity loss cannot reset a delayed
+journey to its earlier printed arrival.
 
 ## Sydney Trains service dates
 

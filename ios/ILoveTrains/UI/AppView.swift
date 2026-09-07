@@ -1,7 +1,5 @@
 import SwiftUI
 
-private let feedbackSuccessMessage = "Feedback sent. Thank you."
-
 struct TrainAppView: View {
     @ObservedObject var model: TrainViewModel
 
@@ -59,9 +57,9 @@ private struct TrainAppContent: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier(undo ? "message-undo" : "message-dismiss")
                 .task(id: message) {
-                    guard message == feedbackSuccessMessage else { return }
+                    guard model.state.messageAutoDismiss else { return }
                     try? await Task.sleep(for: .seconds(4))
-                    guard !Task.isCancelled, model.state.message == message else { return }
+                    guard !Task.isCancelled, model.state.message == message, model.state.messageAutoDismiss else { return }
                     model.dismissMessage()
                 }
             }

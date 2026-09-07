@@ -23,6 +23,14 @@
   The script restores display size and font scale on exit. Inputs are mapped
   API captures with declared stress deltas in `fixtures/conformance/calibration.json`;
   test hooks are packaged only in the instrumentation APK.
+  A capture retries the specific Compose `Failed waiting for PixelCopy` error at
+  most twice after the first attempt, logging each retry; any other assertion or
+  a third PixelCopy failure remains fatal and no prior bitmap is reused.
+  Setup location capture states cover initial, denied, failed and approximate
+  results in both schemes. `UiCalibrationTest#locationSetupStatesStayReachable`
+  additionally drives every loading/recovery action and the station choice;
+  `SetupLocationControllerTest` checks explicit intent, repeated taps, typing,
+  late results, additional trips and navigation in isolated app storage.
   It also checks feedback-success timeout, simplified Settings selection marks,
   and scrolling to a retained departed T9 offline; its captures include
   Home/Board `Now` and retained-journey states, and the swipe-to-delete pair:
@@ -30,6 +38,10 @@
   then `cancel`, so the fixture's no-op actions never see a dismiss) and
   `home-deleted` seeds the bar with `undoAvailable`. Current native exemplars
   are indexed in `docs/contracts/android-deviations.md`.
+  Run the real SQLite engine gate, including failed-candidate rollback and
+  database application-ID rejection, with `cd android && ./gradlew
+  :app:connectedDebugAndroidTest
+  -Pandroid.testInstrumentationRunnerArguments.class=com.ilovetrains.app.OfflinePlannerInstrumentedTest`.
 - `shoot-ios.sh` — install and capture seeded SwiftUI states on one booted
   iPhone simulator. Build first, then set `ILOVETRAINS_SIMULATOR_ID`,
   `ILOVETRAINS_IOS_APP` and optionally `OUT`; state arguments replace the
@@ -38,6 +50,17 @@
   shots half a second apart byte-identical, `SETTLE_SECONDS` the cap, default
   3), records capture metrics and restores the content-size and status-bar
   overrides.
+  `setup-location-{idle,loading,denied,failed,disabled,empty,approximate}`
+  and their `-light` variants capture native setup's location states. The iOS
+  `AppFlowTests` location tests reset authorization in a fresh test storage
+  domain, supply Town Hall through `XCUIDevice.location`, and drive the actual
+  system grant/denial sheet, autofill, destination keyboard focus and retry.
+  Use a dedicated simulator for these tests: another job launching the same
+  bundle interrupts them even when the build directories differ.
+  A fresh simulator may show the software keyboard where an existing simulator
+  connected to the Mac keyboard hides it. A setup diff confined to the keyboard
+  and the action rail above it is a simulator input-setting difference; inspect
+  the upper screen and verify real typing before replacing an existing baseline.
   `home-deleted` seeds a pending deletion with the bar showing. The mid-swipe
   `home-deleting` frame is a gesture in flight that no seed can produce; the
   `AppFlowTests.testSwipeRevealsDeleteAndUndoRestoresRow` UI test attaches it,
@@ -146,11 +169,14 @@ assertion reads the canonical `web/js/version.js` rather than a fixed string.
 
 The checker first fetches `/js/settings.js` and refuses to run if that server
 is not serving the Settings module. Keep the server alive for the whole run.
-Its parallel batches — the four Settings viewport drives, then the four
-flag-on transfer-limit drives — run on `CDP_PORT` through `CDP_PORT+3`, and
-later drives reuse the first port sequentially. Each
-calibration filename has one writer so later assertion-only cases cannot
-overwrite the reviewed state.
+It waits for the controller before driving it; the filtered-Home calibration
+pins its clock and service times so reruns cannot differ just because time passed.
+The four initial browser drives run in parallel on `CDP_PORT` through
+`CDP_PORT+3`, then the four flag-on transfer-limit drives, and later drives
+reuse those ports after each parallel batch.
+The feedback frames cover 390×844 and 412×732 in both schemes after the
+typed draft survives navigation away and back. Each calibration filename has
+one writer so later assertion-only cases cannot overwrite the reviewed state.
 
 ## comps/
 

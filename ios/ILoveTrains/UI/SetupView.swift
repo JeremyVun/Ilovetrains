@@ -1,5 +1,12 @@
 import SwiftUI
 
+// A blinking caret is the one thing on the setup sheet a screenshot cannot pin.
+#if DEBUG
+private let calibrating = ProcessInfo.processInfo.arguments.contains("--calibration")
+#else
+private let calibrating = false
+#endif
+
 struct SetupView: View {
     @ObservedObject var model: TrainViewModel
     @Environment(\.trainColors) private var colors
@@ -14,7 +21,7 @@ struct SetupView: View {
     private var recent: [Station] { selectingFrom ? model.state.recentFrom : model.state.recentTo }
     private var matches: [Station] {
         guard query.count >= 3 else { return [] }
-        return model.state.stations.filter { $0.id != from?.id && !$0.modes.isDisjoint(with: model.state.enabledModes) }
+        return model.state.stations.filter { $0.id != from?.id }
             .map { ($0, fuzzyScore($0.name, query)) }.filter { $0.1 > 0 }
             .sorted { $0.1 > $1.1 }.prefix(8).map(\.0)
     }
@@ -32,13 +39,12 @@ struct SetupView: View {
                 LazyVStack(spacing: 0) {
                     setupField(label: "From", station: from, placeholder: "Origin station", field: .from)
                     setupField(label: "To", station: to, placeholder: "Destination station", field: .to)
-                    if selectingFrom && query.isEmpty && model.state.useLocation && !model.state.locationGranted && !model.state.locationDenied {
-                        sectionLabel("Nearby")
-                        resultButton("Use my location", detail: nil, id: "use-location", action: model.requestLocation)
+                    if selectingFrom && query.isEmpty {
+                        locationSection
                     }
                     if (selectingFrom || selectingTo) && query.isEmpty && !recent.isEmpty {
                         sectionLabel("You searched before")
-                        ForEach(Array(recent.filter { $0.id != from?.id && !$0.modes.isDisjoint(with: model.state.enabledModes) }.prefix(6))) { station in stationResult(station) }
+                        ForEach(Array(recent.filter { $0.id != from?.id }.prefix(6))) { station in stationResult(station) }
                     } else if (selectingFrom || selectingTo) && (1...2).contains(query.count) {
                         TrainLabel(text: "Type at least three letters").frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 16)
                     } else if (selectingFrom || selectingTo) && query.count >= 3 && matches.isEmpty {
@@ -58,9 +64,36 @@ struct SetupView: View {
                 ActionRail(text: "Choose where you’re leaving from", enabled: false) { }
             }
         }
-        .onAppear { focusedField = selectingFrom ? .from : .to }
+        .onAppear { focusedField = selectingTo ? .to : model.state.setupLocationStatus == .idle ? .from : nil }
+        .onChange(of: model.state.setupLocationStatus) { _, status in
+            if status == .locating || status == .chooseStation { focusedField = nil }
+        }
         .onChange(of: from?.id) { _, _ in query = ""; focusedField = selectingFrom ? .from : .to }
         .onChange(of: to?.id) { _, _ in query = "" }
+    }
+
+    @ViewBuilder private var locationSection: some View {
+        let status = model.state.setupLocationStatus
+        let blocked = model.state.locationDenied
+        sectionLabel("Nearby")
+        if status == .locating {
+            HStack(spacing: 12) {
+                ProgressView().tint(colors.ink2)
+                Text("Finding your location…").font(.system(size: 16)).foregroundStyle(colors.ink2)
+                Spacer()
+            }.frame(minHeight: 56).accessibilityElement(children: .combine)
+                .accessibilityIdentifier("location-progress")
+            TrainRule()
+        } else {
+            if let message = status.message ?? (blocked ? "Location is blocked. Allow access in Settings or search for a station." : nil) {
+                Text(message).font(.system(size: 14)).foregroundStyle(colors.ink2)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 12).padding(.bottom, 4)
+                    .accessibilityIdentifier("location-message")
+            }
+            let title = blocked || status == .servicesDisabled ? "Open Settings" : status == .idle || status == .chooseStation ? "Use my location" : "Try again"
+            resultButton(title, detail: nil, id: "use-location", action: model.requestLocation)
+            ForEach(model.state.nearbyStations) { station in stationResult(station) }
+        }
     }
 
     private func setupField(label: String, station: Station?, placeholder: String, field: Field) -> some View {
@@ -68,10 +101,13 @@ struct SetupView: View {
         return VStack(alignment: .leading, spacing: 6) {
             TrainLabel(text: label)
             if active {
-                TextField(placeholder, text: $query)
+                TextField(placeholder, text: Binding(get: { query }, set: { value in
+                        if field == .from && selectingFrom && value != query { model.setupOriginQueryChanged() }
+                        query = value
+                    }))
                     .textInputAutocapitalization(.words).autocorrectionDisabled()
                     .submitLabel(.search).focused($focusedField, equals: field)
-                    .font(.system(size: 20, weight: .regular)).foregroundStyle(colors.ink).tint(colors.ink)
+                    .font(.system(size: 20, weight: .regular)).foregroundStyle(colors.ink).tint(calibrating ? .clear : colors.ink)
                     .frame(minHeight: 44)
                     .onSubmit {
                         if let first = matches.first { choose(first) }

@@ -79,6 +79,23 @@ class PredictionTest {
         assertNull(visibleFocus(data.copy(modes = setOf("ferry"), focus = focus.copy(journey = mixed)), now))
     }
 
+    @Test fun inferenceRequiresBothEndpointCoordinatesEvenWithSpeedEvidence() {
+        for (missingOrigin in listOf(false, true)) {
+            val origin = if (missingOrigin) Station(rhodes.id, rhodes.name) else rhodes
+            val destination = if (missingOrigin) central else Station(central.id, central.name)
+            val trip = SavedTrip("a", origin, destination)
+            val journey = Journey(listOf(Leg("T9", "train", "Central", origin, destination,
+                now - 300_000, now + 1_200_000)))
+            val board = BoardData(origin, destination, listOf(journey), now)
+            val data = UserData(trips = listOf(trip), lastAnswer = LastAnswer(
+                trip.id, false, now - 400_000, origin.id, board, journey))
+            for (speed in listOf(null, 12.0)) {
+                assertNull("missingOrigin=$missingOrigin, speed=$speed",
+                    inferredFocus(data, Fix(-33.85, 151.13, now, speed), now))
+            }
+        }
+    }
+
     @Test fun historyUsesSydneyTimeWhenDeviceTimezoneDiffers() {
         val previous = TimeZone.getDefault()
         try {

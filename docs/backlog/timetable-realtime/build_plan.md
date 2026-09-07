@@ -32,8 +32,12 @@ Seam contract, backend:
   copied into the one-hour store and served with the past `Cache-Control`. An
   in-transit response stays in the 30-second store and is served with the live
   `Cache-Control`, so the CDN also re-asks within 30 seconds.
-- `internal/cache` gains two small methods to support this: a fresh-only read
-  that does not fetch, and a put. No other cache semantics change.
+- `internal/cache` gains three small methods to support this: a fresh-only
+  read that does not fetch, a put, and a stale read used only after the
+  30-second flight has failed, so the 24-hour stale fallback `api.md` already
+  promises for a settled window stays reachable (build deviation accepted
+  2026-09-07). Nothing from a stale read is ever promoted. No other cache
+  semantics change.
 - The contract paragraph in `api.md` that begins "Cache: a bucket more than 20
   minutes in the past is settled" changes to state both conditions. The
   sentence in the paging paragraph saying a settled page's `estimated` "can
@@ -117,11 +121,25 @@ Seam contract:
   absolute stop time, choose the candidate whose instance places that stop
   within **3 hours [owner]** of the given time. Otherwise choose the
   candidate whose instance start is nearest the header time within a window
-  from **6 hours [owner]** before the header to **24 hours [owner]** after
-  it. Two candidates at equal distance, or none in the window, is
+  from **24 hours [owner, widened from 6 on 2026-09-07]** before the header
+  to **3 hours [owner, narrowed from 24 on 2026-09-07]** after it. The
+  narrowing followed the look-ahead measurement: Sydney Trains publishes
+  nothing more than 0.9 hours ahead, and a 24-hour look-ahead would let a
+  morning trip republished in the evening resolve to tomorrow's instance. The widening followed the replay: 40
+  updates, 23 of them cancellations with a current timestamp, had their only
+  running instance 7 to 21 hours before a 01:33 header, and phase 3's rule
+  that a cancellation is true for the service day needs the whole day
+  reachable. Two candidates at equal distance, or none in the window, is
   *ambiguous* or *unmatched*: the update is dropped and counted. A trip ID
   absent from the index is *unknown* and dropped and counted. An explicit
-  `start_date` still wins when present.
+  `start_date` still wins when present. When the stop-time rule finds no
+  instance within 3 hours (the index carries only first departures, so a
+  late stop on a long trip misses), resolution falls through to the header
+  rule rather than dropping the update (orchestrator ruling on the phase 2
+  review, 2026-09-07).
+- The runtime refresh persists the compiler's manifest, trip index included,
+  to `current.json`; only the *served* manifest strips it (phase 2 review
+  defect, 2026-09-07). Replay counts live in tests, not in contracts.
 - The resolved date fills `serviceDate` in the snapshot, so client joins are
   unchanged.
 - Add `sydneytrains-0.pb` (79,085 bytes) and its capture metadata to
@@ -131,9 +149,17 @@ Seam contract:
 Verify gate:
 
 - Replaying `sydneytrains-0.pb` through the normalizer with the September 6
-  bootstrap index yields at least **200** accepted updates (254 exact ID
-  matches minus those the phase 3 freshness rule will still drop; record the
-  exact number in the test). Zero accepted is a failure.
+  bootstrap index yields a non-zero accepted count; zero is the failure. The
+  plan's earlier ≥200 target was miscounted (owner accepted the measured
+  chain 2026-09-07): only 149 of the 308 feed trips exist in the compiled
+  package, the rest being non-revenue, out-of-service or NSW
+  TrainLink-operated trips phones can never join. Measured with the 6-hour
+  look-back and the old 90-second gate: raw 308, accepted 69, unknown 159,
+  ambiguous 40, stale 40. With the 24-hour look-back, 3-hour look-ahead and
+  phase 3's relationship rule the same replay is raw 308, accepted 129,
+  unknown 159, ambiguous 0, stale 20, with all 98 indexed cancellations and
+  replacements published; those pins live in
+  `TestNormalizeRealtimeReplaysTheCapturedSydneyTrainsFeed`.
 - Table tests: trip running daily seen just after midnight resolves to the
   previous service day; the same trip seen at 23:00 resolves to today; a
   Friday-only trip seen on Saturday 00:30 resolves to Friday; a trip with an
@@ -146,7 +172,7 @@ Verify gate:
   with the resolver rule; `tfnsw-open-data.md`: close the service-date gap
   note with the outcome.
 
-Done: ☐
+Done: ☑ 2026-09-07 (merged to main, Fable-reviewed)
 
 ## Phase 3 — freshness by relationship, and refresh observability
 
@@ -166,8 +192,12 @@ Seam contract:
     5 seconds after it. Older delay predictions are dropped and counted.
   - The accepted timestamp is still carried to clients unchanged.
 - Captured distribution to check the number against (Sydney Trains, 01:33
-  capture): scheduled updates aged ≤90 s: 42; ≤5 min: 6; ≤30 min: 5; ≤6 h:
-  23; older: 74. Cancellations: 59 fresh, 9 older than six hours.
+  capture, measured with the original 6-hour look-back): scheduled updates
+  aged ≤90 s: 42; ≤5 min: 6; ≤30 min: 5; ≤6 h: 23; older: 74. Cancellations:
+  59 fresh, 9 older than six hours. Re-measured under the shipped resolver
+  (indexed rows only): scheduled 51, of which ≤90 s 24, ≤10 min 7, ≤1 h 3,
+  ≤7 h 5, older 12, so 31 accepted and 20 dropped; cancellations 59 (53
+  fresh, 6 older than 7 h) and replacements 39 all accepted.
 - `refreshSource` logs one line per successful refresh:
   `realtime source=<s> raw=<n> accepted=<n> unknown=<n> ambiguous=<n>
   stale=<n> duplicate=<n> header_age=<s>`; and one warning line when raw is
@@ -179,14 +209,15 @@ Seam contract:
 Verify gate:
 
 - Table tests for each relationship at 0 s, 5 min, 11 min and 7 h old.
-- Replay of `sydneytrains-0.pb`: every one of the 68 cancellations and 88
-  replacements is accepted (minus any unknown or ambiguous dates from phase
-  2); the count of dropped stale delays is asserted.
+- Replay of `sydneytrains-0.pb`: every cancellation and replacement whose
+  trip is in the index is accepted (120 structural updates are `unknown`
+  because their trips are outside the compiled package); the count of
+  dropped stale delays is asserted.
 - A test that a feed normalizing to zero accepted updates emits the warning.
 - `go test ./...`; run the server locally without a key and confirm the log
   line appears on the first refresh cycle.
 
-Done: ☐
+Done: ☑ 2026-09-07 (merged to main, Fable-reviewed)
 
 ## Phase 4 — feed poll cadence
 
@@ -196,9 +227,10 @@ Owns: `internal/native/service.go`, its test, `docs/contracts/native-data.md`,
 `docs/operations/deploy.md`.
 
 Seam contract: `defaultRealtimeInterval` becomes 60 seconds. Snapshot expiry
-stays header plus 90 seconds, so a snapshot fetched at second 0 is still
-fresh when the next fetch lands at second 60, and clients keep their own
-30-second refresh against the server. Phone refresh and the Trip Planner
+stays header plus 90 seconds, so a snapshot whose header was under 30
+seconds old at receipt is still fresh when the next fetch lands at second
+60 (the refresh log's `header_age` shows the margin), and clients keep
+their own 30-second refresh against the server. Phone refresh and the Trip Planner
 30-second cache are unchanged: they cost one upstream call per distinct
 station pair per 30 seconds however many phones ask. Feed requests fall from
 14,400 to 7,200 a day against a quota recorded as believed 60,000, unverified.
@@ -208,4 +240,4 @@ neither contract currently states the feed cadence, so add one sentence to
 `native-data.md`, "Realtime snapshots". The 30 seconds at its "Foreground
 refresh" sentence is the phone's refresh against the server and stays. Small enough to fold into phase 3's agent.
 
-Done: ☐
+Done: ☑ 2026-09-07 (merged to main with phase 3)

@@ -13,6 +13,9 @@ in private app storage. It contains saved trips, history, completed rides,
 daily home votes, recent stations, preferences, the last answer and the full
 focused journey with its source evidence. The Kotlin `Wire` adapter owns its
 explicit encoding; it accepts API ISO timestamps and stores epoch milliseconds.
+The focused service and its alternatives retain separate board sources in the
+personal document, so refreshing one cannot renew the other's freshness.
+Older documents without alternatives remain valid.
 Raw coordinates obtained from Android location providers are never serialized.
 Cloud backup and device transfer are excluded.
 
@@ -65,6 +68,9 @@ by [native-data.md](native-data.md).
 
 The same generated prediction and row cases run in XCTest. Native anonymous
 telemetry is disabled; explicit feedback drafts remain only in controller memory.
+Both native journey decoders reject empty journeys and timestamps outside the finite
+JavaScript Date range (absolute epoch milliseconds at most 8.64e15). Malformed
+journey evidence must not discard otherwise valid saved trips.
 
 ## localStorage schema
 
@@ -477,10 +483,15 @@ A fix arriving after the cached paint re-runs `locate` only when the selection
 was predicted, never over an explicit tap. Trip rows stay ordered by
 `rankTrips`, with the header's trip first.
 
-Android first-run setup asks for location once and prefills From when granted.
-That setup fix casts no home vote. Selecting or clearing an origin prevents a
-later fix from overriding the field; saving the chosen origin gives the normal
-first-trip home fallback. See [Android differences](android-deviations.md).
+Both native clients request setup location after an explicit tap, then fill From
+only when the fix identifies a nearby eligible station confidently. A granted
+permission can silently prefill an untouched first-trip origin; additional trips
+require the explicit location action. Typing, selecting or clearing From cancels
+pending autofill; a later explicit location tap authorizes a new attempt. Setup
+fixes cast no home vote, infer no ride and create no saved trip. Saving the chosen
+origin gives the normal first-trip home fallback. Accuracy, coordinates, lookup
+status and nearby choices remain transient device state. The confidence and
+recovery rules live in [ui.md](ui.md#setup-and-station-search).
 
 ### The no-`here` branch: today's formula, unchanged
 

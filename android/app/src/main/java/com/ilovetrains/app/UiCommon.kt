@@ -19,6 +19,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -112,7 +114,7 @@ fun LineChip(line: String, mode: String, text: String = line, modifier: Modifier
              height: Dp = 22.dp, horizontalPadding: Dp = 7.dp) {
     val c = LocalTrainColors.current
     // The chip is sized in text units: enlarged text grows it instead of being clipped by it.
-    Box(modifier.height(height * LocalDensity.current.fontScale).clip(RoundedCornerShape(3.dp))
+    Box(modifier.height(height * LocalDensity.current.fontScale).clip(RoundedCornerShape(LineChipCornerRadius))
         .background(lineColor(line, mode, c, fill = true)).padding(horizontal = horizontalPadding).testTag("chip-$text"),
         contentAlignment = Alignment.Center) {
         Text(text.uppercase(), color = chipInk(line, mode, c), fontSize = 14.sp,
@@ -120,17 +122,31 @@ fun LineChip(line: String, mode: String, text: String = line, modifier: Modifier
     }
 }
 
+internal val LineChipCornerRadius = 3.dp
+
 fun platformText(raw: String?, mode: String, full: Boolean = false): String? {
     if (raw.isNullOrBlank()) return null
-    val cleaned = raw.trim().replace(Regex("^(Platform|Wharf)\\s*", RegexOption.IGNORE_CASE), "")
+    val value = raw.trim()
+    val place = if (mode.equals("ferry", true)) "Wharf" else "Platform"
+    if (full) {
+        if (Regex("\\b$place\\b", RegexOption.IGNORE_CASE).containsMatchIn(value)) return value
+        if (place == "Wharf" && value.startsWith("Side", ignoreCase = true)) return value
+        return "$place $value"
+    }
+    val cleaned = value.replace(Regex("^(Platform|Wharf)\\s*", RegexOption.IGNORE_CASE), "")
     if (mode.equals("ferry", true)) {
         val numbered = Regex("\\d+").find(cleaned)?.value
-        if (numbered == null) return if (full) raw else "Wharf"
         val side = Regex("Side\\s*([A-Za-z0-9]+)", RegexOption.IGNORE_CASE).find(cleaned)?.groupValues?.get(1)
-        return if (full) "Wharf $numbered${side?.let { ", Side $it" } ?: ""}" else numbered + (side ?: "")
+        return if (numbered == null) side ?: "Wharf" else numbered + (side ?: "")
     }
     val platform = Regex("[A-Za-z0-9]+(?:[A-Za-z])?").find(cleaned)?.value ?: cleaned
-    return if (full) "Platform $platform" else platform
+    return platform
+}
+
+fun departureCapText(raw: String?, mode: String): String? {
+    val compact = platformText(raw, mode) ?: return null
+    if (!mode.equals("ferry", true)) return platformText(raw, mode, full = true)
+    return if (compact == "Wharf") "Wharf" else platformText(raw, mode, full = true)
 }
 
 fun minutesBetween(from: Long, to: Long): Int = ((to / 60_000) - (from / 60_000)).toInt()
@@ -142,24 +158,175 @@ fun figureFor(journey: Journey, board: BoardData?, now: Long): Figure {
     val stale = board == null || board.offline || journey.retained || now - board.generatedAt > 90_000
     val mins = minutesBetween(now, departure)
     if (journey.cancelled) return Figure("—", provenance = "Cancelled", past = mins < 0)
-    if (stale) return Figure("", provenance = if (journey.retained && journey.realtime) "Last known" else "Scheduled", past = mins < 0)
-    if (mins < 0) return Figure(abs(mins).toString(), "min", "Ago", past = true)
-    val liveRealtime = board.source == "live" && journey.realtime
-    if (mins == 0) return Figure("Now", provenance = if (liveRealtime) "Departing" else "Scheduled")
-    if (mins > 99) return Figure(((mins / 60f).roundToInt()).toString(), "H", if (liveRealtime) "" else "Scheduled")
+    if (mins < 0) {
+        val elapsed = abs(mins)
+        return if (elapsed > 99) Figure((elapsed / 60f).roundToInt().toString(), "H", "Ago", past = true)
+            else Figure(elapsed.toString(), "min", "Ago", past = true)
+    }
+    val liveRealtime = !stale && board?.source == "live" && journey.realtime
     val late = minutesBetween(journey.departure, journey.effectiveDeparture)
-    return Figure(mins.toString(), "min", if (late > 0) "$late min late" else if (liveRealtime) "" else "Scheduled")
+    val provenance = when {
+        late > 0 -> "$late min late"
+        !liveRealtime -> "Scheduled"
+        mins == 0 -> "Departing"
+        else -> ""
+    }
+    if (mins == 0) return Figure("Now", provenance = provenance)
+    if (mins > 99) return Figure(((mins / 60f).roundToInt()).toString(), "H", provenance)
+    return Figure(mins.toString(), "min", provenance)
 }
 
 fun directionFigureFor(journey: Journey, now: Long): Figure? {
     if (now < journey.effectiveDeparture || now >= journey.effectiveArrival) return null
-    val nextChange = journey.legs.dropLast(1).firstOrNull { now < it.effectiveArrival }
-    val actionTime = nextChange?.effectiveArrival ?: journey.effectiveArrival
-    return Figure(
-        minutesBetween(now, actionTime).coerceAtLeast(0).toString(),
-        "min",
-        if (nextChange != null) "To change" else "To go",
-    )
+    journey.legs.forEachIndexed { index, leg ->
+        val next = journey.legs.getOrNull(index + 1)
+        val target = when {
+            now < leg.effectiveArrival -> leg.effectiveArrival
+            next != null && now < next.effectiveDeparture -> next.effectiveDeparture
+            else -> return@forEachIndexed
+        }
+        val minutes = minutesBetween(now, target).coerceAtLeast(0)
+        val provenance = if (next == null) "To go" else "To change"
+        return if (minutes > 99) Figure((minutes / 60f).roundToInt().toString(), "H", provenance)
+            else Figure(minutes.toString(), "min", provenance)
+    }
+    return null
+}
+
+internal sealed interface AxisElement {
+    data object Cap : AxisElement
+    data class Ride(val index: Int) : AxisElement
+    data class Dwell(val index: Int) : AxisElement
+    data class Alight(val index: Int) : AxisElement
+    data class Board(val index: Int) : AxisElement
+    data class StationLabel(val index: Int) : AxisElement
+    data object TinyTrain : AxisElement
+    data object Progress : AxisElement
+}
+
+internal data class AxisSize(val width: Int, val height: Int)
+internal data class AxisFrame(var x: Int = 0, var y: Int = 0, var width: Int = 0, var height: Int = 0)
+
+internal fun journeyAxisFrames(
+    journey: Journey,
+    width: Int,
+    elements: List<AxisElement>,
+    sizes: List<AxisSize>,
+    barHeight: Int,
+    baseChipHeight: Int,
+    minimumHeight: Int,
+    itemGap: Int,
+    labelTopGap: Int,
+    labelCollisionGap: Int,
+    ridePaintInset: Int,
+    progress: Float?,
+): Pair<List<AxisFrame>, Int> {
+    val safeWidth = width.coerceAtLeast(1)
+    val capIndex = elements.indexOf(AxisElement.Cap)
+    val capWidth = sizes.getOrNull(capIndex)?.width ?: 0
+    val axisWidth = (safeWidth - capWidth).coerceAtLeast(1)
+    val duration = (journey.effectiveArrival - journey.effectiveDeparture).coerceAtLeast(1)
+    fun x(instant: Long): Int = capWidth + (axisWidth *
+        ((instant - journey.effectiveDeparture).toDouble() / duration).coerceIn(0.0, 1.0)).roundToInt()
+    val frames = MutableList(elements.size) { AxisFrame() }
+    val chipHeight = maxOf(baseChipHeight, elements.indices.filter {
+        elements[it] == AxisElement.Cap || elements[it] is AxisElement.Alight || elements[it] is AxisElement.Board
+    }.maxOfOrNull { sizes[it].height } ?: 0)
+    val pins = mutableListOf<Int>()
+    val labels = mutableListOf<Int>()
+    elements.forEachIndexed { index, element ->
+        val size = sizes[index]
+        frames[index] = when (element) {
+            AxisElement.Cap -> AxisFrame(0, 0, size.width, size.height)
+            is AxisElement.Ride -> {
+                val leg = journey.legs[element.index]
+                val start = x(leg.effectiveDeparture)
+                AxisFrame(start, (chipHeight - barHeight) / 2,
+                    (x(leg.effectiveArrival) - start).coerceAtLeast(1), barHeight)
+            }
+            is AxisElement.Dwell -> {
+                val leg = journey.legs[element.index]
+                val start = x(leg.effectiveArrival)
+                AxisFrame(start, (chipHeight - barHeight) / 2,
+                    (x(journey.legs[element.index + 1].effectiveDeparture) - start).coerceAtLeast(1), barHeight)
+            }
+            is AxisElement.Alight -> {
+                val anchor = x(journey.legs[element.index].effectiveArrival)
+                pins += index
+                AxisFrame((anchor - size.width).coerceIn(capWidth, (safeWidth - size.width).coerceAtLeast(capWidth)), 0, size.width, size.height)
+            }
+            is AxisElement.Board -> {
+                val anchor = x(journey.legs[element.index + 1].effectiveDeparture)
+                pins += index
+                AxisFrame(anchor.coerceIn(capWidth, (safeWidth - size.width).coerceAtLeast(capWidth)), 0, size.width, size.height)
+            }
+            is AxisElement.StationLabel -> {
+                labels += index
+                AxisFrame(width = size.width.coerceAtMost(safeWidth), height = size.height)
+            }
+            AxisElement.TinyTrain -> AxisFrame(capWidth, (chipHeight - barHeight) / 2 - size.height * 18 / 44, axisWidth, size.height)
+            AxisElement.Progress -> {
+                val center = capWidth + (axisWidth * (progress ?: 0f).coerceIn(0f, 1f)).roundToInt()
+                AxisFrame(center - size.width / 2, -size.height - labelTopGap / 2, size.width, size.height)
+            }
+        }
+    }
+    val lanes = mutableListOf(mutableListOf<Int>())
+    var used = 0
+    for (index in pins) {
+        val required = frames[index].width + if (lanes.last().isEmpty()) 0 else itemGap
+        if (used + required > axisWidth && lanes.last().isNotEmpty()) {
+            lanes.add(mutableListOf()); used = 0
+        }
+        lanes.last() += index
+        used += frames[index].width + if (used == 0) 0 else itemGap
+    }
+    lanes.forEachIndexed { lane, indices ->
+        var right = capWidth - itemGap
+        indices.forEach { index ->
+            frames[index].x = maxOf(frames[index].x, right + itemGap)
+            frames[index].y = lane * (chipHeight + itemGap)
+            right = frames[index].x + frames[index].width
+        }
+        var edge = safeWidth
+        indices.asReversed().forEach { index ->
+            frames[index].x = minOf(frames[index].x, edge - frames[index].width)
+            edge = frames[index].x - itemGap
+        }
+    }
+    elements.forEachIndexed { index, element ->
+        if (element !is AxisElement.Ride) return@forEachIndexed
+        val frame = frames[index]
+        val logicalStart = frame.x
+        val logicalEnd = frame.x + frame.width
+        val board = elements.indexOf(AxisElement.Board(element.index - 1)).takeIf { it >= 0 }
+            ?.let(frames::get)?.takeIf { it.y == 0 }
+        val alight = elements.indexOf(AxisElement.Alight(element.index)).takeIf { it >= 0 }
+            ?.let(frames::get)?.takeIf { it.y == 0 }
+        val paintedStart = board?.let { marker ->
+            val inset = ridePaintInset.coerceAtMost(marker.width / 2)
+            logicalStart.coerceIn(marker.x + inset, marker.x + marker.width - inset)
+        } ?: logicalStart
+        val paintedEnd = alight?.let { marker ->
+            val inset = ridePaintInset.coerceAtMost(marker.width / 2)
+            logicalEnd.coerceIn(marker.x + inset, marker.x + marker.width - inset)
+        } ?: logicalEnd
+        frame.x = paintedStart
+        frame.width = (paintedEnd - paintedStart).coerceAtLeast(0)
+    }
+    val markerBottom = maxOf(chipHeight, pins.maxOfOrNull { frames[it].y + frames[it].height } ?: 0)
+    val placed = mutableListOf<AxisFrame>()
+    labels.forEach { index ->
+        val element = elements[index] as AxisElement.StationLabel
+        val midpoint = x((journey.legs[element.index].effectiveArrival + journey.legs[element.index + 1].effectiveDeparture) / 2)
+        val frame = frames[index]
+        frame.x = (midpoint - frame.width / 2).coerceIn(0, (safeWidth - frame.width).coerceAtLeast(0))
+        frame.y = markerBottom + labelTopGap
+        placed.filter { frame.x < it.x + it.width + labelCollisionGap && frame.x + frame.width > it.x - labelCollisionGap }
+            .forEach { prior -> frame.y = maxOf(frame.y, prior.y + prior.height + labelCollisionGap) }
+        placed += frame.copy()
+    }
+    return frames to maxOf(minimumHeight, frames.filterIndexed { i, _ -> elements[i] != AxisElement.TinyTrain }.maxOfOrNull { it.y + it.height } ?: 0)
 }
 
 @Composable
@@ -169,88 +336,79 @@ fun JourneyAxis(journey: Journey, modifier: Modifier = Modifier, large: Boolean 
     val c = LocalTrainColors.current
     val fontScale = LocalDensity.current.fontScale
     val first = journey.legs.first()
-    val total = (journey.effectiveArrival - journey.effectiveDeparture).coerceAtLeast(1)
-    val axisHeight = if (large) (42 + ((fontScale - 1f).coerceAtLeast(0f) * 80f)).dp else 22.dp * fontScale
-    val itemAlignment = if (large) Alignment.Top else Alignment.CenterVertically
-    Row(modifier.height(axisHeight), verticalAlignment = itemAlignment) {
-        platformText(first.fromPlatform, first.mode)?.takeIf { showCap }?.let {
-            LineChip(first.line, first.mode, if (first.mode == "ferry" && it == "Wharf") it else "${if (first.mode == "ferry") "Wharf" else "Platform"} $it",
+    val cap = departureCapText(first.fromPlatform, first.mode).takeIf { showCap }
+    Layout(modifier = modifier.semantics {
+        contentDescription = "Journey from ${first.from.shortName} to ${journey.legs.last().to.shortName}"
+    }, content = {
+        cap?.let {
+            LineChip(first.line, first.mode, it, Modifier.layoutId(AxisElement.Cap),
                 height = if (large) 24.dp else 22.dp, horizontalPadding = if (large) 10.dp else 7.dp)
         }
-        BoxWithConstraints(Modifier.weight(1f).height(axisHeight)) {
-            val barHeight = if (large) 14.dp else 7.dp
-            if (tinyTrain) {
-                val railTop = if (large) 5.dp else (axisHeight - barHeight) / 2
-                TinyTrainLane(Modifier.fillMaxWidth().offset(y = railTop - 18.dp)
-                    .wrapContentHeight(Alignment.Top, unbounded = true).zIndex(1f))
+        journey.legs.forEachIndexed { index, leg ->
+            Box(Modifier.layoutId(AxisElement.Ride(index)).background(lineColor(leg.line, leg.mode, c, fill = true),
+                RoundedCornerShape(topEnd = if (index == journey.legs.lastIndex) 3.dp else 0.dp,
+                    bottomEnd = if (index == journey.legs.lastIndex) 3.dp else 0.dp)))
+            if (index < journey.legs.lastIndex) {
+                val next = journey.legs[index + 1]
+                Box(Modifier.layoutId(AxisElement.Dwell(index)).background(
+                    if (isTightChange(journey, index)) c.warning else c.rule))
             }
-            val segmentPlacement: Modifier.() -> Modifier = {
-                if (large) align(Alignment.TopStart).offset(y = 5.dp) else align(Alignment.CenterStart)
-            }
-            journey.legs.forEachIndexed { index, leg ->
-                val start = (leg.effectiveDeparture - journey.effectiveDeparture).toFloat() / total
-                val ride = (leg.effectiveArrival - leg.effectiveDeparture).toFloat() / total
-                Box(Modifier.offset(x = maxWidth * start).width(maxWidth * ride.coerceAtLeast(.001f))
-                    .height(barHeight).segmentPlacement()
-                    .background(lineColor(leg.line, leg.mode, c, fill = true),
-                        RoundedCornerShape(topEnd = if (index == journey.legs.lastIndex) 3.dp else 0.dp,
-                            bottomEnd = if (index == journey.legs.lastIndex) 3.dp else 0.dp)))
-                if (index < journey.legs.lastIndex) {
-                    val next = journey.legs[index + 1]
-                    val waitStart = (leg.effectiveArrival - journey.effectiveDeparture).toFloat() / total
-                    val wait = (next.effectiveDeparture - leg.effectiveArrival).toFloat() / total
-                    Box(Modifier.offset(x = maxWidth * waitStart).width(maxWidth * wait.coerceAtLeast(.001f))
-                        .height(barHeight).segmentPlacement().background(
-                            if (minutesBetween(leg.effectiveArrival, next.effectiveDeparture) < 5) c.warning else c.rule))
-                    platformText(leg.toPlatform, leg.mode)?.let {
-                        LineChip(leg.line, leg.mode, it,
-                            Modifier.offset(x = maxWidth * waitStart - 3.dp)
-                                .align(if (large) Alignment.TopStart else Alignment.CenterStart).zIndex(2f),
-                            height = if (large) 24.dp else 22.dp, horizontalPadding = 5.dp)
-                    }
-                    platformText(next.fromPlatform, next.mode)?.let {
-                        val nextStart = (next.effectiveDeparture - journey.effectiveDeparture).toFloat() / total
-                        LineChip(next.line, next.mode, it,
-                            Modifier.offset(x = maxWidth * nextStart + 3.dp)
-                                .align(if (large) Alignment.TopStart else Alignment.CenterStart).zIndex(2f),
-                            height = if (large) 24.dp else 22.dp, horizontalPadding = 5.dp)
-                    }
-                    if (large) {
-                        val middle = (leg.effectiveArrival + next.effectiveDeparture) / 2
-                        val at = (middle - journey.effectiveDeparture).toFloat() / total
-                        Column(Modifier.offset(x = maxWidth * at - 48.dp).width(96.dp).align(Alignment.BottomStart),
-                            horizontalAlignment = Alignment.CenterHorizontally) {
-                            if (progress != null) Box(Modifier.width(1.dp).height(6.dp).background(c.ink3))
-                            Label(if (leg.to.id == next.from.id) leg.to.shortName else "${leg.to.shortName} → ${next.from.shortName}",
-                                Modifier.fillMaxWidth(), align = TextAlign.Center, maxLines = 2)
-                        }
-                    }
+        }
+        if (tinyTrain) TinyTrainLane(Modifier.layoutId(AxisElement.TinyTrain))
+        journey.legs.dropLast(1).forEachIndexed { index, leg ->
+            val next = journey.legs[index + 1]
+            if (showAlightingPin(journey.legs.size, index)) {
+                platformText(leg.toPlatform, leg.mode)?.let {
+                    LineChip(leg.line, leg.mode, it,
+                        Modifier.layoutId(AxisElement.Alight(index)).testTag("axis-alight-$index"),
+                        height = if (large) 24.dp else 22.dp, horizontalPadding = 5.dp)
                 }
             }
-            progress?.let { at ->
-                if (large) {
-                    val instant = journey.effectiveDeparture + (total * at).toLong()
-                    val activeLeg = journey.legs.firstOrNull { instant <= it.effectiveArrival }
-                        ?: journey.legs.last()
-                    val marker = lineColor(activeLeg.line, activeLeg.mode, c, fill = true)
-                    Box(Modifier.width(maxWidth * at.coerceIn(0f, 1f)).height(barHeight).offset(y = 5.dp)
-                        .align(Alignment.TopStart).background(c.ground.copy(alpha = .62f),
-                            RoundedCornerShape(topEnd = if (at >= 1f) 3.dp else 0.dp,
-                                bottomEnd = if (at >= 1f) 3.dp else 0.dp)).zIndex(1f))
-                    Canvas(Modifier.offset(x = maxWidth * at - 6.5.dp).width(13.dp).height(27.dp)
-                        .align(Alignment.TopStart).zIndex(3f)) {
-                        val triangle = Path().apply {
-                            moveTo(0f, 0f); lineTo(size.width, 0f); lineTo(size.width / 2f, 9.dp.toPx()); close()
-                        }
-                        drawPath(triangle, marker)
-                        drawRect(marker, androidx.compose.ui.geometry.Offset(size.width / 2f - 1.dp.toPx(), 9.dp.toPx()),
-                            androidx.compose.ui.geometry.Size(2.dp.toPx(), 18.dp.toPx()))
-                    }
-                } else {
-                    Box(Modifier.offset(x = maxWidth * at - 1.dp).width(2.dp).height(11.dp)
-                        .align(Alignment.TopStart).background(c.ink).zIndex(3f))
-                }
+            platformText(next.fromPlatform, next.mode)?.let {
+                LineChip(next.line, next.mode, it,
+                    Modifier.layoutId(AxisElement.Board(index)).testTag("axis-board-$index"),
+                    height = if (large) 24.dp else 22.dp, horizontalPadding = 5.dp)
             }
+            Text((if (leg.to.id == next.from.id) leg.to.shortName else "${leg.to.shortName} → ${next.from.shortName}").uppercase(Locale.ENGLISH),
+                Modifier.layoutId(AxisElement.StationLabel(index)), color = c.ink2, fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold, letterSpacing = .6.sp, textAlign = TextAlign.Center,
+                lineHeight = 13.5.sp, maxLines = 4, overflow = TextOverflow.Clip)
+        }
+        progress?.let { at ->
+            Canvas(Modifier.layoutId(AxisElement.Progress).width(13.dp).height(9.dp)) {
+                val triangle = Path().apply {
+                    moveTo(0f, 0f); lineTo(size.width, 0f); lineTo(size.width / 2f, size.height); close()
+                }
+                drawPath(triangle, c.ink3)
+            }
+        }
+    }) { measurables, constraints ->
+        val width = constraints.maxWidth.coerceAtLeast(1)
+        val elements = measurables.map { it.layoutId as AxisElement }
+        val measured = arrayOfNulls<androidx.compose.ui.layout.Placeable>(measurables.size)
+        val sizes = measurables.mapIndexed { index, measurable ->
+            val element = elements[index]
+            if (element == AxisElement.TinyTrain) AxisSize(0, 44.dp.roundToPx())
+            else if (element is AxisElement.Ride || element is AxisElement.Dwell) AxisSize(0, 0)
+            else {
+                val placeable = measurable.measure(androidx.compose.ui.unit.Constraints(maxWidth = width))
+                measured[index] = placeable
+                AxisSize(placeable.width, placeable.height)
+            }
+        }
+        val barHeight = (if (large) 14.dp else 7.dp).roundToPx()
+        val baseChipHeight = ((if (large) 24f else 22f) * fontScale).dp.roundToPx()
+        val minimumHeight = (if (large) (42 + ((fontScale - 1f).coerceAtLeast(0f) * 80f)).dp else 22.dp * fontScale).roundToPx()
+        val (frames, desiredHeight) = journeyAxisFrames(journey, width, elements, sizes, barHeight, baseChipHeight, minimumHeight,
+            3.dp.roundToPx(), 4.dp.roundToPx(), 6.dp.roundToPx(), LineChipCornerRadius.roundToPx(), progress)
+        frames.forEachIndexed { index, frame ->
+            if (measured[index] == null) {
+                measured[index] = measurables[index].measure(androidx.compose.ui.unit.Constraints.fixed(frame.width, frame.height))
+            }
+        }
+        val height = desiredHeight.coerceIn(constraints.minHeight, constraints.maxHeight)
+        layout(width, height) {
+            measured.forEachIndexed { index, placeable -> placeable?.placeRelative(frames[index].x, frames[index].y) }
         }
     }
 }

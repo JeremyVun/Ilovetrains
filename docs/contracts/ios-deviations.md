@@ -12,7 +12,11 @@ iOS implementation requested on 2026-09-07.
   action in setup or Settings. There is no footer permission popup and no
   background tracking. Denied or restricted permission is labelled
   `Location is blocked`; the
-  row’s `OPEN SETTINGS ›` action opens the app's iOS Settings page.
+  row’s `OPEN SETTINGS ›` action opens the app's iOS Settings page. Setup
+  follows the shared native location flow in [ui.md](ui.md#setup-and-station-search).
+  A permission sheet's inactive scene does not cancel its pending request;
+  backgrounding stops the provider, and returning resumes a pending permitted
+  lookup. A one-shot location request times out after 15 seconds.
 - Station search uses the native keyboard and Return chooses the first match.
   System keyboard avoidance resizes the available content area.
 - A saved trip row carries trailing swipe actions: a short swipe reveals a
@@ -75,3 +79,9 @@ settings-light`. With the flag on they are `ios-settings-transfer-limit.png`,
 same names. The additional `settings-off`, `settings-blocked` and
 `settings-on` calibration states (and their `-light` variants) exercise every
 location-row action.
+
+Native setup location exemplars are `assets/comps/latest/ios-setup-location-`
+`{idle,denied,failed,approximate}[-light].png`, captured at 402×874 pt on
+an iPhone 17. The idle frame includes the keyboard; result and recovery frames
+keep it dismissed. Real permission, keyboard handoff and manual recovery are
+also driven at 390×844 pt by `AppFlowTests` on an iPhone 13.

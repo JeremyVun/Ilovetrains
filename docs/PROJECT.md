@@ -151,9 +151,10 @@ moves through are binding in `docs/contracts/ui.md`.
   transfer platforms.
 - **Setup and add-trip**: recent searches per field, fuzzy-ranked station
   typeahead, one full-width save action. Web geolocation is asked contextually
-  once the user has two or more trips. Android first launch asks once and fills
-  the nearest station when granted; the user can change it before choosing a
-  destination. Denial leaves manual setup available.
+  once the user has two or more trips. Native setup asks when the user taps
+  “Use my location”, fills a confidently identified nearby station, and focuses
+  the destination. Uncertain locations offer station choices; failure or denial
+  leaves a clear recovery action and manual search available.
 - Dark is the primary scheme; light is derived by measurement and shipped.
 
 The measured geometry that resulted is recorded as invariants in

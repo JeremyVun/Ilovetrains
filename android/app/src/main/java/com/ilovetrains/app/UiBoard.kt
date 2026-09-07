@@ -34,7 +34,7 @@ fun BoardScreen(state: AppState, actions: UiActions) {
         Column(Modifier.fillMaxSize()) {
             BoardMast(null, state.now, actions)
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Label(if (state.refreshing) "Opening timetable" else state.message ?: "Timetable unavailable", color = c.ink3)
+                Label(if (state.refreshing) "Opening timetable" else "Timetable unavailable", color = c.ink3)
             }
         }
         return
@@ -132,24 +132,23 @@ fun BoardRow(journey: Journey, board: BoardData?, now: Long, onClick: (() -> Uni
     }
     val clickable = if (onClick == null) Modifier else Modifier.clickable(role = Role.Button, onClick = onClick)
     Row(clickable.fillMaxWidth().testTag("board-journey-${journey.key}").heightIn(min = if (detail) 100.dp else 96.dp)
-        .background(c.ground).padding(horizontal = PagePadding, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+        .background(c.ground).padding(horizontal = PagePadding, vertical = if (detail) 8.dp else 7.dp),
+        verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.width(if (detail) 69.dp else 72.dp), horizontalAlignment = Alignment.End) {
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(fig.value, color = figureColor, fontSize = when {
-                    fig.value.equals("NOW", ignoreCase = true) -> 27.sp
-                    fig.value.length >= 5 -> 28.sp
+                    wideFigure(fig) -> 28.sp
                     else -> 40.sp
                 },
                     modifier = Modifier.testTag("board-figure-${journey.key}"),
                     fontWeight = FontWeight(250), letterSpacing = (-1.5).sp, lineHeight = 38.sp,
-                    textDecoration = if (journey.cancelled && fig.value.contains(':')) TextDecoration.LineThrough else null,
                     maxLines = 1, softWrap = false)
                 if (fig.unit.isNotEmpty()) Text(fig.unit, color = figureColor, fontSize = 12.sp,
                     fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 2.dp, bottom = 4.dp))
             }
-            Label(fig.provenance, Modifier.heightIn(min = 12.dp).padding(top = 4.dp),
+            Label(fig.provenance, Modifier.fillMaxWidth().heightIn(min = 12.dp).padding(top = 4.dp),
                 color = if (late && !fig.past || journey.cancelled) c.warning else c.ink3,
-                size = if (fig.provenance.length >= 9) 7 else 9, maxLines = 1)
+                size = if (fig.provenance.length >= 9) 7 else 9, align = TextAlign.End, maxLines = 1)
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
@@ -168,11 +167,6 @@ fun BoardRow(journey: Journey, board: BoardData?, now: Long, onClick: (() -> Uni
                 if (journey.cancelled) Label("Cancelled", Modifier.padding(start = 7.dp), color = c.warning, size = 9)
             }
             JourneyAxis(journey, Modifier.fillMaxWidth().padding(top = 6.dp).alpha(if (journey.cancelled) .3f else 1f))
-            if (journey.legs.size > 1) {
-                Label(journey.legs.zipWithNext().joinToString(" · ") { (a, b) ->
-                    if (a.to.id == b.from.id) a.to.shortName else "${a.to.shortName} → ${b.from.shortName}"
-                }, Modifier.fillMaxWidth().padding(top = 3.dp), align = TextAlign.Center, maxLines = 2)
-            }
             Text(first.headsign.ifBlank { first.to.shortName }, color = c.ink3, fontSize = 13.sp,
                 fontWeight = FontWeight.Light, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 6.dp))

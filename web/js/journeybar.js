@@ -84,7 +84,7 @@ export function journeyBarHtml(spec, opts = {}) {
   spec.legs.forEach((leg, index) => {
     const start = cursor / total * 100;
     const end = (cursor + leg.minutes) / total * 100;
-    html += `<span class="sy-r${index === 0 ? ' a' : index === 1 ? ' b' : ''} leg-${index}" data-seg data-line-code="${esc(leg.code)}" data-colour-key="${esc(leg.colourKey)}" style="left:${start}%;width:${end - start}%;background:${lineFill(leg.colourKey || 'T7')}"></span>`;
+    html += `<span class="sy-r${index === 0 ? ' a' : index === 1 ? ' b' : ''} leg-${index}" data-seg style="left:${start}%;width:${end - start}%"><span class="sy-rp" data-line-code="${esc(leg.code)}" data-colour-key="${esc(leg.colourKey)}" style="background:${lineFill(leg.colourKey || 'T7')}"></span></span>`;
     cursor += leg.minutes;
     if (index < spec.legs.length - 1) {
       const change = changeAt(opts, index);
@@ -177,6 +177,38 @@ export function clampJourneyBars(root = document) {
         platform.style.left = '0';
         platform.dataset.clamped = '1';
       }
+    });
+    // Paint meets the resolved chip interior while the percentage span remains the time axis.
+    const paintEdges = new Map();
+    bar.querySelectorAll('.sy-p[data-transfer-index]').forEach((platform) => {
+      if (!platform.getClientRects().length) return;
+      const index = Number(platform.dataset.transferIndex);
+      const arriving = platform.dataset.pin === 'a';
+      const ride = bar.querySelector(`.leg-${arriving ? index : index + 1}`);
+      if (!ride) return;
+      const rideBounds = ride.getBoundingClientRect();
+      const platformBounds = platform.getBoundingClientRect();
+      const platformStyle = getComputedStyle(platform);
+      const radius = Math.min(platformBounds.width / 2, parseFloat(arriving
+        ? platformStyle.borderTopRightRadius : platformStyle.borderTopLeftRadius) || 0);
+      const interiorStart = platformBounds.left + radius;
+      const interiorEnd = platformBounds.right - radius;
+      const edges = paintEdges.get(ride) || { left: 0, right: 0 };
+      if (arriving) {
+        const end = Math.max(interiorStart, Math.min(interiorEnd, rideBounds.right));
+        edges.right = rideBounds.right - end;
+      } else {
+        const start = Math.max(interiorStart, Math.min(interiorEnd, rideBounds.left));
+        edges.left = start - rideBounds.left;
+      }
+      paintEdges.set(ride, edges);
+    });
+    bar.querySelectorAll('.sy-r').forEach((ride) => {
+      const paint = ride.querySelector('.sy-rp');
+      if (!paint) return;
+      const edges = paintEdges.get(ride) || { left: 0, right: 0 };
+      paint.style.left = `${edges.left}px`;
+      paint.style.right = `${edges.right}px`;
     });
     // Long change names can wrap or stack without moving the time axis.
     const device = bar.closest('.sy-j');

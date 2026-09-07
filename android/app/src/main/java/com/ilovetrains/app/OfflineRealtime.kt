@@ -11,6 +11,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.abs
 
 internal data class RealtimeResult<T>(val value: T, val observedAt: Long? = null, val matched: Boolean = false)
 internal data class StopAssignment(val platform: String?, val stationId: String)
@@ -87,7 +88,7 @@ internal class OfflineRealtime {
                     dropOffType = if (to?.relationship == "skipped") 1 else connection.dropOffType,
                     fromPlatform = fromAssignment?.platform ?: connection.fromPlatform,
                     toPlatform = toAssignment?.platform ?: connection.toPlatform,
-                    cancelled = update.status == "cancelled" || replacementMissingStop || crossHubAssignment || from?.relationship == "skipped" || to?.relationship == "skipped",
+                    cancelled = update.status == "cancelled" || replacementMissingStop || crossHubAssignment,
                 )
             }
         }
@@ -104,36 +105,6 @@ internal class OfflineRealtime {
             observedAt = minOf(observedAt ?: Long.MAX_VALUE, snapshot.headerTimestamp)
         }
         return RealtimeResult(journey, observedAt, matched)
-    }
-
-    fun overlay(connection: ScheduledConnection, assignment: (String, String) -> StopAssignment?): RealtimeResult<ScheduledConnection> {
-        val snapshot = freshSnapshot(connection.source) ?: return RealtimeResult(connection)
-        val update = snapshot.updates[key(connection.tripId, connection.serviceDate)] ?: return RealtimeResult(connection)
-        val from = update.stops.firstOrNull { it.matches(connection.fromStopId, connection.fromSequence) }
-        val to = update.stops.firstOrNull { it.matches(connection.toStopId, connection.toSequence) }
-        val defaultDelay = update.delaySeconds?.times(1_000L)
-        val departure = if (from?.relationship == "noData") null else from?.departure
-            ?: from?.departureDelaySeconds?.let { connection.departure + it * 1_000L }
-            ?: defaultDelay?.let { connection.departure + it }
-        val arrival = if (to?.relationship == "noData") null else to?.arrival
-            ?: to?.arrivalDelaySeconds?.let { connection.arrival + it * 1_000L }
-            ?: defaultDelay?.let { connection.arrival + it }
-        val replacementMissingStop = update.status == "replacement" && (from == null || to == null)
-        val fromAssignment = from?.assignedStopId?.let { assignment(connection.source, it) }
-        val toAssignment = to?.assignedStopId?.let { assignment(connection.source, it) }
-        val crossHubAssignment = fromAssignment?.stationId?.let { it != connection.fromStationId } == true ||
-            toAssignment?.stationId?.let { it != connection.toStationId } == true
-        val cancelled = update.status == "cancelled" || replacementMissingStop || crossHubAssignment || from?.relationship == "skipped" || to?.relationship == "skipped"
-        val value = connection.copy(
-            estimatedDeparture = departure,
-            estimatedArrival = arrival,
-            pickupType = if (from?.relationship == "skipped") 1 else connection.pickupType,
-            dropOffType = if (to?.relationship == "skipped") 1 else connection.dropOffType,
-            fromPlatform = fromAssignment?.platform ?: connection.fromPlatform,
-            toPlatform = toAssignment?.platform ?: connection.toPlatform,
-            cancelled = cancelled,
-        )
-        return RealtimeResult(value, snapshot.headerTimestamp, true)
     }
 
     private fun estimate(stop: StopUpdate?, scheduled: Long, departure: Boolean, inheritedDelay: Long?): Long? {
@@ -199,7 +170,9 @@ internal class OfflineRealtime {
 
     internal fun accept(json: String, expectedSource: String, now: Long = System.currentTimeMillis()): Boolean {
         val snapshot = parseSnapshot(JSONObject(json), expectedSource)
+        if (snapshot.headerTimestamp > now + MAX_FUTURE_HEADER_MILLIS) return false
         if (snapshot.expiresAt <= now) return false
+        if (snapshots[expectedSource]?.headerTimestamp ?: Long.MIN_VALUE > snapshot.headerTimestamp) return false
         snapshots[expectedSource] = snapshot
         return true
     }
@@ -228,7 +201,9 @@ internal class OfflineRealtime {
                         departure = stop.optionalTime("departureMs"),
                         arrivalDelaySeconds = stop.optionalInt("arrivalDelaySeconds"),
                         departureDelaySeconds = stop.optionalInt("departureDelaySeconds"),
-                        relationship = stop.optString("scheduleRelationship", "scheduled"),
+                        relationship = stop.optString("scheduleRelationship", "scheduled").also {
+                            require(it in STOP_RELATIONSHIPS)
+                        },
                     )
                 }
             }
@@ -236,7 +211,8 @@ internal class OfflineRealtime {
             require(key !in updates)
             updates[key] = TripUpdate(tripId, serviceDate, status, item.optionalInt("delaySeconds"), stops)
         }
-        return Snapshot(source, json.requiredTime("headerTimestamp"), json.requiredTime("expiresAt"), updates)
+        val headerTimestamp = json.requiredTime("headerTimestamp")
+        return Snapshot(source, headerTimestamp, minOf(json.requiredTime("expiresAt"), headerTimestamp + MAX_SNAPSHOT_AGE_MILLIS), updates)
     }
 
     private fun key(tripId: String, serviceDate: String) = "$tripId\u0000$serviceDate"
@@ -257,9 +233,20 @@ internal class OfflineRealtime {
     private fun JSONObject.optionalInt(name: String): Int? = if (has(name) && !isNull(name)) getInt(name) else null
     private fun JSONObject.optionalTime(name: String): Long? = if (has(name) && !isNull(name)) parseTime(get(name)) else null
     private fun JSONObject.requiredTime(name: String): Long = parseTime(get(name))
-    private fun parseTime(value: Any): Long = when (value) {
-        is Number -> value.toLong()
-        is String -> Instant.parse(value).toEpochMilli()
-        else -> error("invalid timestamp")
+    private fun parseTime(value: Any): Long {
+        val timestamp = when (value) {
+            is Number -> value.toDouble()
+            is String -> Instant.parse(value).toEpochMilli().toDouble()
+            else -> error("invalid timestamp")
+        }
+        require(timestamp.isFinite() && abs(timestamp) <= MAX_EPOCH_MILLIS)
+        return timestamp.toLong()
+    }
+
+    private companion object {
+        const val MAX_SNAPSHOT_AGE_MILLIS = 90_000L
+        const val MAX_FUTURE_HEADER_MILLIS = 5 * 60_000L
+        const val MAX_EPOCH_MILLIS = 8_640_000_000_000_000.0
+        val STOP_RELATIONSHIPS = setOf("scheduled", "skipped", "noData", "unscheduled")
     }
 }

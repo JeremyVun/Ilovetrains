@@ -30,6 +30,7 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -52,11 +53,47 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 import java.io.FileOutputStream
+import kotlin.math.roundToInt
 
 @RunWith(AndroidJUnit4::class)
 class UiCalibrationTest {
     @get:Rule val compose = createComposeRule()
     private var viewportMetrics = ""
+    private var captureDensity = 1f
+
+    @Test fun locationSetupStatesStayReachable() {
+        val fixture = Fixtures()
+        val state = mutableStateOf(fixture.setupState.copy(setupFrom = null, trips = emptyList(),
+            locationGranted = false, recentFrom = emptyList()))
+        var requestCount = 0
+        val actions = object : UiActions by NoActions {
+            override fun requestLocation() { requestCount++ }
+            override fun chooseSetupFrom(station: Station) { state.value = state.value.copy(setupFrom = station) }
+        }
+        compose.setContent { TrainApp(state.value, actions) }
+        for (appearance in listOf(Appearance.Dark, Appearance.Light)) {
+            for (status in SetupLocationStatus.entries) {
+                compose.runOnIdle { state.value = state.value.copy(appearance = appearance, setupLocationStatus = status,
+                    locationDenied = status == SetupLocationStatus.Denied,
+                    nearbyStations = if (status == SetupLocationStatus.ChooseStation) fixture.locationStations else emptyList()) }
+                capture("setup-location-${status.name.lowercase()}-${appearance.name.lowercase()}")
+                if (status == SetupLocationStatus.Locating) {
+                    compose.onNodeWithText("Finding your location…").assertIsDisplayed()
+                    compose.onAllNodesWithText("Use my location").assertCountEquals(0)
+                } else {
+                    val action = when (status) {
+                        SetupLocationStatus.Denied, SetupLocationStatus.ServicesDisabled -> "Open Settings"
+                        SetupLocationStatus.Idle, SetupLocationStatus.ChooseStation -> "Use my location"
+                        else -> "Try again"
+                    }
+                    compose.onNodeWithText(action).assertIsDisplayed().performClick()
+                }
+            }
+        }
+        compose.runOnIdle { assertEquals(12, requestCount) }
+        compose.onNodeWithText(fixture.locationStations.first().shortName).performClick()
+        compose.onNodeWithText("Destination station").assertIsDisplayed()
+    }
 
     @Test fun captureCanonicalScreens() {
         val fixture = Fixtures()
@@ -67,13 +104,15 @@ class UiCalibrationTest {
             val layoutDirection = LocalLayoutDirection.current
             val safe = WindowInsets.safeDrawing
             SideEffect {
+                captureDensity = density.density
                 val left = safe.getLeft(density, layoutDirection) / density.density
                 val right = safe.getRight(density, layoutDirection) / density.density
                 val top = safe.getTop(density) / density.density
                 val bottom = safe.getBottom(density) / density.density
-                viewportMetrics = "root=${configuration.screenWidthDp}x${configuration.screenHeightDp}dp\n" +
-                    "safeDrawing=${left.toInt()},${top.toInt()},${right.toInt()},${bottom.toInt()}dp\n" +
-                    "content=${(configuration.screenWidthDp - left - right).toInt()}x${(configuration.screenHeightDp - top - bottom).toInt()}dp\n"
+                viewportMetrics = "configuredRoot=${configuration.screenWidthDp}x${configuration.screenHeightDp}dp\n" +
+                    "configuredSafeDrawing=${left.toInt()},${top.toInt()},${right.toInt()},${bottom.toInt()}dp\n" +
+                    "configuredContent=${(configuration.screenWidthDp - left - right).toInt()}x${(configuration.screenHeightDp - top - bottom).toInt()}dp\n" +
+                    "density=${density.density}\nfontScale=${density.fontScale}\n"
             }
             TrainApp(state.value, NoActions)
         }
@@ -87,13 +126,46 @@ class UiCalibrationTest {
         capture("detail")
         compose.runOnIdle { state.value = fixture.setupState }
         capture("setup")
+        for (appearance in listOf(Appearance.Dark, Appearance.Light)) {
+            for (status in listOf(SetupLocationStatus.Idle, SetupLocationStatus.Denied, SetupLocationStatus.Unavailable, SetupLocationStatus.ChooseStation)) {
+                val name = when (status) {
+                    SetupLocationStatus.Unavailable -> "failed"
+                    SetupLocationStatus.ChooseStation -> "approximate"
+                    else -> status.name.lowercase()
+                }
+                compose.runOnIdle { state.value = fixture.setupState.copy(setupFrom = null, trips = emptyList(), recentFrom = emptyList(),
+                    appearance = appearance, locationGranted = false, locationDenied = status == SetupLocationStatus.Denied,
+                    setupLocationStatus = status, nearbyStations = if (status == SetupLocationStatus.ChooseStation) fixture.locationStations else emptyList()) }
+                capture("setup-location-$name${if (appearance == Appearance.Light) "-light" else ""}")
+            }
+        }
         compose.runOnIdle { state.value = fixture.settingsState }
         capture("settings")
         compose.runOnIdle { state.value = fixture.delayedState }
         capture("board-delayed")
         compose.runOnIdle { state.value = fixture.cancelledState }
         capture("detail-cancelled")
+        val cancelledLabels = compose.onAllNodesWithText("CANCELLED", useUnmergedTree = true).fetchSemanticsNodes()
+        assertTrue("expected rendered CANCELLED labels", cancelledLabels.isNotEmpty())
+        val cancelledFailures = mutableListOf<String>()
+        cancelledLabels.forEach { node ->
+            val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            val action = checkNotNull(node.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action)
+            assertTrue("CANCELLED layout result unavailable", action(results))
+            results.forEach { result ->
+                val detail = "bounds=${node.boundsInRoot} size=${result.size} lines=${result.lineCount} " +
+                    "maxWidth=${result.layoutInput.constraints.maxWidth} paragraphWidth=${result.multiParagraph.width} " +
+                    "lineRight=${result.getLineRight(0)} widthOverflow=${result.didOverflowWidth} " +
+                    "heightOverflow=${result.didOverflowHeight}"
+                println("CANCELLED layout $detail")
+                val visibleOverflow = result.didOverflowHeight || result.lineCount != 1 ||
+                    (0 until result.lineCount).any { result.getLineLeft(it) < 0f || result.getLineRight(it) > result.size.width }
+                if (visibleOverflow) cancelledFailures += detail
+            }
+        }
+        assertTrue("CANCELLED layout failure: ${cancelledFailures.joinToString("; ")}", cancelledFailures.isEmpty())
         compose.runOnIdle { state.value = fixture.twoChangesState }
+        assertDetailGeometryAndPixels()
         capture("detail-two-changes")
         compose.runOnIdle { state.value = fixture.activePinnedState }
         capture("home-active-pinned")
@@ -117,6 +189,14 @@ class UiCalibrationTest {
         capture("home-long-names")
         compose.runOnIdle { state.value = fixture.home.copy(appearance = Appearance.Light) }
         capture("home-light")
+        compose.runOnIdle { state.value = fixture.serverStaleState }
+        capture("home-server-stale")
+        compose.runOnIdle { state.value = fixture.serverStaleState.copy(appearance = Appearance.Light) }
+        capture("home-server-stale-light")
+        compose.runOnIdle { state.value = fixture.serverStalePinnedDelayedState }
+        capture("home-server-stale-pinned-delayed")
+        compose.runOnIdle { state.value = fixture.serverStalePinnedDelayedState.copy(appearance = Appearance.Light) }
+        capture("home-server-stale-pinned-delayed-light")
         compose.runOnIdle { state.value = fixture.boardState.copy(appearance = Appearance.Light) }
         capture("board-light")
         compose.runOnIdle { state.value = fixture.settingsState.copy(appearance = Appearance.Light) }
@@ -127,6 +207,10 @@ class UiCalibrationTest {
         capture("settings-transfer-limit-light")
         compose.runOnIdle { state.value = fixture.homeNowState }
         capture("home-now")
+        compose.runOnIdle { state.value = fixture.justAddedState }
+        capture("home-just-added")
+        compose.runOnIdle { state.value = fixture.unknownLineState }
+        capture("home-unknown-line")
         compose.runOnIdle { state.value = fixture.boardNowState }
         capture("board-now")
         compose.runOnIdle { state.value = fixture.homeNowState.copy(appearance = Appearance.Light) }
@@ -151,6 +235,20 @@ class UiCalibrationTest {
         compose.onNodeWithTag("trip-${fixture.beachTrip.id}").performTouchInput { cancel() }
         compose.runOnIdle { state.value = fixture.deletedState }
         capture("home-deleted")
+        compose.runOnIdle { state.value = fixture.feedbackDraftState }
+        compose.onNodeWithText("Send feedback").performClick()
+        compose.onNodeWithText("The platform marker overlaps the line").performClick()
+        capture("settings-feedback-draft-focused")
+    }
+
+    @Test fun detailAxisJoinsAndHeaderGeometryAreRenderedCorrectly() {
+        val fixture = Fixtures()
+        val state = mutableStateOf(fixture.twoChangesState)
+        compose.setContent { TrainApp(state.value, NoActions) }
+        for (appearance in listOf(Appearance.Dark, Appearance.Light)) {
+            compose.runOnIdle { state.value = fixture.twoChangesState.copy(appearance = appearance) }
+            assertDetailGeometryAndPixels()
+        }
     }
 
     @Test fun swipeDeletesRowAndUndoRestoresIt() {
@@ -263,6 +361,19 @@ class UiCalibrationTest {
         compose.onNodeWithTag("board-journey-${journey.key}").assertIsDisplayed()
     }
 
+    @Test fun ordinaryBoardRowsMatchTheIosRhythm() {
+        val fixture = Fixtures()
+        var density = 1f
+        compose.setContent {
+            density = LocalDensity.current.density
+            TrainApp(fixture.boardNowState, NoActions)
+        }
+        val journey = checkNotNull(fixture.boardNowState.board).journeys.first()
+        val height = compose.onNodeWithTag("board-journey-${journey.key}").fetchSemanticsNode().boundsInRoot.height
+
+        assertTrue("board row was ${height / density}dp", height / density in 96f..98f)
+    }
+
     @Test fun settingsUseOnlyPlainServiceStates() {
         val fixture = Fixtures()
         compose.setContent { TrainApp(fixture.settingsState, NoActions) }
@@ -342,7 +453,7 @@ class UiCalibrationTest {
         val fixture = Fixtures()
         val success = "Feedback sent. Thank you."
         val error = "Couldn’t send feedback. Check your connection and try again."
-        val state = mutableStateOf(fixture.settingsState.copy(message = success))
+        val state = mutableStateOf(fixture.settingsState.copy(message = success, messageAutoDismiss = true))
         val actions = object : UiActions by NoActions {
             override fun dismissMessage() { state.value = state.value.copy(message = null) }
         }
@@ -354,7 +465,7 @@ class UiCalibrationTest {
         compose.runOnIdle { }
         compose.onNodeWithText(success).assertIsNotDisplayed()
 
-        compose.runOnIdle { state.value = state.value.copy(message = error) }
+        compose.runOnIdle { state.value = state.value.copy(message = error, messageAutoDismiss = false) }
         compose.mainClock.advanceTimeBy(10_000)
         compose.runOnIdle { }
         compose.onNodeWithText(error).assertIsDisplayed()
@@ -364,12 +475,67 @@ class UiCalibrationTest {
         compose.waitForIdle()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val directory = File(context.getExternalFilesDir(null), "calibration").also { it.mkdirs() }
-        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
-        if (name == "home") File(directory, "metrics.txt").writeText(viewportMetrics + "capture=${bitmap.width}x${bitmap.height}px\n")
-        FileOutputStream(File(directory, "$name.png")).use {
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+        var bitmap: Bitmap? = null
+        for (attempt in 1..3) {
+            try {
+                bitmap = compose.onNodeWithTag("train-app-root").captureToImage().asAndroidBitmap()
+                break
+            } catch (error: AssertionError) {
+                if (!error.message.orEmpty().contains("Failed waiting for PixelCopy") || attempt == 3) throw error
+                println("PixelCopy retry for $name after attempt $attempt")
+                Thread.sleep(100)
+                compose.waitForIdle()
+            }
         }
-        bitmap.recycle()
+        val captured = checkNotNull(bitmap)
+        if (name == "home") File(directory, "metrics.txt").writeText(
+            viewportMetrics + "capturedBitmap=${captured.width}x${captured.height}px\n" +
+                "capturedLogical=${(captured.width / captureDensity).roundToInt()}x${(captured.height / captureDensity).roundToInt()}dp\n"
+        )
+        FileOutputStream(File(directory, "$name.png")).use {
+            captured.compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
+        captured.recycle()
+    }
+
+    private fun assertDetailGeometryAndPixels() {
+        compose.waitForIdle()
+        val root = compose.onNodeWithTag("train-app-root").fetchSemanticsNode().boundsInRoot
+        val alight = compose.onNodeWithTag("axis-alight-0", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val pixels = compose.onNodeWithTag("train-app-root").captureToImage().toPixelMap()
+        val edgeX = (alight.left - root.left).roundToInt()
+        val centerY = (alight.center.y - root.top).roundToInt()
+        val edgePixels = (edgeX - 2..edgeX + 1).map { x -> pixels[x, centerY] }
+        assertTrue("ground slit before alighting marker: $edgePixels", edgePixels.all { color ->
+            color.red > .5f && color.red > color.green * 2f && color.red > color.blue * 1.5f
+        })
+
+        val board = compose.onNodeWithTag("axis-board-0", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val boardLeft = (board.left - root.left).roundToInt()
+        val boardTop = (board.top - root.top).roundToInt()
+        val boardCenterY = (board.center.y - root.top).roundToInt()
+        val beforeBoard = pixels[boardLeft - 1, boardCenterY]
+        assertTrue("blue ride extrudes left of boarding marker: $beforeBoard",
+            beforeBoard.blue < .5f || beforeBoard.blue <= beforeBoard.red || beforeBoard.blue <= beforeBoard.green)
+        val roundedCorner = pixels[boardLeft + 1, boardTop + 1]
+        val adjacentGround = pixels[boardLeft - 2, boardTop + 1]
+        assertEquals("boarding marker lost its rounded ground corner", adjacentGround.red, roundedCorner.red, .05f)
+        assertEquals("boarding marker lost its rounded ground corner", adjacentGround.green, roundedCorner.green, .05f)
+        assertEquals("boarding marker lost its rounded ground corner", adjacentGround.blue, roundedCorner.blue, .05f)
+
+        val freshness = compose.onNodeWithTag("detail-freshness").fetchSemanticsNode().boundsInRoot
+        val journeyLabel = compose.onNodeWithText("JOURNEY", ignoreCase = true, useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue("Detail freshness must remain in the top row", freshness.bottom <= journeyLabel.top)
+
+        compose.onAllNodesWithTag("detail-step-time", useUnmergedTree = true).fetchSemanticsNodes().forEach { node ->
+            val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            val action = checkNotNull(node.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action)
+            assertTrue("Detail time layout result unavailable", action(results))
+            results.forEach { result ->
+                assertEquals("Detail time is not trailing aligned", result.size.width.toFloat(), result.getLineRight(0), 1f)
+            }
+        }
     }
 }
 
@@ -405,12 +571,23 @@ private class Fixtures {
     )
 
     val home = state()
+    val serverStaleState = state(board = centralBoard.copy(generatedAt = centralNow, serverStale = true))
     val boardState = home.copy(screen = Screen.Board)
     private val nowBoard = centralBoard.copy(generatedAt = centralBoard.journeys.first().effectiveDeparture)
     val homeNowState = state(nowBoard.generatedAt, nowBoard)
     val boardNowState = homeNowState.copy(screen = Screen.Board)
+    val justAddedState = homeNowState.copy(
+        justAddedTripId = centralTrip.id,
+        tripMetadata = mapOf(centralTrip.id to "480 m away"),
+    )
+    val unknownLineState = homeNowState.copy(trips = listOf(centralTrip.copy(lines = emptyList())))
     val detailState = state(transferNow, transferBoard).copy(
         screen = Screen.Detail, detail = transferBoard.journeys.first())
+    // The approximate-location stress case uses real nearby stations from the bundled index.
+    val locationStations = InstrumentationRegistry.getInstrumentation().targetContext.assets.open("stations.json").bufferedReader().use {
+        val stations = org.json.JSONArray(it.readText()).readEach(Wire::station)
+        setupLocationChoice(stations, AllModes, Fix(-33.873596, 151.206899, 1, accuracyMetres = 1_000.0)).stations
+    }
     val setupState = home.copy(
         screen = Screen.Setup, setupFrom = centralBoard.from, setupTo = null,
         stations = listOf(centralBoard.to, transferBoard.from, transferBoard.to, ferryBoard.from, ferryBoard.to),
@@ -420,6 +597,7 @@ private class Fixtures {
         screen = Screen.Settings, home = centralBoard.from, automaticHome = centralBoard.from,
         timetableStatus = "5 Sep – 4 Oct 2026", version = "1.0.0", appearance = Appearance.System,
     )
+    val feedbackDraftState = settingsState.copy(feedbackDraft = "The platform marker overlaps the line")
 
     // Stress delta: the real first Central service runs six minutes late.
     private val delayedJourney = centralBoard.journeys.first().let { journey ->
@@ -430,6 +608,18 @@ private class Fixtures {
     }
     val delayedState = boardState.copy(board = centralBoard.copy(
         journeys = listOf(delayedJourney) + centralBoard.journeys.drop(1)))
+    private val serverStaleDelayedBoard = checkNotNull(delayedState.board).copy(
+        generatedAt = centralNow,
+        serverStale = true,
+    )
+    val serverStalePinnedDelayedState = state(centralNow, serverStaleDelayedBoard).copy(
+        focus = FocusedJourney(
+            centralTrip.id,
+            false,
+            serverStaleDelayedBoard.journeys.first(),
+            serverStaleDelayedBoard,
+        ),
+    )
 
     // Stress delta: the real T9/T4 transfer is five minutes late and retained after departure.
     private val departedT9 = transferBoard.journeys.first().let { journey ->
@@ -483,7 +673,7 @@ private class Fixtures {
         screen = Screen.Detail, detail = pyrmontBoard.journeys.first())
 }
 private object NoActions : UiActions {
-    override fun back() {} ; override fun openTrip(id: String, reverse: Boolean) {} ; override fun reverseTrip() {}
+    override fun back() {} ; override fun openTrip(id: String, reverse: Boolean) {}
     override fun openJourney(journey: Journey) {} ; override fun pinJourney(journey: Journey) {} ; override fun unpinJourney() {}
     override fun showReturn() {} ; override fun newTrip() {} ; override fun chooseSetupFrom(station: Station) {}
     override fun clearSetupFrom() {} ; override fun chooseSetupTo(station: Station) {} ; override fun clearSetupTo() {}
@@ -492,5 +682,6 @@ private object NoActions : UiActions {
     override fun setTransferLimit(value: TransferLimit) {}
     override fun setUseLocation(enabled: Boolean) {} ; override fun requestLocation() {} ; override fun chooseHome() {}
     override fun setHome(station: Station?) {} ; override fun refresh() {} ; override fun earlier() {}
-    override fun updateTimetable() {} ; override fun feedback(text: String, category: String) {} ; override fun dismissMessage() {}
+    override fun updateTimetable() {} ; override fun setFeedbackDraft(text: String) {} ; override fun setFeedbackCategory(category: String) {}
+    override fun feedback(text: String, category: String) {} ; override fun dismissMessage() {}
 }

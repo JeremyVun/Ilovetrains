@@ -6,15 +6,6 @@ function journeyGeometryProblems(root = document) {
   const overlaps = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1
     && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
   const visible = (rect) => rect.width > 0 && rect.height > 0;
-  function hasSeparator(element) {
-    const style = getComputedStyle(element);
-    const ground = getComputedStyle(document.body).backgroundColor;
-    const border = parseFloat(style.borderLeftWidth) >= 1 && style.borderLeftColor === ground;
-    const shadow = style.boxShadow;
-    const lengths = shadow.replace(/rgba?\([^)]*\)/g, '').trim().split(/\s+/).map(parseFloat);
-    return border || (shadow.includes(ground) && lengths[0] === 0 && lengths[1] === 0
-      && lengths[2] === 0 && lengths[3] >= 1);
-  }
   function textRects(element, clip = false) {
     if (!element) return [];
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
@@ -70,14 +61,6 @@ function journeyGeometryProblems(root = document) {
         if (overlaps(devices[i].box, devices[j].box)) {
           problems.push('boarding or transfer markers overlap: '
             + devices[i].element.textContent.trim() + ' / ' + devices[j].element.textContent.trim());
-        }
-        const cap = [devices[i], devices[j]].find(({ element }) => element.classList.contains('sy-cap'));
-        const pin = [devices[i], devices[j]].find(({ element }) =>
-          element.matches('.sy-p') || element.closest('.sy-p'));
-        if (cap && pin && Math.abs(cap.box.right - pin.box.left) <= 1
-          && Math.min(cap.box.bottom, pin.box.bottom) > Math.max(cap.box.top, pin.box.top)
-          && !hasSeparator(pin.element)) {
-          problems.push('clamped transfer marker merges with the boarding cap without a visible separator');
         }
       }
     }

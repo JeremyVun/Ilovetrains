@@ -252,15 +252,11 @@ struct UserData: Codable, Equatable, Sendable {
 
         var seenTrips = Set<String>()
         value.trips = value.trips.filter { seenTrips.insert($0.id).inserted }
-        let latestView = Dictionary(grouping: value.history, by: \.tripId).mapValues { events in
-            events.map(\.at).max() ?? 0
-        }
-        let retained = Set(value.trips.sorted { lhs, rhs in
-            let lhsUse = max(lhs.lastViewed, latestView[lhs.id] ?? 0, lhs.createdAt)
-            let rhsUse = max(rhs.lastViewed, latestView[rhs.id] ?? 0, rhs.createdAt)
-            if lhsUse != rhsUse { return lhsUse > rhsUse }
-            return lhs.createdAt > rhs.createdAt
-        }.prefix(10).map(\.id))
+        let retained = Set(value.trips.enumerated().sorted { lhs, rhs in
+            let lhsUse = value.tripUseTime(lhs.element)
+            let rhsUse = value.tripUseTime(rhs.element)
+            return lhsUse == rhsUse ? lhs.offset < rhs.offset : lhsUse > rhsUse
+        }.prefix(10).map(\.element.id))
         value.trips = value.trips.filter { retained.contains($0.id) }
         let tripIDs = Set(value.trips.map(\.id))
         value.history.removeAll { !tripIDs.contains($0.tripId) }
@@ -278,6 +274,18 @@ struct UserData: Codable, Equatable, Sendable {
         var value = board
         value.journeys = board.journeys.filter(withinTransferLimit)
         return value
+    }
+
+    func tripUseTime(_ trip: SavedTrip) -> Millis {
+        history.lazy.filter { $0.tripId == trip.id }.map(\.at).max() ?? trip.createdAt
+    }
+
+    func leastRecentlyUsedTrip() -> SavedTrip? {
+        trips.enumerated().min { lhs, rhs in
+            let lhsUse = tripUseTime(lhs.element)
+            let rhsUse = tripUseTime(rhs.element)
+            return lhsUse == rhsUse ? lhs.offset < rhs.offset : lhsUse < rhsUse
+        }?.element
     }
 
     private static func lossyFlags(_ container: KeyedDecodingContainer<CodingKeys>) -> [String: Bool] {
@@ -341,6 +349,7 @@ actor DeviceStore {
     func save(_ data: UserData) async throws {
         try createDirectories()
         let payload = try encoder.encode(data.normalized())
+        if (try? Data(contentsOf: stateURL)) == payload { return }
         if fileManager.fileExists(atPath: stateURL.path) {
             try? fileManager.removeItem(at: backupURL)
             try fileManager.copyItem(at: stateURL, to: backupURL)
@@ -458,14 +467,18 @@ actor DeviceStore {
         }
         for pair in newestPairs.dropFirst(10) {
             for entry in pair { try fileManager.removeItem(at: entry.url) }
+            let removed = Set(pair.map(\.url))
+            entries.removeAll { removed.contains($0.url) }
         }
-        entries = cacheEntries()
         for pair in Dictionary(grouping: entries, by: { "\($0.board.from.id)\u{1F}\($0.board.to.id)" }).values {
-            for entry in pair.sorted(by: { $0.modifiedAt > $1.modifiedAt }).dropFirst(8) {
+            let extras = Array(pair.sorted(by: { $0.modifiedAt > $1.modifiedAt }).dropFirst(8))
+            for entry in extras {
                 try fileManager.removeItem(at: entry.url)
             }
+            let removed = Set(extras.map(\.url))
+            entries.removeAll { removed.contains($0.url) }
         }
-        for entry in cacheEntries().sorted(by: { $0.modifiedAt > $1.modifiedAt }).dropFirst(64) {
+        for entry in entries.sorted(by: { $0.modifiedAt > $1.modifiedAt }).dropFirst(64) {
             try fileManager.removeItem(at: entry.url)
         }
     }

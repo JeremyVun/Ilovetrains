@@ -13,8 +13,8 @@ import {
   boardingLabel, departureKey, journeyDetail, journeyKey, modeWords, platformNumber
 } from './journey.js';
 
-/* 30s refresh cadence plus margin: past this, a countdown is a claim the data
-   cannot support. */
+/* 30s refresh cadence plus margin: past this, freshness and provenance use
+   the stale treatment while the timetable figure remains visible. */
 export const STALE_MS = 90_000;
 const LIVE_DOT_MS = 45_000;
 
@@ -76,16 +76,13 @@ export function boardModel(body, nowMs, opts = {}) {
   };
 }
 
-/** The figure in the big slot: a dash for a cancellation, nothing at all off
-    stale data (a countdown from an old cache is a lie), "Now" for
-    the minute a service is leaving in, minutes up to 99, and rounded hours
-    beyond that — the unit changes so the figure stays one
-    glance wide. */
+/** The figure in the big slot: a dash for a cancellation, "Now" for the
+    minute a service is leaving in, minutes up to 99, and rounded hours beyond
+    that — the unit changes so the figure stays one glance wide. */
 export const CANCELLED_FIGURE = '—';
 
-function figureFor(cancelled, stale, mins) {
+function figureFor(cancelled, mins) {
   if (cancelled) return CANCELLED_FIGURE;
-  if (stale) return '';
   return countdownFigure(mins);
 }
 
@@ -136,7 +133,7 @@ function journeyRow(journey, nowMs, stale, opts) {
 
   const figure = past && !cancelled
     ? countdownFigure(Math.max(0, -mins))
-    : figureFor(cancelled, stale, mins);
+    : figureFor(cancelled, mins);
 
   const lineCode = (journey.line && journey.line.name) || '';
   const firstLine = (firstLeg && firstLeg.line) || journey.line || {};
