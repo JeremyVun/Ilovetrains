@@ -180,6 +180,11 @@ one writer so later assertion-only cases cannot overwrite the reviewed state.
 
 ## comps/
 
+A frozen, accepted travel-tracker reference lives in
+[`comps/persistent-travel-tracker/`](comps/persistent-travel-tracker/README.md).
+It reproduces the labelled visual targets under `assets/comps/latest/travel-tracker/`;
+it is not product code or native-rendering evidence.
+
 A round is a directory of HTML plus a one-line shoot, not a copied `shoot.js`:
 
 ```

@@ -1,7 +1,9 @@
 # Native travel surfaces
 
 Checked 2026-09-08 against the official sources below. These are platform
-constraints for the persistent travel tracker, not a settled product design.
+constraints for the persistent travel tracker. The accepted visual design and
+build handoff are in [the backlog](../backlog/persistent-travel-tracker/design.md);
+visual acceptance does not prove native execution behavior.
 
 ## Android
 
@@ -11,7 +13,7 @@ progress and actions are system-template fields; do not assume arbitrary
 Compose layout in the notification.
 [Progress-centric notifications](https://developer.android.com/develop/ui/compose/notifications/progress-centric).
 
-For the thicker-line comp, test `ProgressStyle.setStyledByProgress(false)`.
+For a fuller line, `ProgressStyle.setStyledByProgress(false)` is available.
 The default styles future segments as unfilled; disabling it gives every
 segment the filled appearance. The app must then distinguish progress through
 the tracker icon or segment colours. This is a supported styling choice, not
@@ -87,3 +89,30 @@ personal-state boundary and is outside the current proposal.
 
 Answer these with isolated native prototypes and real renderer captures before
 treating a browser illustration as implementable system UI.
+
+## Local renderer evidence, 2026-09-08
+
+- Android 16 / SDK 36, API 36.1 system image revision 4, build
+  `BE4B.251210.005`: the isolated `com.ilovetrains.trackerlab` probe rendered
+  a complete three-stage structured sequence and two condensed prose examples.
+  Both transfer platforms, seven-minute change and destination ETA fit in the
+  system's subtext/title/body fields. These fields each rendered one line on
+  that image; the full iOS prose layout is not an Android geometry promise.
+- `setStyledByProgress(false)` produced filled 11/7/50 segments and a visible
+  point at supplied positions 6/14/61. The notification dump confirmed the
+  supplied lengths and styling flag; this is not a native pixel-proportion
+  measurement. `requestPromotedOngoing=true` confirms a request, not independently
+  verified granted promotion. Progress points carry position/colour, not the
+  app's platform-number labels. System UI ANRs limited further capture; no
+  unverified variant is counted as native evidence.
+- Earlier iOS 26.4 ActivityKit probes exposed a real lock-screen activity and
+  camera-separated compact regions. The exact accepted Option 1 adaptation
+  subsequently built, installed and launched; after permission, its isolated
+  simulator exposed lock-screen accessibility controls but returned black
+  framebuffers. The attempt stopped after five minutes. No accepted-design
+  native lock-screen image was obtained.
+- All probes used static or shifted review clocks. None proves realtime
+  refresh, reliable ticking/phase changes, freshness expiry, process-death
+  recovery or physical-device power behavior. The build begins by proving
+  these separately from layout. The accepted browser reference is preserved
+  in [the calibration set](../../assets/comps/latest/travel-tracker/README.md).

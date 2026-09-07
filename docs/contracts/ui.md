@@ -627,11 +627,21 @@ due, precedes the first `shown_*`.
 The authoritative comps live at `assets/comps/latest/`. It always holds the
 current calibration exemplars and nothing else; when an owner verdict
 replaces a screen's design, the new exemplar frames replace the old ones in
-the same change as this contract, and git keeps the history. Every frame in it
-is a shot of the built client from `tools/shoot-states.js`,
+the same change as this contract, and git keeps the history. Shipped-screen
+frames are shots of the built client from `tools/shoot-states.js`,
 `tools/check-settings-browser.js`, `tools/shoot-android.sh` or
 `tools/shoot-ios.sh`. A frame no instrument can reproduce is removed rather
 than left to rot.
+
+An accepted, not-yet-built design may be retained here as an explicitly labelled
+visual target with its reproducible comp source. The 2026-09-08
+[travel tracker target](../../assets/comps/latest/travel-tracker/README.md) is
+such a reference: short prose plus the quiet trip line, accepted for the next
+build session. Its browser frames do not establish shipped native behavior.
+Replace them with verified native exemplars when implementation lands. Platform
+boxes on that line remain an optional visual follow-up, not part of the accepted
+baseline. The active behavior/design boundary is in its
+[backlog handoff](../backlog/persistent-travel-tracker/design.md).
 
 The board, home and detail calibration frames are listed below.
 `tools/check-settings-browser.js --frames assets/comps/latest` adds twelve
