@@ -99,10 +99,14 @@ The prepared Compose configuration supplies the runtime settings above and
 joins `shared-flags`. The flags stack creates that named network; deploy it
 before ilovetrains. The app joins it as an external network.
 The owner sealed and pushed the infra configuration in commit `1e2f564`.
-**Deployment remains pending:** publish the app image, then deploy flags
-followed by ilovetrains.
-No production credentials were read during implementation. This integration has
-been verified with a local flagsd protocol fixture, not the production service.
+Version `1.3.0` (source `6182609`, service worker `v46`) deployed on 2026-09-08,
+with flags first, then ilovetrains. Both deployctl jobs succeeded. Image digest:
+`sha256:fbbd7587e6c4f9d8895090113ca7403a8a6dd928ced8782b46d96ac5f0e49dae`.
+Production health, version, shell assets and Android download passed HTTP checks;
+`GET /api/v1/flags` returned `{"tiny_train":false}` with `Cache-Control: no-store`.
+Live on/off changes, private visibility and deletion passed against a local
+flagsd protocol fixture. A production flag-on toggle has not yet been verified.
+No production credentials were read during implementation.
 
 ## Verify
 
