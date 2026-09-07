@@ -265,6 +265,61 @@ func TestWaiterRespectsItsOwnCancellation(t *testing.T) {
 	<-leaderDone
 }
 
+func TestReadsNeverFetchAndRespectTheirWindows(t *testing.T) {
+	c := New[string](30*time.Second, 10*time.Minute)
+	clock := withClock(c)
+	var calls atomic.Int32
+
+	if _, ok := c.Get("k"); ok {
+		t.Error("Get returned a value for an empty cache")
+	}
+	if _, err := c.Do(context.Background(), "k", constant("v1", &calls)); err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	if got, ok := c.Get("k"); !ok || got != "v1" {
+		t.Errorf("Get = %q, %v, want v1, true", got, ok)
+	}
+
+	clock.Advance(31 * time.Second)
+	if got, ok := c.Get("k"); ok {
+		t.Errorf("Get = %q past the TTL, want nothing", got)
+	}
+	if got, ok := c.Stale("k"); !ok || got != "v1" {
+		t.Errorf("Stale = %q, %v, want v1, true", got, ok)
+	}
+
+	clock.Advance(10 * time.Minute)
+	if got, ok := c.Stale("k"); ok {
+		t.Errorf("Stale = %q past the stale window, want nothing", got)
+	}
+	if calls.Load() != 1 {
+		t.Errorf("fetches = %d, want 1: a read never fetches", calls.Load())
+	}
+}
+
+func TestPutStoresAValueAsIfItHadBeenFetched(t *testing.T) {
+	c := New[string](30*time.Second, 10*time.Minute)
+	clock := withClock(c)
+	var calls atomic.Int32
+
+	c.Put("k", "v1")
+	if got, ok := c.Get("k"); !ok || got != "v1" {
+		t.Errorf("Get = %q, %v, want v1, true", got, ok)
+	}
+	got, err := c.Do(context.Background(), "k", constant("v2", &calls))
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	if got.Value != "v1" || calls.Load() != 0 {
+		t.Errorf("Do = %q after %d fetches, want the put value and no fetch", got.Value, calls.Load())
+	}
+
+	clock.Advance(31 * time.Second)
+	if got, ok := c.Get("k"); ok {
+		t.Errorf("Get = %q, want a put value to age out like a fetched one", got)
+	}
+}
+
 func TestSweepDropsUnusableEntries(t *testing.T) {
 	c := New[string](30*time.Second, 10*time.Minute)
 	clock := withClock(c)

@@ -63,9 +63,9 @@ const (
 	bucketSize = 10 * time.Minute
 
 	// settledAge is how far into the past a bucket must be before every journey
-	// in it has departed and what ran can no longer change. A bucket newer than
-	// this can still contain a train that has not left, so it keeps the live
-	// cache policy.
+	// in it has departed. A bucket newer than this can still contain a train
+	// that has not left; a bucket older than it can still contain one that has
+	// not arrived, which is why departure alone does not settle a window.
 	settledAge = 20 * time.Minute
 
 	// How far a client may page. See departAt: these bound the key space.
@@ -89,8 +89,9 @@ const stopsLimit = 10
 // no per-user state: every response is a pure function of the query string.
 type Server struct {
 	upstream Upstream
-	// Two departure caches, not one: a live window is worth 30 seconds and a
-	// settled past window is worth an hour, and cache.Cache holds one TTL.
+	// Two departure caches, not one: every fetch goes through the 30-second
+	// live store, and a window whose journeys have all arrived is copied into
+	// the past store, where it is worth an hour.
 	departures     *cache.Cache[*tfnsw.DeparturesResponse]
 	departuresPast *cache.Cache[*tfnsw.DeparturesResponse]
 	webDir         string
@@ -203,12 +204,15 @@ func (s *Server) handleDepartures(w http.ResponseWriter, r *http.Request) {
 	// share an entry, and asking for the current bucket explicitly is a
 	// different answer (it echoes `at`) from asking for now.
 	key := from + "|" + to + "|" + strconv.Itoa(limit) + "|" + bucketKey(at) + "|" + modesKey(modes)
-	store, cacheControl := s.departures, departuresCacheControl
-	if settled(at, now) {
-		store, cacheControl = s.departuresPast, departuresPastCacheControl
+	past := settledBucket(at, now)
+	if past {
+		if response, ok := s.departuresPast.Get(key); ok {
+			writeData(w, departuresPastCacheControl, false, response)
+			return
+		}
 	}
 
-	result, err := store.Do(r.Context(), key, func(ctx context.Context) (*tfnsw.DeparturesResponse, error) {
+	result, err := s.departures.Do(r.Context(), key, func(ctx context.Context) (*tfnsw.DeparturesResponse, error) {
 		if len(modes) == 0 {
 			return s.emptyDepartures(from, to, at, now), nil
 		}
@@ -217,8 +221,20 @@ func (s *Server) handleDepartures(w http.ResponseWriter, r *http.Request) {
 		return s.upstream.DeparturesWithOptions(ctx, from, to, limit, at, tfnsw.DeparturesOptions{Modes: modes})
 	})
 	if err != nil {
+		if response, ok := s.pastFallback(past, key); ok {
+			writeData(w, departuresPastCacheControl, true, response)
+			return
+		}
 		writeError(w, err)
 		return
+	}
+
+	cacheControl := departuresCacheControl
+	// A stale answer is what upstream could not confirm, so it never becomes
+	// the hour-long copy of a window.
+	if past && !result.Stale && allJourneysArrived(result.Value, now) {
+		s.departuresPast.Put(key, result.Value)
+		cacheControl = departuresPastCacheControl
 	}
 	writeData(w, cacheControl, result.Stale, result.Value)
 }
@@ -245,11 +261,45 @@ func modesKey(modes []tfnsw.Mode) string {
 	return strings.Join(parts, ",")
 }
 
-// settled reports whether a window is far enough in the past that every journey
-// in it has already departed, so the answer can be cached hard. A zero `at` is
-// the live board and never settled.
-func settled(at, now time.Time) bool {
+// settledBucket reports whether a window is far enough in the past that every
+// journey in it has already departed, which makes its answer a candidate for
+// the hour-long store. A zero `at` is the live board and never a candidate.
+func settledBucket(at, now time.Time) bool {
 	return !at.IsZero() && at.Before(now.Add(-settledAge))
+}
+
+// allJourneysArrived reports whether a window has finished happening, so its
+// answer can no longer change and is worth caching hard. A cancelled journey
+// has nothing left to arrive; an unreadable arrival is no evidence of one, so
+// it keeps the window live.
+func allJourneysArrived(response *tfnsw.DeparturesResponse, now time.Time) bool {
+	for _, journey := range response.Journeys {
+		if journey.Cancelled {
+			continue
+		}
+		arrival, err := time.Parse(time.RFC3339, effectiveArrival(journey))
+		if err != nil || arrival.After(now) {
+			return false
+		}
+	}
+	return true
+}
+
+func effectiveArrival(journey tfnsw.Journey) string {
+	if journey.Arrival.Estimated != nil {
+		return *journey.Arrival.Estimated
+	}
+	return journey.Arrival.Scheduled
+}
+
+// pastFallback serves a settled window that has outlived its hour rather than
+// failing the request, as the contract's 24-hour stale window for a past
+// window promises.
+func (s *Server) pastFallback(past bool, key string) (*tfnsw.DeparturesResponse, bool) {
+	if !past {
+		return nil, false
+	}
+	return s.departuresPast.Stale(key)
 }
 
 // bucketKey renders a window for the cache key. The empty string is "now",
