@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-/* Review probe for the unified flags fetch: counts every /api/v1/flags request
- * the real web client makes per open, foreground return and 30 s tick, and
- * checks the tiny train only ever follows an answer fetched in this process.
- * node tools/review-probe-flags.js --url http://localhost:8198
+/* Counts every /api/v1/flags request the real web client makes per open,
+ * foreground return and 30 s tick, and checks the tiny train only ever follows
+ * an answer fetched in this process.
+ * node tools/check-flags-fetch.js --url http://localhost:8198
  */
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -40,7 +40,7 @@ async function run() {
     flags: { tiny_train: true, transferLimit: true },
     cache: { [`${trip.from.id}-${trip.to.id}`]: { fetchedAt: body.generatedAt, body } }
   };
-  const seed = `
+  const seed = (startHidden = false) => `
     localStorage.setItem('trains.v1', ${JSON.stringify(JSON.stringify(doc))});
     Date.now = () => ${NOW};
     window.__flags = { calls: 0, aborted: 0, answer: 'fail' };
@@ -66,7 +66,7 @@ async function run() {
     };
     const nativeInterval = window.setInterval.bind(window);
     window.setInterval = (fn, ms, ...rest) => { if (ms === 30000) window.__tick = fn; return nativeInterval(fn, ms, ...rest); };
-    let hiddenNow = false;
+    let hiddenNow = ${startHidden};
     Object.defineProperty(document, 'hidden', { get: () => hiddenNow, configurable: true });
     Object.defineProperty(document, 'visibilityState', { get: () => hiddenNow ? 'hidden' : 'visible', configurable: true });
     window.__setHidden = (value) => { hiddenNow = value; document.dispatchEvent(new Event('visibilitychange')); };
@@ -76,7 +76,7 @@ async function run() {
 
   await withPage(async (page) => {
     await page.send('Emulation.setTimezoneOverride', { timezoneId: 'Australia/Sydney' });
-    await page.send('Page.addScriptToEvaluateOnNewDocument', { source: seed });
+    await page.send('Page.addScriptToEvaluateOnNewDocument', { source: seed() });
     await frame(page, { url, width: 390, height: 844, scheme: 'dark', settle: 400 });
     await ready(page);
     await sleep(300);
@@ -148,7 +148,7 @@ async function run() {
   });
 
   await withPage(async (page) => {
-    await page.send('Page.addScriptToEvaluateOnNewDocument', { source: seed });
+    await page.send('Page.addScriptToEvaluateOnNewDocument', { source: seed() });
     await frame(page, { url: url + '/?tinyTrain=1', width: 390, height: 844, scheme: 'dark', settle: 400 });
     await ready(page);
     await sleep(300);
@@ -162,13 +162,26 @@ async function run() {
   });
 
   await withPage(async (page) => {
-    await page.send('Page.addScriptToEvaluateOnNewDocument', { source: seed });
+    await page.send('Page.addScriptToEvaluateOnNewDocument', { source: seed() });
     await frame(page, { url: url + '/?tinyTrain=0', width: 390, height: 844, scheme: 'dark', settle: 400 });
     await ready(page);
     await answer(page, { tiny_train: true, transferLimit: true });
     await tick(page);
     await sleep(300);
     step('I3 preview off beats a server true', !(await toyShown(page)) && await calls(page) === 2);
+  });
+
+  await withPage(async (page) => {
+    await page.send('Page.addScriptToEvaluateOnNewDocument', { source: seed(true) });
+    await frame(page, { url, width: 390, height: 844, scheme: 'dark', settle: 400 });
+    await ready(page);
+    await sleep(300);
+    step('I1 an open that starts hidden spends no request', await calls(page) === 0);
+    await answer(page, { tiny_train: true, transferLimit: true });
+    await hidden(page, false);
+    await sleep(300);
+    step('I1 becoming visible fetches once', await calls(page) === 1);
+    step('I4 the toy follows that first answer', await toyShown(page));
   });
 
   console.log(results.join('\n'));
