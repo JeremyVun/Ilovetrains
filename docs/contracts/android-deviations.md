@@ -16,6 +16,7 @@ This file records deliberate differences between the native Android app and the 
 
 - Settings gives Use location and Home 72dp minimum rows with 10dp vertical padding. Service choices show only `On` or `Off`, without checkmarks, circles or underlines. Appearance keeps the selected checkmark, removes the underline and reserves the System subtitle's space in every option so previews and labels align.
 - Home and board figures keep `Now` on one line, including enlarged Android text. They must fit their allocated column without clipping or invading the adjacent station/time columns.
+- Line and platform chips are sized in text units: enlarged text grows the chip, and the small journey axis with it, rather than clipping the glyphs (owner bug report, 2026-09-07). The bottom message bar's deletion text may wrap to two lines at enlarged text so its verb survives.
 - Journey lines have 3dp rounded corners at the destination end in Home, Board and Detail. Internal ride/transfer joins remain square so the time axis stays continuous (owner ruling, 2026-09-07).
 - Successful feedback confirmation dismisses after four seconds, extended by Android's accessibility timeout. Errors retain their manual dismissal and draft recovery.
 - Offline boards retain departed services and last-known delays; the shared native retention rules are in [native-data.md](native-data.md#cached-boards-and-departed-services). `LAST KNOWN` distinguishes retained estimates from fresh observations. No stale countdown or travelling-direction figure is presented as live.

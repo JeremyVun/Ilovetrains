@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -110,11 +111,12 @@ fun ActionRail(text: String, onClick: () -> Unit, enabled: Boolean = true, minHe
 fun LineChip(line: String, mode: String, text: String = line, modifier: Modifier = Modifier,
              height: Dp = 22.dp, horizontalPadding: Dp = 7.dp) {
     val c = LocalTrainColors.current
-    Box(modifier.height(height).clip(RoundedCornerShape(3.dp))
-        .background(lineColor(line, mode, c, fill = true)).padding(horizontal = horizontalPadding),
+    // The chip is sized in text units: enlarged text grows it instead of being clipped by it.
+    Box(modifier.height(height * LocalDensity.current.fontScale).clip(RoundedCornerShape(3.dp))
+        .background(lineColor(line, mode, c, fill = true)).padding(horizontal = horizontalPadding).testTag("chip-$text"),
         contentAlignment = Alignment.Center) {
         Text(text.uppercase(), color = chipInk(line, mode, c), fontSize = 14.sp,
-            fontWeight = FontWeight.Bold, letterSpacing = 0.sp, maxLines = 1)
+            fontWeight = FontWeight.Bold, letterSpacing = 0.sp, maxLines = 1, softWrap = false)
     }
 }
 
@@ -168,7 +170,7 @@ fun JourneyAxis(journey: Journey, modifier: Modifier = Modifier, large: Boolean 
     val fontScale = LocalDensity.current.fontScale
     val first = journey.legs.first()
     val total = (journey.effectiveArrival - journey.effectiveDeparture).coerceAtLeast(1)
-    val axisHeight = if (large) (42 + ((fontScale - 1f).coerceAtLeast(0f) * 80f)).dp else 22.dp
+    val axisHeight = if (large) (42 + ((fontScale - 1f).coerceAtLeast(0f) * 80f)).dp else 22.dp * fontScale
     val itemAlignment = if (large) Alignment.Top else Alignment.CenterVertically
     Row(modifier.height(axisHeight), verticalAlignment = itemAlignment) {
         platformText(first.fromPlatform, first.mode)?.takeIf { showCap }?.let {

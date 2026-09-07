@@ -226,6 +226,16 @@ to the owner's phase 3 verdict on the frames.
   so it is a property of how a `List` cell positions its content, not a layout
   defect. Accepting those three iOS baselines with this item is the
   orchestrator's recommendation; it is the owner's call.
+- **Line chips scale with the text (owner bug report, 2026-09-07).** The
+  1.3× frame showed `T1` clipped inside its chip. The chip had a fixed dp
+  height while its text is in sp, and the text's intrinsic height already
+  exceeds the chip at 1.0, so the fixed height was trimming font padding by
+  design. A minimum height grew every chip at rest; the fix sizes the chip
+  in text units (height × font scale, and the small journey axis with it),
+  identical at 1.0 and growing exactly with the glyphs. iOS chips use fixed
+  point sizes that Dynamic Type does not scale, so nothing changes there.
+  `lineChipsGrowWithEnlargedTextInsteadOfClippingIt` forces font scale 1.3
+  and asserts every chip's text sits inside its chip.
 - **Menu delete shares the path.** `Delete trip` in the Android long-press
   menu and the iOS context menu call the same `deleteTrip`, so both are
   undoable. iOS LRU eviction still purges immediately; it is not a deletion

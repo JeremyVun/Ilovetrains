@@ -7,7 +7,12 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
@@ -34,6 +39,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -172,6 +178,29 @@ class UiCalibrationTest {
         compose.onNodeWithTag(row).performTouchInput { swipeLeft(centerRight.x, centerRight.x - width * 0.75f, durationMillis = 2_000) }
         compose.waitUntil(5_000) { actions.deleted.size == 2 }
         compose.onNodeWithTag(row).assertDoesNotExist()
+    }
+
+    @Test fun lineChipsGrowWithEnlargedTextInsteadOfClippingIt() {
+        val fixture = Fixtures()
+        compose.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 1.3f)) {
+                TrainApp(fixture.twoTripsState, NoActions)
+            }
+        }
+        val chips = compose.onAllNodes(SemanticsMatcher("line chip") {
+            it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("chip-") == true
+        }, useUnmergedTree = true)
+        chips.assertCountEquals(4)
+        (0 until 4).forEach { index ->
+            // Glyphs may never reach the chip's edge: the old fixed height clipped them there at 1.3.
+            val pixels = chips[index].captureToImage().toPixelMap()
+            val fill = pixels[2, pixels.height / 2]
+            val inkOnEdge = listOf(0, pixels.height - 1)
+                .flatMap { y -> (pixels.width / 3 until pixels.width * 2 / 3).map { x -> pixels[x, y] } }
+                .count { it != fill }
+            assertEquals("chip $index has glyph ink on its top or bottom edge", 0, inkOnEdge)
+        }
     }
 
     @Test fun tripListStillScrollsVertically() {
