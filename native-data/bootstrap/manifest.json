@@ -14,5 +14,9 @@
       "serviceDateFrom": "20260905",
       "serviceDateTo": "20261004"
     }
-  ]
+  ],
+  "tripIndex": {
+    "name": "trip-index-e4a92de49bb35d2eeb2b0e5039a222a2215f47a334f44cfacdad807c64ef5df6.tsv.gz",
+    "sha256": "e4a92de49bb35d2eeb2b0e5039a222a2215f47a334f44cfacdad807c64ef5df6"
+  }
 }

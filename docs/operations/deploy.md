@@ -71,6 +71,21 @@ Check cached module content as well as the worker version: old HTTP-cached
 assets can otherwise enter a newly named shell cache. Installation reloads
 all shell requests; the cached controller must match the deployed source.
 
+Check what the realtime refresh actually published. Each source logs one line
+per refresh that changed the feed:
+
+```
+realtime source=sydneytrains raw=308 accepted=129 unknown=159 ambiguous=0 stale=20 duplicate=0 header_age=6s
+```
+
+`grep "realtime source="` shows every source's last count; alert on
+`realtime warning`, which is emitted whenever a non-empty feed publishes
+nothing. A `/data/current.json` compiled without a trip index makes Sydney
+Trains warn (and log `native timetable: manifest declares no trip index` at
+startup) until the next daily timetable refresh rewrites it. A source logs
+nothing when upstream answers 304 or returns a byte-identical feed; its
+snapshot still ages out through `X-Data-Stale`.
+
 Check static response headers too: `/js/main.js` and `/sw.js` must retain
 `Cache-Control: no-store` through the edge. A cold profile must load the app
 on its first navigation, before a worker-controlled reload can mask stale
