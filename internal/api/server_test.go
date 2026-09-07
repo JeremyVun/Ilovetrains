@@ -523,8 +523,6 @@ func TestDeparturesSettledWindowIsCachedForAnHour(t *testing.T) {
 	}
 }
 
-// movingServer is pinnedServer with a clock the test advances, shared by the
-// handler and both stores, so a window can be watched while its journeys run.
 func movingServer(t *testing.T, upstream Upstream, clock *time.Time) (*Server, http.Handler) {
 	t.Helper()
 	server, handler := pinnedServer(t, upstream)
@@ -535,9 +533,7 @@ func movingServer(t *testing.T, upstream Upstream, clock *time.Time) (*Server, h
 	return server, handler
 }
 
-// travellingDepartures is the shape that froze: a journey that left 25 minutes
-// before testNow, timetabled to arrive at testNow and running late to
-// `arrival`, so only the estimate says whether it is in yet.
+// The shape that froze: timetabled to arrive at testNow, so only the estimate says whether it is in yet.
 func travellingDepartures(arrival time.Time) *tfnsw.DeparturesResponse {
 	response := sampleDepartures()
 	estimated := arrival.Format(time.RFC3339)
@@ -560,8 +556,6 @@ func estimatedArrival(t *testing.T, recorder *httptest.ResponseRecorder) string 
 }
 
 func TestSettledBucketStaysLiveUntilItsJourneysArrive(t *testing.T) {
-	// The measured defect: a train that left 25 minutes ago is still travelling,
-	// and its bucket being old is not a reason to freeze its arrival for an hour.
 	clock := testNow
 	upstream := &fakeUpstream{departures: travellingDepartures(testNow.Add(5 * time.Minute))}
 	_, handler := movingServer(t, upstream, &clock)
@@ -655,8 +649,6 @@ func TestSettledBucketIsCachedHardOnceNothingCanArrive(t *testing.T) {
 }
 
 func TestStaleAnswerIsNeverCachedHard(t *testing.T) {
-	// A stale body is what upstream could not confirm, so it must not become
-	// the hour-long copy of a window even when its journeys look finished.
 	clock := testNow
 	upstream := &fakeUpstream{
 		departures:    travellingDepartures(testNow.Add(5 * time.Minute)),
@@ -684,8 +676,6 @@ func TestStaleAnswerIsNeverCachedHard(t *testing.T) {
 }
 
 func TestSettledWindowPastItsHourIsServedStaleWhenUpstreamFails(t *testing.T) {
-	// The contract's 24-hour stale window for a past window: what already
-	// happened is better served old than as a 502.
 	clock := testNow
 	upstream := &fakeUpstream{
 		departures:    sampleDepartures(),

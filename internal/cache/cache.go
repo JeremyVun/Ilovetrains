@@ -104,8 +104,8 @@ func (c *Cache[T]) Get(key string) (T, bool) {
 	return value, ok
 }
 
-// Stale returns a cached value that is past its TTL but still inside the stale
-// window, for a caller that would otherwise have nothing to serve.
+// Stale returns any cached value still inside the stale window, fresh or not,
+// for a caller that would otherwise have nothing to serve.
 func (c *Cache[T]) Stale(key string) (T, bool) {
 	value, _, ok := c.stale(key)
 	return value, ok

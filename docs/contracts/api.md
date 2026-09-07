@@ -49,9 +49,10 @@ with a matching 1-hour in-memory TTL. An old bucket whose train is still
 running is not settled: it keeps the live policy and is asked again, so an
 arrival that moves mid-journey reaches the client rather than freezing for the
 hour. Buckets nearer to now, ahead of now, or absent keep the live policy too,
-and an answer served stale on upstream error is never cached hard. Caching a
-settled window hard is not only cheap but more truthful: the cached copy was
-taken while the actuals still existed upstream.
+and an answer served stale on upstream error is never promoted into the
+hour-long store. Caching a settled window hard is not only cheap but more
+truthful: the cached copy was taken while the actuals, as far as upstream
+still had them, existed.
 
 `at` is rejected with `400` when it is unparseable, further than 24 hours in
 the past, or more than 2 hours in the future. This bounds the key space, which
