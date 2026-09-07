@@ -7,8 +7,10 @@ FROM golang:1.26-alpine AS build
 WORKDIR /src
 COPY go.mod ./
 COPY go.sum ./
+COPY vendor ./vendor
 COPY cmd ./cmd
 COPY internal ./internal
+ENV GOFLAGS=-mod=vendor
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/trainsd ./cmd/server
 
 FROM alpine:3.22 AS runtime
