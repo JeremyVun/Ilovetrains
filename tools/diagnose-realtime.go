@@ -75,6 +75,9 @@ func main() {
 					if age > 90 {
 						counts["tripTimestampOlderThan90s"]++
 					}
+					if age > 600 && u.GetTrip().GetScheduleRelationship() == gtfs.TripDescriptor_SCHEDULED {
+						counts["scheduledOlderThan10m"]++
+					}
 					if age < -5 {
 						counts["tripTimestampMoreThan5sAhead"]++
 					}
