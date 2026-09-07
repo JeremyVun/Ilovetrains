@@ -113,7 +113,7 @@ Runs on one tree with phases 1–3 landed. Owns `tools/baselines/`,
   is the only permitted difference beyond the fixture data.
 - Confirm `web/sw.js` `VERSION` bumped.
 
-Done marker: `[ ] phase 4 done`. Then the `backlog-item` close stage.
+Done marker: `[x] phase 4 done`. Then the `backlog-item` close stage.
 
 ## Build coordination (2026-09-07)
 
@@ -145,3 +145,21 @@ don't-ask-again action; the emulator exited during that tap, so its final
 screenshot was not captured. The initial broader connected suite failed two
 unchanged planner timing gates (next service 41.7s, cold route 8.1s); all UI
 calibration tests passed. A separate Sol cross-client review found no defects.
+
+Release packaging: signed Android 1.2.4 APK built and verified; 52 release
+unit tests and release lint passed. Full visual sweep captured all platforms;
+three non-Settings iOS differences and a missing existing filtered-Home web
+baseline are being checked before phase 4 acceptance.
+
+Visual attribution: detached pre-implementation d8f0a73 reproduced all three
+non-Settings iOS frames pixel-identically under the regression mask. Their
+stale baselines missed earlier journey-axis and saved-row changes. The clean
+attribution worktree was removed. The filtered-Home web output collision was
+fixed by making service-eligibility its sole writer; hidden-focus checks remain.
+
+Phase 4 verified: all 87 frames captured and the reviewed aggregate compares
+87 same, zero DIFF, zero NEW, zero missing. Current Settings exemplars and
+reviewed baselines are updated. Go tests, 335 web tests, Android debug/release
+builds with 52 JVM tests per configuration and lint, and iOS tests passed as
+recorded above. The broader Android planner timing failures remain outside
+this feature. All phases are complete; closeout and deployment follow.

@@ -41,7 +41,7 @@ ask to allow installation from that browser. Alternatively, copy the APK
 to the phone or install over USB debugging:
 
 ```sh
-adb install -r android/releases/ilovetrains-1.2.3.apk
+adb install -r android/releases/ilovetrains-1.2.4.apk
 ```
 
 A debug APK has a different signing identity. Android cannot replace it with
