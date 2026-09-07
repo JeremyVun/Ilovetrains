@@ -7,6 +7,7 @@ import java.time.format.DateTimeFormatter
 val Sydney: ZoneId = ZoneId.of("Australia/Sydney")
 val AllModes = setOf("train", "metro", "ferry")
 const val TransferLimitFlag = "transferLimit"
+const val TinyTrainFlag = "tiny_train"
 
 enum class TransferLimit(val wire: String, val label: String) {
     Two("two", "Up to 2"), Any("any", "No limit");
@@ -89,7 +90,8 @@ data class AppState(
     val feedbackDraft: String = "", val feedbackCategory: String = "problem",
     val feedbackSubmitting: Boolean = false, val feedbackSucceeded: Boolean = false,
     val message: String? = null, val messageAutoDismiss: Boolean = false,
-    val undoAvailable: Boolean = false, val version: String = BuildConfig.VERSION_NAME
+    val undoAvailable: Boolean = false, val version: String = BuildConfig.VERSION_NAME,
+    val tinyTrain: Boolean = false
 ) {
     val selectedTrip get() = trips.find { it.id == selectedTripId }
     val shownBoard get() = if (screen == Screen.Home) homeBoard ?: board else board

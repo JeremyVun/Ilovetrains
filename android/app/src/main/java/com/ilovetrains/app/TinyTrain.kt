@@ -23,57 +23,29 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.*
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URI
 
-// Only evaluated public values cross this boundary. No SDK key or device context.
-internal fun tinyTrainEnabled(raw: String): Boolean = JSONObject(raw).opt("tiny_train") == true
-
-internal suspend fun fetchTinyTrainFlag(baseUrl: String = BuildConfig.API_BASE): Boolean = withContext(Dispatchers.IO) {
-    val connection = URI("${baseUrl.trimEnd('/')}/api/v1/flags").toURL().openConnection() as HttpURLConnection
-    connection.connectTimeout = 3000
-    connection.readTimeout = 3000
-    connection.useCaches = false
-    connection.instanceFollowRedirects = false
-    connection.setRequestProperty("Accept", "application/json")
-    connection.setRequestProperty("Cache-Control", "no-store")
-    try {
-        connection.responseCode == 200 && tinyTrainEnabled(readLimited(connection.inputStream, 65_536))
-    } catch (error: CancellationException) { throw error }
-    catch (_: Exception) { false }
-    finally { connection.disconnect() }
-}
-
-internal val LocalTinyTrainFlag = staticCompositionLocalOf<Boolean?> { null }
+/* The view model's one flags answer, never a stored one: the toy stays off
+   until this foreground's own request lands. */
+internal val LocalTinyTrainFlag = staticCompositionLocalOf { false }
 
 @Composable
-internal fun TinyTrainLane(modifier: Modifier = Modifier, flagOverride: Boolean? = LocalTinyTrainFlag.current) {
+internal fun TinyTrainLane(modifier: Modifier = Modifier, flag: Boolean = LocalTinyTrainFlag.current) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val colors = LocalTrainColors.current
-    var enabled by remember { mutableStateOf(false) }
+    var paused by remember { mutableStateOf(true) }
     var running by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
     var reduced by remember { mutableStateOf(false) }
-    // Stop the drawing immediately, even if a flag request is still unwinding.
+    val enabled = flag && !paused
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_PAUSE) { enabled = false; running = false }
+            paused = event != Lifecycle.Event.ON_RESUME
+            if (paused) running = false
         }
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
     }
-    LaunchedEffect(lifecycle, flagOverride) {
-        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            try {
-                while (isActive) {
-                    enabled = flagOverride ?: fetchTinyTrainFlag()
-                    if (!enabled) running = false
-                    delay(30_000)
-                }
-            } finally { enabled = false; running = false }
-        }
-    }
+    LaunchedEffect(enabled) { if (!enabled) running = false }
     LaunchedEffect(running) {
         if (!running) return@LaunchedEffect
         try {

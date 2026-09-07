@@ -75,10 +75,13 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         }
     }
     private fun persist() { writes.trySend(data) }
+    /* One request per open, resume and 30s tick answers every flag. The toy
+       reads only this answer, so a stored value cannot replay a finished rollout. */
     private fun readFlags() {
         viewModelScope.launch {
-            val flags = runCatching { api.flags() }.getOrNull() ?: return@launch
-            if (flags == data.flags) return@launch
+            val flags = runCatching { api.flags() }.getOrNull()
+            mutable.value = mutable.value.copy(tinyTrain = flags?.get(TinyTrainFlag) == true)
+            if (flags == null || flags == data.flags) return@launch
             val before = data.capped
             data = data.copy(flags = flags); persist()
             if (data.capped != before) {
@@ -128,10 +131,10 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         mutable.value = mutable.value.copy(now = System.currentTimeMillis())
         refreshLoop = viewModelScope.launch {
             var ticks = 0
-            if (mutable.value.ready) { choosePrediction(); refreshSharedData(); refresh(); if (data.useLocation) onSilentLocation?.invoke() }
+            if (mutable.value.ready) { choosePrediction(); refreshSharedData(); refresh(); readFlags(); if (data.useLocation) onSilentLocation?.invoke() }
             while (isActive) {
                 delay(1000); mutable.value = mutable.value.copy(now = System.currentTimeMillis())
-                if (++ticks % 30 == 0 && mutable.value.ready) { refreshSharedData(); refresh() }
+                if (++ticks % 30 == 0 && mutable.value.ready) { refreshSharedData(); refresh(); readFlags() }
                 else if (data.focus != null && mutable.value.now >= data.focus!!.journey.effectiveArrival && !mutable.value.focusComplete
                     && data.focus!!.board.isLive(mutable.value.now)) settleFocus()
             }
