@@ -6,6 +6,14 @@ internal fun BoardData.lastKnown() = copy(offline = true, journeys = journeys.ma
 
 internal fun FocusedJourney.lastKnown() = copy(journey = journey.copy(retained = true), board = board.lastKnown())
 
+/** A board that never knew a locally identified journey cannot demote it; the realtime overlay owns that one. */
+internal fun FocusedJourney.demotedForUnmatchedBoard(): FocusedJourney? =
+    if (journey.legs.all { it.identity != null }) null else lastKnown()
+
+/** The overlay is the only refresh a locally identified journey has, so losing its match is last known now. */
+internal fun FocusedJourney.demotedForLostOverlay(): FocusedJourney? =
+    if (journey.legs.all { it.identity != null }) lastKnown() else null
+
 /** An offline open keeps the answer the rider last saw, without inferring a ride. */
 fun retainedHomeJourney(board: BoardData?, now: Long): Journey? {
     if (board == null || !board.offline) return null

@@ -267,7 +267,7 @@ final class ControllerTests: XCTestCase {
         cancelledModel.pause()
     }
 
-    func testI2CorrectionKeepsOneRowAndTheCap() {
+    func testACorrectionKeepsOneRowAndTheHundredRowCap() {
         let a = Station(id: "200060", name: "Central Station"), b = Station(id: "215020", name: "Parramatta Station")
         let now = epochNow()
         let journey = Journey(legs: [Leg(line: "T1", mode: "train", headsign: "Parramatta", from: a, to: b, departure: now - 1_500_000, arrival: now - 60_000)])
@@ -296,7 +296,7 @@ final class ControllerTests: XCTestCase {
         return value
     }
 
-    func testProbeALocallyIdentifiedFocusHandsOffToTheMatchingAPIJourney() async throws {
+    func testALocallyIdentifiedFocusHandsOffToTheMatchingAPIJourney() async throws {
         let fixture = identified(departedFocus())
         let (store, model) = try await networkedModel(data: fixture.data, arrival: fixture.stale + 300_000)
         model.resume()
@@ -310,8 +310,8 @@ final class ControllerTests: XCTestCase {
         model.pause()
     }
 
-    func testProbeAnUnmatchedAPIBoardDemotesALocallyIdentifiedFocusAndSettlesItFromTheSnapshot() async throws {
-        let fixture = identified(departedFocus())
+    func testAnUnmatchedAPIBoardDemotesAnOnlineRoutedFocusAndSettlesItFromTheSnapshot() async throws {
+        let fixture = departedFocus()
         let (store, model) = try await networkedModel(data: fixture.data, arrival: fixture.stale + 300_000)
         var elsewhere = fixture.data
         elsewhere.focus!.journey.legs[0].departure += 60_000
@@ -320,36 +320,74 @@ final class ControllerTests: XCTestCase {
         for _ in 0..<100 where model.state.focus?.journey.retained != true { try await Task.sleep(for: .milliseconds(10)) }
         XCTAssertEqual(model.state.focus?.journey.retained, true, "no matching key: lastKnown() demoted the focus")
         XCTAssertEqual(model.state.focus?.board.offline, true)
-        XCTAssertNotNil(model.state.focus?.journey.legs[0].identity, "identity survives the demotion, so the overlay may re-promote it")
         XCTAssertEqual(model.state.focus?.journey.effectiveArrival, fixture.stale, "the moved arrival never reached the focus")
         try await settled(store) { $0.rides.map(\.arrival) == [fixture.stale] }
         model.pause()
     }
 
-    func testProbeAFailedFocusRequestSettlesALocallyIdentifiedFocusFromItsSnapshot() async throws {
+    func testTheOverlayRatherThanAnUnmatchedAPIBoardDemotesALocallyIdentifiedFocus() async throws {
+        let fixture = identified(departedFocus())
+        let (store, model) = try await networkedModel(data: fixture.data, arrival: fixture.stale + 300_000)
+        var elsewhere = fixture.data
+        elsewhere.focus!.journey.legs[0].departure += 60_000
+        StubbedDepartures.body = try departuresBody(elsewhere, arrival: fixture.stale + 300_000)
+        model.resume()
+        try await settled(store) { $0.rides.map(\.arrival) == [fixture.stale] }
+        XCTAssertNotEqual(model.state.focus?.journey.retained, true, "the API board that never knew this journey demoted it")
+        XCTAssertNotNil(model.state.focus?.journey.legs[0].identity)
+        XCTAssertEqual(model.state.focus?.journey.effectiveArrival, fixture.stale, "the moved arrival never reached the focus")
+
+        try await demoted(model)
+        XCTAssertEqual(model.state.focus?.journey.retained, true, "the overlay found no live update and left the focus live")
+        XCTAssertEqual(model.state.focus?.board.offline, true)
+        XCTAssertNotNil(model.state.focus?.journey.legs[0].identity, "identity survives the demotion, so the overlay may re-promote it")
+        model.pause()
+    }
+
+    func testDemotionFollowsWhoCanRefreshTheFocus() {
+        let fixture = identified(departedFocus())
+        let local = fixture.data.focus!
+        XCTAssertNil(local.demotedForUnmatchedBoard(), "only the overlay refreshes an identified journey")
+        XCTAssertEqual(local.demotedForLostOverlay()?.journey.retained, true)
+        XCTAssertEqual(local.demotedForLostOverlay()?.board.offline, true)
+        let online = departedFocus().data.focus!
+        XCTAssertEqual(online.demotedForUnmatchedBoard(), online.lastKnown())
+        XCTAssertNil(online.demotedForLostOverlay(), "the overlay never ran for a journey it cannot identify")
+    }
+
+    func testAFailedFocusRequestSettlesALocallyIdentifiedFocusFromItsSnapshot() async throws {
         let fixture = identified(departedFocus())
         let (store, model) = try await networkedModel(data: fixture.data, arrival: fixture.stale + 300_000)
         StubbedDepartures.body = Data("not a board".utf8)
         XCTAssertFalse(model.state.focus!.board.isLive(model.state.now), "the tick alone cannot settle this focus")
         model.resume()
         try await settled(store) { $0.rides.map(\.arrival) == [fixture.stale] }
+        try await demoted(model)
         XCTAssertEqual(model.state.focus?.journey.retained, true)
         XCTAssertTrue(model.state.focusComplete)
         model.pause()
     }
 
-    func testProbeTheRealtimeTaskRestartsTheFocusRequestWhenItsOwnFetchFails() async throws {
+    func testAFailedRealtimeFetchDoesNotRestartTheFollowedJourneysRequest() async throws {
         let fixture = departedFocus()
         let (_, model) = try await networkedModel(data: fixture.data, arrival: fixture.stale + 300_000, delay: .seconds(3))
         StubbedDepartures.requests = []
         model.resume()
         try await Task.sleep(for: .milliseconds(2_500))
         let focusRequests = StubbedDepartures.requests.filter { $0.query?.contains("at=") == true }
-        XCTExpectFailure("refreshSharedData now falls through a failed realtime fetch to refresh(), which cancels and restarts the followed journey's request") {
-            XCTAssertEqual(focusRequests.count, 1, "asked more than once before any answer: \(StubbedDepartures.requests.map(\.absoluteString))")
-        }
+        XCTAssertEqual(focusRequests.count, 1, "asked more than once before any answer: \(StubbedDepartures.requests.map(\.absoluteString))")
         model.pause()
         StubbedDepartures.delay = .zero
+    }
+
+    /// The overlay only runs once the bundled timetable is open, which is seconds on a cold simulator.
+    private func demoted(_ model: TrainViewModel) async throws {
+        let began = epochNow()
+        for _ in 0..<3000 {
+            if model.state.focus?.journey.retained == true { return }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTFail("no demotion after \(epochNow() - began) ms: focus=\(String(describing: model.state.focus?.journey.retained)) offline=\(String(describing: model.state.focus?.board.offline)) status=\(model.state.timetableStatus)")
     }
 
     private func refreshed(_ model: TrainViewModel, arrival: Millis) async throws {

@@ -121,9 +121,11 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         realtimeJob = viewModelScope.launch {
             try {
                 initialized.await()
-                try { planner.refreshRealtime(api.baseUrl) } catch (e: CancellationException) { throw e } catch (_: Exception) { }
+                val fetched = try { planner.refreshRealtime(api.baseUrl); true }
+                    catch (e: CancellationException) { throw e } catch (_: Exception) { false }
                 val request = generation; val pair = ends(); val modes = data.modes.toSet()
-                if (pair != null && modes.isNotEmpty() && mutable.value.board?.isLive(mutable.value.now) != true) {
+                // Replanning on a failed fetch would republish the same rows from the realtime the app already had.
+                if (fetched && pair != null && modes.isNotEmpty() && mutable.value.board?.isLive(mutable.value.now) != true) {
                     val local = planner.plan(pair.first, pair.second, mutable.value.now - 900_000, modes, 24)
                     if (local.journeys.isNotEmpty()) {
                         val prior = mutable.value.board?.takeIf { it.from.id == pair.first.id && it.to.id == pair.second.id }
@@ -140,11 +142,11 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
                                 generatedAt = updated.observedAt ?: focus.board.generatedAt,
                                 source = "live", offline = false, serverStale = false)))
                             persist()
-                        }
+                        } else data.focus?.demotedForLostOverlay()?.let { data = data.copy(focus = it); persist() }
                         settleFocus(judgeClock = updated?.live == true)
                     }
                 }
-                if (now - lastTimetableCheck > 6 * 3_600_000) {
+                if (fetched && now - lastTimetableCheck > 6 * 3_600_000) {
                     lastTimetableCheck = now
                     planner.update(api.baseUrl)
                     mutable.value = mutable.value.copy(timetableStatus = planner.coverageDescription)
@@ -231,7 +233,7 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
             if (data.focus?.journey?.key != focus.journey.key || data.focus?.tripId != focus.tripId || data.focus?.reverse != focus.reverse) return@launch
             val match = result?.journeys?.find { it.key == focus.journey.key }
             if (match != null) data = data.copy(focus = focus.copy(journey = match, board = result))
-            else data = data.copy(focus = focus.lastKnown())
+            else focus.demotedForUnmatchedBoard()?.let { data = data.copy(focus = it) }
             settleFocus(); persist(); syncPersonal()
         }
     }

@@ -11,6 +11,7 @@ class BoardRetentionTest {
     private val t9 = Journey(listOf(Leg("T9", "train", "Epping", townHall, rhodes,
         now + 60_000, now + 25 * 60_000, now + 4 * 60_000, now + 28 * 60_000)))
     private val previous = BoardData(townHall, rhodes, listOf(t9), now, source = "live", homeJourneyKey = t9.key)
+    private val localT9 = Journey(t9.legs.map { it.copy(identity = TripIdentity("sydneytrains", "T9.42", "2026-09-07", townHall.id, rhodes.id)) })
 
     @Test fun offlinePinKeepsItsLastKnownDelayAndArrivalAcrossRestart() {
         val focus = FocusedJourney("trip", false, t9, previous).lastKnown()
@@ -77,6 +78,24 @@ class BoardRetentionTest {
         assertEquals(2, result.journeys.size)
         assertEquals(t9.key, nextHomeJourney(result, now + 9 * 60_000)?.key)
         assertNull(retainedHomeJourney(result, t9.effectiveArrival + 30 * 60_000 + 1))
+    }
+
+    @Test fun anUnmatchedApiBoardDemotesOnlyTheJourneyItCouldHaveCarried() {
+        val identified = FocusedJourney("trip", false, localT9, previous.copy(journeys = listOf(localT9)))
+        assertNull(identified.demotedForUnmatchedBoard())
+        val online = FocusedJourney("trip", false, t9, previous)
+        assertEquals(online.lastKnown(), online.demotedForUnmatchedBoard())
+        assertTrue(requireNotNull(online.demotedForUnmatchedBoard()).journey.retained)
+    }
+
+    @Test fun aLostOverlayMatchDemotesTheJourneyOnlyThisPhoneCanRefresh() {
+        val identified = FocusedJourney("trip", false, localT9, previous.copy(journeys = listOf(localT9)))
+        val demoted = requireNotNull(identified.demotedForLostOverlay())
+        assertTrue(demoted.journey.retained)
+        assertTrue(demoted.board.offline)
+        assertFalse(demoted.board.isLive(now))
+        assertEquals(localT9.effectiveArrival, demoted.journey.effectiveArrival)
+        assertNull(FocusedJourney("trip", false, t9, previous).demotedForLostOverlay())
     }
 
     @Test fun oldHistoryAndOtherStationPairsCannotLeakIntoBoard() {

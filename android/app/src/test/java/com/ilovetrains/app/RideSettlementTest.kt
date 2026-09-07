@@ -46,7 +46,7 @@ class RideSettlementTest {
         assertEquals(emptyList<Ride>(), emptyList<Ride>().settled(focus(now + 60_000), arrived = false))
     }
 
-    @Test fun i2CorrectionNeverDuplicatesAndTheCapHolds() {
+    @Test fun aCorrectionNeverDuplicatesARowAndTheHundredRowCapHolds() {
         val filler = (0 until 100).map { Ride("other-$it", false, now - it * 60_000L, now - 1, central, parramatta) }
         val recorded = filler.settled(focus(now - 60_000), arrived = true)
         assertEquals(100, recorded.size)
@@ -74,7 +74,7 @@ class RideSettlementTest {
         assertEquals(emptyList<Ride>(), atDestination.settled(focus(now + 5 * 60_000), arrived = false))
     }
 
-    @Test fun i1AStaleArrivalInThePastRecordsNothingUntilTheRefreshedOneHasPassed() {
+    @Test fun aStaleArrivalInThePastRecordsNothingUntilTheRefreshedOneHasPassed() {
         val stale = focus(now - 60_000)
         val moved = focus(now + 5 * 60_000)
         assertEquals(emptyList<Ride>(), emptyList<Ride>().settled(moved, arrived = now >= moved.journey.effectiveArrival))

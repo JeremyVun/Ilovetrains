@@ -213,6 +213,16 @@ struct BoardData: Codable, Equatable, Sendable {
 private let pastBoardRetention: Millis = 86_400_000
 
 extension FocusedJourney {
+    /// A board that never knew a locally identified journey cannot demote it; the realtime overlay owns that one.
+    func demotedForUnmatchedBoard() -> FocusedJourney? {
+        journey.legs.allSatisfy { $0.identity != nil } ? nil : lastKnown()
+    }
+
+    /// The overlay is the only refresh a locally identified journey has, so losing its match is last known now.
+    func demotedForLostOverlay() -> FocusedJourney? {
+        journey.legs.allSatisfy { $0.identity != nil } ? lastKnown() : nil
+    }
+
     func lastKnown() -> FocusedJourney {
         var copy = self
         copy.journey.retained = true

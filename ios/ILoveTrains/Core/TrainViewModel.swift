@@ -231,7 +231,7 @@ final class TrainViewModel: ObservableObject {
         realtimeTask = Task {
             defer { if sharedRequest == sharedGeneration { realtimeTask = nil } }
             try? await bootstrap?.value
-            try? await planner.refreshRealtime(baseURL: api.baseURL)
+            let fetched = (try? await planner.refreshRealtime(baseURL: api.baseURL)) != nil
             guard !Task.isCancelled, active, sharedRequest == sharedGeneration else { return }
             if let focus = data.focus, focus.journey.legs.allSatisfy({ $0.identity != nil }) {
                 let update = await planner.refreshFocused(focus.journey)
@@ -245,10 +245,12 @@ final class TrainViewModel: ObservableObject {
                         refreshed.board.generatedAt = update.observedAt ?? focus.board.generatedAt
                         refreshed.board.source = "live"; refreshed.board.offline = false; refreshed.board.serverStale = false
                         data.focus = refreshed
-                    }
+                    } else if let demoted = data.focus?.demotedForLostOverlay() { data.focus = demoted }
                     settleFocus(judgeClock: update.live); persist(); syncPersonal()
                 }
             }
+            // Restarting the board on a failed fetch would cancel the followed journey's request every tick.
+            guard fetched else { return }
             if state.board?.isLive(state.now) != true { refresh() }
             if state.now - lastTimetableCheck >= 21_600_000 {
                 lastTimetableCheck = state.now
@@ -272,7 +274,7 @@ final class TrainViewModel: ObservableObject {
             guard !Task.isCancelled, sameFocus(focus) else { return }
             if let result, let match = result.journeys.first(where: { $0.key == focus.journey.key }) {
                 var updated = focus; updated.board = result; updated.alternatives = nil; updated.journey = match; data.focus = updated
-            } else { data.focus = focus.lastKnown() }
+            } else if let demoted = focus.demotedForUnmatchedBoard() { data.focus = demoted }
             settleFocus(); persist(); syncPersonal()
         }
     }

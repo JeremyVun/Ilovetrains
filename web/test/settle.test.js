@@ -34,7 +34,7 @@ function shiftedBody(minutes) {
   return transferBody({ journeys });
 }
 
-test('I2: correcting then withdrawing then re-recording never duplicates a row', () => {
+test('correcting then withdrawing then re-recording never duplicates a row', () => {
   const now = ARRIVAL + 2 * 60_000;
   let doc = settleRide(docWithFocus(), now);
   doc = settleRefreshedFocus(doc, SELECTION, shiftedBody(1), now);
@@ -47,7 +47,7 @@ test('I2: correcting then withdrawing then re-recording never duplicates a row',
   assert.equal(Date.parse(again.rides[0].arrivedAt), ARRIVAL + 10 * 60_000);
 });
 
-test('I2: the 100-row cap holds through a correction that re-adds the row', () => {
+test('the 100-row cap holds through a correction that re-adds the row', () => {
   const now = ARRIVAL + 2 * 60_000;
   const filler = Array.from({ length: 100 }, (_, i) => ({
     tripId: 'other', direction: 'forward', scheduledDeparture: `2026-01-01T00:${String(i).padStart(2, '0')}:00+11:00`,
@@ -61,7 +61,7 @@ test('I2: the 100-row cap holds through a correction that re-adds the row', () =
   assert.equal(doc.rides.filter((r) => r.tripId === TRIP.id).length, 1);
 });
 
-test('I3: a 200 m completion records before the timetable agrees and survives an unmoved refresh', () => {
+test('a 200 m completion records before the timetable agrees and survives an unmoved refresh', () => {
   const now = ARRIVAL - 3 * 60_000;
   const recorded = settleRide(docWithFocus(), now, AT_BONDI);
   assert.equal(recorded.rides.length, 1, 'the fix at the destination records the ride');
@@ -72,7 +72,7 @@ test('I3: a 200 m completion records before the timetable agrees and survives an
   assert.notEqual(directionsModel(unmoved.focus, now).phase, 'done', 'the pure model does not know about the fix');
 });
 
-test('I3: a moved future arrival withdraws the row once the fix is gone, and keeps it while it is held', () => {
+test('a moved future arrival withdraws the row once the fix is gone, and keeps it while it is held', () => {
   const now = ARRIVAL - 3 * 60_000;
   const recorded = settleRide(docWithFocus(), now, AT_BONDI);
   const moved = settleRefreshedFocus(recorded, SELECTION, shiftedBody(2), now + 30_000, null);
@@ -116,7 +116,7 @@ test('legacy row recorded from a delayed departure matches neither recordRide no
   assert.equal(settled.rides.length, 2, 'documented: the legacy row cannot be found, so a second is added');
 });
 
-test('I4: settleRide on an unmoved journey equals the old recordCompletedFocus', () => {
+test('settleRide on an unmoved journey equals the old recordCompletedFocus', () => {
   const now = ARRIVAL + 60_000;
   const doc = docWithFocus();
   const ends = { from: TRIP.from, to: TRIP.to };
@@ -126,12 +126,12 @@ test('I4: settleRide on an unmoved journey equals the old recordCompletedFocus',
   assert.equal(clearFocus(settleRide(doc, now)).focus, undefined);
 });
 
-test('I4: settleRide without a trip for the focus records nothing', () => {
+test('settleRide without a trip for the focus records nothing', () => {
   const doc = { ...docWithFocus(), trips: [] };
   assert.equal(settleRide(doc, ARRIVAL + 60_000), doc);
 });
 
-test('I5-analogue: a refresh that expires the focus still records the ride first', () => {
+test('a refresh that expires the focus still records the ride first', () => {
   const now = ARRIVAL + 31 * 60_000;
   const settled = settleRefreshedFocus(docWithFocus(), SELECTION, shiftedBody(0), now);
   assert.equal(settled.focus, undefined);
