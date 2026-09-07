@@ -1,6 +1,8 @@
 package com.ilovetrains.app
 
 import android.app.Application
+import android.os.Build
+import android.view.accessibility.AccessibilityManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.*
@@ -12,7 +14,7 @@ import java.time.Instant
 import java.util.UUID
 import kotlin.math.roundToInt
 
-class TrainViewModel(application: Application) : AndroidViewModel(application), UiActions {
+class TrainViewModel @JvmOverloads constructor(application: Application, private val undoWindowMillis: Long = UndoWindowMillis) : AndroidViewModel(application), UiActions {
     private val store = DeviceStore(application)
     private val api = TransitApi()
     private val planner = OfflinePlanner(application)
@@ -31,6 +33,8 @@ class TrainViewModel(application: Application) : AndroidViewModel(application), 
     private var refreshLoop: Job? = null
     private var realtimeJob: Job? = null
     private var feedbackJob: Job? = null
+    private var pendingDeletion: PendingDeletion? = null
+    private var undoJob: Job? = null
     private var lastRealtimeAttempt = 0L
     private var lastTimetableCheck = 0L
     private var initialized = CompletableDeferred<Unit>()
@@ -63,7 +67,7 @@ class TrainViewModel(application: Application) : AndroidViewModel(application), 
         }
     }
     private fun persist() { writes.trySend(data) }
-    private fun message(text: String) { mutable.value = mutable.value.copy(message = text) }
+    private fun message(text: String?) { mutable.value = mutable.value.copy(message = text, undoAvailable = false) }
     private fun visibleFocus(): FocusedJourney? = visibleFocus(data, mutable.value.now)
     private fun syncPersonal() {
         val focus = visibleFocus()
@@ -359,12 +363,32 @@ class TrainViewModel(application: Application) : AndroidViewModel(application), 
         syncPersonal(); refresh()
     }
     override fun deleteTrip(id: String) {
-        val trip = data.trips.find { it.id == id } ?: return
-        data = data.copy(trips = data.trips.filter { it.id != id }, history = data.history.filter { it.tripId != id },
-            focus = data.focus?.takeIf { it.tripId != id }, lastAnswer = data.lastAnswer?.takeIf { it.tripId != id }, lastTripId = data.lastTripId?.takeIf { it != id })
-        persist(); viewModelScope.launch { store.removeCache(trip) }
+        val (remaining, pending) = data.beginDeletion(id) ?: return
+        undoJob?.cancel(); expireDeletion()
+        data = remaining; pendingDeletion = pending; persist()
         if (mutable.value.selectedTripId == id) { explicit = false; mutable.value = mutable.value.copy(board = null) }
         choosePrediction(); syncPersonal(); refresh()
+        mutable.value = mutable.value.copy(message = deletionMessage(pending.trip), undoAvailable = true)
+        undoJob = viewModelScope.launch { delay(undoTimeoutMillis()); expireDeletion() }
+    }
+    override fun undoDelete() {
+        val pending = pendingDeletion ?: return
+        undoJob?.cancel(); undoJob = null; pendingDeletion = null
+        data = data.restore(pending); persist()
+        mutable.value = mutable.value.copy(message = null, undoAvailable = false)
+        choosePrediction(); syncPersonal(); refresh()
+    }
+    private fun expireDeletion() {
+        val pending = pendingDeletion ?: return
+        pendingDeletion = null
+        viewModelScope.launch { store.removeCache(pending.trip) }
+        if (mutable.value.message == deletionMessage(pending.trip)) message(null)
+    }
+    private fun undoTimeoutMillis(): Long {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return undoWindowMillis
+        val manager = getApplication<Application>().getSystemService(AccessibilityManager::class.java) ?: return undoWindowMillis
+        return manager.getRecommendedTimeoutMillis(undoWindowMillis.toInt(),
+            AccessibilityManager.FLAG_CONTENT_TEXT or AccessibilityManager.FLAG_CONTENT_CONTROLS).toLong()
     }
     override fun openSettings() {
         settingsBack = mutable.value.screen
@@ -415,7 +439,7 @@ class TrainViewModel(application: Application) : AndroidViewModel(application), 
     override fun feedback(text: String, category: String) {
         if (feedbackJob?.isActive == true) return
         feedbackJob = viewModelScope.launch {
-            mutable.value = mutable.value.copy(feedbackSubmitting = true, feedbackSucceeded = false, message = null)
+            mutable.value = mutable.value.copy(feedbackSubmitting = true, feedbackSucceeded = false, message = null, undoAvailable = false)
             try {
                 api.feedback(text, category)
                 mutable.value = mutable.value.copy(feedbackSucceeded = true)
@@ -426,7 +450,7 @@ class TrainViewModel(application: Application) : AndroidViewModel(application), 
             finally { mutable.value = mutable.value.copy(feedbackSubmitting = false) }
         }
     }
-    override fun dismissMessage() { mutable.value = mutable.value.copy(message = null) }
+    override fun dismissMessage() { message(null) }
 
     private fun Journey.scheduledOnly() = copy(legs = legs.map {
         it.copy(estimatedDeparture = null, estimatedArrival = null, cancelled = false)

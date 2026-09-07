@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -53,10 +54,11 @@ fun TrainApp(state: AppState, actions: UiActions) {
                     }
                 }
                 Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(c.ink)
-                    .heightIn(min = 52.dp).clickable(role = Role.Button, onClick = actions::dismissMessage)
+                    .heightIn(min = 52.dp).clickable(role = Role.Button, onClick = if (state.undoAvailable) actions::undoDelete else actions::dismissMessage)
                     .padding(horizontal = PagePadding), verticalAlignment = Alignment.CenterVertically) {
-                    Text(message, Modifier.weight(1f), color = c.ground, fontSize = 14.sp, fontWeight = FontWeight.Normal)
-                    Label("Dismiss", color = c.ground)
+                    Text(message, Modifier.weight(1f), color = c.ground, fontSize = 14.sp, fontWeight = FontWeight.Normal,
+                        maxLines = if (state.undoAvailable) 1 else Int.MAX_VALUE, overflow = TextOverflow.Clip)
+                    Label(if (state.undoAvailable) "Undo" else "Dismiss", color = c.ground)
                 }
             }
         }

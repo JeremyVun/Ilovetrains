@@ -13,6 +13,9 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxState
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -60,10 +63,10 @@ fun HomeScreen(state: AppState, actions: UiActions) {
             }
             Rule(heavy = true)
         }
-        LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = PagePadding)) {
-            item("anchor") { Label("My trips", Modifier.padding(top = 22.dp, bottom = 10.dp), color = c.ink, size = 11) }
-            items(state.trips, key = { it.id }) { trip -> SavedTripRow(trip, state, actions) }
-            item("end") { Label("— End of trips", Modifier.padding(top = 14.dp, bottom = 6.dp)) }
+        LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+            item("anchor") { Label("My trips", Modifier.padding(start = PagePadding, end = PagePadding, top = 22.dp, bottom = 10.dp), color = c.ink, size = 11) }
+            items(state.trips, key = { it.id }) { trip -> SavedTripRow(trip, state, actions, Modifier.animateItem()) }
+            item("end") { Label("— End of trips", Modifier.padding(start = PagePadding, end = PagePadding, top = 14.dp, bottom = 6.dp)) }
         }
         HomeFooter(actions)
     }
@@ -246,7 +249,7 @@ private fun SmartHeader(state: AppState, board: BoardData, journey: Journey, can
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun SavedTripRow(trip: SavedTrip, state: AppState, actions: UiActions) {
+private fun SavedTripRow(trip: SavedTrip, state: AppState, actions: UiActions, modifier: Modifier = Modifier) {
     val c = LocalTrainColors.current
     val largeText = LocalDensity.current.fontScale > 1.15f
     var showActions by remember(trip.id) { mutableStateOf(false) }
@@ -254,6 +257,15 @@ private fun SavedTripRow(trip: SavedTrip, state: AppState, actions: UiActions) {
     val shown = state.selectedTripId == trip.id
     val lines = trip.lines.ifEmpty { listOf("T") }
     val stacked = lines.size > 1 && trip.from.shortName.length + trip.to.shortName.length > 26
+    // Plain remember: the lazy list's saved state would bring an undone row back already dismissed.
+    val dismissState = remember(trip.id) { SwipeToDismissBoxState(SwipeToDismissBoxValue.Settled, positionalThreshold = { it * 0.5f }) }
+    SwipeToDismissBox(dismissState, backgroundContent = {
+        Box(Modifier.fillMaxSize().background(c.warning).padding(horizontal = PagePadding), contentAlignment = Alignment.CenterEnd) {
+            Label("Delete", color = c.ground, size = 12)
+        }
+    }, modifier = modifier.testTag("trip-${trip.id}"), enableDismissFromStartToEnd = false,
+        onDismiss = { actions.deleteTrip(trip.id) }) {
+    Column(Modifier.fillMaxWidth().background(c.ground).padding(horizontal = PagePadding)) {
     Box(Modifier.fillMaxWidth()) {
     Row(Modifier.fillMaxWidth().heightIn(min = if (stacked) 92.dp else 72.dp)
         .semantics { customActions = listOf(CustomAccessibilityAction("Trip actions") { showActions = true; true }) }
@@ -331,6 +343,8 @@ private fun SavedTripRow(trip: SavedTrip, state: AppState, actions: UiActions) {
         }
     }
     Rule()
+    }
+    }
 }
 
 @Composable

@@ -6,7 +6,10 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.captureToImage
@@ -26,6 +29,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.json.JSONObject
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -118,6 +122,59 @@ class UiCalibrationTest {
         capture("detail-f1-manly")
         compose.runOnIdle { state.value = fixture.pyrmontTransferState }
         capture("detail-pyrmont-double-bay")
+        compose.runOnIdle { state.value = fixture.twoTripsState }
+        compose.onNodeWithTag("trip-${fixture.beachTrip.id}").performTouchInput {
+            down(centerRight); moveBy(Offset(-width * 0.6f, 0f))
+        }
+        capture("home-deleting")
+        compose.onNodeWithTag("trip-${fixture.beachTrip.id}").performTouchInput { cancel() }
+        compose.runOnIdle { state.value = fixture.deletedState }
+        capture("home-deleted")
+    }
+
+    @Test fun swipeDeletesRowAndUndoRestoresIt() {
+        val fixture = Fixtures()
+        val state = mutableStateOf(fixture.twoTripsState)
+        val actions = object : UiActions by NoActions {
+            val deleted = mutableListOf<String>()
+            override fun deleteTrip(id: String) {
+                deleted += id
+                state.value = state.value.copy(trips = state.value.trips.filter { it.id != id }, totalTrips = state.value.trips.size - 1,
+                    message = "Rhodes → Bondi Junction deleted", undoAvailable = true)
+            }
+            override fun undoDelete() { state.value = fixture.twoTripsState }
+        }
+        compose.setContent { TrainApp(state.value, actions) }
+        val row = "trip-${fixture.beachTrip.id}"
+
+        compose.onNodeWithTag(row).performTouchInput { swipeLeft(centerRight.x, centerRight.x - width * 0.25f, durationMillis = 2_000) }
+        compose.waitForIdle()
+        assertEquals(emptyList<String>(), actions.deleted)
+        compose.onNodeWithTag(row).assertIsDisplayed()
+
+        compose.onNodeWithTag(row).performTouchInput { swipeLeft(centerRight.x, centerRight.x - width * 0.75f, durationMillis = 2_000) }
+        compose.waitUntil(5_000) { actions.deleted.isNotEmpty() }
+        assertEquals(listOf(fixture.beachTrip.id), actions.deleted)
+        compose.onNodeWithText("UNDO").assertIsDisplayed()
+        compose.onNodeWithText("Rhodes → Bondi Junction deleted").assertIsDisplayed()
+        compose.onNodeWithTag(row).assertDoesNotExist()
+
+        compose.onNodeWithText("UNDO").performClick()
+        compose.onNodeWithTag(row).assertIsDisplayed()
+        compose.onNodeWithText("UNDO").assertDoesNotExist()
+
+        compose.onNodeWithTag(row).performTouchInput { swipeLeft(centerRight.x, centerRight.x - width * 0.75f, durationMillis = 2_000) }
+        compose.waitUntil(5_000) { actions.deleted.size == 2 }
+        compose.onNodeWithTag(row).assertDoesNotExist()
+    }
+
+    @Test fun tripListStillScrollsVertically() {
+        val fixture = Fixtures()
+        val trips = (0 until 8).map { i -> fixture.beachTrip.copy(id = "$i") }
+        compose.setContent { TrainApp(fixture.home.copy(trips = trips, totalTrips = trips.size), NoActions) }
+        compose.onNodeWithTag("trip-7").assertIsNotDisplayed()
+        compose.onNodeWithTag("trip-0").performTouchInput { swipeUp() }
+        compose.onNodeWithTag("trip-7").assertIsDisplayed()
     }
 
     @Test fun pagesEarlierAfterPastRowsArrive() {
@@ -297,6 +354,9 @@ private class Fixtures {
         focus = activePinnedState.focus?.copy(pinned = false))
     val completedState = activePinnedState.copy(focusComplete = true)
 
+    val beachTrip = SavedTrip("rhodes-bondi", transferBoard.from, transferBoard.to, lines = listOf("T9", "T4"))
+    val twoTripsState = home.copy(trips = listOf(centralTrip, beachTrip), totalTrips = 2)
+    val deletedState = home.copy(message = "Rhodes → Bondi Junction deleted", undoAvailable = true)
     val longNamesState = state(pyrmontNow, pyrmontBoard).copy(
         trips = listOf(SavedTrip("pyrmont-double-bay", pyrmontBoard.from, pyrmontBoard.to, lines = listOf("F4", "F7"))),
         totalTrips = 1, selectedTripId = "pyrmont-double-bay",
@@ -312,7 +372,7 @@ private object NoActions : UiActions {
     override fun openJourney(journey: Journey) {} ; override fun pinJourney(journey: Journey) {} ; override fun unpinJourney() {}
     override fun showReturn() {} ; override fun newTrip() {} ; override fun chooseSetupFrom(station: Station) {}
     override fun clearSetupFrom() {} ; override fun chooseSetupTo(station: Station) {} ; override fun clearSetupTo() {}
-    override fun saveTrip(from: Station, to: Station) {} ; override fun deleteTrip(id: String) {} ; override fun openSettings() {}
+    override fun saveTrip(from: Station, to: Station) {} ; override fun deleteTrip(id: String) {} ; override fun undoDelete() {} ; override fun openSettings() {}
     override fun setAppearance(value: Appearance) {} ; override fun setMode(mode: String, enabled: Boolean) {}
     override fun setUseLocation(enabled: Boolean) {} ; override fun requestLocation() {} ; override fun chooseHome() {}
     override fun setHome(station: Station?) {} ; override fun refresh() {} ; override fun earlier() {}

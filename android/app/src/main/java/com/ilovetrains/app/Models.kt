@@ -64,7 +64,7 @@ data class AppState(
     val timetableStatus: String = "Opening offline timetable", val timetableUpdating: Boolean = false,
     val tripMetadata: Map<String, String> = emptyMap(),
     val feedbackSubmitting: Boolean = false, val feedbackSucceeded: Boolean = false,
-    val message: String? = null, val version: String = BuildConfig.VERSION_NAME
+    val message: String? = null, val undoAvailable: Boolean = false, val version: String = BuildConfig.VERSION_NAME
 ) {
     val selectedTrip get() = trips.find { it.id == selectedTripId }
     val shownBoard get() = if (screen == Screen.Home) homeBoard ?: board else board
@@ -84,6 +84,7 @@ interface UiActions {
     fun clearSetupTo()
     fun saveTrip(from: Station, to: Station)
     fun deleteTrip(id: String)
+    fun undoDelete()
     fun openSettings()
     fun setAppearance(value: Appearance)
     fun setMode(mode: String, enabled: Boolean)

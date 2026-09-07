@@ -45,6 +45,8 @@ three rules. Done when committed.
 
 ## Phase 1 — Android — DONE marker: `swipe-to-delete phase 1` commit
 
+**DONE 2026-09-07.** JVM gate green (51 unit tests, 7 new in `TripDeletionTest`, lint clean); `swipeDeletesRowAndUndoRestoresIt` and `tripListStillScrollsVertically` pass on the booted emulator at 390x844.
+
 Owns: `android/app/src/main/java/com/ilovetrains/app/UiHome.kt`,
 `UiApp.kt`, `Models.kt`, `TrainViewModel.kt`, new `TripDeletion.kt`, new
 `android/app/src/test/java/com/ilovetrains/app/TripDeletionTest.kt`,
@@ -179,7 +181,10 @@ exported from the xcresult, and the Android partial-drag capture).
 2. `tools/shoot-ios.sh` for the default states plus `home-deleted`; export
    `home-deleting` from the UI test's xcresult with `xcrun xcresulttool`.
 3. `tools/visual-regression.js` for all three clients. Every pre-existing
-   frame passes unchanged. The four new frames are the only additions.
+   frame passes unchanged. The three new baseline frames (`home-deleting`
+   and `home-deleted` on Android, `home-deleted` on iOS) are the only
+   additions; the iOS `home-deleting` frame is a comp only (see `design.md`
+   "Build decisions").
 4. Accessibility drive: Android with TalkBack on the emulator, confirm
    `Trip actions` still opens the menu and the bar announces the deletion
    text and `Undo`; iOS with VoiceOver in the simulator or Accessibility

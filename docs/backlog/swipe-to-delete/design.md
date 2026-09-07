@@ -182,6 +182,46 @@ largest supported text size.
 | 2026-09-07 | Copy: `{from} → {to} deleted` / `Undo`. | Owner ruling |
 | 2026-09-07 | Cache purge deferred to window expiry; everything else deletes immediately. | Owner ruling |
 
+## Build decisions (orchestrator, 2026-09-07)
+
+Made on the orchestrator's own authority during the build; each is subject
+to the owner's phase 3 verdict on the frames.
+
+- **Android background is full-bleed.** The horizontal page padding moved
+  from the `LazyColumn` to each item, so the warning-coloured background
+  reaches both screen edges like the iOS swipe button, while the `Delete`
+  label and the row content keep the page inset. A row at rest is pixel
+  identical; the visual-regression run is the proof.
+- **A fast flick also commits.** `SwipeToDismissBox` has a fixed velocity
+  threshold (Material's 125 dp/s) beside the positional one, so a short but
+  quick flick dismisses, as in Gmail. The half-width positional threshold
+  governs a slow drag. The instrumented test drags slowly to prove the
+  positional rule.
+- **Dismiss state is a plain `remember`.** `rememberSwipeToDismissBoxState`
+  is saveable, and the lazy list keeps saved state by item key, so an undone
+  row would return already dismissed and delete itself again. The state is
+  constructed with `remember(trip.id)` instead.
+- **Restore is a no-op if the same pair was saved again** during the window,
+  so undo can never produce two rows for one station pair.
+- **The comps use two trips.** Central → Parramatta stays and shows the
+  header; Rhodes → Bondi Junction is the row deleted on both platforms, so
+  the `deleted` frames keep a header and the bar reads
+  `Rhodes → Bondi Junction deleted`. iOS seeds this as `--calibration
+  home-two-trips` (at rest) and `home-deleted` (bar showing, no expiry timer,
+  since a seeded frame is frozen).
+- **The iOS `deleting` frame is a comp, not a baseline.** It is a gesture
+  mid-flight that only the UI test can produce, exported from its xcresult;
+  `tools/visual-regression.js` has no iOS column for it. The other three new
+  frames are baselines.
+- **The iOS UI test's vertical swipe checks arbitration, not scrolling:** two
+  rows do not fill the screen, so the assertion is that a vertical swipe on
+  the row reveals no `Delete` button and keeps the row. Android's eight-trip
+  scroll test covers the scroll case.
+- **Menu delete shares the path.** `Delete trip` in the Android long-press
+  menu and the iOS context menu call the same `deleteTrip`, so both are
+  undoable. iOS LRU eviction still purges immediately; it is not a deletion
+  the user made.
+
 ## Rejected alternatives
 
 - **Confirmation dialog.** Punishes every deliberate delete; both platforms
