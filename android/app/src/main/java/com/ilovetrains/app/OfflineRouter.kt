@@ -45,7 +45,7 @@ internal class OfflineRouter(
         val node: PathNode,
     )
 
-    fun route(from: Station, to: Station, at: Long, connections: List<ScheduledConnection>, limit: Int): List<Journey> {
+    fun route(from: Station, to: Station, at: Long, connections: List<ScheduledConnection>, limit: Int, maxTransfers: Int = this.maxTransfers): List<Journey> {
         if (from.id == to.id || limit <= 0) return emptyList()
         val seenTrips = HashSet<String>(maxOriginServices)
         val seeds = ArrayList<Int>(maxOriginServices)
@@ -71,7 +71,7 @@ internal class OfflineRouter(
         val candidates = ArrayList<Label>(seeds.size)
         for (seedPosition in seeds.indices) {
             val index = seeds[seedPosition]
-            routeSeed(to.id, index, connections[index], connections)?.let(candidates::add)
+            routeSeed(to.id, index, connections[index], connections, maxTransfers)?.let(candidates::add)
             val eligible = filterConditionalLongWaits(candidates)
             if (eligible.size < limit) continue
             val nextDeparture = seeds.getOrNull(seedPosition + 1)?.let { connections[it].effectiveDeparture } ?: Long.MAX_VALUE
@@ -85,7 +85,7 @@ internal class OfflineRouter(
             .take(limit)
     }
 
-    private fun routeSeed(destination: String, startIndex: Int, seed: ScheduledConnection, connections: List<ScheduledConnection>): Label? {
+    private fun routeSeed(destination: String, startIndex: Int, seed: ScheduledConnection, connections: List<ScheduledConnection>, maxTransfers: Int): Label? {
         if (seed.effectiveArrival < seed.effectiveDeparture) return null
         val seedLabel = Label(seed.effectiveArrival, seed.effectiveDeparture, 0, PathNode(seed, null))
         val stationLabels = mutableMapOf<String, MutableMap<Pair<Int, String>, Label>>()
