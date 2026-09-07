@@ -58,6 +58,36 @@ final class AppFlowTests: XCTestCase {
     }
 
     @MainActor
+    func testSwipeRevealsDeleteAndUndoRestoresRow() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--calibration", "home-two-trips"]
+        app.launch()
+        let row = app.buttons["trip-second-trip"]
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+
+        row.swipeUp()
+        XCTAssertFalse(app.buttons["Delete"].exists, "A vertical swipe on the row scrolls; it does not reveal Delete")
+        XCTAssertTrue(row.exists)
+
+        row.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5))
+            .press(forDuration: 0.1, thenDragTo: row.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.5)))
+        let delete = app.buttons["Delete"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 3))
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "home-deleting"; shot.lifetime = .keepAlways
+        add(shot)
+
+        delete.tap()
+        let undo = app.buttons["message-undo"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 3))
+        XCTAssertFalse(row.exists)
+        XCTAssertTrue(app.staticTexts["Rhodes → Bondi Junction deleted"].exists)
+        undo.tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 3))
+        XCTAssertFalse(undo.exists)
+    }
+
+    @MainActor
     func testFeedbackDraftSurvivesSettingsNavigationWithoutSending() {
         let app = XCUIApplication()
         app.launchArguments = ["--calibration", "settings"]

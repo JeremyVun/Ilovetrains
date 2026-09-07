@@ -217,6 +217,14 @@ to the owner's phase 3 verdict on the frames.
   rows do not fill the screen, so the assertion is that a vertical swipe on
   the row reveals no `Delete` button and keeps the row. Android's eight-trip
   scroll test covers the scroll case.
+- **The iOS List re-rasterises row text by a third of a point.** With the
+  `List` in place the trips-row geometry is unchanged (same bounding box, the
+  vertical bars and rules identical), but the row's text is drawn one device
+  pixel lower, which `visual-regression.js` reports on `home`, `home-light`
+  and `home-inferred`. Forcing an integral anchor-row height made it worse,
+  so it is a property of how a `List` cell positions its content, not a layout
+  defect. Accepting those three iOS baselines with this item is the
+  orchestrator's recommendation; it is the owner's call.
 - **Menu delete shares the path.** `Delete trip` in the Android long-press
   menu and the iOS context menu call the same `deleteTrip`, so both are
   undoable. iOS LRU eviction still purges immediately; it is not a deletion

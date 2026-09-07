@@ -44,10 +44,12 @@ private struct TrainAppContent: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             if model.state.ready, let message = model.state.message {
-                Button(action: model.dismissMessage) {
+                let undo = model.state.undoAvailable
+                Button(action: undo ? model.undoDelete : model.dismissMessage) {
                     HStack(spacing: 12) {
-                        Text(message).font(.system(size: 14, weight: .regular)).frame(maxWidth: .infinity, alignment: .leading)
-                        TrainLabel(text: "Dismiss", color: colors.ground)
+                        Text(message).font(.system(size: 14, weight: .regular)).lineLimit(undo ? 1 : nil)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        TrainLabel(text: undo ? "Undo" : "Dismiss", color: colors.ground)
                     }
                     .foregroundStyle(colors.ground)
                     .padding(.horizontal, pagePadding)
@@ -55,7 +57,7 @@ private struct TrainAppContent: View {
                     .background(colors.ink)
                 }
                 .buttonStyle(.plain)
-                .accessibilityIdentifier("message-dismiss")
+                .accessibilityIdentifier(undo ? "message-undo" : "message-dismiss")
                 .task(id: message) {
                     guard message == feedbackSuccessMessage else { return }
                     try? await Task.sleep(for: .seconds(4))

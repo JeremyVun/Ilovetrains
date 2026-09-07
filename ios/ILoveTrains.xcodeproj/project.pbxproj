@@ -7,120 +7,122 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0469840EE53DAD35C5E5B987A8E601ED /* BoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A5C1418A6C846CF72D6AA9FD39F21E6 /* BoardView.swift */; };
-		0551A3C5A7A355B2B4EE01E940D49F8E /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DF0CE4B4B489206BAD2B19377D1990F5 /* Foundation.framework */; };
+		087732BE6816B598BAF98261817B8962 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F73A9793884A98DC81A1795D0C3DCA1 /* Theme.swift */; };
+		0D4AB715003936B50D401C92A93ED9F3 /* timetable.zip in Resources */ = {isa = PBXBuildFile; fileRef = 182FE857EA97EFD719A745BA8720CFFE /* timetable.zip */; };
+		0F43FE8D726E429998E2E74860E7D008 /* OfflineZip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92A0A5C4D870B1113675F13ECF72A530 /* OfflineZip.swift */; };
 		161497505CADA024A011A346B45B0E47 /* BoardRetentionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25AC9C044213813934E60F18943C3902 /* BoardRetentionTests.swift */; };
+		161DE8DDCE1E548EAE8E7A79F2387B20 /* stations.json in Resources */ = {isa = PBXBuildFile; fileRef = 83F3C91479FEF2D83389ECA406538F12 /* stations.json */; };
+		16890EBDE5A34C1C29DB2C89E09E7D21 /* JourneyAxisLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35B272AD42BBE6CF38A51CD4866A7A80 /* JourneyAxisLayout.swift */; };
+		171FDCFCB616A3389220FC53AE8AF40C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A6A720BFD7C1239778644EE2178B6FEB /* Assets.xcassets */; };
+		1D53368F877EEA9C12581BC9909E1777 /* DeviceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90F580CBE84AA756CD63EE0455947C8C /* DeviceStore.swift */; };
 		227C4681257578CCD221273B8028B71D /* PredictionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 886A038593A84A19382E589337B95141 /* PredictionTests.swift */; };
 		22C9C689987563D58D526A6BA4CC127E /* OfflineRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDA9D73822E8193F23D712829238E66B /* OfflineRouterTests.swift */; };
-		320FB920A102033FA61C31A274A5C7A7 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 629298F5116802F5134DF36EE7908FEE /* PrivacyInfo.xcprivacy */; };
-		3687573B2A6DA2C27E35021F4A077B7B /* TrainViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42517480E75B3FFA72C60A66BB67D250 /* TrainViewModel.swift */; };
-		38D2B022CD3A614AD57E639623B86851 /* timetable-manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = 3615243F548DB6A2604B7946A7B38EF9 /* timetable-manifest.json */; };
-		3D92BB886EC1A77263EFE97E15F24353 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BA83440D20B5F2BAD57BB7A2898E931 /* SetupView.swift */; };
-		3E7C81ACD517FAB8AC08DA5EF79FE34A /* DeviceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C99563647B0455300FBB1320713168C9 /* DeviceStore.swift */; };
+		2EC7307F78DB3FA9DC195098E4909A1C /* calibration.json in Resources */ = {isa = PBXBuildFile; fileRef = 0F00D5834AA8CD296A78671B98F366B9 /* calibration.json */; };
+		3A44F47136861DD4164C6A7834FEAAF2 /* TrainViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57DD7FF8FC3C334C57C7CFC3EEBAB61D /* TrainViewModel.swift */; };
+		3BC6FD02DD8B82028A2150405D3EEF3A /* ILoveTrainsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C33FC07BDE6739D660B7BE805F53D25 /* ILoveTrainsApp.swift */; };
+		3FA9C96A149BD4505A919F287CDE3448 /* DetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F99A9E07614D25517EFB47B525BBC577 /* DetailView.swift */; };
+		415344D61BBAB0A435A205D06F43463D /* OfflineRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09ECF11EDB32084E2AEA90314ABFA4E7 /* OfflineRouter.swift */; };
 		4318F31D1B925A5C05C440FAC908ECA0 /* RowConformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AC09C9409003F3D7E4E206C4EDD16B0 /* RowConformanceTests.swift */; };
 		4618AE84BC96A2DFEFF7DE3AC340E07D /* OfflinePackageStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2269C1581DC5132C8800C6E786AD18 /* OfflinePackageStoreTests.swift */; };
 		477DFB7310465CCA4CCD251490C07E7E /* AppFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0D676BD29373C9C0CE8DE3ED663C4A /* AppFlowTests.swift */; };
+		4854ECCE21B41B8C389825908A5D6B16 /* TransitModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 187B2015508A3DA090330C7C6EBDCE0E /* TransitModels.swift */; };
+		4AB1D15BEDFA009447E7C03D822C1D71 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 369E3C3CE85C8D9794DE25612E6AAD6B /* SettingsView.swift */; };
+		4E24C8385B6FAEEFD2D53BA212ACA25A /* OfflineRealtime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75EE451EE7896A90B5C84525EAC53FC4 /* OfflineRealtime.swift */; };
+		5103AF8E065964CEF116140FCB210591 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B7D9A893C91691BDAAF872209754910 /* HomeView.swift */; };
 		538B69BA0181E229B1B71D3BD7F61456 /* StorageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF850A09F92B75BDBB02B3779C13B3A5 /* StorageTests.swift */; };
 		560EC98CB1EDAD0CFCB6F75007678D60 /* ControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F7B7DB6A767CE62B869425D595E9263 /* ControllerTests.swift */; };
-		5C87A827ECBB9D7ADB06F00709B5F4EA /* OfflineRealtime.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9BD2EB8E5FA819A772457CB4DAAAF4 /* OfflineRealtime.swift */; };
 		5DD1D9BF38AB2B0CE555EE8C8E34077B /* OfflineRealtimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 114EAF36CE8AC644EF2A5725C2D95716 /* OfflineRealtimeTests.swift */; };
-		6A9974284CAD0498FBE80250FACF7692 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 961614011D1C448189ED1CF41B302B2C /* AppState.swift */; };
-		72E89E338E32740CFAAE5A09B9E5C914 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A6A720BFD7C1239778644EE2178B6FEB /* Assets.xcassets */; };
-		7F0322FA2081BE0C8E44BF71DABDEF99 /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D917A8F9AA79423513C55F97D08F000 /* LocationService.swift */; };
+		6715CEFAAC9DD94139A88273372943B6 /* TransitAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 448A4BD4D50296E87A28CE895EABCC71 /* TransitAPI.swift */; };
+		73BB200B4179885CDB40AABACC014006 /* Common.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD4DAE0D758CB4DF9D3052CDD4914019 /* Common.swift */; };
+		77D881F53DE546E8A049A6C232641FF3 /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 487CBDD900CB8FB87CAA132C03E47266 /* LocationService.swift */; };
+		7DF22448FBEE8FCF123506E4F1DC06C3 /* OfflinePackageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1554BF5D4735CE7608D4D2BFDF432892 /* OfflinePackageStore.swift */; };
+		82E99068347C9C7B05322B188FA467F8 /* BoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15C4B1DD3C827B68946FBD1E83D3473D /* BoardView.swift */; };
 		839574B4043377482393F28CE528B0A7 /* HomeStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47C6C9BF08B29567D99AF04090C5D52B /* HomeStatusTests.swift */; };
-		844A8BB3C69CBC35DDAFE4D0BEFE337B /* AppView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D04A6F059ED2D7E3064AACCA6B03317F /* AppView.swift */; };
-		84AD53D163AEBB159F3D05B72C9376E3 /* OfflinePlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BBB3C5538BFB99D79740D7CF7826305 /* OfflinePlanner.swift */; };
 		8A9B7741EA7C7177E12D54920CBD078F /* prediction.json in Resources */ = {isa = PBXBuildFile; fileRef = CCF9F353578F2449D9D62F29EBA158B8 /* prediction.json */; };
 		8C3CDE54C66EAFCFA96616350D39D588 /* JourneyAxisLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBB7378360287999016F12B0BCD5B94B /* JourneyAxisLayoutTests.swift */; };
 		8FC022321C20DFC6330EFF74F9C4BBEA /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DF0CE4B4B489206BAD2B19377D1990F5 /* Foundation.framework */; };
-		90FE1B92C4485ECCF132566869D7191E /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13174E4D616BF3DFC90026CE97C8F5CE /* HomeView.swift */; };
-		98A51C5E34EC37BBCBFCA79A9EF7ED5C /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68C0E33F4E434E2B1034EBF4ED943D18 /* Theme.swift */; };
-		9CB81ADA6EC2889C06C4EB4F47B8B372 /* OfflineDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FC9C3F4F0CAE1F86B1DDFC68E68DED3 /* OfflineDatabase.swift */; };
-		9E7D2EF345E320BA9B76B6B9F4394C12 /* JourneyAxisLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = B99E4B9B11A54900375D5791625173A6 /* JourneyAxisLayout.swift */; };
-		A5704B31E221A340E5E42317CCABD009 /* TransitModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F17BB166E3D02A46723E238A1A7F8FA0 /* TransitModels.swift */; };
-		A793E66AA669EF460F9E39D67569F91F /* Common.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA8D683F0DBF0963C0530E2F37102DE1 /* Common.swift */; };
-		A938884FC2ECF04163DCC482914D4D4B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 909FD5761A6688AD36837D88FD8B0429 /* SettingsView.swift */; };
-		AB1E2BB15EB481FD95D9D08D90A7A9B3 /* DetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D09EA61A57BEBDAA9C7947A61554F32 /* DetailView.swift */; };
+		97CC26322414B58F9809649437E494A3 /* OfflinePlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A8BA43E41A6935B648AEE219294B6E0 /* OfflinePlanner.swift */; };
+		9C24377ACE26B2901AD4FBFDD59FB95B /* timetable-manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = 3615243F548DB6A2604B7946A7B38EF9 /* timetable-manifest.json */; };
 		ABEB582A751594711563A7B405B389A2 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DF0CE4B4B489206BAD2B19377D1990F5 /* Foundation.framework */; };
-		AC87B3D9B4EA4FEE1261180E1A623FB8 /* stations.json in Resources */ = {isa = PBXBuildFile; fileRef = 83F3C91479FEF2D83389ECA406538F12 /* stations.json */; };
-		B1546DA132586E2BCF45519DF4504106 /* OfflineRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54EACFCDB3EE9915CE460D10C0BE6C9D /* OfflineRouter.swift */; };
-		C21E56F75B4A94830EB1C43EAB1CE06D /* OfflineZip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9057088967828D1E15D6A65F315EA227 /* OfflineZip.swift */; };
-		C4276617E995B8466C48007CBB77251D /* OfflinePackageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3631E985A94E2BCB388479CF1462BD2 /* OfflinePackageStore.swift */; };
+		B15B228D78093FC2F02E9F290234D746 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0E4FA6B9A3E199FD2B24A607F32AE71 /* AppState.swift */; };
+		B53FD94ADF1C592799151269ADC1DDC6 /* TripDeletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB44FBBD9134AB75A8EE343080605076 /* TripDeletion.swift */; };
 		C5CE415B5E9199F901500E4C3DABABD3 /* calibration.json in Resources */ = {isa = PBXBuildFile; fileRef = 0F00D5834AA8CD296A78671B98F366B9 /* calibration.json */; };
-		CCD1461AC2294499C698DE467F436F0B /* timetable.zip in Resources */ = {isa = PBXBuildFile; fileRef = 182FE857EA97EFD719A745BA8720CFFE /* timetable.zip */; };
-		D0C39E438D9ACE45A3CABDB714E4616D /* Prediction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78E0B35A437366712706229C50594259 /* Prediction.swift */; };
-		D26A868810A7ACC4DB95B88D55519A72 /* calibration.json in Resources */ = {isa = PBXBuildFile; fileRef = 0F00D5834AA8CD296A78671B98F366B9 /* calibration.json */; };
 		D3B8A1492BAC820115D65979B73C2ED0 /* OfflinePlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACC7764BC77045166B79F67C694B1453 /* OfflinePlannerTests.swift */; };
+		E071068EEE81F77630384D075D5BC2D0 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE08B61C43CA96D0168182C2CA0CB8A0 /* SetupView.swift */; };
+		E1EE15B60EA3AA12B30A02C0FF9BFF42 /* AppView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E884F9CE9E76571F197ED782E17779F7 /* AppView.swift */; };
 		EF3C38C65B2898B1F3E25EB9BE97C2CF /* rows.json in Resources */ = {isa = PBXBuildFile; fileRef = 0D18AC45E2EED300E4D4AD4DCB9CE8F8 /* rows.json */; };
-		F58B8C8AC587A2E55FD9D4F551890F5D /* ILoveTrainsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46538B333FBE7831F3D38C184E1999EC /* ILoveTrainsApp.swift */; };
-		FAD09A0C5BF32C358B2EB7DAE2280CB9 /* TransitAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9533DB91EA2A920ADC391AD5B6B7C35 /* TransitAPI.swift */; };
+		F36BFFEBF05217936981DDFD8A48B80E /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DF0CE4B4B489206BAD2B19377D1990F5 /* Foundation.framework */; };
+		F4A9303D657CAB3CE1BD90901077256E /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 629298F5116802F5134DF36EE7908FEE /* PrivacyInfo.xcprivacy */; };
+		F5D721F995E12D1AAD778E4A5B9BB0D0 /* Prediction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0328A903C52EA7B0B568F9870B6C20C8 /* Prediction.swift */; };
+		FFF21E40A2FD99790AE3E58E319B9082 /* OfflineDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87B509202582DCB9F7B3E40D094D16BB /* OfflineDatabase.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		3A187C592BC37748641653A6225810CC /* PBXContainerItemProxy */ = {
+		59D0010127E5DF83BF6E29A826F64DB8 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 6565F67C49D70F290716235AAC408279 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 9D84F5CB24F0B9BE0300F525B29A1C99;
+			remoteGlobalIDString = CEF34622959541AFF90D4EBD9ADF6DF6;
 			remoteInfo = ILoveTrains;
 		};
-		DD8B503F7BAF4DE98F09E4EEB669F45A /* PBXContainerItemProxy */ = {
+		CE2B39DE12FDEDE26B31173DA84E528D /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 6565F67C49D70F290716235AAC408279 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 9D84F5CB24F0B9BE0300F525B29A1C99;
+			remoteGlobalIDString = CEF34622959541AFF90D4EBD9ADF6DF6;
 			remoteInfo = ILoveTrains;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		0BA83440D20B5F2BAD57BB7A2898E931 /* SetupView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SetupView.swift; path = UI/SetupView.swift; sourceTree = "<group>"; };
+		0328A903C52EA7B0B568F9870B6C20C8 /* Prediction.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Prediction.swift; path = Core/Prediction.swift; sourceTree = "<group>"; };
+		09ECF11EDB32084E2AEA90314ABFA4E7 /* OfflineRouter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflineRouter.swift; path = Core/OfflineRouter.swift; sourceTree = "<group>"; };
 		0D18AC45E2EED300E4D4AD4DCB9CE8F8 /* rows.json */ = {isa = PBXFileReference; includeInIndex = 1; path = rows.json; sourceTree = "<group>"; };
 		0F00D5834AA8CD296A78671B98F366B9 /* calibration.json */ = {isa = PBXFileReference; includeInIndex = 1; path = calibration.json; sourceTree = "<group>"; };
 		114EAF36CE8AC644EF2A5725C2D95716 /* OfflineRealtimeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OfflineRealtimeTests.swift; sourceTree = "<group>"; };
-		13174E4D616BF3DFC90026CE97C8F5CE /* HomeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HomeView.swift; path = UI/HomeView.swift; sourceTree = "<group>"; };
+		1554BF5D4735CE7608D4D2BFDF432892 /* OfflinePackageStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflinePackageStore.swift; path = Core/OfflinePackageStore.swift; sourceTree = "<group>"; };
+		15C4B1DD3C827B68946FBD1E83D3473D /* BoardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BoardView.swift; path = UI/BoardView.swift; sourceTree = "<group>"; };
 		182FE857EA97EFD719A745BA8720CFFE /* timetable.zip */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = archive.zip; path = timetable.zip; sourceTree = "<group>"; };
+		187B2015508A3DA090330C7C6EBDCE0E /* TransitModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TransitModels.swift; path = Core/TransitModels.swift; sourceTree = "<group>"; };
+		1C33FC07BDE6739D660B7BE805F53D25 /* ILoveTrainsApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ILoveTrainsApp.swift; sourceTree = "<group>"; };
+		1F73A9793884A98DC81A1795D0C3DCA1 /* Theme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Theme.swift; path = UI/Theme.swift; sourceTree = "<group>"; };
 		25AC9C044213813934E60F18943C3902 /* BoardRetentionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BoardRetentionTests.swift; sourceTree = "<group>"; };
 		2F7B7DB6A767CE62B869425D595E9263 /* ControllerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ControllerTests.swift; sourceTree = "<group>"; };
+		35B272AD42BBE6CF38A51CD4866A7A80 /* JourneyAxisLayout.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = JourneyAxisLayout.swift; path = UI/JourneyAxisLayout.swift; sourceTree = "<group>"; };
 		3615243F548DB6A2604B7946A7B38EF9 /* timetable-manifest.json */ = {isa = PBXFileReference; includeInIndex = 1; path = "timetable-manifest.json"; sourceTree = "<group>"; };
-		3FC9C3F4F0CAE1F86B1DDFC68E68DED3 /* OfflineDatabase.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflineDatabase.swift; path = Core/OfflineDatabase.swift; sourceTree = "<group>"; };
-		42517480E75B3FFA72C60A66BB67D250 /* TrainViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TrainViewModel.swift; path = Core/TrainViewModel.swift; sourceTree = "<group>"; };
-		46538B333FBE7831F3D38C184E1999EC /* ILoveTrainsApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ILoveTrainsApp.swift; sourceTree = "<group>"; };
+		369E3C3CE85C8D9794DE25612E6AAD6B /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SettingsView.swift; path = UI/SettingsView.swift; sourceTree = "<group>"; };
+		448A4BD4D50296E87A28CE895EABCC71 /* TransitAPI.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TransitAPI.swift; path = Core/TransitAPI.swift; sourceTree = "<group>"; };
 		47C6C9BF08B29567D99AF04090C5D52B /* HomeStatusTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeStatusTests.swift; sourceTree = "<group>"; };
+		487CBDD900CB8FB87CAA132C03E47266 /* LocationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LocationService.swift; path = Core/LocationService.swift; sourceTree = "<group>"; };
 		4A2269C1581DC5132C8800C6E786AD18 /* OfflinePackageStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OfflinePackageStoreTests.swift; sourceTree = "<group>"; };
-		4BBB3C5538BFB99D79740D7CF7826305 /* OfflinePlanner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflinePlanner.swift; path = Core/OfflinePlanner.swift; sourceTree = "<group>"; };
-		54EACFCDB3EE9915CE460D10C0BE6C9D /* OfflineRouter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflineRouter.swift; path = Core/OfflineRouter.swift; sourceTree = "<group>"; };
+		4B7D9A893C91691BDAAF872209754910 /* HomeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HomeView.swift; path = UI/HomeView.swift; sourceTree = "<group>"; };
+		57DD7FF8FC3C334C57C7CFC3EEBAB61D /* TrainViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TrainViewModel.swift; path = Core/TrainViewModel.swift; sourceTree = "<group>"; };
 		5B56DA782CD3D4D59DA36F8105F62EDA /* ILoveTrainsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ILoveTrainsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		629298F5116802F5134DF36EE7908FEE /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		649B2E9AB807B9BE4376911329B9D7D4 /* ILoveTrainsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ILoveTrainsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		68C0E33F4E434E2B1034EBF4ED943D18 /* Theme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Theme.swift; path = UI/Theme.swift; sourceTree = "<group>"; };
-		6A5C1418A6C846CF72D6AA9FD39F21E6 /* BoardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BoardView.swift; path = UI/BoardView.swift; sourceTree = "<group>"; };
 		6AC09C9409003F3D7E4E206C4EDD16B0 /* RowConformanceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RowConformanceTests.swift; sourceTree = "<group>"; };
-		6D917A8F9AA79423513C55F97D08F000 /* LocationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LocationService.swift; path = Core/LocationService.swift; sourceTree = "<group>"; };
-		78E0B35A437366712706229C50594259 /* Prediction.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Prediction.swift; path = Core/Prediction.swift; sourceTree = "<group>"; };
-		7D09EA61A57BEBDAA9C7947A61554F32 /* DetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DetailView.swift; path = UI/DetailView.swift; sourceTree = "<group>"; };
+		75EE451EE7896A90B5C84525EAC53FC4 /* OfflineRealtime.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflineRealtime.swift; path = Core/OfflineRealtime.swift; sourceTree = "<group>"; };
 		83F3C91479FEF2D83389ECA406538F12 /* stations.json */ = {isa = PBXFileReference; includeInIndex = 1; path = stations.json; sourceTree = "<group>"; };
+		87B509202582DCB9F7B3E40D094D16BB /* OfflineDatabase.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflineDatabase.swift; path = Core/OfflineDatabase.swift; sourceTree = "<group>"; };
 		886A038593A84A19382E589337B95141 /* PredictionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PredictionTests.swift; sourceTree = "<group>"; };
 		8A0D676BD29373C9C0CE8DE3ED663C4A /* AppFlowTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppFlowTests.swift; sourceTree = "<group>"; };
-		9057088967828D1E15D6A65F315EA227 /* OfflineZip.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflineZip.swift; path = Core/OfflineZip.swift; sourceTree = "<group>"; };
-		909FD5761A6688AD36837D88FD8B0429 /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SettingsView.swift; path = UI/SettingsView.swift; sourceTree = "<group>"; };
-		961614011D1C448189ED1CF41B302B2C /* AppState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppState.swift; path = Core/AppState.swift; sourceTree = "<group>"; };
+		8A8BA43E41A6935B648AEE219294B6E0 /* OfflinePlanner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflinePlanner.swift; path = Core/OfflinePlanner.swift; sourceTree = "<group>"; };
+		90F580CBE84AA756CD63EE0455947C8C /* DeviceStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DeviceStore.swift; path = Core/DeviceStore.swift; sourceTree = "<group>"; };
+		92A0A5C4D870B1113675F13ECF72A530 /* OfflineZip.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflineZip.swift; path = Core/OfflineZip.swift; sourceTree = "<group>"; };
 		9BFC7C822A4E5378540BB99E190550F7 /* ILoveTrains.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ILoveTrains.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A6A720BFD7C1239778644EE2178B6FEB /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		ACC7764BC77045166B79F67C694B1453 /* OfflinePlannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OfflinePlannerTests.swift; sourceTree = "<group>"; };
+		AD4DAE0D758CB4DF9D3052CDD4914019 /* Common.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Common.swift; path = UI/Common.swift; sourceTree = "<group>"; };
 		AF850A09F92B75BDBB02B3779C13B3A5 /* StorageTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StorageTests.swift; sourceTree = "<group>"; };
-		B9533DB91EA2A920ADC391AD5B6B7C35 /* TransitAPI.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TransitAPI.swift; path = Core/TransitAPI.swift; sourceTree = "<group>"; };
-		B99E4B9B11A54900375D5791625173A6 /* JourneyAxisLayout.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = JourneyAxisLayout.swift; path = UI/JourneyAxisLayout.swift; sourceTree = "<group>"; };
-		C99563647B0455300FBB1320713168C9 /* DeviceStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DeviceStore.swift; path = Core/DeviceStore.swift; sourceTree = "<group>"; };
-		CA8D683F0DBF0963C0530E2F37102DE1 /* Common.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Common.swift; path = UI/Common.swift; sourceTree = "<group>"; };
-		CB9BD2EB8E5FA819A772457CB4DAAAF4 /* OfflineRealtime.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflineRealtime.swift; path = Core/OfflineRealtime.swift; sourceTree = "<group>"; };
+		BB44FBBD9134AB75A8EE343080605076 /* TripDeletion.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TripDeletion.swift; path = Core/TripDeletion.swift; sourceTree = "<group>"; };
 		CCF9F353578F2449D9D62F29EBA158B8 /* prediction.json */ = {isa = PBXFileReference; includeInIndex = 1; path = prediction.json; sourceTree = "<group>"; };
-		D04A6F059ED2D7E3064AACCA6B03317F /* AppView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppView.swift; path = UI/AppView.swift; sourceTree = "<group>"; };
 		DBB7378360287999016F12B0BCD5B94B /* JourneyAxisLayoutTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JourneyAxisLayoutTests.swift; sourceTree = "<group>"; };
 		DDA9D73822E8193F23D712829238E66B /* OfflineRouterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OfflineRouterTests.swift; sourceTree = "<group>"; };
 		DF0CE4B4B489206BAD2B19377D1990F5 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
-		F17BB166E3D02A46723E238A1A7F8FA0 /* TransitModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TransitModels.swift; path = Core/TransitModels.swift; sourceTree = "<group>"; };
-		F3631E985A94E2BCB388479CF1462BD2 /* OfflinePackageStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OfflinePackageStore.swift; path = Core/OfflinePackageStore.swift; sourceTree = "<group>"; };
+		E884F9CE9E76571F197ED782E17779F7 /* AppView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppView.swift; path = UI/AppView.swift; sourceTree = "<group>"; };
+		EE08B61C43CA96D0168182C2CA0CB8A0 /* SetupView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SetupView.swift; path = UI/SetupView.swift; sourceTree = "<group>"; };
+		F0E4FA6B9A3E199FD2B24A607F32AE71 /* AppState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppState.swift; path = Core/AppState.swift; sourceTree = "<group>"; };
+		F99A9E07614D25517EFB47B525BBC577 /* DetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DetailView.swift; path = UI/DetailView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -140,11 +142,11 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		68783941F191991A0D801C4619698C05 /* Frameworks */ = {
+		A01FCD84F89D72DCD66AAE8998DDA251 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0551A3C5A7A355B2B4EE01E940D49F8E /* Foundation.framework in Frameworks */,
+				F36BFFEBF05217936981DDFD8A48B80E /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -165,6 +167,38 @@
 				DF0CE4B4B489206BAD2B19377D1990F5 /* Foundation.framework */,
 			);
 			name = iOS;
+			sourceTree = "<group>";
+		};
+		490C4F0BB9951B060A10D3288513D5B1 /* ILoveTrains */ = {
+			isa = PBXGroup;
+			children = (
+				F0E4FA6B9A3E199FD2B24A607F32AE71 /* AppState.swift */,
+				90F580CBE84AA756CD63EE0455947C8C /* DeviceStore.swift */,
+				487CBDD900CB8FB87CAA132C03E47266 /* LocationService.swift */,
+				87B509202582DCB9F7B3E40D094D16BB /* OfflineDatabase.swift */,
+				1554BF5D4735CE7608D4D2BFDF432892 /* OfflinePackageStore.swift */,
+				8A8BA43E41A6935B648AEE219294B6E0 /* OfflinePlanner.swift */,
+				75EE451EE7896A90B5C84525EAC53FC4 /* OfflineRealtime.swift */,
+				09ECF11EDB32084E2AEA90314ABFA4E7 /* OfflineRouter.swift */,
+				92A0A5C4D870B1113675F13ECF72A530 /* OfflineZip.swift */,
+				0328A903C52EA7B0B568F9870B6C20C8 /* Prediction.swift */,
+				57DD7FF8FC3C334C57C7CFC3EEBAB61D /* TrainViewModel.swift */,
+				448A4BD4D50296E87A28CE895EABCC71 /* TransitAPI.swift */,
+				187B2015508A3DA090330C7C6EBDCE0E /* TransitModels.swift */,
+				BB44FBBD9134AB75A8EE343080605076 /* TripDeletion.swift */,
+				1C33FC07BDE6739D660B7BE805F53D25 /* ILoveTrainsApp.swift */,
+				E884F9CE9E76571F197ED782E17779F7 /* AppView.swift */,
+				15C4B1DD3C827B68946FBD1E83D3473D /* BoardView.swift */,
+				AD4DAE0D758CB4DF9D3052CDD4914019 /* Common.swift */,
+				F99A9E07614D25517EFB47B525BBC577 /* DetailView.swift */,
+				4B7D9A893C91691BDAAF872209754910 /* HomeView.swift */,
+				35B272AD42BBE6CF38A51CD4866A7A80 /* JourneyAxisLayout.swift */,
+				369E3C3CE85C8D9794DE25612E6AAD6B /* SettingsView.swift */,
+				EE08B61C43CA96D0168182C2CA0CB8A0 /* SetupView.swift */,
+				1F73A9793884A98DC81A1795D0C3DCA1 /* Theme.swift */,
+			);
+			name = ILoveTrains;
+			path = ILoveTrains;
 			sourceTree = "<group>";
 		};
 		6B2601766C47D02DD0DBEECDEA0E7C58 /* ILoveTrainsTests */ = {
@@ -196,37 +230,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		B6A4D072269C549861776828549AF3A9 /* ILoveTrains */ = {
-			isa = PBXGroup;
-			children = (
-				961614011D1C448189ED1CF41B302B2C /* AppState.swift */,
-				C99563647B0455300FBB1320713168C9 /* DeviceStore.swift */,
-				6D917A8F9AA79423513C55F97D08F000 /* LocationService.swift */,
-				3FC9C3F4F0CAE1F86B1DDFC68E68DED3 /* OfflineDatabase.swift */,
-				F3631E985A94E2BCB388479CF1462BD2 /* OfflinePackageStore.swift */,
-				4BBB3C5538BFB99D79740D7CF7826305 /* OfflinePlanner.swift */,
-				CB9BD2EB8E5FA819A772457CB4DAAAF4 /* OfflineRealtime.swift */,
-				54EACFCDB3EE9915CE460D10C0BE6C9D /* OfflineRouter.swift */,
-				9057088967828D1E15D6A65F315EA227 /* OfflineZip.swift */,
-				78E0B35A437366712706229C50594259 /* Prediction.swift */,
-				42517480E75B3FFA72C60A66BB67D250 /* TrainViewModel.swift */,
-				B9533DB91EA2A920ADC391AD5B6B7C35 /* TransitAPI.swift */,
-				F17BB166E3D02A46723E238A1A7F8FA0 /* TransitModels.swift */,
-				46538B333FBE7831F3D38C184E1999EC /* ILoveTrainsApp.swift */,
-				D04A6F059ED2D7E3064AACCA6B03317F /* AppView.swift */,
-				6A5C1418A6C846CF72D6AA9FD39F21E6 /* BoardView.swift */,
-				CA8D683F0DBF0963C0530E2F37102DE1 /* Common.swift */,
-				7D09EA61A57BEBDAA9C7947A61554F32 /* DetailView.swift */,
-				13174E4D616BF3DFC90026CE97C8F5CE /* HomeView.swift */,
-				B99E4B9B11A54900375D5791625173A6 /* JourneyAxisLayout.swift */,
-				909FD5761A6688AD36837D88FD8B0429 /* SettingsView.swift */,
-				0BA83440D20B5F2BAD57BB7A2898E931 /* SetupView.swift */,
-				68C0E33F4E434E2B1034EBF4ED943D18 /* Theme.swift */,
-			);
-			name = ILoveTrains;
-			path = ILoveTrains;
-			sourceTree = "<group>";
-		};
 		BD847F75E3604E8973D14149C8CFB7D9 /* ILoveTrainsUITests */ = {
 			isa = PBXGroup;
 			children = (
@@ -254,7 +257,7 @@
 			children = (
 				81CC0235E36FF664E67FCFE5AF2727E1 /* Products */,
 				0611571C3E490FF7966437D23A1313CB /* Frameworks */,
-				B6A4D072269C549861776828549AF3A9 /* ILoveTrains */,
+				490C4F0BB9951B060A10D3288513D5B1 /* ILoveTrains */,
 				6B2601766C47D02DD0DBEECDEA0E7C58 /* ILoveTrainsTests */,
 				BD847F75E3604E8973D14149C8CFB7D9 /* ILoveTrainsUITests */,
 				C30B5669F8BA20F8515E8B45133EB152 /* Resources */,
@@ -287,7 +290,7 @@
 			buildRules = (
 			);
 			dependencies = (
-				DECAB6513F8CBAA173B279E8A64800DC /* PBXTargetDependency */,
+				607DD4894DB96C1AEC03696789430B08 /* PBXTargetDependency */,
 			);
 			name = ILoveTrainsTests;
 			productName = ILoveTrainsTests;
@@ -305,20 +308,20 @@
 			buildRules = (
 			);
 			dependencies = (
-				AD952E22EC0575748FB41845732CECA6 /* PBXTargetDependency */,
+				7F632E42EE5E9346FD3F08E5D706CFB4 /* PBXTargetDependency */,
 			);
 			name = ILoveTrainsUITests;
 			productName = ILoveTrainsUITests;
 			productReference = 5B56DA782CD3D4D59DA36F8105F62EDA /* ILoveTrainsUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
-		9D84F5CB24F0B9BE0300F525B29A1C99 /* ILoveTrains */ = {
+		CEF34622959541AFF90D4EBD9ADF6DF6 /* ILoveTrains */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 85AA86FFB983DCB24804254E9855C729 /* Build configuration list for PBXNativeTarget "ILoveTrains" */;
+			buildConfigurationList = B46868B238DB6C6B081FEE3BA11C459F /* Build configuration list for PBXNativeTarget "ILoveTrains" */;
 			buildPhases = (
-				B95E458E9E5F575CAE53DA890D4CD4FE /* Sources */,
-				68783941F191991A0D801C4619698C05 /* Frameworks */,
-				550D632537170763B3333C1F8F5D6D5D /* Resources */,
+				EFEBACDB2860AF3EBD40E92B72673DBA /* Sources */,
+				A01FCD84F89D72DCD66AAE8998DDA251 /* Frameworks */,
+				0A3626FEDAC03A1F6A62C20FCFEC614C /* Resources */,
 			);
 			buildRules = (
 			);
@@ -353,7 +356,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				9D84F5CB24F0B9BE0300F525B29A1C99 /* ILoveTrains */,
+				CEF34622959541AFF90D4EBD9ADF6DF6 /* ILoveTrains */,
 				54FC0156F81BADE5DA141F2FAF62ABD5 /* ILoveTrainsTests */,
 				91E28EE1CF6E6354BA398B93D50B86AE /* ILoveTrainsUITests */,
 			);
@@ -361,6 +364,19 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		0A3626FEDAC03A1F6A62C20FCFEC614C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				171FDCFCB616A3389220FC53AE8AF40C /* Assets.xcassets in Resources */,
+				F4A9303D657CAB3CE1BD90901077256E /* PrivacyInfo.xcprivacy in Resources */,
+				161DE8DDCE1E548EAE8E7A79F2387B20 /* stations.json in Resources */,
+				9C24377ACE26B2901AD4FBFDD59FB95B /* timetable-manifest.json in Resources */,
+				0D4AB715003936B50D401C92A93ED9F3 /* timetable.zip in Resources */,
+				2EC7307F78DB3FA9DC195098E4909A1C /* calibration.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		52086B9A1813DC4C11F2D965D7237D7A /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -368,19 +384,6 @@
 				C5CE415B5E9199F901500E4C3DABABD3 /* calibration.json in Resources */,
 				8A9B7741EA7C7177E12D54920CBD078F /* prediction.json in Resources */,
 				EF3C38C65B2898B1F3E25EB9BE97C2CF /* rows.json in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		550D632537170763B3333C1F8F5D6D5D /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				72E89E338E32740CFAAE5A09B9E5C914 /* Assets.xcassets in Resources */,
-				320FB920A102033FA61C31A274A5C7A7 /* PrivacyInfo.xcprivacy in Resources */,
-				AC87B3D9B4EA4FEE1261180E1A623FB8 /* stations.json in Resources */,
-				38D2B022CD3A614AD57E639623B86851 /* timetable-manifest.json in Resources */,
-				CCD1461AC2294499C698DE467F436F0B /* timetable.zip in Resources */,
-				D26A868810A7ACC4DB95B88D55519A72 /* calibration.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -402,33 +405,34 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		B95E458E9E5F575CAE53DA890D4CD4FE /* Sources */ = {
+		EFEBACDB2860AF3EBD40E92B72673DBA /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				6A9974284CAD0498FBE80250FACF7692 /* AppState.swift in Sources */,
-				3E7C81ACD517FAB8AC08DA5EF79FE34A /* DeviceStore.swift in Sources */,
-				7F0322FA2081BE0C8E44BF71DABDEF99 /* LocationService.swift in Sources */,
-				9CB81ADA6EC2889C06C4EB4F47B8B372 /* OfflineDatabase.swift in Sources */,
-				C4276617E995B8466C48007CBB77251D /* OfflinePackageStore.swift in Sources */,
-				84AD53D163AEBB159F3D05B72C9376E3 /* OfflinePlanner.swift in Sources */,
-				5C87A827ECBB9D7ADB06F00709B5F4EA /* OfflineRealtime.swift in Sources */,
-				B1546DA132586E2BCF45519DF4504106 /* OfflineRouter.swift in Sources */,
-				C21E56F75B4A94830EB1C43EAB1CE06D /* OfflineZip.swift in Sources */,
-				D0C39E438D9ACE45A3CABDB714E4616D /* Prediction.swift in Sources */,
-				3687573B2A6DA2C27E35021F4A077B7B /* TrainViewModel.swift in Sources */,
-				FAD09A0C5BF32C358B2EB7DAE2280CB9 /* TransitAPI.swift in Sources */,
-				A5704B31E221A340E5E42317CCABD009 /* TransitModels.swift in Sources */,
-				F58B8C8AC587A2E55FD9D4F551890F5D /* ILoveTrainsApp.swift in Sources */,
-				844A8BB3C69CBC35DDAFE4D0BEFE337B /* AppView.swift in Sources */,
-				0469840EE53DAD35C5E5B987A8E601ED /* BoardView.swift in Sources */,
-				A793E66AA669EF460F9E39D67569F91F /* Common.swift in Sources */,
-				AB1E2BB15EB481FD95D9D08D90A7A9B3 /* DetailView.swift in Sources */,
-				90FE1B92C4485ECCF132566869D7191E /* HomeView.swift in Sources */,
-				9E7D2EF345E320BA9B76B6B9F4394C12 /* JourneyAxisLayout.swift in Sources */,
-				A938884FC2ECF04163DCC482914D4D4B /* SettingsView.swift in Sources */,
-				3D92BB886EC1A77263EFE97E15F24353 /* SetupView.swift in Sources */,
-				98A51C5E34EC37BBCBFCA79A9EF7ED5C /* Theme.swift in Sources */,
+				B15B228D78093FC2F02E9F290234D746 /* AppState.swift in Sources */,
+				1D53368F877EEA9C12581BC9909E1777 /* DeviceStore.swift in Sources */,
+				77D881F53DE546E8A049A6C232641FF3 /* LocationService.swift in Sources */,
+				FFF21E40A2FD99790AE3E58E319B9082 /* OfflineDatabase.swift in Sources */,
+				7DF22448FBEE8FCF123506E4F1DC06C3 /* OfflinePackageStore.swift in Sources */,
+				97CC26322414B58F9809649437E494A3 /* OfflinePlanner.swift in Sources */,
+				4E24C8385B6FAEEFD2D53BA212ACA25A /* OfflineRealtime.swift in Sources */,
+				415344D61BBAB0A435A205D06F43463D /* OfflineRouter.swift in Sources */,
+				0F43FE8D726E429998E2E74860E7D008 /* OfflineZip.swift in Sources */,
+				F5D721F995E12D1AAD778E4A5B9BB0D0 /* Prediction.swift in Sources */,
+				3A44F47136861DD4164C6A7834FEAAF2 /* TrainViewModel.swift in Sources */,
+				6715CEFAAC9DD94139A88273372943B6 /* TransitAPI.swift in Sources */,
+				4854ECCE21B41B8C389825908A5D6B16 /* TransitModels.swift in Sources */,
+				B53FD94ADF1C592799151269ADC1DDC6 /* TripDeletion.swift in Sources */,
+				3BC6FD02DD8B82028A2150405D3EEF3A /* ILoveTrainsApp.swift in Sources */,
+				E1EE15B60EA3AA12B30A02C0FF9BFF42 /* AppView.swift in Sources */,
+				82E99068347C9C7B05322B188FA467F8 /* BoardView.swift in Sources */,
+				73BB200B4179885CDB40AABACC014006 /* Common.swift in Sources */,
+				3FA9C96A149BD4505A919F287CDE3448 /* DetailView.swift in Sources */,
+				5103AF8E065964CEF116140FCB210591 /* HomeView.swift in Sources */,
+				16890EBDE5A34C1C29DB2C89E09E7D21 /* JourneyAxisLayout.swift in Sources */,
+				4AB1D15BEDFA009447E7C03D822C1D71 /* SettingsView.swift in Sources */,
+				E071068EEE81F77630384D075D5BC2D0 /* SetupView.swift in Sources */,
+				087732BE6816B598BAF98261817B8962 /* Theme.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -453,17 +457,17 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		AD952E22EC0575748FB41845732CECA6 /* PBXTargetDependency */ = {
+		607DD4894DB96C1AEC03696789430B08 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = ILoveTrains;
-			target = 9D84F5CB24F0B9BE0300F525B29A1C99 /* ILoveTrains */;
-			targetProxy = DD8B503F7BAF4DE98F09E4EEB669F45A /* PBXContainerItemProxy */;
+			target = CEF34622959541AFF90D4EBD9ADF6DF6 /* ILoveTrains */;
+			targetProxy = CE2B39DE12FDEDE26B31173DA84E528D /* PBXContainerItemProxy */;
 		};
-		DECAB6513F8CBAA173B279E8A64800DC /* PBXTargetDependency */ = {
+		7F632E42EE5E9346FD3F08E5D706CFB4 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = ILoveTrains;
-			target = 9D84F5CB24F0B9BE0300F525B29A1C99 /* ILoveTrains */;
-			targetProxy = 3A187C592BC37748641653A6225810CC /* PBXContainerItemProxy */;
+			target = CEF34622959541AFF90D4EBD9ADF6DF6 /* ILoveTrains */;
+			targetProxy = 59D0010127E5DF83BF6E29A826F64DB8 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -488,6 +492,35 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ILoveTrains.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ILoveTrains";
 				TEST_TARGET_NAME = ILoveTrains;
+			};
+			name = Debug;
+		};
+		0C5932CB64CD782F016995BE7DB31105 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = 6TTZ5U96V9;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ILoveTrains/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 1.2.3;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lsqlite3",
+					"-lz",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
@@ -544,35 +577,6 @@
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
-		};
-		38DE2AA3B6CEA08D7D6F9834E04CA9D9 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
-				DEVELOPMENT_TEAM = 6TTZ5U96V9;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = ILoveTrains/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 1.2.3;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					"-lsqlite3",
-					"-lz",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios;
-				SDKROOT = iphoneos;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
 		};
 		40866C63785216791DC89AE58498CDB3 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -635,36 +639,6 @@
 			};
 			name = Debug;
 		};
-		40B25769A26071931AADB4023EE124D0 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
-				DEVELOPMENT_TEAM = 6TTZ5U96V9;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				EXCLUDED_SOURCE_FILE_NAMES = calibration.json;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = ILoveTrains/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 1.2.3;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					"-lsqlite3",
-					"-lz",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios;
-				SDKROOT = iphoneos;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				VALIDATE_PRODUCT = YES;
-			};
-			name = Release;
-		};
 		64AC132EAF3CB82850FB023D5AA689EC /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -709,6 +683,36 @@
 			};
 			name = Release;
 		};
+		73CC7C0C3752C275A5556BC6204E4ACD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = 6TTZ5U96V9;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				EXCLUDED_SOURCE_FILE_NAMES = calibration.json;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ILoveTrains/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 1.2.3;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lsqlite3",
+					"-lz",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ilovetrains.ios;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		EAA351430B310F090D280A0F0412857A /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -733,20 +737,20 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		85AA86FFB983DCB24804254E9855C729 /* Build configuration list for PBXNativeTarget "ILoveTrains" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				40B25769A26071931AADB4023EE124D0 /* Release */,
-				38DE2AA3B6CEA08D7D6F9834E04CA9D9 /* Debug */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		92D3EE6CEAAC7A41F17CF5A46474DE91 /* Build configuration list for PBXNativeTarget "ILoveTrainsTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				6CE2AEB48A38DBD320506D382CE85442 /* Release */,
 				024B7BF43666BCD24597EFC598330241 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B46868B238DB6C6B081FEE3BA11C459F /* Build configuration list for PBXNativeTarget "ILoveTrains" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				73CC7C0C3752C275A5556BC6204E4ACD /* Release */,
+				0C5932CB64CD782F016995BE7DB31105 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

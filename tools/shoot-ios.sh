@@ -13,7 +13,7 @@ default_states=(
   home board detail detail-two-change setup settings ferry
   home-pinned home-active home-inferred board-delayed detail-cancelled
   home-light board-light detail-light settings-light
-  home-offline board-offline detail-offline
+  home-offline board-offline detail-offline home-deleted
 )
 if [ "$#" -gt 0 ]; then states=("$@")
 else states=("${default_states[@]}")
@@ -69,11 +69,21 @@ xcrun simctl status_bar "$simulator" override \
 xcrun simctl launch --terminate-running-process "$simulator" "$bundle" --calibration home >/dev/null
 sleep 6
 
+# A frame is settled when two shots half a second apart are byte-identical;
+# the launch transition alone takes over two seconds and `settle` is the cap.
 for state in "${states[@]}"; do
   destination="$out/$state.png"
   xcrun simctl launch --terminate-running-process "$simulator" "$bundle" --calibration "$state" >/dev/null
-  sleep "$settle"
+  sleep 1
   xcrun simctl io "$simulator" screenshot "$destination" >/dev/null 2>&1
+  waited=1
+  while awk -v w="$waited" -v s="$settle" 'BEGIN{exit !(w < s)}'; do
+    sleep 0.5
+    waited="$(awk -v w="$waited" 'BEGIN{print w + 0.5}')"
+    xcrun simctl io "$simulator" screenshot "$out/.next.png" >/dev/null 2>&1
+    if cmp -s "$destination" "$out/.next.png"; then rm -f "$out/.next.png"; break; fi
+    mv "$out/.next.png" "$destination"
+  done
 done
 
 first="$out/${states[0]}.png"

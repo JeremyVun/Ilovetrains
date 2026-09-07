@@ -28,14 +28,17 @@ final class TrainViewModel: ObservableObject {
     private var active = false
     private var redirect: FocusedJourney?
     private var redirectTargetId: String?
+    private var pendingDeletion: PendingDeletion?
+    private var undoTask: Task<Void, Never>?
+    private let undoWindow: Duration
     let location = LocationService()
     #if DEBUG
     var seeded = false
     var networkDisabled = false
     #endif
 
-    init(store: DeviceStore = DeviceStore(), api: TransitAPI = TransitAPI(), planner: OfflinePlanner = OfflinePlanner()) {
-        self.api = api; self.planner = planner
+    init(store: DeviceStore = DeviceStore(), api: TransitAPI = TransitAPI(), planner: OfflinePlanner = OfflinePlanner(), undoWindow: Duration = defaultUndoWindow) {
+        self.api = api; self.planner = planner; self.undoWindow = undoWindow
         #if DEBUG
         if let domain = ProcessInfo.processInfo.environment["ILOVETRAINS_TEST_DOMAIN"], UUID(uuidString: domain) != nil {
             let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("UITests/" + domain)
@@ -76,7 +79,7 @@ final class TrainViewModel: ObservableObject {
         writeTask = Task {
             await previous?.value
             do { try await store.save(snapshot) }
-            catch { state.message = "Couldn’t save changes on this phone. Free some storage and try again." }
+            catch { show("Couldn’t save changes on this phone. Free some storage and try again.") }
         }
     }
     private func currentFocus() -> FocusedJourney? { visibleFocus(data: data, now: state.now) }
@@ -390,8 +393,7 @@ final class TrainViewModel: ObservableObject {
     func chooseSetupTo(_ station: Station) { state.setupTo = station }
     func clearSetupTo() { state.setupTo = nil }
     private func addTrip(_ trip: SavedTrip) {
-        if data.trips.count >= 10, let evicted = data.trips.min(by: { ($0.lastViewed == 0 ? $0.createdAt : $0.lastViewed) < ($1.lastViewed == 0 ? $1.createdAt : $1.lastViewed) }) { removeTrip(evicted.id) }
-        data.trips.append(trip)
+        data.trips.append(trip); enforceTripCap()
     }
     func saveTrip(from: Station, to: Station) {
         guard from.id != to.id, !from.modes.isDisjoint(with: data.modes), !to.modes.isDisjoint(with: data.modes) else { return }
@@ -416,18 +418,45 @@ final class TrainViewModel: ObservableObject {
         }
     }
     private func removeTrip(_ id: String) {
-        guard let trip = data.trips.first(where: { $0.id == id }) else { return }
-        data.trips.removeAll { $0.id == id }; data.history.removeAll { $0.tripId == id }
-        if data.focus?.tripId == id { data.focus = nil }
-        if data.lastAnswer?.tripId == id { data.lastAnswer = nil }
-        if data.lastTripId == id { data.lastTripId = nil }
-        Task { try? await store.purgeCache(for: trip) }
+        guard let (remaining, pending) = data.beginningDeletion(of: id) else { return }
+        data = remaining
+        let store = store
+        Task { try? await store.purgeCache(for: pending.trip) }
+    }
+    private func enforceTripCap() {
+        while data.trips.count > 10, let evicted = data.trips.min(by: { ($0.lastViewed == 0 ? $0.createdAt : $0.lastViewed) < ($1.lastViewed == 0 ? $1.createdAt : $1.lastViewed) }) {
+            removeTrip(evicted.id)
+        }
     }
     func deleteTrip(id: String) {
-        removeTrip(id); persist()
+        guard let (remaining, pending) = data.beginningDeletion(of: id) else { return }
+        undoTask?.cancel(); expireDeletion()
+        data = remaining; pendingDeletion = pending; persist()
         if state.selectedTripId == id { explicit = false; state.board = nil }
         choosePrediction(); syncPersonal(); refresh()
+        state.message = deletionMessage(pending.trip); state.undoAvailable = true
+        let window = undoWindow
+        undoTask = Task { [weak self] in
+            try? await Task.sleep(for: window)
+            guard !Task.isCancelled else { return }
+            self?.expireDeletion()
+        }
     }
+    func undoDelete() {
+        guard let pending = pendingDeletion else { return }
+        undoTask?.cancel(); undoTask = nil; pendingDeletion = nil
+        data = data.restoring(pending); enforceTripCap(); persist()
+        show(nil)
+        choosePrediction(); syncPersonal(); refresh()
+    }
+    private func expireDeletion() {
+        guard let pending = pendingDeletion else { return }
+        pendingDeletion = nil
+        let store = store
+        Task { try? await store.purgeCache(for: pending.trip) }
+        if state.message == deletionMessage(pending.trip) { show(nil) }
+    }
+    private func show(_ message: String?) { state.message = message; state.undoAvailable = false }
     func openSettings() { settingsBack = state.screen; state.screen = .settings; state.feedbackSucceeded = false }
     func setAppearance(_ value: Appearance) { data.appearance = value; persist(); syncPersonal() }
     func setMode(mode: String, enabled: Bool) {
@@ -466,19 +495,19 @@ final class TrainViewModel: ObservableObject {
                 try? await bootstrap?.value
                 try await planner.update(baseURL: api.baseURL)
                 bootstrap = Task { }; state.timetableStatus = await planner.coverageDescription; refresh()
-            } catch { state.message = "Couldn’t update timetables. Your saved timetable is still available. Try again when you’re online." }
+            } catch { show("Couldn’t update timetables. Your saved timetable is still available. Try again when you’re online.") }
         }
     }
     func feedback(text: String, category: String = "problem") {
         guard !state.feedbackSubmitting else { return }
-        state.feedbackSubmitting = true; state.feedbackSucceeded = false; state.message = nil
+        state.feedbackSubmitting = true; state.feedbackSucceeded = false; show(nil)
         Task {
             defer { state.feedbackSubmitting = false }
-            do { try await api.feedback(text: text, category: category); state.feedbackSucceeded = true; feedbackDraft = ""; state.message = "Feedback sent. Thank you." }
-            catch { state.message = "Couldn’t send feedback. Check your connection and try again." }
+            do { try await api.feedback(text: text, category: category); state.feedbackSucceeded = true; feedbackDraft = ""; show("Feedback sent. Thank you.") }
+            catch { show("Couldn’t send feedback. Check your connection and try again.") }
         }
     }
-    func dismissMessage() { state.message = nil }
+    func dismissMessage() { show(nil) }
 }
 
 #if DEBUG
@@ -530,6 +559,15 @@ private extension TrainViewModel {
         let trip = SavedTrip(id: "calibration-trip", from: board.from, to: board.to, createdAt: now, lines: Array(Set(board.journeys.first?.legs.map(\.line) ?? [])).sorted())
         data.trips = [trip]; data.appearance = name.contains("light") ? .light : .dark
         data.lastTripId = trip.id
+        if name.contains("two-trips") || name.contains("deleted") {
+            let second = SavedTrip(id: "second-trip", from: Station(id: "213820", name: "Rhodes Station", modes: ["train"]),
+                                   to: Station(id: "201040", name: "Bondi Junction Station", modes: ["train"]), createdAt: now, lines: ["T4", "T9"])
+            data.trips.append(second)
+            if name.contains("deleted"), let (remaining, pending) = data.beginningDeletion(of: second.id) {
+                data = remaining; pendingDeletion = pending
+                state.message = deletionMessage(second); state.undoAvailable = true
+            }
+        }
         state.selectedTripId = trip.id; state.board = board; state.homeBoard = board
         if name.contains("pinned") || name.contains("active") || name.contains("inferred"), let journey = board.journeys.first {
             data.focus = FocusedJourney(tripId: trip.id, reverse: false, journey: journey, board: board, pinned: !name.contains("inferred"))

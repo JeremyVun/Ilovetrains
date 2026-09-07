@@ -46,6 +46,7 @@ struct AppState {
     var feedbackSubmitting = false
     var feedbackSucceeded = false
     var message: String?
+    var undoAvailable = false
     var version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
     var selectedTrip: SavedTrip? { trips.first { $0.id == selectedTripId } }
     var shownBoard: BoardData? { screen == .home ? homeBoard ?? board : board }

@@ -113,6 +113,8 @@ pass on one booted emulator at 390x844.
 
 ## Phase 2 — iOS — DONE marker: `swipe-to-delete phase 2` commit
 
+**DONE 2026-09-07.** `tools/build-ios.sh --test` green: 59 tests (27 unit including the three new controller tests, 4 UI flows including the swipe drive) on the booted iPhone 17 simulator. The one earlier red was `OfflinePlannerTests` killed by signal while Gradle and the emulator ran alongside; it passed alone and in the final full run.
+
 Owns: `ios/ILoveTrains/UI/HomeView.swift`, `ios/ILoveTrains/UI/AppView.swift`,
 `ios/ILoveTrains/Core/AppState.swift`, `ios/ILoveTrains/Core/TrainViewModel.swift`,
 `ios/ILoveTrainsTests/ControllerTests.swift`,

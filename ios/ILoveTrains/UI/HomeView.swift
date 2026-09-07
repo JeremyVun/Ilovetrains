@@ -63,21 +63,29 @@ struct HomeView: View {
                 TrainRule(heavy: true)
             }
 
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    TrainLabel(text: "My trips", color: colors.ink, size: 11)
-                        .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 22).padding(.bottom, 10)
-                    ForEach(model.state.trips, id: \.id) { trip in
-                        SavedTripRow(trip: trip, state: model.state, model: model)
-                    }
-                    TrainLabel(text: "— End of trips")
-                        .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 14).padding(.bottom, 6)
+            List {
+                TrainLabel(text: "My trips", color: colors.ink, size: 11)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 22).padding(.bottom, 10)
+                    .padding(.horizontal, pagePadding).tripListRow(colors)
+                ForEach(model.state.trips, id: \.id) { trip in
+                    SavedTripRow(trip: trip, state: model.state, model: model).tripListRow(colors)
                 }
-                .padding(.horizontal, pagePadding)
+                TrainLabel(text: "— End of trips")
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 14).padding(.bottom, 6)
+                    .padding(.horizontal, pagePadding).tripListRow(colors)
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
             .scrollIndicators(.hidden)
+            .environment(\.defaultMinListRowHeight, 1)
             HomeFooter(model: model)
         }
+    }
+}
+
+private extension View {
+    func tripListRow(_ colors: TrainColors) -> some View {
+        listRowInsets(EdgeInsets()).listRowSeparator(.hidden).listRowBackground(colors.ground)
     }
 }
 
@@ -282,6 +290,7 @@ private struct SavedTripRow: View {
     @Environment(\.trainColors) private var colors
 
     var body: some View {
+        VStack(spacing: 0) {
         Button { model.openTrip(id: trip.id) } label: {
             HStack(spacing: 13) {
                 HStack(spacing: 3) {
@@ -309,6 +318,11 @@ private struct SavedTripRow: View {
         .accessibilityLabel("\(trip.from.shortName) to \(trip.to.shortName), \(summary)")
         .accessibilityIdentifier("trip-\(trip.id)")
         TrainRule()
+        }
+        .padding(.horizontal, pagePadding)
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button("Delete", role: .destructive) { model.deleteTrip(id: trip.id) }
+        }
     }
 
     private var lines: [String] { trip.lines.isEmpty ? ["T"] : trip.lines }
