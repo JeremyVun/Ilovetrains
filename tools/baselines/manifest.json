@@ -5,12 +5,13 @@
     "device": "Google Chrome 152.0.7977.82, 390x844 css @2x"
   },
   "ios": {
-    "commit": "c8288c1",
+    "commit": "0ada4b3",
     "date": "2026-09-07",
-    "device": "iPhone 17 — Journey line review 1206x2622px, content size large"
+    "device": "iPhone 17 1206x2622px, content size large",
+    "simulator": "iPhone 17"
   },
   "android": {
-    "commit": "9f2112a",
+    "commit": "0ada4b3",
     "date": "2026-09-07",
     "device": "sdk_gphone64_arm64 API 36, root=390x844dp safeDrawing=0,0,0,0dp content=390x844dp capture=1024x2216px"
   }

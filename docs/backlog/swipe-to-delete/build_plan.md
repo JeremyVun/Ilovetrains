@@ -173,6 +173,8 @@ Done when the gate is green on one booted iPhone simulator.
 
 ## Phase 3 — verification wave and owner verdict — DONE marker: `swipe-to-delete phase 3` commit
 
+**DONE 2026-09-07.** Owner approved both platforms with the native-look proviso; Android background ruled to Gmail red with a trash icon; frames in `assets/comps/latest/`, baselines accepted and verified `same` on both devices.
+
 **Status 2026-09-07:** steps 1–5 done, step 6 awaits the owner's verdict on
 `comps/index.html`. Findings from the verification wave:
 

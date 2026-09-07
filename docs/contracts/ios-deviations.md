@@ -18,9 +18,11 @@ iOS implementation requested on 2026-09-07.
   destructive `Delete` button and a full swipe commits without the tap. The
   native context menu still offers `Delete trip`. Either deletion is reversible
   for four seconds from the bottom bar, which reads `{from} → {to} deleted`
-  with an `Undo` label; the trip's cached boards are purged when the window
-  ends ([client-storage.md](client-storage.md#ios-storage)). The row otherwise
-  opens departures. `assets/comps/latest/ios-home-390x844-deleting.png` and
+  with an `Undo` label, wrapping to a second line rather than losing its verb;
+  the trip's cached boards are purged when the window ends
+  ([client-storage.md](client-storage.md#ios-storage)). The trips list is a
+  native `List` with plain style, zero insets and hidden separators so the row
+  at rest matches the previous stack. The row otherwise opens departures. `assets/comps/latest/ios-home-390x844-deleting.png` and
   `ios-home-390x844-deleted.png` are the exemplars. iOS follows the web's
   ten-trip LRU policy, including history and cache cleanup on eviction,
   instead of Android's unlimited saved list.

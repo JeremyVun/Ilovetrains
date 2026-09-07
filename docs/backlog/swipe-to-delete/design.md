@@ -146,9 +146,10 @@ reader knows what was rejected.
 | Bar action | `Undo` · `Restore` | `Undo` |
 
 `{from}` and `{to}` are the trip's short station names, the same strings the
-row shows. The iOS swipe button and the Android revealed background both say
-`Delete`, the plain verb, matching the existing menu's `Delete trip` without
-the noun because the row itself is the noun. The bar text may wrap to a
+row shows. The iOS swipe button says `Delete`, the plain verb, matching the
+existing menu's `Delete trip` without the noun because the row itself is the
+noun. The Android background carries no copy: it is Gmail's red with a white
+trash icon (owner ruling, 2026-09-07), the affordance Android users know. The bar text may wrap to a
 second line at large text sizes and is ellipsised beyond that, so the verb
 survives; a one-line clip dropped the word `deleted` at font scale 1.3 (build
 decision, 2026-09-07).
@@ -182,6 +183,7 @@ decision, 2026-09-07).
 | 2026-09-07 | Undo bar reuses the existing bottom message bar with the label swapped. | Owner ruling |
 | 2026-09-07 | Copy: `{from} → {to} deleted` / `Undo`. | Owner ruling |
 | 2026-09-07 | Cache purge deferred to window expiry; everything else deletes immediately. | Owner ruling |
+| 2026-09-07 | Frames approved with the proviso that each platform's swipe looks native. iOS is the system swipe action. Android's background becomes Gmail's dismiss red with a white trash icon, chosen over the theme-warning `Delete` label from two shot frames. | Owner ruling |
 
 ## Build decisions (orchestrator, 2026-09-07)
 
@@ -189,9 +191,9 @@ Made on the orchestrator's own authority during the build; each is subject
 to the owner's phase 3 verdict on the frames.
 
 - **Android background is full-bleed.** The horizontal page padding moved
-  from the `LazyColumn` to each item, so the warning-coloured background
-  reaches both screen edges like the iOS swipe button, while the `Delete`
-  label and the row content keep the page inset. A row at rest is pixel
+  from the `LazyColumn` to each item, so the red background reaches both
+  screen edges like the iOS swipe button, while the trash icon and the row
+  content keep the page inset. A row at rest is pixel
   identical; the visual-regression run is the proof.
 - **A fast flick also commits.** `SwipeToDismissBox` has a fixed velocity
   threshold (Material's 125 dp/s) beside the positional one, so a short but

@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.DropdownMenu
@@ -20,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
@@ -32,6 +34,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+/** Gmail's dismiss red, the swipe background Android users already know. */
+private val DismissRed = Color(0xFFD93025)
 
 @Composable
 fun HomeScreen(state: AppState, actions: UiActions) {
@@ -260,8 +265,8 @@ private fun SavedTripRow(trip: SavedTrip, state: AppState, actions: UiActions, m
     // Plain remember: the lazy list's saved state would bring an undone row back already dismissed.
     val dismissState = remember(trip.id) { SwipeToDismissBoxState(SwipeToDismissBoxValue.Settled, positionalThreshold = { it * 0.5f }) }
     SwipeToDismissBox(dismissState, backgroundContent = {
-        Box(Modifier.fillMaxSize().background(c.warning).padding(horizontal = PagePadding), contentAlignment = Alignment.CenterEnd) {
-            Label("Delete", color = c.ground, size = 12)
+        Box(Modifier.fillMaxSize().background(DismissRed).padding(horizontal = PagePadding), contentAlignment = Alignment.CenterEnd) {
+            Icon(Icons.Outlined.Delete, contentDescription = null, Modifier.size(24.dp), tint = Color.White)
         }
     }, modifier = modifier.testTag("trip-${trip.id}"), enableDismissFromStartToEnd = false,
         onDismiss = { actions.deleteTrip(trip.id) }) {
