@@ -64,7 +64,7 @@ class CompileTimetableTest(unittest.TestCase):
 
     def test_compiles_calendars_permissions_and_after_midnight_times(self):
         database = self.root / "timetable.sqlite3"
-        counts = COMPILER.compile_database(self.input, database, self.stations, self.mapping)
+        counts = COMPILER.compile_database(self.input, database, self.stations, self.mapping, self.root / "index.tsv.gz")
         self.assertEqual(counts["connections"], 5)
         self.assertEqual(counts["service_exceptions"], 1)
         with sqlite3.connect(database) as connection:
@@ -84,6 +84,10 @@ class CompileTimetableTest(unittest.TestCase):
         self.assertEqual(manifest["packages"][0]["sha256"], second["sha256"])
         self.assertEqual(manifest["packages"][0]["source"], "network")
         self.assertEqual(zipfile.ZipFile(self.root / "assets" / "timetable.zip").namelist(), ["timetable.sqlite3"])
+        self.assertIn("tripIndex", manifest)
+        android = json.loads((self.root / "assets" / "timetable-manifest.json").read_text())
+        self.assertNotIn("tripIndex", android)
+        self.assertEqual(android["packages"], manifest["packages"])
 
     def test_trip_index_is_deterministic_and_carries_calendar_facts(self):
         first = COMPILER.write_package(self.input, self.root / "one", None, self.stations, self.mapping)
@@ -108,7 +112,7 @@ class CompileTimetableTest(unittest.TestCase):
     def test_rejects_a_served_stop_without_real_station_mapping(self):
         self.write_feed("metro", 401, missing_stop=True)
         with self.assertRaisesRegex(ValueError, "no real station mapping"):
-            COMPILER.compile_database(self.input, self.root / "bad.sqlite3", self.stations, self.mapping)
+            COMPILER.compile_database(self.input, self.root / "bad.sqlite3", self.stations, self.mapping, self.root / "bad-index.tsv.gz")
 
 
 if __name__ == "__main__":

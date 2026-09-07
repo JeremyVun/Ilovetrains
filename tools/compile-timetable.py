@@ -148,13 +148,13 @@ def trip_index_row(source: str, trip_id: str, first_departure: int, calendar: tu
     return ("\t".join(fields) + "\n").encode("utf-8")
 
 
-def compile_database(input_dir: Path, database: Path, stations_path: Path, mapping_path: Path, trip_index: Path | None = None) -> dict:
+def compile_database(input_dir: Path, database: Path, stations_path: Path, mapping_path: Path, trip_index: Path) -> dict:
     stations = load_stations(stations_path)
     ferry_mapping = load_ferry_mapping(mapping_path)
     connection = sqlite3.connect(database)
     schema(connection)
-    index_file = open(trip_index, "wb") if trip_index is not None else None
-    index_writer = gzip.GzipFile(filename="", mode="wb", fileobj=index_file, compresslevel=9, mtime=0) if index_file else None
+    index_file = open(trip_index, "wb")
+    index_writer = gzip.GzipFile(filename="", mode="wb", fileobj=index_file, compresslevel=9, mtime=0)
     index_rows = 0
     connection.executemany(
         "INSERT INTO stations VALUES(?,?,?,?,?)",
@@ -276,9 +276,7 @@ def compile_database(input_dir: Path, database: Path, stations_path: Path, mappi
             if trip_id is None:
                 return
             times.sort(key=lambda item: integer(item["stop_sequence"]))
-            opening = times[0].get("departure_time") or times[0].get("arrival_time")
-            if opening:
-                first_departures[trip_id] = seconds(opening)
+            first_departures[trip_id] = seconds(times[0]["departure_time"])
             for left, right in zip(times, times[1:]):
                 departure = seconds(left["departure_time"])
                 arrival = seconds(right["arrival_time"])
@@ -307,17 +305,15 @@ def compile_database(input_dir: Path, database: Path, stations_path: Path, mappi
         total_connections += len(batch)
         connection.commit()
 
-        if index_writer is not None:
-            for trip in sorted(eligible_trips, key=lambda item: item["trip_id"]):
-                first_departure = first_departures.get(trip["trip_id"])
-                if first_departure is None:
-                    continue
-                index_writer.write(trip_index_row(source, trip["trip_id"], first_departure, calendars[trip["service_id"]], raw_exceptions.get(trip["service_id"], [])))
-                index_rows += 1
+        for trip in sorted(eligible_trips, key=lambda item: item["trip_id"]):
+            first_departure = first_departures.get(trip["trip_id"])
+            if first_departure is None:
+                continue
+            index_writer.write(trip_index_row(source, trip["trip_id"], first_departure, calendars[trip["service_id"]], raw_exceptions.get(trip["service_id"], [])))
+            index_rows += 1
 
-    if index_writer is not None:
-        index_writer.close()
-        index_file.close()
+    index_writer.close()
+    index_file.close()
 
     coverage_start = max(int(value["startDate"]) for value in source_coverage.values())
     coverage_end = min(int(value["endDate"]) for value in source_coverage.values())
@@ -400,7 +396,8 @@ def write_package(input_dir: Path, output_dir: Path, android_assets: Path | None
         if android_assets is not None:
             android_assets.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(package_path, android_assets / "timetable.zip")
-            (android_assets / "timetable-manifest.json").write_text(json.dumps(manifest, separators=(",", ":")) + "\n")
+            client_manifest = {key: value for key, value in manifest.items() if key != "tripIndex"}
+            (android_assets / "timetable-manifest.json").write_text(json.dumps(client_manifest, separators=(",", ":")) + "\n")
         result = {"databaseBytes": database.stat().st_size, "packageBytes": package_path.stat().st_size, "sha256": digest, "tripIndexBytes": index_path.stat().st_size, "tripIndexSha256": index_digest, **counts}
     return result
 
