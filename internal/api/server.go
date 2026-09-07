@@ -52,6 +52,7 @@ const (
 	departuresCacheControl     = "public, s-maxage=30, stale-while-revalidate=60"
 	departuresPastCacheControl = "public, s-maxage=3600, stale-while-revalidate=86400"
 	stopsCacheControl          = "public, s-maxage=86400, stale-while-revalidate=604800"
+	flagsCacheControl          = "public, s-maxage=60, stale-while-revalidate=300"
 	errorCacheableControl      = "public, s-maxage=60"
 	noStore                    = "no-store"
 )
@@ -76,6 +77,8 @@ const (
 const (
 	defaultLimit = 6
 	maxLimit     = 10
+	// maxTransferLimit only bounds junk: no Sydney journey has nine changes.
+	maxTransferLimit = 9
 )
 
 const minQueryLength = 2
@@ -95,6 +98,7 @@ type Server struct {
 	loc            *time.Location
 	now            func() time.Time
 	native         *native.Service
+	flags          Flags
 }
 
 type Option func(*Server)
@@ -129,6 +133,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/departures", s.handleDepartures)
 	mux.HandleFunc("GET /api/v1/stops", s.handleStops)
+	mux.HandleFunc("GET /api/v1/flags", s.handleFlags)
 	if s.native != nil {
 		mux.HandleFunc("GET /api/v1/timetable/manifest", s.handleTimetableManifest)
 		mux.HandleFunc("GET /api/v1/timetable/packages/{package}", s.handleTimetablePackage)
@@ -196,11 +201,24 @@ func (s *Server) handleDepartures(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
+	// A bad value is a 400 whether or not the flag is on, so validation does
+	// not vary with a switch the caller cannot see.
+	transferLimit, err := journeyTransferLimit(query.Get("transferLimit"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if !s.transferLimitOn() {
+		transferLimit = tfnsw.NoTransferLimit
+	}
 
 	// The bucket is part of the key, so a past page and the live board never
 	// share an entry, and asking for the current bucket explicitly is a
 	// different answer (it echoes `at`) from asking for now.
 	key := from + "|" + to + "|" + strconv.Itoa(limit) + "|" + bucketKey(at) + "|" + modesKey(modes)
+	if transferLimit >= 0 {
+		key += "|transferLimit=" + strconv.Itoa(transferLimit)
+	}
 	past := settledBucket(at, now)
 	if response, ok := s.departuresPast.Get(key); past && ok {
 		writeData(w, departuresPastCacheControl, false, response)
@@ -213,7 +231,8 @@ func (s *Server) handleDepartures(w http.ResponseWriter, r *http.Request) {
 		}
 		ctx, cancel := fetchContext(ctx)
 		defer cancel()
-		return s.upstream.DeparturesWithOptions(ctx, from, to, limit, at, tfnsw.DeparturesOptions{Modes: modes})
+		return s.upstream.DeparturesWithOptions(ctx, from, to, limit, at,
+			tfnsw.DeparturesOptions{Modes: modes, TransferLimit: transferLimit})
 	})
 	if err != nil {
 		if response, ok := s.departuresPast.Stale(key); past && ok {
