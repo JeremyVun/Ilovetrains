@@ -18,7 +18,7 @@ import * as Board from './board.js';
 import { clampJourneyBars } from './journeybar.js';
 import * as Detail from './detail.js';
 import * as Home from './home.js';
-import { tinyTrainPreview, fetchTinyTrain } from './feature-flags.js';
+import { tinyTrainPreview, TINY_TRAIN_FLAG } from './feature-flags.js';
 import { attachTinyTrain } from './tiny-train.js';
 import { renderSetup } from './setup.js';
 import { getDepartures, getFlags, getStops } from './api.js';
@@ -33,6 +33,7 @@ import {
 } from './analytics.js';
 
 const REFRESH_MS = 30_000;
+const FLAGS_TIMEOUT_MS = 3_000;
 const TICK_MS = 1_000;
 const VIEW_QUALIFIES_MS = 5_000;
 const LIMIT = 6;
@@ -63,15 +64,7 @@ function clearTrain() {
   trainLine = null;
 }
 
-async function refreshFeatureFlags() {
-  if (trainPreview !== null || flagsRequest || document.hidden) return;
-  const request = new AbortController();
-  flagsRequest = request;
-  const timeout = setTimeout(() => request.abort(), 3000);
-  const enabled = await fetchTinyTrain(fetch, request.signal);
-  clearTimeout(timeout);
-  if (flagsRequest !== request) return;
-  flagsRequest = null;
+function applyTinyTrain(enabled) {
   if (enabled === tinyTrain) return;
   tinyTrain = enabled;
   if (!enabled) clearTrain();
@@ -333,16 +326,28 @@ function refetchEligible() {
   fetchLive();
 }
 
-/* One answer per open, after the first paint: the board never waits on it, and
-   the stored answer is what this open already drew with. */
+/* One request per open, foreground return and refresh tick, shared by every
+   flag: the board never waits on it, and the toy stays off until this open's
+   own answer lands so a stored value can never replay a finished rollout. */
 async function loadFlags() {
-  let flags;
-  try { flags = await getFlags(); } catch (_) { return; }
-  const wasCapped = capped();
-  ctx.update(setFlags(state.doc, flags));
-  if (capped() === wasCapped) return;
-  if (state.view === 'settings') renderSettings(state.root, ctx, settingsSubview());
-  refetchEligible();
+  if (flagsRequest) return;
+  const request = new AbortController();
+  flagsRequest = request;
+  const timeout = setTimeout(() => request.abort(), FLAGS_TIMEOUT_MS);
+  let flags = null;
+  try { flags = await getFlags({ signal: request.signal }); } catch (_) { /* the stored answer stands */ }
+  clearTimeout(timeout);
+  if (flagsRequest !== request) return;
+  flagsRequest = null;
+  if (flags) {
+    const wasCapped = capped();
+    ctx.update(setFlags(state.doc, flags));
+    if (capped() !== wasCapped) {
+      if (state.view === 'settings') renderSettings(state.root, ctx, settingsSubview());
+      refetchEligible();
+    }
+  }
+  applyTinyTrain(trainPreview ?? flags?.[TINY_TRAIN_FLAG] === true);
 }
 
 function settingsSubview() {
@@ -1318,7 +1323,7 @@ function startTimers(recordBoardView) {
   timers.refresh = setInterval(() => {
     if (!document.hidden) {
       fetchLive({ independent: true });
-      refreshFeatureFlags();
+      loadFlags();
     }
   }, REFRESH_MS);
   if (recordBoardView) timers.view = setTimeout(qualifyView, VIEW_QUALIFIES_MS);
@@ -1364,7 +1369,7 @@ document.addEventListener('visibilitychange', () => {
     flagsRequest = null;
     return;
   }
-  refreshFeatureFlags();
+  loadFlags();
   if (!onLiveView() && state.view !== 'settings') return;
   suppressPreferenceEvents = false;
   if (state.view === 'home') {
@@ -1419,4 +1424,3 @@ if (location.hostname === 'localhost') {
 
 route();
 loadFlags();
-refreshFeatureFlags();

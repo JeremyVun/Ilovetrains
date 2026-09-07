@@ -18,12 +18,3 @@ export function tinyTrainPreview(hostname, search, storage) {
   } catch (_) { /* default when storage is blocked */ }
   return null;
 }
-
-export async function fetchTinyTrain(fetchFn, signal) {
-  try {
-    const response = await fetchFn('/api/v1/flags', { cache: 'no-store', credentials: 'omit', signal });
-    if (!response.ok) return false;
-    const flags = await response.json();
-    return flags?.[TINY_TRAIN_FLAG] === true;
-  } catch (_) { return false; }
-}

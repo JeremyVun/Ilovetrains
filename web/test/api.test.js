@@ -47,10 +47,17 @@ test('flags are read from the backend and an offline open keeps the stored answe
   };
   try {
     assert.deepEqual(await getFlags(), { tiny_train: false, transferLimit: true });
-    assert.equal(paths[0], '/api/v1/flags');
+    assert.deepEqual(paths, ['/api/v1/flags'], 'every flag shares the one request');
     globalThis.fetch = async () => new Response(JSON.stringify({}));
     assert.deepEqual(await getFlags(), {});
     globalThis.fetch = async () => { throw new TypeError('failed to fetch'); };
     await assert.rejects(getFlags(), (error) => error.code === 'offline');
+    const controller = new AbortController();
+    globalThis.fetch = async (_url, options) => {
+      assert.equal(options.signal, controller.signal);
+      controller.abort();
+      throw Object.assign(new Error('aborted'), { name: 'AbortError' });
+    };
+    await assert.rejects(getFlags({ signal: controller.signal }), (error) => error.name === 'AbortError');
   } finally { globalThis.fetch = original; }
 });

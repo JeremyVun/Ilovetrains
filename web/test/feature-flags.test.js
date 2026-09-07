@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { tinyTrainPreview, fetchTinyTrain, TINY_TRAIN_KEY } from '../js/feature-flags.js';
+import { tinyTrainPreview, TINY_TRAIN_FLAG, TINY_TRAIN_KEY } from '../js/feature-flags.js';
 
 function store(value) {
   const values = new Map(value === undefined ? [] : [[TINY_TRAIN_KEY, value]]);
@@ -41,20 +41,10 @@ test('blocked storage still permits an explicit local preview for this visit', (
   }
 });
 
-test('only a successful evaluated boolean true enables the train', async () => {
-  for (const body of [null, {}, { 'tiny_train': 'true' }, { 'tiny_train': 1 }, { 'tiny_train': false }]) {
-    assert.equal(await fetchTinyTrain(async () => ({ ok: true, json: async () => body })), false);
-  }
-  const controller = new AbortController();
-  assert.equal(await fetchTinyTrain(async (url, options) => {
-    assert.equal(url, '/api/v1/flags');
-    assert.deepEqual(options, { cache: 'no-store', credentials: 'omit', signal: controller.signal });
-    return { ok: true, json: async () => ({ 'tiny_train': true }) };
-  }, controller.signal), true);
-});
-
-test('unavailable, invalid and failed flag responses turn the feature off', async () => {
-  assert.equal(await fetchTinyTrain(async () => { throw Error('offline'); }), false);
-  assert.equal(await fetchTinyTrain(async () => ({ ok: false, json: async () => ({ 'tiny_train': true }) })), false);
-  assert.equal(await fetchTinyTrain(async () => ({ ok: true, json: async () => { throw Error('invalid JSON'); } })), false);
+/* The toy has no request of its own any more: it reads the published name out
+   of the one answer the controller already fetches. */
+test('the module offers a preview override and a published name, never a fetch', async () => {
+  const source = await import('../js/feature-flags.js');
+  assert.deepEqual(Object.keys(source).sort(), ['TINY_TRAIN_FLAG', 'TINY_TRAIN_KEY', 'tinyTrainPreview']);
+  assert.equal(TINY_TRAIN_FLAG, 'tiny_train');
 });
