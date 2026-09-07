@@ -121,7 +121,7 @@ class UiCalibrationTest {
         capture("board-light")
         compose.runOnIdle { state.value = fixture.settingsState.copy(appearance = Appearance.Light) }
         capture("settings-light")
-        compose.runOnIdle { state.value = fixture.settingsState.copy(transferLimit = TransferLimit.Two) }
+        compose.runOnIdle { state.value = fixture.settingsState.copy(transferLimit = TransferLimit.Two, appearance = Appearance.Dark) }
         capture("settings-transfer-limit")
         compose.runOnIdle { state.value = fixture.settingsState.copy(transferLimit = TransferLimit.Any, appearance = Appearance.Light) }
         capture("settings-transfer-limit-light")
