@@ -1,6 +1,5 @@
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const START_CARRIAGES = 6;
-const MAX_CARRIAGES = 64;
+const CARRIAGES = 6;
 const RUN_MS = 2600;
 const REDUCED_MS = 650;
 
@@ -70,7 +69,6 @@ export function attachTinyTrain(host) {
   let speed = 0;
   let stageWidth = 0;
   let trainWidth = 0;
-  let carCount = 0;
   let destroyed = false;
   function refresh(nextHost = host) {
     if (nextHost !== host) {
@@ -95,17 +93,8 @@ export function attachTinyTrain(host) {
     consist?.remove();
     consist = null;
     trainWidth = 0;
-    carCount = 0;
     host.classList.remove('tiny-train-lane-active', 'tiny-train-reduced');
     trigger.setAttribute('aria-label', 'Run a tiny train');
-  }
-
-  function addCar() {
-    if (!consist || carCount >= MAX_CARRIAGES) return;
-    consist.prepend(carriage(false));
-    carCount += 1;
-    trainWidth += 33;
-    consist.dataset.carriages = String(carCount);
   }
 
   function frame(now) {
@@ -127,13 +116,11 @@ export function attachTinyTrain(host) {
     host.classList.add('tiny-train-lane-active');
     consist = document.createElement('span');
     consist.className = 'tiny-train-consist';
-    for (let i = 1; i < START_CARRIAGES; i += 1) consist.append(carriage(false));
+    for (let i = 1; i < CARRIAGES; i += 1) consist.append(carriage(false));
     consist.append(carriage(true));
-    carCount = START_CARRIAGES;
-    consist.dataset.carriages = String(carCount);
+    consist.dataset.carriages = String(CARRIAGES);
     stage.append(consist);
     trainWidth = consist.getBoundingClientRect().width;
-    trigger.setAttribute('aria-label', 'Add a carriage');
 
     if (reduced.matches) {
       host.classList.add('tiny-train-reduced');
@@ -149,8 +136,7 @@ export function attachTinyTrain(host) {
   }
 
   function activate() {
-    if (consist) addCar();
-    else run();
+    if (!consist) run();
   }
 
   function keyDown(event) {

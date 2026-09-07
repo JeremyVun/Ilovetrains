@@ -164,7 +164,7 @@ fun directionFigureFor(journey: Journey, now: Long): Figure? {
 
 @Composable
 fun JourneyAxis(journey: Journey, modifier: Modifier = Modifier, large: Boolean = false,
-                showCap: Boolean = true, progress: Float? = null) {
+                showCap: Boolean = true, progress: Float? = null, tinyTrain: Boolean = false) {
     if (journey.legs.isEmpty()) return
     val c = LocalTrainColors.current
     val fontScale = LocalDensity.current.fontScale
@@ -179,6 +179,11 @@ fun JourneyAxis(journey: Journey, modifier: Modifier = Modifier, large: Boolean 
         }
         BoxWithConstraints(Modifier.weight(1f).height(axisHeight)) {
             val barHeight = if (large) 14.dp else 7.dp
+            if (tinyTrain) {
+                val railTop = if (large) 5.dp else (axisHeight - barHeight) / 2
+                TinyTrainLane(Modifier.fillMaxWidth().offset(y = railTop - 18.dp)
+                    .wrapContentHeight(Alignment.Top, unbounded = true).zIndex(1f))
+            }
             val segmentPlacement: Modifier.() -> Modifier = {
                 if (large) align(Alignment.TopStart).offset(y = 5.dp) else align(Alignment.CenterStart)
             }

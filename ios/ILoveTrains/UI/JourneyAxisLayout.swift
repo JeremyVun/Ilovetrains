@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum AxisItem: Equatable {
-    case cap, ride(Int), dwell(Int), alight(Int), board(Int), station(Int), progress
+    case cap, ride(Int), dwell(Int), alight(Int), board(Int), station(Int), progress, tinyTrain
 }
 
 struct AxisItemKey: LayoutValueKey {
@@ -48,6 +48,8 @@ struct JourneyAxisGeometry {
                 pins.append(i)
             case .station:
                 labels.append(i)
+            case .tinyTrain:
+                boxes[i] = CGRect(x: capWidth, y: (chipHeight - barHeight) / 2 - 18, width: axisWidth, height: 44)
             case .progress:
                 let center = capWidth + axisWidth * min(1, max(0, progress ?? 0))
                 boxes[i] = CGRect(x: center - 6.5, y: -11, width: 13, height: 9)
@@ -92,7 +94,7 @@ struct JourneyAxisGeometry {
             boxes[index] = box; placed.append(box)
         }
         frames = boxes
-        size = CGSize(width: width, height: max(large ? 42 : 22, boxes.map(\.maxY).max() ?? 0))
+        size = CGSize(width: width, height: max(large ? 42 : 22, boxes.enumerated().filter { items[$0.offset] != .tinyTrain }.map { $0.element.maxY }.max() ?? 0))
     }
 }
 

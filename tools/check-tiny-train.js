@@ -94,15 +94,15 @@ async function check() {
         fs.writeFileSync(path.join(out, `${stem}-passing.png`), await screenshot(page));
         await evaluate(page, `(() => {
           document.querySelector('.tiny-train-trigger').click();
-          if (document.querySelectorAll('.tiny-train-car').length !== 7) throw Error('tap did not add a carriage');
+          if (document.querySelectorAll('.tiny-train-car').length !== 6) throw Error('repeat tap changed carriage count');
           const t = window.__trains;
           t.now = () => ${NOW + 60000};
           t.rerender();
           if (document.querySelector('.tiny-train-stage') !== window.trainStageBefore) throw Error('live repaint replaced train');
           if (document.querySelector('.hm-hd .sy-bar') === window.trainLineBefore) throw Error('live repaint retained stale journey markup');
-          if (document.querySelectorAll('.tiny-train-car').length !== 7) throw Error('live repaint lost carriages');
+          if (document.querySelectorAll('.tiny-train-car').length !== 6) throw Error('live repaint lost carriages');
           for (let i = 0; i < 80; i++) document.querySelector('.tiny-train-trigger').click();
-          if (document.querySelectorAll('.tiny-train-car').length > 64) throw Error('unbounded carriage count');
+          if (document.querySelectorAll('.tiny-train-car').length !== 6) throw Error('repeat taps changed carriage count');
         })()`);
         await sleep(150);
         fs.writeFileSync(path.join(out, `${stem}-long.png`), await screenshot(page));
@@ -128,7 +128,7 @@ async function check() {
           const trigger = document.querySelector('.tiny-train-trigger');
           if (scroller.scrollTop <= 0) throw Error('touch did not scroll trips');
           if (trigger.hidden) throw Error('trip-line control disappeared while only saved trips scrolled');
-          if (document.querySelectorAll('.tiny-train-car').length !== 64) throw Error('trip-list scroll interrupted header train');
+          if (document.querySelectorAll('.tiny-train-car').length !== 6) throw Error('trip-list scroll interrupted header train');
           if (trigger.getBoundingClientRect().bottom > scroller.getBoundingClientRect().top) throw Error('trip-line control overlaps saved trips');
           scroller.querySelector(':scope > div:last-child').remove();
           scroller.scrollTop = 0;
@@ -149,7 +149,7 @@ async function check() {
         assert.equal(await evaluate(page, 'document.querySelectorAll(".tiny-train-car").length'), 6, 'Enter starts a train');
         await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 });
         await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 });
-        assert.equal(await evaluate(page, 'document.querySelectorAll(".tiny-train-car").length'), 7, 'Space adds a carriage');
+        assert.equal(await evaluate(page, 'document.querySelectorAll(".tiny-train-car").length'), 6, 'Space ignores an active train');
         await page.send('Emulation.setEmulatedMedia', { features: [
           { name: 'prefers-color-scheme', value: scheme },
           { name: 'prefers-reduced-motion', value: 'reduce' }
