@@ -164,7 +164,8 @@ func TestLoadServiceDatesReadsTheSidecarAndVerifiesItsHash(t *testing.T) {
 		t.Fatalf("exceptions = %+v", metro)
 	}
 
-	if err := os.WriteFile(filepath.Join(dir, index.Name), []byte("corrupted"), 0o644); err != nil {
+	altered := writeTestTripIndex(t, dir, []string{"sydneytrains\tlate\t90600\t20260901\t20261031\t1\t\t"})
+	if err := os.Rename(filepath.Join(dir, altered.Name), filepath.Join(dir, index.Name)); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := LoadServiceDates(dir); err == nil {

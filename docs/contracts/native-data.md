@@ -28,6 +28,17 @@ never leave the device.
 }
 ```
 
+The compiler's own `manifest.json` carries one further object, `tripIndex`,
+naming a server-only sidecar written beside it and its SHA-256. The sidecar is
+one deterministic gzipped, tab-separated row per trip in the package, holding
+its source, trip ID, first departure in seconds, service start and end dates,
+weekday mask, added dates and removed dates. The server resolves missing
+realtime service dates from it and strips the field before publishing the
+manifest above, so no client sees or downloads it and the package hash is
+unaffected. A manifest without the field, an absent sidecar, or one that fails
+its recorded SHA-256 leaves every dateless update unresolved and the timetable
+otherwise usable.
+
 There is one aggregate `network` package so trips can transfer between source
 feeds in one indexed query. Compact dates are Sydney service dates in
 `YYYYMMDD`. `generatedAt` records capture time and never becomes fresh merely
@@ -60,8 +71,8 @@ python3 tools/compile-timetable.py \
 
 It expects `sydneytrains.zip`, `nswtrains.zip`, `metro.zip`, `ferries.zip` and
 `mff.zip`. Output is deterministic for identical inputs: the server directory
-gets `{sha256}.zip` and `manifest.json`; Android assets get `timetable.zip` and
-`timetable-manifest.json`.
+gets `{sha256}.zip`, `trip-index-{sha256}.tsv.gz` and `manifest.json`; Android
+assets get `timetable.zip` and `timetable-manifest.json`.
 
 ## SQLite schema
 
@@ -171,7 +182,9 @@ for one of the five source names:
 Trip status is `scheduled`, `added`, `unscheduled`, `cancelled` or
 `replacement`. Stop relationship is `scheduled`, `skipped`, `noData` or
 `unscheduled`. Optional fields are omitted rather than sent as guessed values.
-The backend omits invalid or duplicate `(tripId,serviceDate)` updates. An
+The backend omits invalid or duplicate `(tripId,serviceDate)` updates; a
+missing service date is resolved as described under "Sydney Trains service
+dates" or the update is dropped. An
 explicit trip timestamp is accepted only from header minus 90 seconds through
 header plus 5 seconds; an absent timestamp inherits header freshness only with
 an explicit valid service date. Byte-identical upstream responses preserve the
@@ -224,17 +237,43 @@ countdowns. Pinned snapshots follow the same rule when refresh fails; connectivi
 loss cannot reset a delayed journey to its earlier printed arrival. These are
 native exceptions to the web's stale-row treatment (owner ruling, 2026-09-07).
 
-## Sydney Trains realtime coverage gap
+## Sydney Trains service dates
 
-A production read at 19:01 Sydney time on 7 September 2026 returned HTTP 200
-with a fresh `sydneytrains` header and zero normalized updates. The current
-normalizer requires an explicit GTFS `start_date`; the captured Sydney Trains
-feed documented in the [source research](../references/tfnsw-open-data.md#native-sydney-trains-service-date-gap--2026-09-07)
-omits it. Thus fresh transport does not establish useful realtime coverage.
-The online Trip Planner currently remains the preferred online answer for both
-native clients. Restoring native Sydney Trains updates requires a verified
-service-day join against exact timetable identities, with overnight, replacement
-and stale-trip tests. Do not guess today's date or weaken freshness guards.
+Sydney Trains trip updates carry no `start_date`. The server resolves one from
+the compiled trip index before publishing an update. A valid published
+`start_date` always wins, so every other source is unaffected.
+
+Candidate service dates are the header's Sydney date minus one, the header's
+date, and plus one. A candidate survives only if the trip's calendar runs on
+it: an added exception runs whatever the range says, otherwise the date must
+lie inside the service range on a weekday that service runs and must not be a
+removed exception. A candidate's instance start is its service date at midnight
+Sydney time plus the trip's first departure, so GTFS times past 24:00 fall on
+the following morning and daylight saving is applied by the zone rather than by
+arithmetic.
+
+When the update carries any absolute arrival or departure time, the earliest of
+them chooses the candidate whose instance start is within three hours of it.
+Otherwise the header time chooses the nearest instance start between six hours
+before the header and twenty-four hours after it. Two candidates the same
+distance away, or none inside the window, is *ambiguous*; a trip ID the index
+does not hold is *unknown*. Both are dropped and counted, never guessed.
+Duplicate detection uses the resolved `(tripId, serviceDate)`, and the resolved
+date is the one clients join on, so no client behaviour changes.
+
+The index holds only the trips inside the published package. Non-revenue,
+out-of-service and NSW TrainLink-operated trips inside the Sydney Trains bundle
+are excluded from both, so their updates resolve to *unknown*.
+
+Replaying the reviewed capture `tools/fixtures/gtfs_realtime_sydneytrains_20260906.pb`
+(see the [source research](../references/tfnsw-open-data.md#native-sydney-trains-service-dates--closed-2026-09-07))
+against the bootstrap index resolves 109 of its 308 updates, with 159 unknown
+and 40 ambiguous. The 159 are 59 non-revenue, 54 absent from the static bundle,
+17 out of service and 29 NSW TrainLink-operated trips. Each of the 40 has
+exactly one running instance, 7 to 21 hours before the header and outside the
+six-hour window; 23 of those are cancellations carrying a current trip
+timestamp. Of the 109 resolved, 69 then pass the per-update 90-second
+trip-timestamp gate, against zero updates published before this rule existed.
 
 ## Captured package measurement
 

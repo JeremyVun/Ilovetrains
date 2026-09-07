@@ -288,21 +288,31 @@ web retains Trip Planner. Trip Updates, Vehicle Positions and Alerts for
 Sydney Trains and Metro exist on the portal. Portal guidance:
 poll realtime feeds ≥10–15s apart, static bundles at most daily.
 
-### Native Sydney Trains service-date gap — 2026-09-07
+### Native Sydney Trains service dates — closed 2026-09-07
 
 Read `GET https://ilovetrains.jeremyvun.com/api/v1/realtime/sydneytrains`
 at 09:01:23 UTC with curl: HTTP 200, source header `2026-09-07T09:01:06Z`,
-expiry `2026-09-07T09:02:36Z`, and `updates: []`. This is a fresh but empty
+expiry `2026-09-07T09:02:36Z`, and `updates: []`. This was a fresh but empty
 normalized snapshot, not proof that Sydney Trains has no realtime services.
 
 The reviewed 6 September capture in
 `tools/fixtures/gtfs_realtime_summary.json` has 308 Sydney Trains updates,
-all without `start_date`; 254 exactly match a static trip ID. The current
-`internal/native/realtime.go` rejects every missing service date before mapping
-stop updates. Fixing this needs a verified trip-instance/service-day join,
-including overnight runs and old per-trip observations, not a default to the
-current date. These observations explain a native coverage gap; they do not
-establish which estimate was shown on the owner's earlier Rhodes trip.
+all without `start_date`; 254 exactly match a static trip ID in the raw bundle.
+The normalizer rejected every one of them.
+
+The server now resolves the service day from a trip index compiled beside the
+timetable package: the three candidate Sydney dates around the feed header,
+filtered by the trip's calendar, chosen by the update's earliest absolute stop
+time or, failing that, by proximity to the header. The rule and its windows are
+binding in [native-data.md](../contracts/native-data.md#sydney-trains-service-dates).
+Replaying the same capture publishes 69 updates where it published none, and
+drops the rest as unknown or ambiguous rather than guessing a date.
+
+Two upstream properties remain observations, not guarantees: 105 of the 254
+statically matching trips are non-revenue, out-of-service or NSW
+TrainLink-operated services that the compiled package deliberately excludes,
+and the feed keeps republishing updates, including cancellations with current
+timestamps, for services that began 7 to 21 hours earlier.
 
 ## Budget math for v1 caching
 

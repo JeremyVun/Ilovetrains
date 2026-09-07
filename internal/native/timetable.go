@@ -343,7 +343,9 @@ func loadManifest(path string, packageDirs []string) (*activeTimetable, string, 
 	if err := validatePackage(packagePath, pkg); err != nil {
 		return nil, "", err
 	}
-	canonical, err := json.Marshal(manifest)
+	published := manifest
+	published.TripIndex = nil
+	canonical, err := json.Marshal(published)
 	if err != nil {
 		return nil, "", err
 	}

@@ -92,6 +92,7 @@ class CompileTimetableTest(unittest.TestCase):
         name = json.loads((self.root / "one" / "manifest.json").read_text())["tripIndex"]["name"]
         self.assertEqual(name, f"trip-index-{first['tripIndexSha256']}.tsv.gz")
         self.assertEqual((self.root / "one" / name).read_bytes(), (self.root / "two" / name).read_bytes())
+        self.assertEqual((self.root / "one" / name).read_bytes()[3:8], b"\x00\x00\x00\x00\x00")
         self.assertEqual(gzip.decompress((self.root / "one" / name).read_bytes()).decode().splitlines(), [
             "sydneytrains\tT\t90600\t20260101\t20261231\t127\t\t",
             "nswtrains\tT\t90600\t20260101\t20261231\t127\t\t",

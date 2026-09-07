@@ -227,6 +227,13 @@ func TestBootstrapTripIndexResolvesDatelessUpdates(t *testing.T) {
 	if outcome != dateResolved || date != "20260905" {
 		t.Fatalf("resolve = %q/%d", date, outcome)
 	}
+	_, representation, err := service.Manifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(representation.JSON), "tripIndex") {
+		t.Fatalf("the server-only trip index reached the published manifest: %s", representation.JSON)
+	}
 }
 
 func TestMissingTripIndexLeavesTheTimetableUsable(t *testing.T) {

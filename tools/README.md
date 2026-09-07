@@ -9,8 +9,9 @@
   `--release` for the signed installable APK and server download copy. See
   [Android operations](../docs/operations/android.md) for SDK and signing setup.
 - `compile-timetable.py` — compile captured GTFS schedules into the shared
-  deterministic SQLite package. It never loads credentials. Input names,
-  source authority and package validation are specified in
+  deterministic SQLite package and the server-only trip index beside it. It
+  never loads credentials. Input names, source authority, package validation
+  and the trip index are specified in
   [native-data.md](../docs/contracts/native-data.md).
   Run compiler tests with `python3 -m unittest discover -s tools/test -p 'test_compile_timetable.py'`.
 - `export-android-conformance.mjs` — regenerate committed prediction and row
@@ -66,6 +67,13 @@
   bodies are discarded. This measures source availability, not routing or
   GTFS-R semantic correctness. Raw captures belong in `/tmp`; preserve small
   reviewed fixtures and findings deliberately, not whole upstream bundles.
+- `diagnose-realtime.go` — replay a capture's protobuf feeds through the
+  production normalizer with no credentials and no network:
+  `go run tools/diagnose-realtime.go /tmp/trains-gtfs-<name> [bootstrap-dir]`
+  from the repository root. It verifies each file against `capture.json`'s
+  hash and prints per-file raw, normalized and resolver-outcome counts. The
+  optional second argument selects the manifest whose trip index resolves
+  service dates; it defaults to `native-data/bootstrap`.
 - `inspect-gtfs.py` — offline hash-checked GTFS-R diagnostics for a capture:
   `uv run --with gtfs-realtime-bindings==2.2.0 python tools/inspect-gtfs.py /tmp/trains-gtfs-<name> > /tmp/trains-gtfs-report.json`.
   Reports source timestamps, standard schedule relationships and exact trip-ID
@@ -78,6 +86,12 @@
   The three `departures_*.json` files are mapped public-API captures from
   2026-09-05 for the approved ferry-board calibration: Pyrmont Bay → Double
   Bay, its reverse, and Circular Quay → Manly’s numbered/side wharf control.
+  `gtfs_realtime_sydneytrains_20260906.pb` is the unmodified 79,085-byte
+  Sydney Trains trip-update body from the 6 September capture, kept as the
+  service-date resolver's real-source acceptance test;
+  `gtfs_realtime_sydneytrains_20260906.json` records its URL, timestamps,
+  headers and SHA-256, which the Go test re-checks before replaying it. Every
+  other realtime fixture is synthetic and keeps its synthetic dates.
 - `visual-regression.js` — one command that shoots the web, Android and iOS
   clients, compares every frame pixel for pixel with `tools/baselines/`, and
   writes a report with baseline | current | diff composites. Read
@@ -650,6 +664,17 @@ and never reads `.env`. It fails on unmapped boarding stops and emits a
 deterministic one-entry ZIP plus its SHA-256 manifest. Regeneration replaces
 the checked-in bootstrap, so review route counts, coverage and package size
 before accepting it.
+
+It also writes `trip-index-{sha256}.tsv.gz` beside the manifest, which records
+its name and hash. The sidecar is one gzipped, tab-separated row per trip in
+the package — source, trip ID, first departure in seconds, service start and
+end dates, weekday mask, added dates, removed dates — sorted by source order
+then trip ID, with a zeroed gzip header so identical inputs give identical
+bytes. Only the server reads it, to resolve realtime updates that arrive with
+no service date; it is not downloaded by any client and is not part of the
+package hash. The 6 September capture compiles 132,562 rows into 982,548
+bytes. Copy it into the runtime data directory with the manifest, or dateless
+updates stay unresolved.
 
 ## Analytics browser and production checks
 
