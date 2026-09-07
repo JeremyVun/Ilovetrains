@@ -206,3 +206,17 @@ test('the shared device uses Wharf for unnumbered origins and preserves specific
     'ordinary rail keeps a specific platform'
   );
 });
+
+/* The toy hangs off the bar's coloured leg. `data-seg` and `data-line-code`
+   sit on nested spans, so a compound selector silently matches nothing. */
+test('the tiny train selector matches the leg the bar actually emits', () => {
+  const main = readFileSync(fileURLToPath(new URL('../js/main.js', import.meta.url)), 'utf8');
+  const selector = /line\?\.querySelector\('([^']+)'\)/.exec(main);
+
+  assert.ok(selector, 'the controller still looks for a coloured leg');
+  const [outer, inner] = selector[1].split(' ');
+  const html = journeyBarHtml(journeyBarSpec(transferJourneys()[0]));
+  const leg = new RegExp(`<span [^>]*${outer.slice(1, -1)}[^>]*>\\s*<span [^>]*${inner.slice(1, -1)}=`);
+  assert.equal(selector[1].includes(' '), true, 'the attributes are on nested elements');
+  assert.match(html, leg);
+});

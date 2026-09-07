@@ -800,7 +800,7 @@ function renderHome() {
     if (nextList) nextList.scrollTop = scrollTop;
     Home.finishHomeRender(state.root);
     const line = state.root.querySelector('.hm-hd .sy-bar');
-    if (tinyTrain && line?.querySelector('[data-seg][data-line-code]')) {
+    if (tinyTrain && line?.querySelector('[data-seg] [data-line-code]')) {
       if (removeTrain) removeTrain.refresh(line);
       else removeTrain = attachTinyTrain(line);
       trainLine = line;
