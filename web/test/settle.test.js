@@ -4,12 +4,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { setFocus, settleRide, settleRefreshedFocus, directionsModel, clearFocus } from '../js/focus.js';
-import { arrivalMs } from '../js/journey.js';
 import { emptyDoc, recordRide, correctRide } from '../js/storage.js';
 import { transferBody, transferJourneys } from './fixture.js';
 
-/* Review probes for the timetable-realtime phase 1 seam (client-storage.md,
-   Completed rides). Each test names the invariant it attacks. */
+/* The ride-settlement seam (client-storage.md, Completed rides). Each test
+   names the invariant it holds. */
 
 const TRIP = {
   id: 'trip-rhodes-bondi',
@@ -73,29 +72,21 @@ test('I3: a 200 m completion records before the timetable agrees and survives an
   assert.notEqual(directionsModel(unmoved.focus, now).phase, 'done', 'the pure model does not know about the fix');
 });
 
-test('I3 hazard: a 200 m completion is withdrawn by a later-moved arrival once the fix is gone', () => {
+test('I3: a moved future arrival withdraws the row once the fix is gone, and keeps it while it is held', () => {
   const now = ARRIVAL - 3 * 60_000;
   const recorded = settleRide(docWithFocus(), now, AT_BONDI);
   const moved = settleRefreshedFocus(recorded, SELECTION, shiftedBody(2), now + 30_000, null);
-  assert.equal(moved.rides.length, 0, 'documented: the timetable overrules the fix that already arrived');
+  assert.equal(moved.rides.length, 0, 'without a fix the arrival still ahead is not evidence of arrival');
   const withFix = settleRefreshedFocus(recorded, SELECTION, shiftedBody(2), now + 30_000, AT_BONDI);
   assert.equal(withFix.rides.length, 1, 'with the fix still valid the row is re-recorded');
   assert.equal(Date.parse(withFix.rides[0].arrivedAt), ARRIVAL + 2 * 60_000);
 });
 
-test('plan text: a recorded ride takes a refreshed arrival that moved EARLIER but is still past', { todo: 'builder guards on later-only; owner ruling' }, () => {
+test('a recorded ride takes a refreshed arrival that moved earlier but is still past', () => {
   const now = ARRIVAL + 5 * 60_000;
   const recorded = settleRide(docWithFocus(), now);
   const earlier = settleRefreshedFocus(recorded, SELECTION, shiftedBody(-2), now);
   assert.equal(Date.parse(earlier.rides[0].arrivedAt), ARRIVAL - 2 * 60_000);
-});
-
-test('builder behaviour: an earlier-moved arrival is left on the recorded row', () => {
-  const now = ARRIVAL + 5 * 60_000;
-  const recorded = settleRide(docWithFocus(), now);
-  const earlier = settleRefreshedFocus(recorded, SELECTION, shiftedBody(-2), now);
-  assert.equal(Date.parse(earlier.rides[0].arrivedAt), ARRIVAL);
-  assert.equal(arrivalMs(earlier.focus.journey), ARRIVAL - 2 * 60_000, 'the focus itself did move');
 });
 
 test('legacy row: a ride without scheduledDeparture is matched through departedAt', () => {

@@ -140,8 +140,7 @@ export function matchJourney(journeys, snapshot) {
   return (Array.isArray(journeys) ? journeys : []).find((j) => journeyKey(j) === key) || null;
 }
 
-/** The snapshot the focus carries, replaced from a board that has this journey
-    on it. An unmatched journey keeps the snapshot it has — that is what makes
+/** An unmatched journey keeps the snapshot it has — that is what makes
     directions survive the journey's own departure. */
 export function applyFocusSnapshot(doc, selection, body) {
   const focus = focusOf(doc);
@@ -161,12 +160,7 @@ export function refreshFocus(doc, selection, body, nowMs) {
   return focusExpired(focus, nowMs) ? clearFocus(doc) : applyFocusSnapshot(doc, selection, body);
 }
 
-/**
- * The ride ledger for the focused journey, judged from the arrival the last
- * refresh left in the snapshot. A ride recorded from an arrival that has since
- * moved takes the new one, and one that has not happened yet is withdrawn:
- * an expected finish is not evidence of arrival (client-storage.md).
- */
+// Correct before judging: an expected finish is not evidence of arrival (client-storage.md).
 export function settleRide(doc, nowMs, fix = null) {
   const focus = focusOf(doc);
   const trip = focus && findTrip(doc, focus.tripId);
@@ -174,14 +168,12 @@ export function settleRide(doc, nowMs, fix = null) {
   if (!focus || !trip || arrival === null) return doc;
   const selection = { tripId: focus.tripId, direction: focus.direction };
   const ends = leg(trip, focus.direction);
-  const corrected = correctRide(doc, selection, focus.journey, nowMs);
-  return nowMs < arrival && !arrived(focus, ends.to, fix, nowMs) ? corrected
-    : recordRide(corrected, selection, focus.journey, ends.from, ends.to);
+  const hasArrived = nowMs >= arrival || arrived(focus, ends.to, fix, nowMs);
+  const corrected = correctRide(doc, selection, focus.journey, nowMs, hasArrived);
+  return hasArrived ? recordRide(corrected, selection, focus.journey, ends.from, ends.to) : corrected;
 }
 
-/** Completion is decided after the arrival evidence has had its chance to move:
-    the fresh journey is applied, the ride is settled against it, and only then
-    may the focus expire (client-storage.md, Completed rides). */
+// Apply before settling, settle before expiring (client-storage.md).
 export function settleRefreshedFocus(doc, selection, body, nowMs, fix = null) {
   const applied = applyFocusSnapshot(doc, selection, body);
   return refreshFocus(settleRide(applied, nowMs, fix), selection, body, nowMs);

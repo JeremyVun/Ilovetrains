@@ -350,10 +350,7 @@ export function recordRide(doc, selection, journey, from, to) {
   return { ...doc, rides };
 }
 
-/** A ride recorded while its journey was still live follows later evidence: it
-    takes a refreshed arrival, and is withdrawn when that arrival has not
-    happened yet (client-storage.md, Completed rides). */
-export function correctRide(doc, selection, journey, nowMs) {
+export function correctRide(doc, selection, journey, nowMs, arrived = false) {
   if (!selection || !journey) return doc;
   const departedAt = (journey.departure || {}).estimated || (journey.departure || {}).scheduled;
   const scheduledDeparture = (journey.departure || {}).scheduled || departedAt;
@@ -363,10 +360,9 @@ export function correctRide(doc, selection, journey, nowMs) {
     && ride.direction === selection.direction
     && (ride.scheduledDeparture || ride.departedAt) === scheduledDeparture);
   const moved = Date.parse(arrivedAt || '');
-  if (index < 0 || !Number.isFinite(moved) || moved <= Date.parse(rides[index].arrivedAt)) return doc;
-  return moved > nowMs
-    ? { ...doc, rides: rides.filter((_, i) => i !== index) }
-    : { ...doc, rides: rides.map((ride, i) => (i === index ? { ...ride, arrivedAt } : ride)) };
+  if (index < 0 || !Number.isFinite(moved) || moved === Date.parse(rides[index].arrivedAt)) return doc;
+  if (arrived) return { ...doc, rides: rides.map((ride, i) => (i === index ? { ...ride, arrivedAt } : ride)) };
+  return moved > nowMs ? { ...doc, rides: rides.filter((_, i) => i !== index) } : doc;
 }
 
 export function updateStop(doc, stop) {

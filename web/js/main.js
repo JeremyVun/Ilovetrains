@@ -1132,6 +1132,7 @@ async function refreshFollowed() {
     renderCurrent();
   } catch (_) {
     if (!controller.signal.aborted && focusInflight === controller) {
+      ctx.update(settleFocusRide(state.doc));
       state.focusOffline = true;
       renderCurrent();
     }
@@ -1167,7 +1168,7 @@ async function fetchLive({ independent = false } = {}) {
     state.body = eligible;
     state.serverStale = serverStale;
     state.offline = false;
-    ctx.update(settleFocusRide(putCache(state.doc, key, body, now(), { serverStale })));
+    ctx.update(putCache(state.doc, key, body, now(), { serverStale }));
     noteLastOpen();
     if (state.journey) state.journey = matchJourney(eligible.journeys, state.journey) || state.journey;
   } catch (error) {
