@@ -181,18 +181,23 @@ for one of the five source names:
 
 Trip status is `scheduled`, `added`, `unscheduled`, `cancelled` or
 `replacement`. Stop relationship is `scheduled`, `skipped`, `noData` or
-`unscheduled`. Optional fields are omitted rather than sent as guessed values.
-The backend omits invalid or duplicate `(tripId,serviceDate)` updates; a
-missing service date is resolved as described under "Sydney Trains service
-dates" or the update is dropped. An
-explicit trip timestamp is accepted only from header minus 90 seconds through
-header plus 5 seconds; an absent timestamp inherits header freshness.
-Byte-identical upstream responses preserve the
-previous `generatedAt` and strong ETag.
+`unscheduled`. Optional fields are omitted rather than sent as guessed
+values. The backend omits invalid or duplicate `(tripId,serviceDate)`
+updates; a missing service date is resolved as described under "Sydney
+Trains service dates" or the update is dropped. No trip timestamp is
+accepted more than 5 seconds ahead of the header. Below that ceiling a
+`cancelled`, `replacement`, `added` or `unscheduled` update is accepted at
+any age the snapshot holds, because that truth lasts its service day, while
+a `scheduled` delay prediction is accepted only back to 10 minutes before
+the header and is otherwise dropped and counted. An absent timestamp
+inherits header freshness, and an accepted one reaches clients unchanged.
+Byte-identical upstream responses preserve the previous `generatedAt` and
+strong ETag.
 
 Clients use conditional requests and treat `X-Data-Stale: true` or an expired
 snapshot as scheduled-only. Snapshot expiry is the source header timestamp
-plus 90 seconds. A connection joins only on exact source, trip ID and service
+plus 90 seconds. The server polls every upstream feed once a minute, so a
+published snapshot is still fresh when its replacement lands. A connection joins only on exact source, trip ID and service
 date, then stop ID and/or sequence. Assigned stop IDs are resolved through the
 same source's stop table. `noData` suppresses a stop estimate and the trip
 default delay; `skipped` prevents boarding or alighting. A replacement trip
