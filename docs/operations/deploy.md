@@ -93,35 +93,24 @@ Browsers refresh on foreground and every 30 seconds; a failed browser fetch
 turns the feature off. Evaluation uses fixed context `ilovetrains`, with no
 personal attributes. Read attribution is `svc:ilovetrains` / `ilovetrains-api`.
 
-The owner confirmed creation of the `ilovetrains` project and both `tiny_train`
-and `transfer_limit` flags on 2026-09-08. The transfer-limit implementation is
-being integrated separately; its flagsd key is `transfer_limit`.
-The owner staged `FLAGS_KEY` in the infra stack's `secrets.env` on 2026-09-08.
-The prepared Compose configuration supplies the runtime settings above and
-joins `shared-flags`. The flags stack creates that named network; deploy it
-before ilovetrains. The app joins it as an external network.
-The owner sealed and pushed the infra configuration in commit `1e2f564`.
-Version `1.3.0` (source `6182609`, service worker `v46`) deployed on 2026-09-08,
-with flags first, then ilovetrains. Both deployctl jobs succeeded. Image digest:
-`sha256:fbbd7587e6c4f9d8895090113ca7403a8a6dd928ced8782b46d96ac5f0e49dae`.
-Production health, version, shell assets and Android download passed HTTP checks;
-`GET /api/v1/flags` returned `{"tiny_train":false}` with `Cache-Control: no-store`.
-Production Chromium checks passed on fresh and returning profiles: service worker
-`v46` installed and controlled the return visit, real departures and Home/Settings
-navigation worked, and `?tinyTrain=1` could not enable the production feature.
-Live on/off changes, private visibility and deletion passed against a local
-flagsd protocol fixture.
-An owner-authorized read-only container probe found that `production` returned
-404 while `prod` evaluated `tiny_train` to true with reason `FALLTHROUGH`.
-Infra commit `58f5a36` corrects `FLAGS_ENV` to `prod`, using the existing read key.
-Redeploy job `cda2a822d26bcf7506cbf641afc250b5` succeeded; the production endpoint
-then returned `{"tiny_train":true}` with `Cache-Control: no-store` and health
-remained 200. This verifies the real flagsd-to-app path for the enabled flag.
-The returning production browser then displayed the 44px divider control at
-the plain app URL; clicks created three, then four carriages with Home layout
-and service-worker control intact.
-No `.env` files were read or credentials printed; the probe used the container's
-existing process environment.
+The owner created both public flags and supplied the sealed read key. The
+transfer-limit implementation is being integrated separately; its flagsd key
+is `transfer_limit`. The flags stack creates `shared-flags`; ilovetrains joins
+it externally. Deploy flags first if that network does not yet exist.
+
+Production configuration is committed in infra `58f5a36`. An owner-authorized
+read-only container probe verified the actual environment key `prod` and a true
+`tiny_train` evaluation (`FALLTHROUGH`). No `.env` files were read or credentials
+printed; the probe used the container's existing process environment.
+
+Version `1.3.1` (source `e4f25d2`, service worker `v47`) deployed on 2026-09-08
+in job `a887f8acc7f488f53f1f22a0def04090`. Image digest:
+`sha256:fce592e8a9a92b6870d3603e969655add807491e813f68fdc64233ae27809898`.
+Production health, version and shell bytes passed HTTP checks, and the public
+endpoint returned `{"tiny_train":true}`. All 342 web tests, the signed Android
+release build and the four size/scheme interaction checks passed. Seven affected
+Home regression frames matched; no baseline changed. The train starts with six
+cars on the coloured trip line; activating it leaves the line and divider fixed.
 
 ## Verify
 
