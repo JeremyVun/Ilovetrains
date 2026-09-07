@@ -22,7 +22,10 @@ This file records deliberate differences between the native Android app and the 
 - Offline boards retain departed services and last-known delays; the shared native retention rules are in [native-data.md](native-data.md#cached-boards-and-departed-services). `LAST KNOWN` distinguishes retained estimates from fresh observations. No stale countdown or travelling-direction figure is presented as live.
 
 Current native exemplars are `assets/comps/latest/android-settings-390x844.png`
-and its `-light` variant, `android-home-390x844-now.png`,
+and its `-light` variant, the flag-on
+`android-settings-390x844-transfer-limit.png` (capped, dark) and
+`android-settings-390x844-transfer-limit-light.png` (uncapped, light),
+`android-home-390x844-now.png`,
 `android-board-390x844-now.png`, the Home/Board
 `-390x844-offline-retained-t9.png` frames, and the swipe-to-delete pair
 `android-home-390x844-deleting.png` (row dragged past the threshold) and

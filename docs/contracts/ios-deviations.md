@@ -69,6 +69,9 @@ The shared behavior remains defined by [ui.md](ui.md),
 
 Current Settings exemplars are `assets/comps/latest/ios-settings.png` and
 `ios-settings-light.png`, reproduced with `tools/shoot-ios.sh settings
-settings-light`. The additional `settings-off`, `settings-blocked` and
+settings-light`. With the flag on they are `ios-settings-transfer-limit.png`,
+`ios-settings-transfer-limit-no-limit.png` and
+`ios-settings-transfer-limit-light.png`, from the calibration states of the
+same names. The additional `settings-off`, `settings-blocked` and
 `settings-on` calibration states (and their `-light` variants) exercise every
 location-row action.
