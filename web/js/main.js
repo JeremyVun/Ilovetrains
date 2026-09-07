@@ -17,6 +17,8 @@ import * as Board from './board.js';
 import { clampJourneyBars } from './journeybar.js';
 import * as Detail from './detail.js';
 import * as Home from './home.js';
+import { tinyTrainPreview, fetchTinyTrain } from './feature-flags.js';
+import { attachTinyTrain } from './tiny-train.js';
 import { renderSetup } from './setup.js';
 import { getDepartures, getStops } from './api.js';
 import { onAction } from './dom.js';
@@ -47,6 +49,35 @@ function localStore() {
 
 const storage = localStore();
 const documentStore = storage || { getItem: () => null, setItem: () => {} };
+const trainPreview = tinyTrainPreview(location.hostname, location.search, storage);
+let tinyTrain = trainPreview ?? false;
+let flagsRequest = null;
+let trainRule = null;
+let removeTrain = null;
+
+function clearTrain() {
+  removeTrain?.();
+  removeTrain = null;
+  trainRule = null;
+}
+
+async function refreshFeatureFlags() {
+  if (trainPreview !== null || flagsRequest || document.hidden) return;
+  const request = new AbortController();
+  flagsRequest = request;
+  const timeout = setTimeout(() => request.abort(), 3000);
+  const enabled = await fetchTinyTrain(fetch, request.signal);
+  clearTimeout(timeout);
+  if (flagsRequest !== request) return;
+  flagsRequest = null;
+  if (enabled === tinyTrain) return;
+  tinyTrain = enabled;
+  if (!enabled) clearTrain();
+  if (state.view === 'home') {
+    painted.home = null;
+    renderHome();
+  }
+}
 
 const state = {
   doc: loadDoc(documentStore),
@@ -159,6 +190,7 @@ function patchFresh(node, text) {
 }
 
 function freshRoot() {
+  clearTrain();
   const old = document.getElementById('app');
   const element = document.createElement('div');
   element.id = 'app';
@@ -680,6 +712,7 @@ function homeFreshness(model, serverStale = false) {
 function renderHome() {
   if (state.view !== 'home') return;
   if (!state.selection) {
+    clearTrain();
     const html = Home.emptyServicesHtml(enabledModes());
     if (html !== painted.home) { state.root.innerHTML = html; painted.home = html; }
     lastHome = null;
@@ -724,11 +757,23 @@ function renderHome() {
   if (html !== painted.home) {
     const list = state.root.querySelector('[data-t="trip-list"]');
     const scrollTop = list ? list.scrollTop : 0;
+    const trainFocus = trainRule?.contains(document.activeElement) ? document.activeElement : null;
     state.root.innerHTML = html;
     painted.home = html;
+    if (tinyTrain) {
+      const rule = state.root.querySelector('.hm-rule');
+      if (trainRule && rule) rule.replaceWith(trainRule);
+      else if (rule) {
+        trainRule = rule;
+        removeTrain = attachTinyTrain(rule);
+      }
+      // The same node keeps its passing train through live header updates.
+      trainFocus?.focus({ preventScroll: true });
+    }
     const nextList = state.root.querySelector('[data-t="trip-list"]');
     if (nextList) nextList.scrollTop = scrollTop;
     Home.finishHomeRender(state.root);
+    removeTrain?.refresh?.();
   }
   patchFresh(state.root.querySelector('.hm-fresh .lbl'), freshness);
 }
@@ -1249,7 +1294,12 @@ function renderCurrent() {
 function startTimers(recordBoardView) {
   stopTimers();
   timers.tick = setInterval(renderCurrent, TICK_MS);
-  timers.refresh = setInterval(() => { if (!document.hidden) fetchLive({ independent: true }); }, REFRESH_MS);
+  timers.refresh = setInterval(() => {
+    if (!document.hidden) {
+      fetchLive({ independent: true });
+      refreshFeatureFlags();
+    }
+  }, REFRESH_MS);
   if (recordBoardView) timers.view = setTimeout(qualifyView, VIEW_QUALIFIES_MS);
 }
 
@@ -1287,7 +1337,13 @@ async function backfillCoordinates() {
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { stopTimers(); return; }
+  if (document.hidden) {
+    stopTimers();
+    flagsRequest?.abort();
+    flagsRequest = null;
+    return;
+  }
+  refreshFeatureFlags();
   if (!onLiveView() && state.view !== 'settings') return;
   suppressPreferenceEvents = false;
   if (state.view === 'home') {
@@ -1341,3 +1397,4 @@ if (location.hostname === 'localhost') {
 }
 
 route();
+refreshFeatureFlags();

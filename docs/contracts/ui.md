@@ -50,6 +50,33 @@ All interactive rows and controls have a tap target of at least 44 logical
 pixels. Back navigation is explicit; labels such as `EDIT` or `DONE` are not
 substitutes for going back.
 
+## Tiny train preview
+
+The web/PWA has an off-by-default Easter egg, approved for a flagged build on
+2026-09-07. Production is gated by the evaluated public flag `tiny_train`.
+On a local development server only, the browser opts in with `/?tinyTrain=1`
+and out with `/?tinyTrain=0`; persistence is defined in
+[client-storage.md](client-storage.md#local-preview-flags).
+Android and iOS do not include this preview.
+
+On Home, activating the heavy divider beneath the smart header sends a tiny
+double-decker across it. A pass starts with three carriages; activating it
+again during the pass adds a carriage, up to 64 per pass. The drawing has a yellow nose, two rows
+of windows and warm windows in dark appearance. It is silent and never starts
+automatically. The initial pass lasts about two seconds; added carriages extend
+it at the same speed. Reduced motion shows a stationary train for 650ms instead.
+
+The divider's accessible control supports touch, Enter and Space with a
+visible keyboard focus indicator. It preserves surrounding layout and leaves
+departure information and journey actions unobstructed. The train uses the
+blank band above My trips, temporarily placing its track at the bottom of that
+band; when a correction strip sits below the header, the toy sits below that
+strip too. Scrolling My trips away hides its tap target and ends the pass, so
+the target cannot cover a saved-trip row. No game state is saved, and no event
+is sent. Home redraws preserve a passing train; leaving Home, hiding the page
+or disabling the flag ends it. When the flag is off, the divider remains unchanged
+and has no toy control or animation work.
+
 ## Web runtime and performance
 
 - The web client is a static, dependency-free ES-module PWA with no build

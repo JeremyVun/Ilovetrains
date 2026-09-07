@@ -381,6 +381,24 @@ freshness once it has a service date, explicit or resolved as described in
 upstream body preserves the previous `generatedAt` and ETag even if the
 upstream answers `200` instead of `304`.
 
+## GET /api/v1/flags
+
+Returns only supported, evaluated public flag values, with `Cache-Control:
+no-store`. The current response is `{"tiny_train":false}` unless a
+configured public-values provider evaluates that boolean to true. Missing,
+private, invalid or uninitialized values leave the feature off. No raw rules,
+targets, rollout configuration, service credentials or unknown flags appear in
+this response. One Go SDK client filters definitions by `public` and evaluates
+against a single snapshot before returning values through `api.WithPublicFlags`.
+It syncs through the internal flagsd stream without blocking server startup.
+After initial sync it keeps the last valid in-memory snapshot through service
+outages; a restarted process defaults off until its first sync.
+
+Evaluation is global to the app, with no request identity, saved state,
+location or other personal context. The service worker uses network-only
+delivery, and browsers retain no response across launches. Runtime configuration
+and production provisioning are tracked in [deployment operations](../operations/deploy.md#feature-flags).
+
 ## GET /healthz
 
 `200 {"ok": true}`. `Cache-Control: no-store`. For deploy checks only, not

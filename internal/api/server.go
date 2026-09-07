@@ -95,12 +95,20 @@ type Server struct {
 	loc            *time.Location
 	now            func() time.Time
 	native         *native.Service
+	publicFlags    func() map[string]any
 }
 
 type Option func(*Server)
 
 func WithNative(service *native.Service) Option {
 	return func(server *Server) { server.native = service }
+}
+
+// WithPublicFlags accepts locally evaluated values from the server-side SDK.
+// The provider must filter by the definition's public metadata before returning.
+// No request identity or personal client state participates in evaluation.
+func WithPublicFlags(values func() map[string]any) Option {
+	return func(server *Server) { server.publicFlags = values }
 }
 
 // New returns a server serving the API plus, if webDir exists, the static
@@ -129,6 +137,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/departures", s.handleDepartures)
 	mux.HandleFunc("GET /api/v1/stops", s.handleStops)
+	mux.HandleFunc("GET /api/v1/flags", s.handleFlags)
 	if s.native != nil {
 		mux.HandleFunc("GET /api/v1/timetable/manifest", s.handleTimetableManifest)
 		mux.HandleFunc("GET /api/v1/timetable/packages/{package}", s.handleTimetablePackage)

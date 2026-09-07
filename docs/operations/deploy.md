@@ -54,6 +54,56 @@ generation; the bundled bootstrap serves a new volume immediately.
    Build the deploy client with `make build` in that repository if required,
    or set `DEPLOYCTL_BIN=agent/deployctl/deployctl`.
 
+## Feature flags
+
+Flag inventory:
+
+| Key | Type | Public | Owner | Default | Removal condition |
+| --- | --- | --- | --- | --- | --- |
+| `tiny_train` | boolean | yes | Jeremy | off | Remove after the owner accepts or retires the Easter egg |
+
+Target project/environment: `ilovetrains` / `production`. Definition description:
+`Play the tiny train Easter egg beneath the Home header.` Boolean variations
+are `off=false` and `on=true`; initial environment config is disabled with
+`off_variation=off`, empty targets/rules and `fallthrough.variation=on`.
+This is a global UX switch, with no per-device targeting or percentage rollout.
+
+The browser boundary is `GET /api/v1/flags`. The local-only `?tinyTrain=1`
+preview cannot override production. The server uses one shared Go SDK client,
+streaming internal snapshots and evaluating only public definitions locally.
+Keys and raw rules never enter the web bundle. The owner approved vendoring
+on 2026-09-08; the pinned SDK, unchanged evaluator and additive public accessor
+are documented in [third_party/flags](../../third_party/flags/README.md).
+
+Runtime configuration:
+
+| Variable | Value |
+| --- | --- |
+| `FLAGS_URL` | Internal flagsd base URL; unset leaves the feature off |
+| `FLAGS_KEY` | Read-only key scoped to this project and environment; required with `FLAGS_URL` |
+| `FLAGS_PROJECT` | Defaults to `ilovetrains` |
+| `FLAGS_ENV` | Defaults to `production` |
+
+Boot never waits for flagsd. With no disk cache, each process starts off until
+its first snapshot. Once synced, the SDK retains the last valid snapshot in
+memory through a flagsd outage; a kill switch update needs a working stream.
+Browsers refresh on foreground and every 30 seconds; a failed browser fetch
+turns the feature off. Evaluation uses fixed context `ilovetrains`, with no
+personal attributes. Read attribution is `svc:ilovetrains` / `ilovetrains-api`.
+
+The owner confirmed creation of the `ilovetrains` project and both `tiny_train`
+and `transfer_limit` flags on 2026-09-08. The transfer-limit implementation is
+being integrated separately; its flagsd key is `transfer_limit`.
+The owner staged `FLAGS_KEY` in the infra stack's `secrets.env` on 2026-09-08.
+The prepared Compose configuration supplies the runtime settings above and
+joins `shared-flags`. The flags stack creates that named network; deploy it
+before ilovetrains. The app joins it as an external network.
+The owner sealed and pushed the infra configuration in commit `1e2f564`.
+**Deployment remains pending:** publish the app image, then deploy flags
+followed by ilovetrains.
+No production credentials were read during implementation. This integration has
+been verified with a local flagsd protocol fixture, not the production service.
+
 ## Verify
 
 Check https://ilovetrains.jeremyvun.com/healthz and drive the affected flow on

@@ -15,6 +15,10 @@
 //	MAX_CONNECTION_TIME longest planned transfer offered while a later
 //	                    departure arrives sooner than that wait ends,
 //	                    default 60m (Go duration)
+//	FLAGS_URL      optional internal flagsd base URL; unset leaves flags off
+//	FLAGS_KEY      read-only SDK key; required when FLAGS_URL is set
+//	FLAGS_PROJECT  flagsd project, default ilovetrains
+//	FLAGS_ENV      flagsd environment, default production
 package main
 
 import (
@@ -76,6 +80,11 @@ func run() error {
 	}
 
 	webDir := envOr("WEB_DIR", "./web")
+	publicFlags, closeFlags, err := publicFlagsFromEnv(os.Getenv)
+	if err != nil {
+		return err
+	}
+	defer closeFlags()
 	addr := net.JoinHostPort("", envOr("PORT", "8080"))
 	feedClient, err := native.NewHTTPFeedClient(apiKey, os.Getenv("TFNSW_FEED_BASE_URL"), nil)
 	if err != nil {
@@ -97,7 +106,7 @@ func run() error {
 
 	server := &http.Server{
 		Addr:              addr,
-		Handler:           withAccessLog(api.New(client, webDir, api.WithNative(nativeService)).Handler()),
+		Handler:           withAccessLog(api.New(client, webDir, api.WithNative(nativeService), api.WithPublicFlags(publicFlags)).Handler()),
 		ReadHeaderTimeout: readHeaderTimeout,
 		WriteTimeout:      writeTimeout,
 		IdleTimeout:       idleTimeout,
