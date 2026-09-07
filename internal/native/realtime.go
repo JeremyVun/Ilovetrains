@@ -134,8 +134,7 @@ func NormalizeRealtime(source string, body []byte, receivedAt time.Time, dates *
 	return snapshot, representation, counts, err
 }
 
-// A cancellation, replacement, addition or unscheduled run stays true for the rest of its
-// service day; only a delay prediction decays.
+// Structural changes hold for the service day; only delay predictions decay.
 func usableObservation(status string, timestamp, header time.Time) bool {
 	if timestamp.After(header.Add(timestampSkewAhead)) {
 		return false

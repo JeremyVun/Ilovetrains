@@ -72,9 +72,6 @@ func main() {
 				}
 				if u.Timestamp != nil && u.GetTimestamp() != 0 {
 					age := int64(feed.GetHeader().GetTimestamp()) - int64(u.GetTimestamp())
-					if age > 90 {
-						counts["tripTimestampOlderThan90s"]++
-					}
 					if age > 600 && u.GetTrip().GetScheduleRelationship() == gtfs.TripDescriptor_SCHEDULED {
 						counts["scheduledOlderThan10m"]++
 					}

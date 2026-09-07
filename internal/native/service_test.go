@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -13,19 +12,14 @@ import (
 )
 
 type recordingLog struct {
-	mu    sync.Mutex
 	lines []string
 }
 
 func (r *recordingLog) logf(format string, args ...any) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.lines = append(r.lines, fmt.Sprintf(format, args...))
 }
 
 func (r *recordingLog) matching(prefix string) []string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	var found []string
 	for _, line := range r.lines {
 		if strings.HasPrefix(line, prefix) {
@@ -75,7 +69,7 @@ func TestRefreshWarnsWhenNothingSurvives(t *testing.T) {
 	if err := service.refreshSource(context.Background(), "sydneytrains"); err != nil {
 		t.Fatal(err)
 	}
-	want := "realtime warning source=sydneytrains published nothing from 3 updates: unknown=3 ambiguous=0 stale=0 duplicate=0"
+	want := "realtime warning source=sydneytrains published nothing from 3 updates"
 	if lines := logger.matching("realtime warning"); len(lines) != 1 || lines[0] != want {
 		t.Fatalf("warning lines = %v, want %q", lines, want)
 	}
@@ -101,7 +95,7 @@ func TestNotModifiedRefreshLogsNothing(t *testing.T) {
 	}
 }
 
-func TestFeedPollCadenceOutlivesNoSnapshot(t *testing.T) {
+func TestFeedPollIntervalIsInsideSnapshotLifetime(t *testing.T) {
 	service, err := NewService(Config{Fetcher: &fakeFetcher{}, DataDir: t.TempDir()})
 	if err != nil {
 		t.Fatal(err)

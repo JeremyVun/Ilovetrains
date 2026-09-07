@@ -162,18 +162,15 @@ func (s *Service) refreshSource(ctx context.Context, source string) error {
 	result, err := s.fetcher.FetchRealtime(ctx, source, condition)
 	var data *RealtimeData
 	var counts RealtimeCounts
-	var headerAge time.Duration
-	normalized := false
 	if err == nil && !result.NotModified {
 		sourceHash := sha256.Sum256(result.Body)
 		if !hasHash || sourceHash != previousHash {
-			receivedAt := s.now()
-			snapshot, representation, resolution, normalizeErr := NormalizeRealtime(source, result.Body, receivedAt, s.timetable.serviceDates())
+			snapshot, representation, resolution, normalizeErr := NormalizeRealtime(source, result.Body, s.now(), s.timetable.serviceDates())
 			if normalizeErr != nil {
 				err = normalizeErr
 			} else {
 				data = &RealtimeData{Snapshot: snapshot, Representation: representation}
-				counts, headerAge, normalized = resolution, receivedAt.Sub(snapshot.HeaderTimestamp), true
+				counts = resolution
 			}
 		}
 	}
@@ -201,8 +198,8 @@ func (s *Service) refreshSource(ctx context.Context, source string) error {
 	state.flight = nil
 	close(flight)
 	state.mu.Unlock()
-	if err == nil && normalized {
-		s.logCounts(source, counts, headerAge)
+	if err == nil && data != nil {
+		s.logCounts(source, counts, data.Snapshot.GeneratedAt.Sub(data.Snapshot.HeaderTimestamp))
 	}
 	return err
 }
@@ -215,7 +212,6 @@ func (s *Service) logCounts(source string, counts RealtimeCounts, headerAge time
 		source, counts.Raw, counts.Accepted, counts.Unknown, counts.Ambiguous, counts.Stale, counts.Duplicate,
 		headerAge.Round(time.Second))
 	if counts.Raw > 0 && counts.Accepted == 0 {
-		s.logf("realtime warning source=%s published nothing from %d updates: unknown=%d ambiguous=%d stale=%d duplicate=%d",
-			source, counts.Raw, counts.Unknown, counts.Ambiguous, counts.Stale, counts.Duplicate)
+		s.logf("realtime warning source=%s published nothing from %d updates", source, counts.Raw)
 	}
 }

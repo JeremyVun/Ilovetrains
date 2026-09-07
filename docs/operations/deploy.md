@@ -80,15 +80,11 @@ realtime source=sydneytrains raw=308 accepted=129 unknown=159 ambiguous=0 stale=
 
 `grep "realtime source="` shows every source's last count; alert on
 `realtime warning`, which is emitted whenever a non-empty feed publishes
-nothing. Sydney Trains warns until the daily timetable refresh rewrites
-`/data/current.json`: a manifest compiled before this release carries no
-trip index, so no Sydney Trains service date resolves and its accepted count
-stays at zero; the startup line `native timetable: manifest declares no trip
-index` names the same cause. The other four sources are unaffected, and the
-warning stops by itself once the refreshed manifest lands. A source logs
-nothing when upstream answers 304 or returns a byte-identical feed, because
-nothing new was published; its snapshot still ages out through
-`X-Data-Stale`.
+nothing. A `/data/current.json` compiled without a trip index makes Sydney
+Trains warn (and log `native timetable: manifest declares no trip index` at
+startup) until the next daily timetable refresh rewrites it. A source logs
+nothing when upstream answers 304 or returns a byte-identical feed; its
+snapshot still ages out through `X-Data-Stale`.
 
 Check static response headers too: `/js/main.js` and `/sw.js` must retain
 `Cache-Control: no-store` through the edge. A cold profile must load the app
