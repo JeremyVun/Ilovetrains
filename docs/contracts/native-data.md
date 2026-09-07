@@ -194,16 +194,17 @@ inherits header freshness, and an accepted one reaches clients unchanged.
 Byte-identical upstream responses preserve the previous `generatedAt` and
 strong ETag.
 
-Clients use conditional requests and treat `X-Data-Stale: true` or an expired
-snapshot as scheduled-only. Snapshot expiry is the source header timestamp
-plus 90 seconds. The server polls every upstream feed once a minute, so a
-published snapshot is still fresh when its replacement lands. A connection joins only on exact source, trip ID and service
-date, then stop ID and/or sequence. Assigned stop IDs are resolved through the
-same source's stop table. `noData` suppresses a stop estimate and the trip
-default delay; `skipped` prevents boarding or alighting. A replacement trip
-uses only static connections whose two stops remain explicitly present in its
-update. Added or unscheduled trips without a static stop pattern cannot be
-routed locally and remain the online fallback's responsibility.
+Clients use conditional requests and treat `X-Data-Stale: true` or an
+expired snapshot as scheduled-only. Snapshot expiry is the source header
+timestamp plus 90 seconds. The server polls every upstream feed once a
+minute, so a published snapshot is still fresh when its replacement lands. A
+connection joins only on exact source, trip ID and service date, then stop
+ID and/or sequence. Assigned stop IDs are resolved through the same source's
+stop table. `noData` suppresses a stop estimate and the trip default delay;
+`skipped` prevents boarding or alighting. A replacement trip uses only
+static connections whose two stops remain explicitly present in its update.
+Added or unscheduled trips without a static stop pattern cannot be routed
+locally and remain the online fallback's responsibility.
 
 Fresh delays, assignments and cancellations are applied before routing, so a
 broken transfer causes a local replan. A focused journey is refreshed by its
@@ -257,15 +258,16 @@ Sydney time plus the trip's first departure, so GTFS times past 24:00 fall on
 the following morning and daylight saving is applied by the zone rather than by
 arithmetic.
 
-When the update carries any absolute arrival or departure time, the earliest of
-them chooses the candidate whose instance start is within three hours of it.
-When no candidate is that close, and whenever the update carries no absolute
-time at all, the header time chooses the nearest instance start from
-twenty-four hours before it to three hours after it. Sydney Trains publishes
-nothing more than an hour ahead, so the short look-ahead keeps an evening
-republish of a morning cancellation on the day that morning ran. Two candidates the same distance away, or
-none inside the window, is *ambiguous*; a trip ID the index does not hold is
-*unknown*. Both are dropped and counted, never guessed.
+When the update carries any absolute arrival or departure time, the earliest
+of them chooses the candidate whose instance start is within three hours of
+it. When no candidate is that close, and whenever the update carries no
+absolute time at all, the header time chooses the nearest instance start
+from twenty-four hours before it to three hours after it. Sydney Trains
+publishes nothing more than an hour ahead, so the short look-ahead keeps an
+evening republish of a morning cancellation on the day that morning ran. Two
+candidates the same distance away, or none inside the window, is
+*ambiguous*; a trip ID the index does not hold is *unknown*. Both are
+dropped and counted, never guessed.
 Duplicate detection uses the resolved `(tripId, serviceDate)`, and the resolved
 date is the one clients join on, so no client behaviour changes.
 
