@@ -102,7 +102,11 @@ const SCREENS = [
   ['setup', 'setup-origin', 'setup', 'setup'],
   ['settings', 'settings:settings-390x844.png', 'settings', 'settings'],
   ['settings-light', 'settings:settings-390x844-light.png', 'settings-light', 'settings-light'],
-  ['settings-412', 'settings:settings-412x732.png', null, null]
+  ['settings-412', 'settings:settings-412x732.png', null, null],
+  ['settings-transfer-limit', 'settings:settings-390x844-transfer-limit.png', 'settings-transfer-limit', 'settings-transfer-limit'],
+  ['settings-transfer-limit-any', 'settings:settings-390x844-transfer-limit-any.png', null, 'settings-transfer-limit-no-limit'],
+  ['settings-transfer-limit-light', 'settings:settings-390x844-transfer-limit-light.png', 'settings-transfer-limit-light', 'settings-transfer-limit-light'],
+  ['settings-transfer-limit-412', 'settings:settings-412x732-transfer-limit.png', null, null]
 ].map(([screen, web, android, ios]) => ({ screen, web, android, ios }));
 
 const MASKS = { ios: [{ top: 190 }, { bottom: 60 }] };

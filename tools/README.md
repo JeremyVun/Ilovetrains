@@ -140,8 +140,9 @@ assertion reads the canonical `web/js/version.js` rather than a fixed string.
 
 The checker first fetches `/js/settings.js` and refuses to run if that server
 is not serving the Settings module. Keep the server alive for the whole run.
-The four initial browser drives run in parallel on `CDP_PORT` through
-`CDP_PORT+3`, and later drives reuse the first port sequentially. Each
+Its parallel batches — the four Settings viewport drives, then the four
+flag-on transfer-limit drives — run on `CDP_PORT` through `CDP_PORT+3`, and
+later drives reuse the first port sequentially. Each
 calibration filename has one writer so later assertion-only cases cannot
 overwrite the reviewed state.
 
@@ -233,7 +234,8 @@ Traps:
   `localhost:<free port>` itself, and every drive takes a private `CDP_PORT`.
 - The Settings frames come from `check-settings-browser.js`, which asserts as
   it drives; when any of its assertions fails (a version string that no longer
-  matches, say), all four Settings frames report `MISSING` with the message.
+  matches, say), every Settings frame reports `MISSING` with the message,
+  including the ones its earlier drives had already written.
 - iOS frames ignore the top 190 and bottom 60 device px: the simulator status
   bar, whose glyphs shift one channel level between launches, and the home
   indicator, which dims a couple of seconds after launch. An app background
@@ -244,6 +246,11 @@ Traps:
   minutes, saying so, before it starts its own native drive. With several
   iPhone simulators booted it picks the one whose name the baseline manifest
   records, else it asks for `ILOVETRAINS_SIMULATOR_ID`.
+- A peer's `xcodebuild test` is not in that poll and installs its own
+  `ILoveTrains.app` on the shared simulator mid-run, so an iOS frame can be a
+  photograph of somebody else's build. Before believing an iOS `DIFF`, check
+  that your `ios/build/.../ILoveTrains.app` is newer than the peer's drive and
+  that the test log names the tests your branch added.
 - The Android drive runs only `UiCalibrationTest#captureCanonicalScreens`
   (`INSTRUMENT_CLASS` on `shoot-android.sh`); the class's other tests assert
   behaviour and are the build gate's job. The iOS drive caps the settle at two
@@ -309,6 +316,11 @@ the JSON yourself cannot make.
    first: a green sweep of somebody else's code. Pick a private port, and verify
    the served file is yours — `curl` a module and grep it for something your
    branch changed — before believing any frame.
+9. `--seed` navigates twice: once to acquire the origin, then again after
+   writing the key, so the app boots with the seeded document. A URL carrying a
+   fragment makes the second navigation same-document, the app never reloads,
+   and the shot is of an unseeded first run. Seed against the bare origin and
+   set `location.hash` from `--eval`, as `check-settings-browser.js` does.
 
 ## shoot-states.js
 
