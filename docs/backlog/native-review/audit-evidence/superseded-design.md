@@ -41,10 +41,9 @@ After seeing `comps/review-sheet.png` the owner ruled:
 1. **D1 / D2.** iOS is correct: each change names its station at the right
    place on the line and the second change's alighting pin stays hidden.
    Android aligns to iOS. The wider usability problem (several transfers
-   cannot all name their station on one line) is a separate item,
-   `docs/backlog/transfer-cap/`, opened the same day with the owner's
-   starting position: cap the maximum transfers at 2 and add a setting so
-   users can choose their own limit.
+   cannot all name their station on one line) shipped separately as the
+   transfer limit: boards cap at two changes and Settings carries the row
+   that lifts it (`docs/contracts/ui.md`, Settings).
 2. **C3.** Both platforms show the full departure label, `Wharf 4, Side A`,
    wherever that information is available as the departure platform.
 3. **Everything else.** Check how the web does it and align both platforms
@@ -231,7 +230,7 @@ Use the per-ID audit verdict and group scope instead of these remedies.
 
 ### D. Layout and visual rules
 
-- **D1 (bug, Android). Board rows collapse change names into one centred line.** `BoardRow` joins every change with " · " under the axis; the large axis positions the name column with a fixed `offset(x = maxWidth * at − 48.dp).width(96.dp)` that can start off-screen and does no collision handling. **Owner ruling 1:** iOS is correct (`JourneyAxisLayout`: each name under its dwell midpoint, clamped, wrapped, stacked on collision, with tests). Android ports that geometry. The layout of many names is `docs/backlog/transfer-cap/`.
+- **D1 (bug, Android). Board rows collapse change names into one centred line.** `BoardRow` joins every change with " · " under the axis; the large axis positions the name column with a fixed `offset(x = maxWidth * at − 48.dp).width(96.dp)` that can start off-screen and does no collision handling. **Owner ruling 1:** iOS is correct (`JourneyAxisLayout`: each name under its dwell midpoint, clamped, wrapped, stacked on collision, with tests). Android ports that geometry. Many names are avoided by the transfer limit (`docs/contracts/ui.md`, Settings).
 - **D2 (bug, Android). The second change's alighting pin is drawn on two-change results.** `JourneyAxis` draws `leg.toPlatform` for every change; iOS draws it only for the first. **Web:** `app.css` `.sy-row.two .sy-bar .sy-p.a[data-transfer-index="1"] { display: none }`. Android aligns (ruling 1).
 - **D3 (bug, Android). Tight-change warning painted on cancelled rows.** `JourneyAxis` colours the dwell by wait alone; iOS adds `!journey.cancelled`. **Web:** `rowmodel.js` `tight: change.tight && !cancelled`. Android aligns.
 - **D4 (consistency, iOS, low). `LAST KNOWN` wraps to two lines.** `BoardRow` gives the provenance label two lines and a 24 pt minimum only for `Last known`; Android keeps one line at 7 sp. The captured `board-delayed-retained` frame shows the two-line label but no visible row reflow at default text size. **Web:** no `LAST KNOWN` (native exception); the provenance slot is one reserved line. iOS keeps one line and shrinks like Android.

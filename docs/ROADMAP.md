@@ -54,8 +54,16 @@ geometric. Observations waiting on an owner ruling:
   returned a fresh snapshot with zero matched updates. See
   `docs/contracts/native-data.md#sydney-trains-realtime-coverage-gap`.
   Remaining feed questions are in `docs/backlog/timetable-realtime/design.md`.
-- No routing configuration surface. If a case seems to need one, bring it to
+- No routing configuration surface beyond the transfer limit row
+  (`docs/PROJECT.md`, principle 3). If a case seems to need one, bring it to
   the owner as a routing defect first.
+- A journey with three changes renders as shipped code renders it and has
+  never had a comps round: on a four-minute middle leg the alighting pin
+  draws over and left of the boarding pin so travel order reads wrong, the
+  Home header stacks the names on three lines, at font scale 1.3 the six
+  pins exceed the axis and the clamp cuts two numerals, and the taller row
+  shows five whole services instead of six on a 390 board. Only reachable
+  under `No limit`.
 
 ## Design system and tooling as infrastructure
 The comps loop is how the product moves and the native ports copy a design
@@ -81,14 +89,19 @@ the last and make the ports mechanical. Still to build:
 ## Native Android and iOS
 Both apps exist (`android/`, `ios/`) and lag the web by one round. Remaining:
 - **[Persistent travel tracker](backlog/persistent-travel-tracker/design.md)**
-  (owner request 2026-09-07; design/comps opened 2026-09-08): an ongoing
+  (visual design accepted 2026-09-08; [build handoff](backlog/persistent-travel-tracker/build_plan.md)):
+  an ongoing
   notification or lock-screen view, like a food-delivery status, showing the
   next change or get-off station, arrival and progress without reopening the
   app. Android system notification rendering (Live Updates where supported)
-  and iOS Live Activities. Design foreground/background lifecycle, offline
-  labelling, dismissal and journey completion before implementation; the
+  and iOS Live Activities. Accepted baseline: short prose with a quiet trip
+  line; [selected frames](../assets/comps/latest/travel-tracker/README.md).
+  Begin with native rendering/background lifecycle evidence, dismissal and
+  journey completion before product integration; the
   notification must not imply continuous GPS. Appears automatically when
-  travel mode detects travel; pin-triggered entry is an optional follow-up A/B test.
+  travel mode detects travel. Platform boxes on the line are an optional visual
+  refinement, not a build prerequisite; pin-triggered entry is a separate
+  optional follow-up A/B test.
 - Home-screen widgets, background ride detection and notifications.
   OS-rendered artifacts (icons, widgets) pass through the real renderer
   before a verdict.
@@ -102,6 +115,10 @@ Both apps exist (`android/`, `ios/`) and lag the web by one round. Remaining:
   saved-trip row's meta, beside "last ridden Friday". Count only what can
   actually be observed; a count inferred from app opens is a count of looks
   and must be named as such. Needs background ride detection first.
+- The web app reads `/api/v1/flags` twice per open: once for the transfer
+  limit (persisted, once per open) and once for the tiny train (unstored,
+  30-second poll). One read with both lifecycles would need the tiny-train
+  code reworked; an owner call.
 - General A→B trip planner.
 - Other modes: bus, light rail.
 - Metro loose ends worth a live probe when a key is at hand: the only metro
