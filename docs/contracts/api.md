@@ -371,10 +371,13 @@ realtime fields and fall back to the local schedule. Missing static matches
 and added services stay unmatched locally and trigger the native client's
 online Trip Planner fallback.
 
-An update carrying its own timestamp is omitted when that observation is more
-than 90 seconds behind the feed header or more than five seconds ahead of it.
-An update without its own timestamp inherits the header freshness only when it
-has the explicit service date required above. A repeated byte-identical
+No update is accepted with its own timestamp more than five seconds ahead of
+the feed header. Below that, a `cancelled`, `replacement`, `added` or
+`unscheduled` update is accepted at any age within the snapshot, and a
+`scheduled` update is omitted when its timestamp is more than 10 minutes
+behind the header. An update without its own timestamp inherits the header
+freshness once it has a service date, explicit or resolved as described in
+`native-data.md`. A repeated byte-identical
 upstream body preserves the previous `generatedAt` and ETag even if the
 upstream answers `200` instead of `304`.
 
