@@ -673,8 +673,9 @@ then trip ID, with a zeroed gzip header so identical inputs give identical
 bytes. Only the server reads it, to resolve realtime updates that arrive with
 no service date; it is not downloaded by any client and is not part of the
 package hash. The 6 September capture compiles 132,562 rows into 982,548
-bytes. Copy it into the runtime data directory with the manifest, or dateless
-updates stay unresolved.
+bytes. Nothing has to be copied by hand: the server's own refresh writes the
+sidecar into `packages/` beside the compiled ZIP and records it in
+`current.json`, and the checked-in bootstrap directory ships one.
 
 ## Analytics browser and production checks
 

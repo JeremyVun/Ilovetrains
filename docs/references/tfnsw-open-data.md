@@ -305,8 +305,9 @@ timetable package: the three candidate Sydney dates around the feed header,
 filtered by the trip's calendar, chosen by the update's earliest absolute stop
 time or, failing that, by proximity to the header. The rule and its windows are
 binding in [native-data.md](../contracts/native-data.md#sydney-trains-service-dates).
-Replaying the same capture publishes 69 updates where it published none, and
-drops the rest as unknown or ambiguous rather than guessing a date.
+Replaying the same capture now publishes updates where it published none, and
+drops the rest as unknown or ambiguous rather than guessing a date;
+`TestNormalizeRealtimeReplaysTheCapturedSydneyTrainsFeed` holds the counts.
 
 Two upstream properties remain observations, not guarantees: 105 of the 254
 statically matching trips are non-revenue, out-of-service or NSW

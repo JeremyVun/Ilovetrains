@@ -33,9 +33,9 @@ naming a server-only sidecar written beside it and its SHA-256. The sidecar is
 one deterministic gzipped, tab-separated row per trip in the package, holding
 its source, trip ID, first departure in seconds, service start and end dates,
 weekday mask, added dates and removed dates. The server resolves missing
-realtime service dates from it and strips the field before publishing the
-manifest above, so no client sees or downloads it and the package hash is
-unaffected. A manifest without the field, an absent sidecar, or one that fails
+realtime service dates from it and strips the field from both the published
+manifest above and the bundled client asset, so no client sees or downloads it
+and the package hash is unaffected. A manifest without the field, an absent sidecar, or one that fails
 its recorded SHA-256 leaves every dateless update unresolved and the timetable
 otherwise usable.
 
@@ -186,8 +186,8 @@ The backend omits invalid or duplicate `(tripId,serviceDate)` updates; a
 missing service date is resolved as described under "Sydney Trains service
 dates" or the update is dropped. An
 explicit trip timestamp is accepted only from header minus 90 seconds through
-header plus 5 seconds; an absent timestamp inherits header freshness only with
-an explicit valid service date. Byte-identical upstream responses preserve the
+header plus 5 seconds; an absent timestamp inherits header freshness.
+Byte-identical upstream responses preserve the
 previous `generatedAt` and strong ETag.
 
 Clients use conditional requests and treat `X-Data-Stale: true` or an expired
@@ -254,10 +254,11 @@ arithmetic.
 
 When the update carries any absolute arrival or departure time, the earliest of
 them chooses the candidate whose instance start is within three hours of it.
-Otherwise the header time chooses the nearest instance start between six hours
-before the header and twenty-four hours after it. Two candidates the same
-distance away, or none inside the window, is *ambiguous*; a trip ID the index
-does not hold is *unknown*. Both are dropped and counted, never guessed.
+When no candidate is that close, and whenever the update carries no absolute
+time at all, the header time chooses the nearest instance start within
+twenty-four hours either side of it. Two candidates the same distance away, or
+none inside the window, is *ambiguous*; a trip ID the index does not hold is
+*unknown*. Both are dropped and counted, never guessed.
 Duplicate detection uses the resolved `(tripId, serviceDate)`, and the resolved
 date is the one clients join on, so no client behaviour changes.
 
@@ -265,15 +266,12 @@ The index holds only the trips inside the published package. Non-revenue,
 out-of-service and NSW TrainLink-operated trips inside the Sydney Trains bundle
 are excluded from both, so their updates resolve to *unknown*.
 
-Replaying the reviewed capture `tools/fixtures/gtfs_realtime_sydneytrains_20260906.pb`
+`TestNormalizeRealtimeReplaysTheCapturedSydneyTrainsFeed` replays the reviewed
+capture `tools/fixtures/gtfs_realtime_sydneytrains_20260906.pb`
 (see the [source research](../references/tfnsw-open-data.md#native-sydney-trains-service-dates--closed-2026-09-07))
-against the bootstrap index resolves 109 of its 308 updates, with 159 unknown
-and 40 ambiguous. The 159 are 59 non-revenue, 54 absent from the static bundle,
-17 out of service and 29 NSW TrainLink-operated trips. Each of the 40 has
-exactly one running instance, 7 to 21 hours before the header and outside the
-six-hour window; 23 of those are cancellations carrying a current trip
-timestamp. Of the 109 resolved, 69 then pass the per-update 90-second
-trip-timestamp gate, against zero updates published before this rule existed.
+against the bootstrap index and pins how many of its updates each outcome
+takes, so a rule change that moves them is accepted deliberately rather than
+noticed in production.
 
 ## Captured package measurement
 
