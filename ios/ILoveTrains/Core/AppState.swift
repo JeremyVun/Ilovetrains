@@ -11,6 +11,7 @@ enum Screen: String, Codable, Sendable { case home, board, detail, setup, settin
 enum Appearance: String, Codable, CaseIterable, Sendable { case system, dark, light }
 enum TransferLimit: String, Codable, CaseIterable, Sendable { case two, any }
 let transferLimitFlagKey = "transferLimit"
+let tinyTrainFlagKey = "tiny_train"
 
 struct AppState {
     var ready = false
@@ -30,6 +31,7 @@ struct AppState {
     var enabledModes = allModes
     var transferLimit: TransferLimit = .two
     var flags: [String: Bool] = [:]
+    var tinyTrain = false
     var useLocation = true
     var locationGranted = false
     var locationDenied = false

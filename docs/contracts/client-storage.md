@@ -161,10 +161,10 @@ read/write atomic and migration simple):
 - `flags` is optional and holds the last `GET /api/v1/flags` answer as
   published name to boolean. Absent, malformed or non-boolean entries read as off, so a
   missing or unreachable backend can only mean the behaviour that shipped
-  before the flag existed. It is fetched once per open after the first paint,
-  never awaited before a board request, and the stored value is what that open
-  draws with. A flag is the backend's decision about this build, never about
-  this device, so it carries no identity and is not a stored preference.
+  before the flag existed. It is fetched after the first paint, never awaited
+  before a board request, and the stored value is what that open draws with.
+  A flag is the backend's decision about this build, never about this device,
+  so it carries no identity and is not a stored preference.
 - The transfer cap is `flags.transferLimit` and `preferences.transferLimit`
   together: capped means the flag is on and the choice is `two`. While capped
   the client hides every journey with more than two changes wherever it applies
@@ -243,11 +243,14 @@ read/write atomic and migration simple):
 ## Local preview flags
 
 Production uses server-evaluated public flags from `GET /api/v1/flags`, defaults
-off. The tiny train stores no flag response of its own: it reads the endpoint
-after first paint, every 30 seconds on timer-driven screens and on
-foregrounding, times out after three seconds, and a failure leaves the toy off.
-The transfer limit reads the same endpoint once per open and persists the answer
-as `flags` above, so an open with no network draws with the last answer.
+off. Every client makes one flags request per open after first paint, per return
+to the foreground and per 30-second refresh tick, shared by every flag; the web
+times out after three seconds, and a hidden document makes no request and
+cancels one in flight, so an open that starts in a background tab first asks
+when it comes forward. The transfer limit persists that answer as `flags` above,
+so an open with no network draws with the last answer. The tiny train stores no
+flag response of its own: it reads only an answer this process fetched, never
+the stored one, so it is off until one lands and a failure leaves the toy off.
 Requests send no credentials or personal context, and the service worker never
 caches or replays this endpoint.
 
@@ -260,13 +263,14 @@ If storage is unavailable, an explicit query still applies for that page's
 lifetime. Preview overrides are read at startup, so changing one requires a
 reload. Production ignores these query values and this storage key entirely.
 
-Native Home fetches the same evaluated public endpoint independently of timetable
-loading, when its journey header appears or resumes and every 30 seconds while
-visible. Flags remain in memory, default off, and require literal JSON `true`;
-failed requests disable the toy. Leaving Home or backgrounding cancels polling
-and the current animation. Native builds contain no flags SDK key or device
-context. DEBUG iOS calibration can opt in with `--tiny-train`; release builds
-ignore that argument. Toy interactions emit no analytics or API requests.
+Native clients read the same evaluated public endpoint through their view model,
+independently of timetable loading, when the app opens or resumes and every 30
+seconds while it is foreground. The toy's value stays in memory, defaults off,
+and requires literal JSON `true`; a failed request disables it. Leaving Home or
+backgrounding ends the current animation. Native builds contain no flags SDK
+key or device context. DEBUG iOS calibration can opt in with `--tiny-train`;
+release builds ignore that argument. Toy interactions emit no analytics or API
+requests.
 
 ## Analytics queue
 

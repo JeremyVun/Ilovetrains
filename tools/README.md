@@ -140,6 +140,14 @@
   flag-off pixel equality. Uses captured services and blocks API fetches. With a private static
   server serving `web/`, run `node tools/check-tiny-train.js --url
   http://localhost:8198 --out /tmp/ilovetrains-tiny-train-check`.
+- `check-flags-fetch.js` — count every `/api/v1/flags` request the real web
+  client makes per open, foreground return and 30-second tick, and check the
+  tiny train follows only an answer fetched in this process. Covers an open
+  that starts hidden, aborts on hide, the 3-second timeout, a 503 and the
+  local preview override. Its flags transport is page-local, so no API key is
+  involved. With a private static server serving `web/`, run `python3 -m
+  http.server 8198 --bind 127.0.0.1 --directory web` and then `node
+  tools/check-flags-fetch.js --url http://127.0.0.1:8198`.
 - `check-settings-browser.js` — drive Settings in real Chromium at both phone
   sizes and schemes; assert permissions, home restore, feedback, keyboard,
   mode-request races, focus refresh and target/reachability contracts. Its

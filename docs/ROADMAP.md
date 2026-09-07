@@ -115,10 +115,6 @@ Both apps exist (`android/`, `ios/`) and lag the web by one round. Remaining:
   saved-trip row's meta, beside "last ridden Friday". Count only what can
   actually be observed; a count inferred from app opens is a count of looks
   and must be named as such. Needs background ride detection first.
-- The web app reads `/api/v1/flags` twice per open: once for the transfer
-  limit (persisted, once per open) and once for the tiny train (unstored,
-  30-second poll). One read with both lifecycles would need the tiny-train
-  code reworked; an owner call.
 - General A→B trip planner.
 - Other modes: bus, light rail.
 - Metro loose ends worth a live probe when a key is at hand: the only metro

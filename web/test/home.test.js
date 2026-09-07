@@ -817,9 +817,9 @@ test('a backend flag answer refetches once, and only when it changes the cap', (
   const body = /async function loadFlags\(\) \{([\s\S]*?)\n\}/.exec(main);
 
   assert.ok(body, 'the controller still reads the flags endpoint');
-  assert.match(body[1], /try \{ flags = await getFlags\(\); \} catch \(_\) \{ return; \}/);
+  assert.match(body[1], /flags = await getFlags\(\{ signal: request\.signal \}\);/);
   assert.match(body[1], /ctx\.update\(setFlags\(state\.doc, flags\)\)/);
-  assert.match(body[1], /if \(capped\(\) === wasCapped\) return;/);
+  assert.match(body[1], /if \(capped\(\) !== wasCapped\)/);
   assert.equal(body[1].match(/refetchEligible\(\)/g).length, 1);
   assert.match(body[1], /if \(state\.view === 'settings'\) renderSettings/);
   assert.equal(main.match(/^\s*refetchEligible\(\);$/gm).length, 2,
@@ -829,6 +829,14 @@ test('a backend flag answer refetches once, and only when it changes the cap', (
   assert.match(main, /^loadFlags\(\);$/m);
   assert.equal(main.indexOf('\nloadFlags();') > main.indexOf('\nroute();'), true,
     'the first paint never waits on the flag');
+});
+
+/* One answer serves every flag: a second request per open is the defect this
+   test exists to catch. */
+test('one call site reaches the flags endpoint', () => {
+  const main = readFileSync(join(import.meta.dirname, '..', 'js', 'main.js'), 'utf8');
+  assert.equal(main.match(/getFlags\(/g).length, 1, 'exactly one call site');
+  assert.equal(main.match(/'\/api\/v1\/flags'/g), null, 'the endpoint lives in api.js alone');
 });
 
 /* The followed journey is already fetched all-mode, so the cap must not narrow

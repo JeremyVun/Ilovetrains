@@ -1,34 +1,12 @@
 import SwiftUI
 
-struct TinyTrainFlags: Decodable {
-    let tinyTrain: Bool
-    private enum CodingKeys: String, CodingKey { case tinyTrain = "tiny_train" }
-    init(from decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        tinyTrain = (try? values.decode(Bool.self, forKey: .tinyTrain)) ?? false
-    }
-}
-
-func fetchTinyTrainFlag(session: URLSession = .shared) async -> Bool {
-    var request = URLRequest(url: URL(string: "https://ilovetrains.jeremyvun.com/api/v1/flags")!,
-                             cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 3)
-    request.httpShouldHandleCookies = false
-    request.setValue("application/json", forHTTPHeaderField: "Accept")
-    request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
-    do {
-        let (data, response) = try await session.data(for: request)
-        guard (response as? HTTPURLResponse)?.statusCode == 200, data.count <= 65_536 else { return false }
-        return try JSONDecoder().decode(TinyTrainFlags.self, from: data).tinyTrain
-    } catch { return false }
-}
-
 struct TinyTrainLane: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.trainColors) private var colors
-    @State private var enabled = false
     @State private var started: Date?
     @State private var runID = 0
+    var flag = false
     var flagOverride: Bool? = nil
     var onAvailabilityChange: (Bool) -> Void = { _ in }
 
@@ -40,6 +18,8 @@ struct TinyTrainLane: View {
         #endif
         return nil
     }
+
+    private var enabled: Bool { scenePhase == .active && (flagOverride ?? previewFlag ?? flag) }
 
     var body: some View {
         ZStack {
@@ -68,28 +48,18 @@ struct TinyTrainLane: View {
             }
         }
         .frame(height: 44)
-        .task(id: scenePhase) {
-            enabled = false; started = nil
-            guard scenePhase == .active else { return }
-            while !Task.isCancelled {
-                let value: Bool
-                if let override = flagOverride ?? previewFlag { value = override }
-                else { value = await fetchTinyTrainFlag() }
-                guard !Task.isCancelled else { return }
-                enabled = value
-                if !value { started = nil }
-                do { try await Task.sleep(for: .seconds(30)) } catch { return }
-            }
-        }
         .task(id: runID) {
             guard started != nil else { return }
             do { try await Task.sleep(for: .milliseconds(reduceMotion ? 650 : 2600)) }
             catch { return }
             started = nil
         }
-        .onChange(of: enabled) { _, value in onAvailabilityChange(value) }
+        .onChange(of: enabled, initial: true) { _, value in
+            if !value { started = nil }
+            onAvailabilityChange(value)
+        }
         .onChange(of: reduceMotion) { _, _ in started = nil }
-        .onDisappear { started = nil; enabled = false; onAvailabilityChange(false) }
+        .onDisappear { started = nil; onAvailabilityChange(false) }
     }
 
     private func drawCar(_ context: inout GraphicsContext, lead: Bool) {

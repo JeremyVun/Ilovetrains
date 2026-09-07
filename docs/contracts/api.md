@@ -421,6 +421,9 @@ snapshot through service outages; a restarted process defaults off until its
 first sync, so a flag source that is down or absent can only mean today's
 behaviour, never a half-enabled one.
 
+Every client makes one flags request per open, per return to the foreground and
+per 30-second refresh tick, and every flag reads that one answer.
+
 Evaluation is global to the app, with no request identity, saved state,
 location or other personal context: a flag is on or off for everyone, and
 percentage rollouts are unsupported by design. The service worker uses

@@ -219,7 +219,7 @@ struct JourneyAxis: View {
     var large = false
     var showCap = true
     var progress: Double? = nil
-    var tinyTrain = false
+    var tinyTrain: Bool? = nil
     @State private var trainEnabled = false
     @Environment(\.trainColors) private var colors
 
@@ -243,8 +243,8 @@ struct JourneyAxis: View {
                             .layoutValue(key: AxisItemKey.self, value: .dwell(index))
                     }
                 }
-                if tinyTrain {
-                    TinyTrainLane(onAvailabilityChange: { trainEnabled = $0 }).layoutValue(key: AxisItemKey.self, value: .tinyTrain)
+                if let tinyTrain {
+                    TinyTrainLane(flag: tinyTrain, onAvailabilityChange: { trainEnabled = $0 }).layoutValue(key: AxisItemKey.self, value: .tinyTrain)
                 }
                 ForEach(Array(journey.legs.dropLast().enumerated()), id: \.offset) { index, leg in
                     let next = journey.legs[index + 1]
