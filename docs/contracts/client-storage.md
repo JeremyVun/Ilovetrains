@@ -142,13 +142,13 @@ read/write atomic and migration simple):
   management policy; native deletion is defined under "Android storage" and
   "iOS storage" above.
 - `preferences` is optional. Omitted fields preserve the existing behaviour:
-  System appearance, location enabled, no manual home and all served modes
-  enabled. `appearance` accepts only `system`, `light` and `dark`;
+  System appearance, location enabled, no manual home, all served modes
+  enabled and the transfer limit at two changes. `appearance` accepts only `system`, `light` and `dark`;
   `useLocation` accepts only a boolean; a malformed `homeOverride` drops; and
   `enabledModes` keeps only `train`, `metro` and `ferry` in that stable order.
   Missing or non-array modes means all three, while an explicit `[]` remains
   all-off. `transferLimit` accepts only `two` and `any`; anything else, or its
-  absence, reads as `two`, the cap of two changes. The schema stays version 1.
+  absence, reads as `two`. The schema stays version 1.
   The preference document never leaves the device; the selected mode allow-list
   and, while capped, the transfer limit are sent only with the stateless
   departures query they shape.
