@@ -20,7 +20,7 @@ const (
 	sydneyZone         = "Australia/Sydney"
 	stopTimeWindow     = 3 * time.Hour
 	headerWindowBefore = 24 * time.Hour
-	headerWindowAfter  = 24 * time.Hour
+	headerWindowAfter  = 3 * time.Hour
 )
 
 type dateOutcome int

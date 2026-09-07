@@ -255,8 +255,10 @@ arithmetic.
 When the update carries any absolute arrival or departure time, the earliest of
 them chooses the candidate whose instance start is within three hours of it.
 When no candidate is that close, and whenever the update carries no absolute
-time at all, the header time chooses the nearest instance start within
-twenty-four hours either side of it. Two candidates the same distance away, or
+time at all, the header time chooses the nearest instance start from
+twenty-four hours before it to three hours after it. Sydney Trains publishes
+nothing more than an hour ahead, so the short look-ahead keeps an evening
+republish of a morning cancellation on the day that morning ran. Two candidates the same distance away, or
 none inside the window, is *ambiguous*; a trip ID the index does not hold is
 *unknown*. Both are dropped and counted, never guessed.
 Duplicate detection uses the resolved `(tripId, serviceDate)`, and the resolved

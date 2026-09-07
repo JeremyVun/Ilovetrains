@@ -42,7 +42,7 @@ func TestResolveServiceDatePicksTheRunningInstance(t *testing.T) {
 		"sydneytrains\x00special": {firstDepartureSecs: 21600, startDate: 20260901, endDate: 20260902, weekdays: 0,
 			added: []int32{20260906}},
 		"sydneytrains\x00overnight": {firstDepartureSecs: 95400, startDate: 20260901, endDate: 20261031, weekdays: everyDay},
-		"sydneytrains\x00noon":      {firstDepartureSecs: 43200, startDate: 20260901, endDate: 20261031, weekdays: everyDay},
+		"sydneytrains\x00commuter":  {firstDepartureSecs: 16200, startDate: 20260901, endDate: 20261031, weekdays: 0b0011111},
 	})
 
 	cases := []struct {
@@ -62,10 +62,12 @@ func TestResolveServiceDatePicksTheRunningInstance(t *testing.T) {
 		{name: "an absolute stop time outvotes the header", trip: "morning",
 			header:   sydneyTime(t, 2026, time.September, 6, 1, 33),
 			stopTime: sydneyTime(t, 2026, time.September, 5, 7, 0), want: "20260905"},
-		{name: "the header decides when no stop time is given", trip: "morning",
-			header: sydneyTime(t, 2026, time.September, 6, 1, 33), want: "20260906"},
+		{name: "a morning trip seen after midnight ran the morning that passed", trip: "morning",
+			header: sydneyTime(t, 2026, time.September, 6, 1, 33), want: "20260905"},
 		{name: "a removed date is not a candidate", trip: "suspended",
-			header: sydneyTime(t, 2026, time.September, 6, 7, 0), want: "20260907"},
+			header: sydneyTime(t, 2026, time.September, 6, 7, 0), outcome: dateAmbiguous},
+		{name: "the same schedule without that removal is today", trip: "morning",
+			header: sydneyTime(t, 2026, time.September, 6, 7, 0), want: "20260906"},
 		{name: "an added date is a candidate outside the calendar range", trip: "special",
 			header: sydneyTime(t, 2026, time.September, 6, 5, 30), want: "20260906"},
 		{name: "daylight saving does not move the service day", trip: "overnight",
@@ -74,12 +76,12 @@ func TestResolveServiceDatePicksTheRunningInstance(t *testing.T) {
 			header: sydneyTime(t, 2026, time.September, 6, 7, 0), outcome: dateAmbiguous},
 		{name: "a stop time far from every instance falls back to the header", trip: "morning",
 			header:   sydneyTime(t, 2026, time.September, 6, 1, 33),
-			stopTime: sydneyTime(t, 2026, time.September, 6, 15, 0), want: "20260906"},
+			stopTime: sydneyTime(t, 2026, time.September, 6, 15, 0), want: "20260905"},
 		{name: "a stop time far from every instance whose header is also outside stays ambiguous", trip: "saturday",
 			header:   sydneyTime(t, 2026, time.September, 6, 7, 0),
 			stopTime: sydneyTime(t, 2026, time.September, 6, 15, 0), outcome: dateAmbiguous},
-		{name: "a trip exactly twelve hours from both neighbouring instances is ambiguous", trip: "noon",
-			header: sydneyTime(t, 2026, time.September, 6, 0, 0), outcome: dateAmbiguous},
+		{name: "an evening header cannot reach tomorrow morning's instance", trip: "commuter",
+			header: sydneyTime(t, 2026, time.September, 8, 17, 0), want: "20260908"},
 		{name: "a trip absent from the index is unknown", trip: "ghost",
 			header: sydneyTime(t, 2026, time.September, 6, 1, 33), outcome: dateUnknown},
 	}
@@ -110,11 +112,11 @@ func TestNearestInstanceRejectsAnEqualDistanceTie(t *testing.T) {
 		{date: "20260905", start: target.Add(-2 * time.Hour)},
 		{date: "20260906", start: target.Add(2 * time.Hour)},
 	}
-	if date, outcome := nearestInstance(tied, target, 6*time.Hour, 24*time.Hour); outcome != dateAmbiguous {
+	if date, outcome := nearestInstance(tied, target, headerWindowBefore, headerWindowAfter); outcome != dateAmbiguous {
 		t.Fatalf("tie resolved to %q/%d, want ambiguous", date, outcome)
 	}
 	closer := append(tied, serviceInstance{date: "20260907", start: target.Add(time.Hour)})
-	if date, outcome := nearestInstance(closer, target, 6*time.Hour, 24*time.Hour); outcome != dateResolved || date != "20260907" {
+	if date, outcome := nearestInstance(closer, target, headerWindowBefore, headerWindowAfter); outcome != dateResolved || date != "20260907" {
 		t.Fatalf("nearest = %q/%d, want 20260907", date, outcome)
 	}
 }
