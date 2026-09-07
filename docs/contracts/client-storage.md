@@ -245,11 +245,12 @@ read/write atomic and migration simple):
 Production uses server-evaluated public flags from `GET /api/v1/flags`, defaults
 off. Every client makes one flags request per open after first paint, per return
 to the foreground and per 30-second refresh tick, shared by every flag; the web
-times out after three seconds and a hidden document cancels the request in
-flight. The transfer limit persists that answer as `flags` above, so an open
-with no network draws with the last answer. The tiny train stores no flag
-response of its own: it reads only an answer this process fetched, never the
-stored one, so it is off until one lands and a failure leaves the toy off.
+times out after three seconds, and a hidden document makes no request and
+cancels one in flight, so an open that starts in a background tab first asks
+when it comes forward. The transfer limit persists that answer as `flags` above,
+so an open with no network draws with the last answer. The tiny train stores no
+flag response of its own: it reads only an answer this process fetched, never
+the stored one, so it is off until one lands and a failure leaves the toy off.
 Requests send no credentials or personal context, and the service worker never
 caches or replays this endpoint.
 
