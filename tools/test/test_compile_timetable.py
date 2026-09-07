@@ -1,3 +1,4 @@
+import gzip
 import importlib.util
 import json
 import sqlite3
@@ -83,6 +84,25 @@ class CompileTimetableTest(unittest.TestCase):
         self.assertEqual(manifest["packages"][0]["sha256"], second["sha256"])
         self.assertEqual(manifest["packages"][0]["source"], "network")
         self.assertEqual(zipfile.ZipFile(self.root / "assets" / "timetable.zip").namelist(), ["timetable.sqlite3"])
+
+    def test_trip_index_is_deterministic_and_carries_calendar_facts(self):
+        first = COMPILER.write_package(self.input, self.root / "one", None, self.stations, self.mapping)
+        second = COMPILER.write_package(self.input, self.root / "two", None, self.stations, self.mapping)
+        self.assertEqual(first["tripIndexSha256"], second["tripIndexSha256"])
+        name = json.loads((self.root / "one" / "manifest.json").read_text())["tripIndex"]["name"]
+        self.assertEqual(name, f"trip-index-{first['tripIndexSha256']}.tsv.gz")
+        self.assertEqual((self.root / "one" / name).read_bytes(), (self.root / "two" / name).read_bytes())
+        self.assertEqual(gzip.decompress((self.root / "one" / name).read_bytes()).decode().splitlines(), [
+            "sydneytrains\tT\t90600\t20260101\t20261231\t127\t\t",
+            "nswtrains\tT\t90600\t20260101\t20261231\t127\t\t",
+            "metro\tT\t90600\t20260101\t20261231\t127\t\t",
+            "ferries\tT\t90600\t20260101\t20261231\t127\t\t",
+            "mff\tT\t90600\t20260101\t20261231\t127\t\t20261005",
+        ])
+
+    def test_trip_index_rejects_an_identifier_that_would_break_a_row(self):
+        with self.assertRaisesRegex(ValueError, "trip index"):
+            COMPILER.trip_index_row("metro", "bad\tid", 90600, (20260101, 20261231, 127), [])
 
     def test_rejects_a_served_stop_without_real_station_mapping(self):
         self.write_feed("metro", 401, missing_stop=True)

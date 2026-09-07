@@ -164,7 +164,7 @@ func (s *Service) refreshSource(ctx context.Context, source string) error {
 	if err == nil && !result.NotModified {
 		sourceHash := sha256.Sum256(result.Body)
 		if !hasHash || sourceHash != previousHash {
-			snapshot, representation, normalizeErr := NormalizeRealtime(source, result.Body, s.now())
+			snapshot, representation, _, normalizeErr := NormalizeRealtime(source, result.Body, s.now(), s.timetable.serviceDates())
 			if normalizeErr != nil {
 				err = normalizeErr
 			} else {

@@ -14,6 +14,12 @@ type Manifest struct {
 	ServiceDateFrom string             `json:"serviceDateFrom"`
 	ServiceDateTo   string             `json:"serviceDateTo"`
 	Packages        []TimetablePackage `json:"packages"`
+	TripIndex       *TripIndex         `json:"tripIndex,omitempty"`
+}
+
+type TripIndex struct {
+	Name   string `json:"name"`
+	SHA256 string `json:"sha256"`
 }
 
 type TimetablePackage struct {
@@ -56,6 +62,15 @@ type StopUpdate struct {
 	ArrivalDelaySeconds   *int32  `json:"arrivalDelaySeconds,omitempty"`
 	DepartureDelaySeconds *int32  `json:"departureDelaySeconds,omitempty"`
 	ScheduleRelationship  string  `json:"scheduleRelationship"`
+}
+
+type RealtimeCounts struct {
+	Raw       int
+	Accepted  int
+	Unknown   int
+	Ambiguous int
+	Stale     int
+	Duplicate int
 }
 
 type Representation struct {

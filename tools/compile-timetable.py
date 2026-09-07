@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 import datetime as dt
+import gzip
 import hashlib
 import json
 import os
@@ -137,11 +138,24 @@ def source_generated_at(input_dir: Path) -> str:
     return value.replace("+00:00", "Z")
 
 
-def compile_database(input_dir: Path, database: Path, stations_path: Path, mapping_path: Path) -> dict:
+def trip_index_row(source: str, trip_id: str, first_departure: int, calendar: tuple[int, int, int], exceptions: list[tuple[int, int]]) -> bytes:
+    if "\t" in trip_id or "\n" in trip_id:
+        raise ValueError(f"{source} trip {trip_id!r} cannot be written to the trip index")
+    start, end, mask = calendar
+    added = ",".join(str(date) for date, exception in sorted(exceptions) if exception == 1)
+    removed = ",".join(str(date) for date, exception in sorted(exceptions) if exception == 2)
+    fields = (source, trip_id, str(first_departure), str(start), str(end), str(mask), added, removed)
+    return ("\t".join(fields) + "\n").encode("utf-8")
+
+
+def compile_database(input_dir: Path, database: Path, stations_path: Path, mapping_path: Path, trip_index: Path | None = None) -> dict:
     stations = load_stations(stations_path)
     ferry_mapping = load_ferry_mapping(mapping_path)
     connection = sqlite3.connect(database)
     schema(connection)
+    index_file = open(trip_index, "wb") if trip_index is not None else None
+    index_writer = gzip.GzipFile(filename="", mode="wb", fileobj=index_file, compresslevel=9, mtime=0) if index_file else None
+    index_rows = 0
     connection.executemany(
         "INSERT INTO stations VALUES(?,?,?,?,?)",
         ((item["id"], item["name"], item["location"]["lat"], item["location"]["lon"], ",".join(item["modes"])) for item in stations.values()),
@@ -255,12 +269,16 @@ def compile_database(input_dir: Path, database: Path, stations_path: Path, mappi
         completed = set()
         times: list[dict] = []
         batch = []
+        first_departures: dict[str, int] = {}
 
         def flush_times(trip_id: str | None) -> None:
             nonlocal total_connections
             if trip_id is None:
                 return
             times.sort(key=lambda item: integer(item["stop_sequence"]))
+            opening = times[0].get("departure_time") or times[0].get("arrival_time")
+            if opening:
+                first_departures[trip_id] = seconds(opening)
             for left, right in zip(times, times[1:]):
                 departure = seconds(left["departure_time"])
                 arrival = seconds(right["arrival_time"])
@@ -289,6 +307,18 @@ def compile_database(input_dir: Path, database: Path, stations_path: Path, mappi
         total_connections += len(batch)
         connection.commit()
 
+        if index_writer is not None:
+            for trip in sorted(eligible_trips, key=lambda item: item["trip_id"]):
+                first_departure = first_departures.get(trip["trip_id"])
+                if first_departure is None:
+                    continue
+                index_writer.write(trip_index_row(source, trip["trip_id"], first_departure, calendars[trip["service_id"]], raw_exceptions.get(trip["service_id"], [])))
+                index_rows += 1
+
+    if index_writer is not None:
+        index_writer.close()
+        index_file.close()
+
     coverage_start = max(int(value["startDate"]) for value in source_coverage.values())
     coverage_end = min(int(value["endDate"]) for value in source_coverage.values())
     if coverage_start > coverage_end:
@@ -315,6 +345,7 @@ def compile_database(input_dir: Path, database: Path, stations_path: Path, mappi
     connection.close()
     if integrity != "ok":
         raise ValueError(f"compiled database failed integrity_check: {integrity}")
+    counts["tripIndexRows"] = index_rows
     counts["coverageStart"] = str(coverage_start)
     counts["coverageEnd"] = str(coverage_end)
     counts["sourceCoverage"] = source_coverage
@@ -334,7 +365,12 @@ def write_package(input_dir: Path, output_dir: Path, android_assets: Path | None
     output_dir.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="ilovetrains-timetable-") as temporary:
         database = Path(temporary) / "timetable.sqlite3"
-        counts = compile_database(input_dir, database, stations_path, mapping_path)
+        draft_index = Path(temporary) / "trip-index.tsv.gz"
+        counts = compile_database(input_dir, database, stations_path, mapping_path, draft_index)
+        index_digest = hashlib.sha256(draft_index.read_bytes()).hexdigest()
+        index_name = f"trip-index-{index_digest}.tsv.gz"
+        index_path = output_dir / index_name
+        os.replace(draft_index, index_path)
         draft_zip = Path(temporary) / "timetable.zip"
         digest = deterministic_zip(database, draft_zip)
         zip_name = f"{digest}.zip"
@@ -358,13 +394,14 @@ def write_package(input_dir: Path, output_dir: Path, android_assets: Path | None
                 "serviceDateFrom": counts["coverageStart"],
                 "serviceDateTo": counts["coverageEnd"],
             }],
+            "tripIndex": {"name": index_name, "sha256": index_digest},
         }
         (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
         if android_assets is not None:
             android_assets.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(package_path, android_assets / "timetable.zip")
             (android_assets / "timetable-manifest.json").write_text(json.dumps(manifest, separators=(",", ":")) + "\n")
-        result = {"databaseBytes": database.stat().st_size, "packageBytes": package_path.stat().st_size, "sha256": digest, **counts}
+        result = {"databaseBytes": database.stat().st_size, "packageBytes": package_path.stat().st_size, "sha256": digest, "tripIndexBytes": index_path.stat().st_size, "tripIndexSha256": index_digest, **counts}
     return result
 
 

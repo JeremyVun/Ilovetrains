@@ -30,6 +30,7 @@ var shaPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 type activeTimetable struct {
 	manifest       Manifest
 	representation Representation
+	dates          *ServiceDates
 }
 
 type timetableStore struct {
@@ -71,6 +72,7 @@ func newTimetableStore(config Config) (*timetableStore, error) {
 	if store.dataDir != "" {
 		candidates = append(candidates, filepath.Join(store.dataDir, "current.json"))
 	}
+	activeDir := ""
 	for _, path := range candidates {
 		active, packagePath, err := loadManifest(path, store.packageCandidates(filepath.Dir(path)))
 		if err != nil {
@@ -80,11 +82,49 @@ func newTimetableStore(config Config) (*timetableStore, error) {
 			return nil, err
 		}
 		if store.active == nil || active.manifest.GeneratedAt.After(store.active.manifest.GeneratedAt) {
-			store.active = active
+			store.active, activeDir = active, filepath.Dir(path)
 		}
 		store.packages[active.manifest.Packages[0].SHA256] = packagePath
 	}
+	if store.active != nil {
+		store.active.dates = store.loadServiceDates(store.active.manifest, store.packageCandidates(activeDir))
+	}
 	return store, nil
+}
+
+func (s *timetableStore) loadServiceDates(manifest Manifest, dirs []string) *ServiceDates {
+	if manifest.TripIndex == nil {
+		return &ServiceDates{}
+	}
+	for _, dir := range dirs {
+		path := filepath.Join(dir, manifest.TripIndex.Name)
+		if _, err := os.Stat(path); err != nil {
+			continue
+		}
+		dates, err := loadTripIndex(path, manifest.TripIndex.SHA256)
+		if err == nil {
+			return dates
+		}
+		s.log("native timetable: %s: %v", manifest.TripIndex.Name, err)
+		return &ServiceDates{}
+	}
+	s.log("native timetable: %s is missing, realtime updates without a service date cannot be resolved", manifest.TripIndex.Name)
+	return &ServiceDates{}
+}
+
+func (s *timetableStore) log(format string, args ...any) {
+	if s.logf != nil {
+		s.logf(format, args...)
+	}
+}
+
+func (s *timetableStore) serviceDates() *ServiceDates {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.active == nil {
+		return nil
+	}
+	return s.active.dates
 }
 
 func (s *timetableStore) packageCandidates(manifestDir string) []string {
@@ -242,6 +282,17 @@ func (s *timetableStore) refresh(ctx context.Context) error {
 	} else if err != nil {
 		return err
 	}
+	if index := active.manifest.TripIndex; index != nil {
+		finalIndex := filepath.Join(s.dataDir, "packages", index.Name)
+		if _, err := os.Stat(finalIndex); errors.Is(err, os.ErrNotExist) {
+			if err := os.Rename(filepath.Join(outputDir, index.Name), finalIndex); err != nil {
+				return fmt.Errorf("publish timetable trip index: %w", err)
+			}
+		} else if err != nil {
+			return err
+		}
+	}
+	active.dates = s.loadServiceDates(active.manifest, s.packageCandidates(s.dataDir))
 	if err := promoteFeeds(inputDir, filepath.Join(s.dataDir, "feeds")); err != nil {
 		return err
 	}
@@ -322,6 +373,11 @@ func validateManifest(manifest Manifest) error {
 	}
 	if pkg.ServiceDateFrom != manifest.ServiceDateFrom || pkg.ServiceDateTo != manifest.ServiceDateTo {
 		return errors.New("timetable package coverage does not match manifest")
+	}
+	if index := manifest.TripIndex; index != nil {
+		if !shaPattern.MatchString(index.SHA256) || index.Name != "trip-index-"+index.SHA256+".tsv.gz" {
+			return errors.New("invalid timetable trip index")
+		}
 	}
 	return nil
 }

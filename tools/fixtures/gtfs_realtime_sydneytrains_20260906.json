@@ -1,0 +1,17 @@
+{
+  "file": "gtfs_realtime_sydneytrains_20260906.pb",
+  "capturedAs": "sydneytrains-0.pb",
+  "captureDirectory": "/tmp/trains-gtfs-20260906-design",
+  "tool": "tools/probe-gtfs.py",
+  "url": "https://api.transport.nsw.gov.au/v2/gtfs/realtime/sydneytrains",
+  "requestedAt": "2026-09-05T15:33:59.255347+00:00",
+  "receivedAt": "2026-09-05T15:33:59.412746+00:00",
+  "status": 200,
+  "bytes": 79085,
+  "sha256": "2994403111f2dfa78a50002f1a4b8777d8973ce09c49cc34419b3a2398ad5dd7",
+  "headers": {
+    "Date": "Sat, 05 Sep 2026 15:33:59 GMT",
+    "Content-Type": "application/octet-stream",
+    "Cache-Control": "private"
+  }
+}

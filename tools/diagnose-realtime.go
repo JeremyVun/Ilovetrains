@@ -16,9 +16,15 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		panic("usage: diagnose-realtime <capture-directory>")
+	if len(os.Args) < 2 || len(os.Args) > 3 {
+		panic("usage: diagnose-realtime <capture-directory> [bootstrap-directory]")
 	}
+	bootstrap := "native-data/bootstrap"
+	if len(os.Args) == 3 {
+		bootstrap = os.Args[2]
+	}
+	dates, err := native.LoadServiceDates(bootstrap)
+	check(err)
 	metadata, err := os.ReadFile(filepath.Join(os.Args[1], "capture.json"))
 	check(err)
 	var records []struct {
@@ -36,6 +42,7 @@ func main() {
 		verified[record.File] = evidence{record.SHA256, record.ReceivedAt}
 	}
 	files := 0
+	fmt.Fprintf(os.Stderr, "trip index entries: %d\n", dates.Len())
 	for _, source := range []string{"sydneytrains", "nswtrains", "metro", "ferries", "mff"} {
 		paths, err := filepath.Glob(filepath.Join(os.Args[1], source+"-[0-9]*.pb"))
 		check(err)
@@ -50,7 +57,7 @@ func main() {
 			var feed gtfs.FeedMessage
 			check(proto.Unmarshal(body, &feed))
 			header := time.Unix(int64(feed.GetHeader().GetTimestamp()), 0).UTC()
-			snapshot, _, err := native.NormalizeRealtime(source, body, capture.receivedAt)
+			snapshot, _, resolution, err := native.NormalizeRealtime(source, body, capture.receivedAt, dates)
 			check(err)
 			counts := map[string]int{}
 			for _, entity := range feed.Entity {
@@ -74,6 +81,10 @@ func main() {
 				}
 			}
 			counts["normalizedUpdates"] = len(snapshot.Updates)
+			counts["resolverUnknown"] = resolution.Unknown
+			counts["resolverAmbiguous"] = resolution.Ambiguous
+			counts["resolverStale"] = resolution.Stale
+			counts["resolverDuplicate"] = resolution.Duplicate
 			// Diagnostic only: inject an arbitrary valid date to isolate the next gate.
 			// This is NOT a proposed service-date resolver; no modified feed is saved.
 			for _, entity := range feed.Entity {
@@ -83,7 +94,7 @@ func main() {
 			}
 			modified, err := proto.Marshal(&feed)
 			check(err)
-			counterfactual, _, err := native.NormalizeRealtime(source, modified, capture.receivedAt)
+			counterfactual, _, _, err := native.NormalizeRealtime(source, modified, capture.receivedAt, dates)
 			check(err)
 			counts["dateGateOnlyBypassedDiagnostic"] = len(counterfactual.Updates)
 			out, err := json.Marshal(map[string]any{"file": filepath.Base(path), "sha256": capture.hash, "headerTimestamp": header, "freshAtCapture": capture.receivedAt.Before(snapshot.ExpiresAt), "counts": counts})

@@ -20,45 +20,69 @@ const (
 	tripTimestampAge = 90 * time.Second
 )
 
-func NormalizeRealtime(source string, body []byte, receivedAt time.Time) (Snapshot, Representation, error) {
+func NormalizeRealtime(source string, body []byte, receivedAt time.Time, dates *ServiceDates) (Snapshot, Representation, RealtimeCounts, error) {
+	var counts RealtimeCounts
 	if !validSource(source) {
-		return Snapshot{}, Representation{}, errors.New("unknown realtime source")
+		return Snapshot{}, Representation{}, counts, errors.New("unknown realtime source")
 	}
 	var feed gtfs.FeedMessage
 	if err := proto.Unmarshal(body, &feed); err != nil {
-		return Snapshot{}, Representation{}, fmt.Errorf("decode GTFS realtime: %w", err)
+		return Snapshot{}, Representation{}, counts, fmt.Errorf("decode GTFS realtime: %w", err)
 	}
 	if feed.Header == nil || feed.Header.GetIncrementality() != gtfs.FeedHeader_FULL_DATASET {
-		return Snapshot{}, Representation{}, errors.New("realtime feed is not FULL_DATASET")
+		return Snapshot{}, Representation{}, counts, errors.New("realtime feed is not FULL_DATASET")
 	}
 	headerSeconds := feed.Header.GetTimestamp()
 	if headerSeconds == 0 {
-		return Snapshot{}, Representation{}, errors.New("realtime feed has no source timestamp")
+		return Snapshot{}, Representation{}, counts, errors.New("realtime feed has no source timestamp")
 	}
 	headerTime := time.Unix(int64(headerSeconds), 0).UTC()
 	if headerTime.After(receivedAt.Add(5 * time.Minute)) {
-		return Snapshot{}, Representation{}, errors.New("realtime source timestamp is in the future")
+		return Snapshot{}, Representation{}, counts, errors.New("realtime source timestamp is in the future")
 	}
 
-	counts := make(map[string]int)
-	for _, entity := range feed.Entity {
-		if entity.GetTripUpdate() == nil {
-			continue
-		}
-		trip := entity.GetTripUpdate().GetTrip()
-		if trip != nil && trip.GetTripId() != "" && trip.GetStartDate() != "" {
-			counts[trip.GetTripId()+"\x00"+trip.GetStartDate()]++
-		}
+	type identified struct {
+		raw         *gtfs.TripUpdate
+		tripID      string
+		serviceDate string
 	}
-
-	updates := make([]TripUpdate, 0, len(feed.Entity))
+	resolved := make([]identified, 0, len(feed.Entity))
+	occurrences := make(map[string]int, len(feed.Entity))
 	for _, entity := range feed.Entity {
 		raw := entity.GetTripUpdate()
-		if raw == nil || raw.Trip == nil {
+		if raw == nil {
+			continue
+		}
+		counts.Raw++
+		if raw.Trip == nil {
 			continue
 		}
 		tripID, serviceDate := raw.Trip.GetTripId(), raw.Trip.GetStartDate()
-		if tripID == "" || !validServiceDate(serviceDate) || counts[tripID+"\x00"+serviceDate] != 1 {
+		if tripID == "" {
+			counts.Unknown++
+			continue
+		}
+		if !validServiceDate(serviceDate) {
+			date, outcome := dates.resolve(source, tripID, headerTime, earliestStopTime(raw))
+			switch outcome {
+			case dateUnknown:
+				counts.Unknown++
+				continue
+			case dateAmbiguous:
+				counts.Ambiguous++
+				continue
+			}
+			serviceDate = date
+		}
+		resolved = append(resolved, identified{raw: raw, tripID: tripID, serviceDate: serviceDate})
+		occurrences[tripID+"\x00"+serviceDate]++
+	}
+
+	updates := make([]TripUpdate, 0, len(resolved))
+	for _, item := range resolved {
+		raw, tripID, serviceDate := item.raw, item.tripID, item.serviceDate
+		if occurrences[tripID+"\x00"+serviceDate] != 1 {
+			counts.Duplicate++
 			continue
 		}
 		status, ok := tripStatus(raw.Trip.GetScheduleRelationship())
@@ -77,6 +101,7 @@ func NormalizeRealtime(source string, body []byte, receivedAt time.Time) (Snapsh
 		if raw.Timestamp != nil && raw.GetTimestamp() != 0 {
 			value := time.Unix(int64(raw.GetTimestamp()), 0).UTC()
 			if value.Before(headerTime.Add(-tripTimestampAge)) || value.After(headerTime.Add(5*time.Second)) {
+				counts.Stale++
 				continue
 			}
 			update.Timestamp = &value
@@ -99,12 +124,31 @@ func NormalizeRealtime(source string, body []byte, receivedAt time.Time) (Snapsh
 		return updates[i].TripID < updates[j].TripID
 	})
 
+	counts.Accepted = len(updates)
 	snapshot := Snapshot{
 		SchemaVersion: SchemaVersion, Source: source, HeaderTimestamp: headerTime,
 		GeneratedAt: receivedAt.UTC(), ExpiresAt: headerTime.Add(realtimeLifetime), Updates: updates,
 	}
 	representation, err := encodeSnapshot(snapshot)
-	return snapshot, representation, err
+	return snapshot, representation, counts, err
+}
+
+func earliestStopTime(update *gtfs.TripUpdate) time.Time {
+	earliest := int64(0)
+	for _, stop := range update.GetStopTimeUpdate() {
+		for _, event := range []*gtfs.TripUpdate_StopTimeEvent{stop.GetArrival(), stop.GetDeparture()} {
+			if event == nil || event.Time == nil || event.GetTime() <= 0 {
+				continue
+			}
+			if earliest == 0 || event.GetTime() < earliest {
+				earliest = event.GetTime()
+			}
+		}
+	}
+	if earliest == 0 {
+		return time.Time{}
+	}
+	return time.Unix(earliest, 0).UTC()
 }
 
 func normalizeStop(raw *gtfs.TripUpdate_StopTimeUpdate) (StopUpdate, bool) {
