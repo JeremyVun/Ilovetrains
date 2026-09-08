@@ -390,6 +390,20 @@ offer follows a finished journey.
 open or a return to visibility, and `lastOpen` exists and nothing is focused.
 Each of those entries takes its own fix when permission is already granted;
 an older request resolving after navigation cannot alter the current screen.
+On web, that request disallows cached fixes and enables high accuracy only
+while the previous open's shown journey is under way, through effective
+arrival + 30 min. A finite speed reading can support entry; an absent or
+non-finite speed leaves geometry as the movement signal.
+
+The web controller snapshots `lastOpen` before the current Home open or
+visibility return can replace it. It records the next open's evidence after
+the cache paint and each successful refresh, only with an unfocused header
+and an eligible, non-cancelled lead journey; rendering never writes it.
+The station is tier-1 `here` or null. The initial cache paint has no fix,
+so a successful refresh after the fix supplies the platform sighting. A
+failed refresh cannot invent one. Inference uses the snapshot from before
+those writes, even when the station index or fix arrives late.
+
 With `J = lastOpen.journey`, `D` its effective
 departure, `A` its effective arrival, and `O` and `Z` the origin and
 destination of `leg(trip, lastOpen.direction)` on the saved trip:

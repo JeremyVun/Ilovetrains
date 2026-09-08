@@ -2514,8 +2514,8 @@ function pageScript(state) {
         }
       }
     }
-    /* The smart header's own furniture. The numbers are the comps round's
-       measurements (docs/backlog/smart-header-v2, OPTIONS-r1.md section 2). */
+    /* Smart-header contrast thresholds: docs/contracts/ui.md, calibration
+       measurements. Composite translucent ink against its painted ground. */
     const light = matchMedia('(prefers-color-scheme: light)').matches;
     const channels = (value) => (String(value).match(/[\\d.]+/g) || []).map(Number);
     const luminance = (rgb) => {
@@ -2547,10 +2547,10 @@ function pageScript(state) {
       if (!el) continue;
       const want = ratios[light ? 1 : 0];
       const got = contrastOf(el);
-      // A hundredth of slack: the comps measured the token against --bg, and
+      // A tenth of slack: the reference measures the token against --bg, and
       // the row and the strip are painted on the panel.
       if (got < want - 0.1) {
-        problems.push(selector + ' is ' + round(got) + ':1 against its ground, under the comps round’s ' + want);
+        problems.push(selector + ' is ' + round(got) + ':1 against its ground, under the UI contract’s ' + want);
       }
     }
 

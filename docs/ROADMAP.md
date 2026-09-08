@@ -105,8 +105,6 @@ Both apps exist (`android/`, `ios/`) and lag the web by one round. Remaining:
   before a verdict.
 - Physical iPhone verification, waiting on a connected phone and an Xcode
   account sign-in (`docs/operations/ios.md`).
-- Optional real-phone speed observation for travel mode, open in
-  `docs/backlog/smart-header-v2/`.
 
 ## Candidates (unscheduled)
 - **Ride history as a stat**: "you rode this 4 times this week" in the

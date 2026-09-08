@@ -719,6 +719,12 @@ its A2 variant has a 44px action;
 `detail-*-tight` shoots a change shortened by a late first leg,
 so its promoted row reads `5 MIN LATE`.
 
+The screenshot tool checks contrast against the nearest opaque background,
+compositing translucent ink first. Dark/light reference ratios are 4.3/4.83:1
+for `Just added`, 8/8.13:1 for the inferred question, and 17.6/17.8:1 for
+its action. The instrument allows 0.1 below each reference ratio for the
+difference between the page and panel backgrounds.
+
 Client markup carries the data attributes the comps harness probes, so the
 instrument measures the built screen with the probes that judged its comps.
 
