@@ -73,8 +73,10 @@ go run ./cmd/server
 Open http://localhost:8080. Runtime variables are `TFNSW_API_KEY` (required),
 `PORT` (default `8080`), `WEB_DIR` (default `./web`),
 `MIN_CONNECTION_TIME` (default `3m`), `MAX_CONNECTION_TIME` (default `60m`),
-and `FLAGS_URL`, `FLAGS_KEY`, `FLAGS_PROJECT`, `FLAGS_ENV` (all optional;
-without `FLAGS_URL` every feature flag reads its default).
+`FLAGS_URL`, `FLAGS_KEY`, `FLAGS_PROJECT`, `FLAGS_ENV` (all optional;
+without `FLAGS_URL` every feature flag reads its default), and
+`ANALYTICS_URL`, `ANALYTICS_PROJECT`, `ANALYTICS_KEY` (optional; without
+`ANALYTICS_URL` the server's accuracy counters stay in its log).
 
 Primary test gates:
 

@@ -133,6 +133,10 @@ by payload content, not systemMessages.
   - `transportation`: `number` ("T1 North Shore & Western Line"),
     `destination.name` (headsign, "Penrith via Parramatta"),
     `product.class`, `properties.RealtimeTripId` / `gtfsTripId`.
+    The GTFS-Realtime feeds key trips by `RealtimeTripId` (the AVMS form,
+    `145T.1396.158.12.A.8.90984066`) for Sydney Trains and ferries; the
+    `gtfsTripId` form (`3001.nsw-2-T1-W.1.TA.2999.sj2`) is the complete-GTFS
+    bundle's identifier. Verified against the 2026-09-06 sydneytrains capture.
 
 ### departure_mon
 `GET /v1/tp/departure_mon?outputFormat=rapidJSON&coordOutputFormat=EPSG:4326&mode=direct&type_dm=stop&name_dm=<stopId>&depArrMacro=dep&itdDate=YYYYMMDD&itdTime=HHMM&TfNSWDM=true`

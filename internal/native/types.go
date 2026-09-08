@@ -83,4 +83,5 @@ type RealtimeData struct {
 	Snapshot       Snapshot
 	Representation Representation
 	Stale          bool
+	index          map[string]int
 }

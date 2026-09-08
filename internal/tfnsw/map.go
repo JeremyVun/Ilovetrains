@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -368,10 +369,27 @@ func legDetail(legs []leg, loc *time.Location) []Leg {
 				Scheduled: formatTime(schedArr, loc),
 				Estimated: formatTimePtr(realtime(l, l.Destination.ArrivalTimeEstimated), loc),
 			},
-			Cancelled: legCancelled(l),
+			Cancelled:    legCancelled(l),
+			TripIDs:      tripIDs(l.Transportation),
+			OriginStopID: l.Origin.ID,
 		})
 	}
 	return out
+}
+
+// Sydney Trains and ferries publish the AVMS identifier in the feed; the
+// GTFS one covers the rest, so every distinct key is offered for the join.
+func tripIDs(t *transportation) []string {
+	if t == nil || t.Properties == nil {
+		return nil
+	}
+	var ids []string
+	for _, id := range []string{t.Properties.RealtimeTripID, t.Properties.AVMSTripID, t.Properties.GTFSTripID} {
+		if id != "" && !slices.Contains(ids, id) {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
 
 // legPlace names the station a leg ends at while keeping its platform, which

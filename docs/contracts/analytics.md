@@ -3,7 +3,9 @@
 The browser posts anonymous counters directly to
 `https://analytics.jeremyvun.com/e`, project `ilovetrains`. The train API
 does not receive analytics. Saved trips, history, rides, location fixes and
-experiment assignment stay on the device.
+experiment assignment stay on the device. The server posts its own accuracy
+counters to the same project; they describe trains, never riders, and are
+listed under "Server accuracy events" below.
 
 ## Privacy and enablement
 
@@ -129,6 +131,29 @@ than confirmed delivery. Other responses and network failures retain the
 queue for the next flush. Overlapping triggers in one page share one fetch.
 This is best-effort counting: offline loss, browser storage resets, multiple
 tabs, and accepted beacons can affect totals. There are no dedup identifiers.
+
+## Server accuracy events
+
+The Go server emits the accuracy figures it logs (see `api.md`, "Accuracy
+log") as counters with `n` set to the window's count, every 15 minutes, when
+`ANALYTICS_URL` is configured. Every dimension is a closed vocabulary. No
+station, trip, request, client or clock value is a field. The delta buckets
+are `early5+`, `early2-5`, `early1-2`, `within1`, `late1-2`, `late2-5` and
+`late5+`, in minutes.
+
+| Event | Meaning | Dimensions |
+| --- | --- | --- |
+| `feed_prediction_scored` | One realtime prediction scored against the same feed's final estimate for that stop | `source` (feed), `lead` (`0-2m`, `2-5m`, `5-10m`, `10-20m`, `20-40m`, `40-90m`), `error` (`late` means the stop passed later than predicted), composites `lead.error`, `source.error` |
+| `feed_stop_unresolved` | A tracked stop whose feed coverage ended more than three minutes before it passed | `source` |
+| `feed_trip_cancelled` | A tracked trip the feed cancelled | `source` |
+| `tripplanner_leg_reconciled` | One served live leg joined to the feed | `mode`, `outcome` (`agree`, `disagree`, `tripplanner_only`, `feed_only`, `scheduled_only`, `unmatched`, `stale`), composite `mode.outcome` |
+| `tripplanner_leg_compared` | One leg where both sources had an estimate | `mode`, `diff` (`late` means Trip Planner's time is later than the feed's), composite `mode.diff` |
+| `tripplanner_cancel_mismatched` | One source reports a cancellation the other does not | `mode` |
+
+Read `feed_prediction_scored[lead.error]` for how a countdown at a given lead
+held up, and `tripplanner_leg_reconciled[mode.outcome]` for how often the
+board's source agreed with the feed. Both are counts of scored predictions and
+served legs, weighted by how often busy pairs are fetched, not by riders.
 
 ## Reading the counters
 

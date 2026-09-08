@@ -152,6 +152,41 @@ startup) until the next daily timetable refresh rewrites it. A source logs
 nothing when upstream answers 304 or returns a byte-identical feed; its
 snapshot still ages out through `X-Data-Stale`.
 
+Check accuracy after a deploy that touches realtime, planning or the mapper.
+Every 15 minutes each feed source logs how its own predictions held up:
+
+```
+accuracy feed source=sydneytrains window=15m0s settled=812 unresolved=40 cancelled=3 tracking=1460
+accuracy feed source=sydneytrains lead=5-10m n=640 within60=601 within120=628 early60=9 late60=30 mae=24s max=410s
+```
+
+`within60` over `n` is the share of countdowns that were right to the
+minute at that lead; `early60` is the count that left earlier than the
+countdown said, which is the one a rider cannot recover from. Rising
+`unresolved` means the feed stopped covering stops before they passed.
+
+The departures endpoint logs how Trip Planner agreed with the feed for the
+legs it actually served, and each disagreement over two minutes as it happens:
+
+```
+accuracy tripplanner mode=train window=15m0s compared=212 agree=205 disagree=7 mae=18s max=240s tripplanner_only=3 feed_only=11 scheduled_only=40 unmatched=2 stale=0 cancel_mismatch=0
+accuracy tripplanner mode=train trip=145T.1396.158.12.A.8.90984066 stop=2000332 planned=2026-09-08T08:00:00+10:00 tripplanner=2026-09-08T08:01:00+10:00 feed=2026-09-08T08:04:00+10:00 diff=-180s
+```
+
+`grep "accuracy "` shows both. A `cancel_mismatch` or a run of large negative
+`diff` values means the board is showing an earlier time than the feed
+believes, so investigate before riders do. `unmatched` growing means the
+join keys changed upstream.
+
+The same windows arrive as counters in the analytics project when the stack
+sets `ANALYTICS_URL` (it does, to the public analytics origin), so the
+dashboard at `https://analytics.jeremyvun.com/ui?project=ilovetrains` shows
+`feed_prediction_scored` split by `lead.error` and
+`tripplanner_leg_reconciled` split by `mode.outcome` without reading logs.
+The event table is in `docs/contracts/analytics.md`. Analytics delivery is
+best effort and never delays a request; a failed post logs
+`analytics: N events dropped`.
+
 Check static response headers too: `/js/main.js` and `/sw.js` must retain
 `Cache-Control: no-store` through the edge. A cold profile must load the app
 on its first navigation, before a worker-controlled reload can mask stale

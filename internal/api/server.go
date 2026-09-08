@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"trains/internal/analytics"
 	"trains/internal/cache"
 	"trains/internal/native"
 	"trains/internal/stations"
@@ -98,12 +99,23 @@ type Server struct {
 	now            func() time.Time
 	native         *native.Service
 	publicFlags    func() map[string]any
+	logf           func(string, ...any)
+	emit           func([]analytics.Event)
+	reconciler     *reconciler
 }
 
 type Option func(*Server)
 
 func WithNative(service *native.Service) Option {
 	return func(server *Server) { server.native = service }
+}
+
+func WithLogf(logf func(string, ...any)) Option {
+	return func(server *Server) { server.logf = logf }
+}
+
+func WithAnalytics(emit func([]analytics.Event)) Option {
+	return func(server *Server) { server.emit = emit }
 }
 
 // WithPublicFlags accepts locally evaluated values from the server-side SDK.
@@ -130,6 +142,9 @@ func New(upstream Upstream, webDir string, options ...Option) *Server {
 	}
 	for _, option := range options {
 		option(server)
+	}
+	if server.native != nil && (server.logf != nil || server.emit != nil) {
+		server.reconciler = newReconciler(server.logf, server.emit, func() time.Time { return server.now() }, server.native.LookupTrip)
 	}
 	return server
 }
@@ -237,8 +252,12 @@ func (s *Server) handleDepartures(w http.ResponseWriter, r *http.Request) {
 		}
 		ctx, cancel := fetchContext(ctx)
 		defer cancel()
-		return s.upstream.DeparturesWithOptions(ctx, from, to, limit, at,
+		response, err := s.upstream.DeparturesWithOptions(ctx, from, to, limit, at,
 			tfnsw.DeparturesOptions{Modes: modes, TransferLimit: transferLimit})
+		if err == nil && !past {
+			s.reconciler.reconcile(response)
+		}
+		return response, err
 	})
 	if err != nil {
 		if response, ok := s.departuresPast.Stale(key); past && ok {

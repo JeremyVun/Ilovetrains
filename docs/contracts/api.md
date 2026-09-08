@@ -463,6 +463,27 @@ indicate its age.
 The 10-minute stale window applies to a live departures window. A settled
 past window has already happened, so its stale window is 24 hours.
 
+## Accuracy log
+
+The server scores its two upstreams against each other and writes the result
+to its own log only. Nothing about riders participates: every figure is about
+trips, and no request identity, station pair or client state is recorded.
+
+- `accuracy feed source=<source> lead=<range> ...` scores each realtime
+  prediction against the last estimate the same feed published for that stop
+  before it passed, grouped by how far out the prediction was. A stop whose
+  feed coverage ended more than three minutes before its final estimate is
+  `unresolved`, never scored. Cancelled trips are counted, never scored.
+- `accuracy tripplanner mode=<mode> ...` compares every live Trip Planner leg
+  the departures endpoint serves with the realtime feed's estimate for the same
+  trip and boarding stop. A disagreement over two minutes, or a cancellation
+  one source reports and the other does not, is logged immediately.
+
+Both write a 15-minute summary per source or mode, and post the same window
+as counters to the analytics project when `ANALYTICS_URL` is set; the event
+vocabulary is in `analytics.md`. Reading the log is in
+`docs/operations/deploy.md`.
+
 ## Static files
 
 `/` serves `./web/` when that directory exists (`WEB_DIR` overrides). The API

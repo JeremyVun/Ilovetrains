@@ -54,6 +54,13 @@ type transportation struct {
 	Number           string    `json:"number"`
 	Product          product   `json:"product"`
 	Destination      *namedRef `json:"destination"`
+	Properties       *tripKeys `json:"properties"`
+}
+
+type tripKeys struct {
+	RealtimeTripID string `json:"RealtimeTripId"`
+	AVMSTripID     string `json:"AVMSTripID"`
+	GTFSTripID     string `json:"gtfsTripId"`
 }
 
 type product struct {

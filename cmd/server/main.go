@@ -19,6 +19,9 @@
 //	FLAGS_KEY      read-only SDK key; required when FLAGS_URL is set
 //	FLAGS_PROJECT  flagsd project, default ilovetrains
 //	FLAGS_ENV      flagsd environment, default production
+//	ANALYTICS_URL  optional analytics service base URL; unset sends no accuracy counters
+//	ANALYTICS_PROJECT analytics project key, default ilovetrains
+//	ANALYTICS_KEY  optional ingest key sent as X-Analytics-Key
 package main
 
 import (
@@ -32,6 +35,7 @@ import (
 	"syscall"
 	"time"
 
+	"trains/internal/analytics"
 	"trains/internal/api"
 	"trains/internal/native"
 	"trains/internal/tfnsw"
@@ -90,12 +94,17 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	emitter, err := analytics.New(os.Getenv("ANALYTICS_URL"), envOr("ANALYTICS_PROJECT", "ilovetrains"), os.Getenv("ANALYTICS_KEY"), log.Printf)
+	if err != nil {
+		return err
+	}
 	nativeService, err := native.NewService(native.Config{
 		Fetcher:      feedClient,
 		DataDir:      envOr("NATIVE_DATA_DIR", "./native-data/runtime"),
 		BootstrapDir: envOr("NATIVE_BOOTSTRAP_DIR", "./native-data/bootstrap"),
 		CompilerPath: envOr("TIMETABLE_COMPILER", "./tools/compile-timetable.py"),
 		Logf:         log.Printf,
+		Emit:         emitter.Emit,
 	})
 	if err != nil {
 		return err
@@ -106,7 +115,7 @@ func run() error {
 
 	server := &http.Server{
 		Addr:              addr,
-		Handler:           withAccessLog(api.New(client, webDir, api.WithNative(nativeService), api.WithPublicFlags(publicFlags)).Handler()),
+		Handler:           withAccessLog(api.New(client, webDir, api.WithNative(nativeService), api.WithPublicFlags(publicFlags), api.WithLogf(log.Printf), api.WithAnalytics(emitter.Emit)).Handler()),
 		ReadHeaderTimeout: readHeaderTimeout,
 		WriteTimeout:      writeTimeout,
 		IdleTimeout:       idleTimeout,

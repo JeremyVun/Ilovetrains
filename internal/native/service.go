@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"trains/internal/analytics"
 )
 
 const (
@@ -25,6 +27,7 @@ type Config struct {
 	TimetableInterval time.Duration
 	Now               func() time.Time
 	Logf              func(string, ...any)
+	Emit              func([]analytics.Event)
 }
 
 type realtimeState struct {
@@ -42,6 +45,7 @@ type Service struct {
 	realtimeInterval time.Duration
 	realtime         map[string]*realtimeState
 	timetable        *timetableStore
+	accuracy         *accuracyTracker
 	logf             func(string, ...any)
 }
 
@@ -62,6 +66,7 @@ func NewService(config Config) (*Service, error) {
 	service := &Service{
 		fetcher: config.Fetcher, now: config.Now, realtimeInterval: config.RealtimeInterval,
 		realtime: make(map[string]*realtimeState, len(Sources)), timetable: store, logf: config.Logf,
+		accuracy: newAccuracyTracker(config.Emit),
 	}
 	for _, source := range Sources {
 		service.realtime[source] = &realtimeState{}
@@ -108,6 +113,7 @@ func (s *Service) RefreshRealtime(ctx context.Context) error {
 	for err := range errs {
 		joined = errors.Join(joined, err)
 	}
+	s.accuracy.summarize(s.logf, s.now(), false)
 	return joined
 }
 
@@ -169,7 +175,7 @@ func (s *Service) refreshSource(ctx context.Context, source string) error {
 			if normalizeErr != nil {
 				err = normalizeErr
 			} else {
-				data = &RealtimeData{Snapshot: snapshot, Representation: representation}
+				data = &RealtimeData{Snapshot: snapshot, Representation: representation, index: tripIndex(snapshot)}
 				counts = resolution
 			}
 		}
@@ -200,6 +206,7 @@ func (s *Service) refreshSource(ctx context.Context, source string) error {
 	state.mu.Unlock()
 	if err == nil && data != nil {
 		s.logCounts(source, counts, data.Snapshot.GeneratedAt.Sub(data.Snapshot.HeaderTimestamp))
+		s.accuracy.observe(data.Snapshot)
 	}
 	return err
 }
@@ -214,4 +221,44 @@ func (s *Service) logCounts(source string, counts RealtimeCounts, headerAge time
 	if counts.Raw > 0 && counts.Accepted == 0 {
 		s.logf("realtime warning source=%s published nothing from %d updates", source, counts.Raw)
 	}
+}
+
+// TripMatch is the latest realtime update a set of upstream trip identifiers
+// resolves to, across every feed source.
+type TripMatch struct {
+	Source string
+	Update TripUpdate
+	Header time.Time
+	Stale  bool
+}
+
+func (s *Service) LookupTrip(ids ...string) (TripMatch, bool) {
+	for _, source := range Sources {
+		state := s.realtime[source]
+		state.mu.Lock()
+		data := state.data
+		state.mu.Unlock()
+		if data == nil {
+			continue
+		}
+		for _, id := range ids {
+			if position, ok := data.index[id]; ok {
+				return TripMatch{
+					Source: source, Update: data.Snapshot.Updates[position], Header: data.Snapshot.HeaderTimestamp,
+					Stale: s.now().After(data.Snapshot.ExpiresAt),
+				}, true
+			}
+		}
+	}
+	return TripMatch{}, false
+}
+
+func tripIndex(snapshot Snapshot) map[string]int {
+	index := make(map[string]int, len(snapshot.Updates))
+	for position, update := range snapshot.Updates {
+		if _, seen := index[update.TripID]; !seen {
+			index[update.TripID] = position
+		}
+	}
+	return index
 }

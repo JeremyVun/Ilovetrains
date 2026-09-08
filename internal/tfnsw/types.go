@@ -99,6 +99,11 @@ type Leg struct {
 	Departure LegTime  `json:"departure"`
 	Arrival   LegTime  `json:"arrival"`
 	Cancelled bool     `json:"cancelled"`
+
+	// Off the wire: the feed join keys and boarding stop the server reconciles
+	// Trip Planner estimates against.
+	TripIDs      []string `json:"-"`
+	OriginStopID string   `json:"-"`
 }
 
 // Journey is one departure from origin to destination. LegDetail always has
