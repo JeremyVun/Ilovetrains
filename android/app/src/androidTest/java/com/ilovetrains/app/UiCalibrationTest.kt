@@ -116,16 +116,32 @@ class UiCalibrationTest {
             }
             TrainApp(state.value, NoActions)
         }
-        capture("home")
-        compose.runOnIdle { state.value = fixture.boardState }
-        capture("board")
-        compose.onRoot().performTouchInput { swipeUp() }
-        compose.onRoot().performTouchInput { swipeUp() }
-        capture("board-end")
-        compose.runOnIdle { state.value = fixture.detailState }
-        capture("detail")
-        compose.runOnIdle { state.value = fixture.setupState }
-        capture("setup")
+        val frames = linkedMapOf<String, () -> Unit>()
+        fun frame(name: String, prepare: () -> Unit) {
+            check(frames.put(name, prepare) == null) { "duplicate calibration frame: $name" }
+        }
+        frame("home") {
+            compose.runOnIdle { state.value = fixture.home }
+            capture("home")
+        }
+        frame("board") {
+            compose.runOnIdle { state.value = fixture.boardState }
+            capture("board")
+        }
+        frame("board-end") {
+            compose.runOnIdle { state.value = fixture.boardState }
+            compose.onRoot().performTouchInput { swipeUp() }
+            compose.onRoot().performTouchInput { swipeUp() }
+            capture("board-end")
+        }
+        frame("detail") {
+            compose.runOnIdle { state.value = fixture.detailState }
+            capture("detail")
+        }
+        frame("setup") {
+            compose.runOnIdle { state.value = fixture.setupState }
+            capture("setup")
+        }
         for (appearance in listOf(Appearance.Dark, Appearance.Light)) {
             for (status in listOf(SetupLocationStatus.Idle, SetupLocationStatus.Denied, SetupLocationStatus.Unavailable, SetupLocationStatus.ChooseStation)) {
                 val name = when (status) {
@@ -133,112 +149,185 @@ class UiCalibrationTest {
                     SetupLocationStatus.ChooseStation -> "approximate"
                     else -> status.name.lowercase()
                 }
-                compose.runOnIdle { state.value = fixture.setupState.copy(setupFrom = null, trips = emptyList(), recentFrom = emptyList(),
-                    appearance = appearance, locationGranted = false, locationDenied = status == SetupLocationStatus.Denied,
-                    setupLocationStatus = status, nearbyStations = if (status == SetupLocationStatus.ChooseStation) fixture.locationStations else emptyList()) }
-                capture("setup-location-$name${if (appearance == Appearance.Light) "-light" else ""}")
+                frame("setup-location-$name${if (appearance == Appearance.Light) "-light" else ""}") {
+                    compose.runOnIdle { state.value = fixture.setupState.copy(setupFrom = null, trips = emptyList(), recentFrom = emptyList(),
+                        appearance = appearance, locationGranted = false, locationDenied = status == SetupLocationStatus.Denied,
+                        setupLocationStatus = status, nearbyStations = if (status == SetupLocationStatus.ChooseStation) fixture.locationStations else emptyList()) }
+                    capture("setup-location-$name${if (appearance == Appearance.Light) "-light" else ""}")
+                }
             }
         }
-        compose.runOnIdle { state.value = fixture.settingsState }
-        capture("settings")
-        compose.runOnIdle { state.value = fixture.delayedState }
-        capture("board-delayed")
-        compose.runOnIdle { state.value = fixture.cancelledState }
-        capture("detail-cancelled")
-        val cancelledLabels = compose.onAllNodesWithText("CANCELLED", useUnmergedTree = true).fetchSemanticsNodes()
-        assertTrue("expected rendered CANCELLED labels", cancelledLabels.isNotEmpty())
-        val cancelledFailures = mutableListOf<String>()
-        cancelledLabels.forEach { node ->
-            val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
-            val action = checkNotNull(node.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action)
-            assertTrue("CANCELLED layout result unavailable", action(results))
-            results.forEach { result ->
-                val detail = "bounds=${node.boundsInRoot} size=${result.size} lines=${result.lineCount} " +
-                    "maxWidth=${result.layoutInput.constraints.maxWidth} paragraphWidth=${result.multiParagraph.width} " +
-                    "lineRight=${result.getLineRight(0)} widthOverflow=${result.didOverflowWidth} " +
-                    "heightOverflow=${result.didOverflowHeight}"
-                println("CANCELLED layout $detail")
-                val visibleOverflow = result.didOverflowHeight || result.lineCount != 1 ||
-                    (0 until result.lineCount).any { result.getLineLeft(it) < 0f || result.getLineRight(it) > result.size.width }
-                if (visibleOverflow) cancelledFailures += detail
+        frame("settings") {
+            compose.runOnIdle { state.value = fixture.settingsState }
+            capture("settings")
+        }
+        frame("board-delayed") {
+            compose.runOnIdle { state.value = fixture.delayedState }
+            capture("board-delayed")
+        }
+        frame("detail-cancelled") {
+            compose.runOnIdle { state.value = fixture.cancelledState }
+            capture("detail-cancelled")
+            val cancelledLabels = compose.onAllNodesWithText("CANCELLED", useUnmergedTree = true).fetchSemanticsNodes()
+            assertTrue("expected rendered CANCELLED labels", cancelledLabels.isNotEmpty())
+            val cancelledFailures = mutableListOf<String>()
+            cancelledLabels.forEach { node ->
+                val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+                val action = checkNotNull(node.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action)
+                assertTrue("CANCELLED layout result unavailable", action(results))
+                results.forEach { result ->
+                    val detail = "bounds=${node.boundsInRoot} size=${result.size} lines=${result.lineCount} " +
+                        "maxWidth=${result.layoutInput.constraints.maxWidth} paragraphWidth=${result.multiParagraph.width} " +
+                        "lineRight=${result.getLineRight(0)} widthOverflow=${result.didOverflowWidth} " +
+                        "heightOverflow=${result.didOverflowHeight}"
+                    println("CANCELLED layout $detail")
+                    val visibleOverflow = result.didOverflowHeight || result.lineCount != 1 ||
+                        (0 until result.lineCount).any { result.getLineLeft(it) < 0f || result.getLineRight(it) > result.size.width }
+                    if (visibleOverflow) cancelledFailures += detail
+                }
             }
+            assertTrue("CANCELLED layout failure: ${cancelledFailures.joinToString("; ")}", cancelledFailures.isEmpty())
         }
-        assertTrue("CANCELLED layout failure: ${cancelledFailures.joinToString("; ")}", cancelledFailures.isEmpty())
-        compose.runOnIdle { state.value = fixture.twoChangesState }
-        assertDetailGeometryAndPixels()
-        capture("detail-two-changes")
-        compose.runOnIdle { state.value = fixture.activePinnedState }
-        capture("home-active-pinned")
-        compose.runOnIdle { state.value = fixture.activePinnedState.copy(appearance = Appearance.Light) }
-        capture("home-active-pinned-light")
-        compose.runOnIdle { state.value = fixture.activePinnedState.copy(screen = Screen.Board, focus = null) }
-        capture("board-transfer")
-        compose.runOnIdle {
-            state.value = fixture.activePinnedState.copy(
-                screen = Screen.Board,
-                focus = null,
-                appearance = Appearance.Light,
-            )
+        frame("detail-two-changes") {
+            compose.runOnIdle { state.value = fixture.twoChangesState }
+            assertDetailGeometryAndPixels()
+            capture("detail-two-changes")
         }
-        capture("board-transfer-light")
-        compose.runOnIdle { state.value = fixture.activeInferredState }
-        capture("home-active-inferred")
-        compose.runOnIdle { state.value = fixture.completedState }
-        capture("home-completed")
-        compose.runOnIdle { state.value = fixture.longNamesState }
-        capture("home-long-names")
-        compose.runOnIdle { state.value = fixture.home.copy(appearance = Appearance.Light) }
-        capture("home-light")
-        compose.runOnIdle { state.value = fixture.serverStaleState }
-        capture("home-server-stale")
-        compose.runOnIdle { state.value = fixture.serverStaleState.copy(appearance = Appearance.Light) }
-        capture("home-server-stale-light")
-        compose.runOnIdle { state.value = fixture.serverStalePinnedDelayedState }
-        capture("home-server-stale-pinned-delayed")
-        compose.runOnIdle { state.value = fixture.serverStalePinnedDelayedState.copy(appearance = Appearance.Light) }
-        capture("home-server-stale-pinned-delayed-light")
-        compose.runOnIdle { state.value = fixture.boardState.copy(appearance = Appearance.Light) }
-        capture("board-light")
-        compose.runOnIdle { state.value = fixture.settingsState.copy(appearance = Appearance.Light) }
-        capture("settings-light")
-        compose.runOnIdle { state.value = fixture.settingsState.copy(transferLimit = TransferLimit.Two, appearance = Appearance.Dark) }
-        capture("settings-transfer-limit")
-        compose.runOnIdle { state.value = fixture.settingsState.copy(transferLimit = TransferLimit.Any, appearance = Appearance.Light) }
-        capture("settings-transfer-limit-light")
-        compose.runOnIdle { state.value = fixture.homeNowState }
-        capture("home-now")
-        compose.runOnIdle { state.value = fixture.justAddedState }
-        capture("home-just-added")
-        compose.runOnIdle { state.value = fixture.unknownLineState }
-        capture("home-unknown-line")
-        compose.runOnIdle { state.value = fixture.boardNowState }
-        capture("board-now")
-        compose.runOnIdle { state.value = fixture.homeNowState.copy(appearance = Appearance.Light) }
-        capture("home-now-light")
-        compose.runOnIdle { state.value = fixture.boardNowState.copy(appearance = Appearance.Light) }
-        capture("board-now-light")
-        compose.runOnIdle { state.value = fixture.offlineDepartedT9State.copy(screen = Screen.Home) }
-        capture("home-offline-retained-t9")
-        compose.runOnIdle { state.value = fixture.offlineDepartedT9State }
-        val retainedT9 = checkNotNull(fixture.offlineDepartedT9State.board).journeys.first()
-        compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("board-journey-${retainedT9.key}"))
-        capture("board-offline-retained-t9")
-        compose.runOnIdle { state.value = fixture.ferryState }
-        capture("detail-f1-manly")
-        compose.runOnIdle { state.value = fixture.pyrmontTransferState }
-        capture("detail-pyrmont-double-bay")
-        compose.runOnIdle { state.value = fixture.twoTripsState }
-        compose.onNodeWithTag("trip-${fixture.beachTrip.id}").performTouchInput {
-            down(centerRight); moveBy(Offset(-width * 0.6f, 0f))
+        frame("home-active-pinned") {
+            compose.runOnIdle { state.value = fixture.activePinnedState }
+            capture("home-active-pinned")
         }
-        capture("home-deleting")
-        compose.onNodeWithTag("trip-${fixture.beachTrip.id}").performTouchInput { cancel() }
-        compose.runOnIdle { state.value = fixture.deletedState }
-        capture("home-deleted")
-        compose.runOnIdle { state.value = fixture.feedbackDraftState }
-        compose.onNodeWithText("Send feedback").performClick()
-        compose.onNodeWithText("The platform marker overlaps the line").performClick()
-        capture("settings-feedback-draft-focused")
+        frame("home-active-pinned-light") {
+            compose.runOnIdle { state.value = fixture.activePinnedState.copy(appearance = Appearance.Light) }
+            capture("home-active-pinned-light")
+        }
+        frame("board-transfer") {
+            compose.runOnIdle { state.value = fixture.activePinnedState.copy(screen = Screen.Board, focus = null) }
+            capture("board-transfer")
+        }
+        frame("board-transfer-light") {
+            compose.runOnIdle { state.value = fixture.activePinnedState.copy(screen = Screen.Board, focus = null, appearance = Appearance.Light) }
+            capture("board-transfer-light")
+        }
+        frame("home-active-inferred") {
+            compose.runOnIdle { state.value = fixture.activeInferredState }
+            capture("home-active-inferred")
+        }
+        frame("home-completed") {
+            compose.runOnIdle { state.value = fixture.completedState }
+            capture("home-completed")
+        }
+        frame("home-long-names") {
+            compose.runOnIdle { state.value = fixture.longNamesState }
+            capture("home-long-names")
+        }
+        frame("home-light") {
+            compose.runOnIdle { state.value = fixture.home.copy(appearance = Appearance.Light) }
+            capture("home-light")
+        }
+        frame("home-server-stale") {
+            compose.runOnIdle { state.value = fixture.serverStaleState }
+            capture("home-server-stale")
+        }
+        frame("home-server-stale-light") {
+            compose.runOnIdle { state.value = fixture.serverStaleState.copy(appearance = Appearance.Light) }
+            capture("home-server-stale-light")
+        }
+        frame("home-server-stale-pinned-delayed") {
+            compose.runOnIdle { state.value = fixture.serverStalePinnedDelayedState }
+            capture("home-server-stale-pinned-delayed")
+        }
+        frame("home-server-stale-pinned-delayed-light") {
+            compose.runOnIdle { state.value = fixture.serverStalePinnedDelayedState.copy(appearance = Appearance.Light) }
+            capture("home-server-stale-pinned-delayed-light")
+        }
+        frame("board-light") {
+            compose.runOnIdle { state.value = fixture.boardState.copy(appearance = Appearance.Light) }
+            capture("board-light")
+        }
+        frame("settings-light") {
+            compose.runOnIdle { state.value = fixture.settingsState.copy(appearance = Appearance.Light) }
+            capture("settings-light")
+        }
+        frame("settings-transfer-limit") {
+            compose.runOnIdle { state.value = fixture.settingsState.copy(transferLimit = TransferLimit.Two, appearance = Appearance.Dark) }
+            capture("settings-transfer-limit")
+        }
+        frame("settings-transfer-limit-light") {
+            compose.runOnIdle { state.value = fixture.settingsState.copy(transferLimit = TransferLimit.Any, appearance = Appearance.Light) }
+            capture("settings-transfer-limit-light")
+        }
+        frame("home-now") {
+            compose.runOnIdle { state.value = fixture.homeNowState }
+            capture("home-now")
+        }
+        frame("home-just-added") {
+            compose.runOnIdle { state.value = fixture.justAddedState }
+            capture("home-just-added")
+        }
+        frame("home-unknown-line") {
+            compose.runOnIdle { state.value = fixture.unknownLineState }
+            capture("home-unknown-line")
+        }
+        frame("board-now") {
+            compose.runOnIdle { state.value = fixture.boardNowState }
+            capture("board-now")
+        }
+        frame("home-now-light") {
+            compose.runOnIdle { state.value = fixture.homeNowState.copy(appearance = Appearance.Light) }
+            capture("home-now-light")
+        }
+        frame("board-now-light") {
+            compose.runOnIdle { state.value = fixture.boardNowState.copy(appearance = Appearance.Light) }
+            capture("board-now-light")
+        }
+        frame("home-offline-retained-t9") {
+            compose.runOnIdle { state.value = fixture.offlineDepartedT9State.copy(screen = Screen.Home) }
+            capture("home-offline-retained-t9")
+        }
+        frame("board-offline-retained-t9") {
+            compose.runOnIdle { state.value = fixture.offlineDepartedT9State }
+            val retainedT9 = checkNotNull(fixture.offlineDepartedT9State.board).journeys.first()
+            compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("board-journey-${retainedT9.key}"))
+            capture("board-offline-retained-t9")
+        }
+        frame("detail-f1-manly") {
+            compose.runOnIdle { state.value = fixture.ferryState }
+            capture("detail-f1-manly")
+        }
+        frame("detail-pyrmont-double-bay") {
+            compose.runOnIdle { state.value = fixture.pyrmontTransferState }
+            capture("detail-pyrmont-double-bay")
+        }
+        frame("home-deleting") {
+            compose.runOnIdle { state.value = fixture.twoTripsState }
+            compose.onNodeWithTag("trip-${fixture.beachTrip.id}").performTouchInput {
+                down(centerRight); moveBy(Offset(-width * 0.6f, 0f))
+            }
+            capture("home-deleting")
+            compose.onNodeWithTag("trip-${fixture.beachTrip.id}").performTouchInput { cancel() }
+        }
+        frame("home-deleted") {
+            compose.runOnIdle { state.value = fixture.deletedState }
+            capture("home-deleted")
+        }
+        frame("settings-feedback-draft-focused") {
+            compose.runOnIdle { state.value = fixture.feedbackDraftState }
+            compose.onNodeWithText("Send feedback").performClick()
+            compose.onNodeWithText("The platform marker overlaps the line").performClick()
+            capture("settings-feedback-draft-focused")
+        }
+        val requested = InstrumentationRegistry.getArguments().getString("calibrationScreens")
+            ?.split(',')?.map { it.trim() }?.toSet()
+        require(requested == null || requested.isNotEmpty() && requested.all { it in frames }) {
+            "unknown calibration screens: ${requested?.minus(frames.keys)}; available: ${frames.keys}"
+        }
+        // Retain catalogue order so a full run preserves the existing transitions.
+        frames.filterKeys { requested == null || it in requested }.forEach { (name, render) ->
+            val started = System.nanoTime()
+            render()
+            println("CALIBRATION $name ${(System.nanoTime() - started) / 1_000_000}ms")
+        }
     }
 
     @Test fun detailAxisJoinsAndHeaderGeometryAreRenderedCorrectly() {
@@ -488,7 +577,8 @@ class UiCalibrationTest {
             }
         }
         val captured = checkNotNull(bitmap)
-        if (name == "home") File(directory, "metrics.txt").writeText(
+        val metrics = File(directory, "metrics.txt")
+        if (name == "home" || !metrics.exists()) metrics.writeText(
             viewportMetrics + "capturedBitmap=${captured.width}x${captured.height}px\n" +
                 "capturedLogical=${(captured.width / captureDensity).roundToInt()}x${(captured.height / captureDensity).roundToInt()}dp\n"
         )

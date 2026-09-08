@@ -114,7 +114,14 @@ const SCREENS = [
   ['settings-transfer-limit', 'settings:settings-390x844-transfer-limit.png', 'settings-transfer-limit', 'settings-transfer-limit'],
   ['settings-transfer-limit-any', 'settings:settings-390x844-transfer-limit-any.png', null, 'settings-transfer-limit-no-limit'],
   ['settings-transfer-limit-light', 'settings:settings-390x844-transfer-limit-light.png', 'settings-transfer-limit-light', 'settings-transfer-limit-light'],
-  ['settings-transfer-limit-412', 'settings:settings-412x732-transfer-limit.png', null, null]
+  ['settings-transfer-limit-412', 'settings:settings-412x732-transfer-limit.png', null, null],
+  ...[
+    'ride', 'transfer', 'final', 'unknown-platform', 'tight-transfer', 'offline-stale', 'long-content',
+    'missed-connection', 'first-leg-cancelled', 'final-leg-cancelled'
+  ].flatMap((state) => [
+    [`tracker-${state}`, null, `tracker:${state}:dark`, `tracker:${state}:dark`],
+    [`tracker-${state}-light`, null, `tracker:${state}:light`, `tracker:${state}:light`]
+  ])
 ].map(([screen, web, android, ios]) => ({ screen, web, android, ios }));
 
 const MASKS = { ios: [{ top: 190 }, { bottom: 60 }] };
@@ -271,61 +278,139 @@ async function shootWeb(screens, out, log) {
 async function shootAndroid(screens, out, log) {
   const dir = path.join(out, 'android');
   fs.mkdirSync(dir, { recursive: true });
+  const serial = process.env.ANDROID_SERIAL || '';
+  const adbArgs = (...args) => serial ? ['-s', serial, ...args] : args;
   let state = '';
-  try { state = execFileSync(ADB, ['get-state'], { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch (_) { /* no adb or device */ }
+  try { state = execFileSync(ADB, adbArgs('get-state'), { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch (_) { /* no adb or device */ }
   if (state !== 'device') throw new Error('one booted Android emulator is required (adb get-state)');
-  await waitForPeer('shoot-android.sh|am instrument', 'android', log);
-  const tmp = path.join(os.tmpdir(), `trains-visual-android-${process.pid}`);
-  fs.rmSync(tmp, { recursive: true, force: true });
+  await waitForPeer('shoot-(travel-tracker-)?android.sh|am instrument', 'android', log);
+  const appScreens = screens.filter((screen) => !screen.android.startsWith('tracker:'));
+  const trackerScreens = screens.filter((screen) => screen.android.startsWith('tracker:'));
+  const appTmp = path.join(os.tmpdir(), `trains-visual-android-${process.pid}`);
+  const trackerTmp = path.join(os.tmpdir(), `trains-visual-android-tracker-${process.pid}`);
+  fs.rmSync(appTmp, { recursive: true, force: true });
+  fs.rmSync(trackerTmp, { recursive: true, force: true });
   const missing = {};
-  let metrics = '';
-  try {
-    await run('bash', [path.join(ROOT, 'tools/shoot-android.sh'), '390x844'],
-      { OUT: tmp, INSTRUMENT_CLASS: 'com.ilovetrains.app.UiCalibrationTest#captureCanonicalScreens' });
-    metrics = fs.readFileSync(path.join(tmp, 'metrics.txt'), 'utf8').trim().replace(/\n/g, ' ');
-    for (const screen of screens) {
-      const shot = path.join(tmp, `${screen.android}.png`);
-      if (fs.existsSync(shot)) fs.copyFileSync(shot, path.join(dir, `${screen.screen}.png`));
-      else missing[screen.screen] = `UiCalibrationTest wrote no ${screen.android}.png`;
+  const metrics = [];
+  if (appScreens.length) {
+    try {
+      await run('bash', [path.join(ROOT, 'tools/shoot-android.sh'), '390x844'],
+        { OUT: appTmp, INSTRUMENT_CLASS: 'com.ilovetrains.app.UiCalibrationTest#captureCanonicalScreens',
+          CALIBRATION_SCREENS: appScreens.map((screen) => screen.android).join(',') });
+      metrics.push(fs.readFileSync(path.join(appTmp, 'metrics.txt'), 'utf8').trim().replace(/\n/g, ' '));
+      for (const screen of appScreens) {
+        const shot = path.join(appTmp, `${screen.android}.png`);
+        if (fs.existsSync(shot)) fs.copyFileSync(shot, path.join(dir, `${screen.screen}.png`));
+        else missing[screen.screen] = `UiCalibrationTest wrote no ${screen.android}.png`;
+      }
+    } catch (e) {
+      for (const screen of appScreens) missing[screen.screen] = `shoot-android: ${e.message}`;
     }
-  } catch (e) {
-    for (const screen of screens) missing[screen.screen] = `shoot-android: ${e.message}`;
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
   }
-  const prop = (name) => { try { return execFileSync(ADB, ['shell', 'getprop', name]).toString().trim(); } catch (_) { return '?'; } };
+  if (trackerScreens.length) {
+    if (!serial) throw new Error('tracker system-surface capture requires explicit ANDROID_SERIAL for its dedicated emulator');
+    const parsed = trackerScreens.map((screen) => {
+      const [, trackerCase, scheme] = screen.android.split(':');
+      return { screen, trackerCase, scheme };
+    });
+    try {
+      await run('bash', [path.join(ROOT, 'tools/shoot-travel-tracker-android.sh'), '390x844'], {
+        ANDROID_SERIAL: serial,
+        OUT: trackerTmp,
+        CAPTURE_ONLY: '1',
+        SURFACES: 'shade',
+        TRACKER_CASES: [...new Set(parsed.map((value) => value.trackerCase))].join(','),
+        SCHEMES: [...new Set(parsed.map((value) => value.scheme))].join(',')
+      });
+      metrics.push(fs.readFileSync(path.join(trackerTmp, 'device.txt'), 'utf8').trim().replace(/\n/g, ' '));
+      for (const { screen, trackerCase, scheme } of parsed) {
+        const shot = path.join(trackerTmp, 'cards', `tracker-${trackerCase}-${scheme}-shade.png`);
+        if (fs.existsSync(shot)) fs.copyFileSync(shot, path.join(dir, `${screen.screen}.png`));
+        else missing[screen.screen] = `tracker shooter wrote no ${path.basename(shot)}`;
+      }
+    } catch (e) {
+      for (const screen of trackerScreens) missing[screen.screen] = `shoot-travel-tracker-android: ${e.message}`;
+    }
+  }
+  fs.rmSync(appTmp, { recursive: true, force: true });
+  fs.rmSync(trackerTmp, { recursive: true, force: true });
+  const prop = (name) => { try { return execFileSync(ADB, adbArgs('shell', 'getprop', name)).toString().trim(); } catch (_) { return '?'; } };
   log(`android: ${screens.length - Object.keys(missing).length} frames`);
-  return { device: `${prop('ro.product.model')} API ${prop('ro.build.version.sdk')}, ${metrics}`, missing };
+  return { device: `${prop('ro.product.model')} API ${prop('ro.build.version.sdk')}, ${metrics.join(' · ')}`, missing };
 }
 
 async function shootIos(screens, out, log) {
   const dir = path.join(out, 'ios');
   fs.mkdirSync(dir, { recursive: true });
   const tmp = path.join(os.tmpdir(), `trains-visual-ios-${process.pid}`);
-  fs.rmSync(tmp, { recursive: true, force: true });
+  const trackerTmp = `${tmp}-tracker`;
+  const appScreens = screens.filter((screen) => !screen.ios.startsWith('tracker:'));
+  const trackerScreens = screens.filter((screen) => screen.ios.startsWith('tracker:'));
   const missing = {};
-  let metrics = '';
+  const metrics = [];
   let simulatorName = '';
-  try {
-    const simulator = bootedIphone();
-    await waitForPeer('shoot-ios.sh', 'ios', log);
-    await run('bash', [path.join(ROOT, 'tools/shoot-ios.sh'), ...screens.map((s) => s.ios)],
-      { OUT: tmp, ILOVETRAINS_SIMULATOR_ID: simulator, SETTLE_SECONDS: process.env.SETTLE_SECONDS || '2' });
-    const fields = Object.fromEntries(fs.readFileSync(path.join(tmp, 'metrics.txt'), 'utf8').trim().split('\n').map((l) => l.split('=')));
-    metrics = `${fields.device} ${fields.capture_pixels}px, content size ${fields.content_size}`;
-    simulatorName = fields.device;
-    for (const screen of screens) {
-      const shot = path.join(tmp, `${screen.ios}.png`);
-      if (fs.existsSync(shot)) fs.copyFileSync(shot, path.join(dir, `${screen.screen}.png`));
-      else missing[screen.screen] = `shoot-ios wrote no ${screen.ios}.png`;
-    }
-  } catch (e) {
-    for (const screen of screens) missing[screen.screen] = `shoot-ios: ${e.message}`;
-  } finally {
+  let simulator;
+  try { simulator = bootedIphone(); } catch (e) {
+    return { missing: Object.fromEntries(screens.map((screen) => [screen.screen, e.message])) };
+  }
+  if (appScreens.length) {
     fs.rmSync(tmp, { recursive: true, force: true });
+    try {
+      await waitForPeer('shoot-(travel-tracker-)?ios.sh', 'ios', log);
+      await run('bash', [path.join(ROOT, 'tools/shoot-ios.sh'), ...appScreens.map((s) => s.ios)],
+        { OUT: tmp, ILOVETRAINS_SIMULATOR_ID: simulator, SETTLE_SECONDS: process.env.SETTLE_SECONDS || '2' });
+      const fields = Object.fromEntries(fs.readFileSync(path.join(tmp, 'metrics.txt'), 'utf8').trim().split('\n').map((l) => l.split('=')));
+      metrics.push(`${fields.device} ${fields.capture_pixels}px, content size ${fields.content_size}`);
+      simulatorName = fields.device;
+      for (const screen of appScreens) {
+        const shot = path.join(tmp, `${screen.ios}.png`);
+        if (fs.existsSync(shot)) fs.copyFileSync(shot, path.join(dir, `${screen.screen}.png`));
+        else missing[screen.screen] = `shoot-ios wrote no ${screen.ios}.png`;
+      }
+    } catch (e) {
+      for (const screen of appScreens) missing[screen.screen] = `shoot-ios: ${e.message}`;
+    } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+  }
+  if (trackerScreens.length) {
+    const parsed = trackerScreens.map((screen) => {
+      const [, trackerCase, scheme] = screen.ios.split(':');
+      return { screen, trackerCase, scheme };
+    });
+    try {
+      if (!process.env.ILOVETRAINS_SIMULATOR_ID) throw new Error('tracker capture requires explicit ILOVETRAINS_SIMULATOR_ID');
+      fs.rmSync(trackerTmp, { recursive: true, force: true });
+      await waitForPeer('shoot-(travel-tracker-)?ios.sh', 'ios', log);
+      await run('bash', [path.join(ROOT, 'tools/shoot-travel-tracker-ios.sh'), '402x874'], {
+        OUT: trackerTmp, ILOVETRAINS_SIMULATOR_ID: simulator,
+        CAPTURE_ONLY: '1', SURFACES: 'notification-center', CONTENT_SIZE: 'large',
+        TRACKER_CASES: [...new Set(parsed.map((value) => value.trackerCase))].join(','),
+        SCHEMES: [...new Set(parsed.map((value) => value.scheme))].join(',')
+      });
+      const fields = Object.fromEntries(fs.readFileSync(path.join(trackerTmp, 'device.txt'), 'utf8').trim().split('\n').map((l) => l.split('=')));
+      simulatorName = fields.device;
+      metrics.push(`${fields.device} ${fields.capture_pixels}px ActivityKit card crops, ${fields.runtime}`);
+      for (const { screen, trackerCase, scheme } of parsed) {
+        const stem = `tracker-${trackerCase}-${scheme}-notification-center`;
+        const shot = path.join(trackerTmp, `${stem}.png`);
+        const bounds = JSON.parse(fs.readFileSync(path.join(trackerTmp, 'dumps', `${stem}-card-bounds.txt`), 'utf8'));
+        if (![bounds.x, bounds.y, bounds.width, bounds.height, bounds.scale].every(Number.isFinite)
+          || bounds.scale !== 3 || bounds.x < 0 || bounds.y < 0 || bounds.width <= 0 || bounds.height <= 0)
+          throw new Error(`invalid observed card bounds: ${stem}`);
+        const left = Math.floor(bounds.x * bounds.scale), top = Math.floor(bounds.y * bounds.scale);
+        const width = Math.ceil((bounds.x + bounds.width) * bounds.scale) - left;
+        const height = Math.ceil((bounds.y + bounds.height) * bounds.scale) - top;
+        const target = path.join(dir, `${screen.screen}.png`);
+        fs.copyFileSync(shot, target);
+        await run('sips', ['-c', String(height), String(width), '--cropOffset', String(top), String(left), target]);
+      }
+    } catch (e) {
+      for (const screen of trackerScreens) missing[screen.screen] = `shoot-travel-tracker-ios: ${e.message}`;
+    }
+    // Retain full system frames and AX evidence for reviewing every cropped card.
+    log(`ios tracker source evidence: ${trackerTmp}`);
   }
   log(`ios: ${screens.length - Object.keys(missing).length} frames`);
-  return { device: metrics, simulator: simulatorName, missing };
+  return { device: metrics.join(' · '), simulator: simulatorName, missing };
 }
 
 const SHOOT = { web: shootWeb, android: shootAndroid, ios: shootIos };
@@ -431,7 +516,7 @@ async function compareAll(pairs, { fuzz }) {
       .catch(() => { /* about:blank ships no viewport meta; the diff never lays out */ });
     const results = [];
     for (const pair of pairs) {
-      const masks = MASKS[pair.platform] || [];
+      const masks = pair.screen.startsWith('tracker-') ? [] : (MASKS[pair.platform] || []);
       const expression = `${COMPARE}(${JSON.stringify(dataUrl(pair.baseline))}, ${JSON.stringify(dataUrl(pair.current))}, ${fuzz}, ${JSON.stringify(masks)})`;
       results.push({ ...pair, ...await chrome.evaluate(page, expression) });
     }

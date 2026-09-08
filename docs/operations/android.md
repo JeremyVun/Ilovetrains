@@ -6,18 +6,36 @@ API at `https://ilovetrains.jeremyvun.com`; there is no TfNSW key in the APK.
 
 ## Build
 
-Install Java 17 and Android SDK platform/build-tools 36. The Gradle wrapper
+Install Java 17, Android SDK platform 36.1 and build-tools 36. The Gradle wrapper
 pins the build; set `JAVA_HOME` and `ANDROID_HOME` as needed. The helper uses
 the usual Homebrew Java 17 and macOS SDK locations when available.
 
 ```sh
 tools/build-android.sh            # debug APK, JVM tests and Android lint
+tools/build-android.sh --unit     # JVM suite only, for iteration
+tools/build-android.sh --unit '*OfflineRealtimeTest' # optional JUnit filters
 tools/build-android.sh --release  # signed/shrunk APK, release tests and lint
 ```
 
 No build script reads or sources an `.env` file. The offline bootstrap is
 bundled in the application, so installing and creating a trip does not require
 a first online session. Its coverage is visible in Settings.
+
+Build helpers retain full output in the printed log path and report elapsed
+time. Set `TEST_VERBOSE=1` to stream it or `TEST_LOG_DIR` to retain CI artifacts.
+Gradle's local build cache is enabled; keep `android/.gradle` and build outputs
+between iterations. The default gate still includes assembly, all JVM tests
+and lint; `--unit` is a narrower iteration command, not feature closeout.
+
+Start an existing, session-owned emulator with
+`tools/start-android-emulator.sh AVD_NAME 5554` (choose a free even port).
+The launcher uses host graphics, 4 GB RAM (`ANDROID_EMULATOR_MEMORY` overrides)
+and Quick Boot without wiping data. It reuses that same running AVD/port without
+changing its configuration. Set the printed `ANDROID_SERIAL` for every drive.
+Stop your device with `adb -s "$ANDROID_SERIAL" emu kill` when finished; this
+saves its Quick Boot state. Changing renderer can change rasterization, so
+inspect the resulting baseline diffs. System notification/API-version tests
+still need their specified dedicated AVD and app-state reset.
 
 The release helper creates a local signing identity on first use in
 `~/.local/share/ilovetrains/android-signing/`, restricted to the owner. Preserve

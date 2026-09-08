@@ -444,6 +444,50 @@ of the full-journey key used for refreshes and board rows. Browsing another trip
 never exits travel mode, and there is no "not on it" control: a wrong entry
 that is not a redirect ends by expiry or by `Pin this train`.
 
+### Native tracker sessions
+
+Android keeps tracker lifecycle metadata in app-private `tracker-v1` preferences,
+separate from the personal document. It stores one active focus identity and
+revision generation, the exact suppressed identity with its dismissal or
+completion reason, and whether notification permission has been requested.
+Journey snapshots and effective times remain in the existing focus. Identity is
+the saved trip ID, direction and ordered service-leg key; an updated estimate or
+platform does not create a new tracker.
+
+Automatic inferred entry starts a tracker session, subject to OS permission.
+Pinning alone does not start one. Replacing focus during an active session also
+replaces the tracker, including a deliberate replacement pin. Browsing another
+board has no effect. Temporary mode/cap hiding removes the system surface while
+retaining its session and suppression metadata; deleting the trip or removing
+focus ends it.
+
+Dismissal suppresses recreation for that exact focus without clearing focus,
+changing a pin or writing a ride. Completion ends the session without a retained
+summary. A tracker clock reaching its endpoint never settles a ride; the existing
+refresh and location completion rules above retain sole authority. A stale
+surface tap or asynchronous update cannot restore a replaced focus. A valid tap
+opens the matching focus with its own trip, direction and source evidence.
+Completion suppression may clear when an accepted refresh moves that same
+journey's effective arrival back into the future and no recorded completion
+remains. Dismissal suppression does not clear on an estimate change.
+
+The Android Activity and foreground service share one application-scoped state
+owner and the existing serialized personal-document writer. The service must
+not maintain a second writable personal snapshot. Its background work refreshes
+the followed service; it does not browse boards, infer new travel from location,
+or poll unrelated flags and timetable downloads.
+
+iOS keeps lifecycle metadata in app-private `tracker-v1.json`, separately from
+the personal document and excluded from backup. It retains the exact focus
+identity, session UUID, generation, ActivityKit identifier and suppression
+reason. The widget receives a display payload through ActivityKit and does not
+read or write personal storage. Relaunch reconciles the persisted session with
+the system's activities; a dismissed activity must not reappear for the same
+focus. A session-bound URL opens only the still-matching focused journey.
+Serial publication and reconciliation prevent older work from restoring a
+replaced session. The iOS execution limits are in
+[ios-deviations.md](ios-deviations.md#persistent-travel-tracker).
+
 ## Where the header starts: `locate`
 
 Outside travel mode the header starts where the user is. The controller passes

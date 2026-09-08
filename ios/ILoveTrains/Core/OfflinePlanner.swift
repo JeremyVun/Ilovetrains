@@ -196,7 +196,13 @@ actor OfflinePlanner {
         let result = realtime.overlay(scheduled) { source, stopId in
             self.assignmentFor(database, source: source, stopId: stopId)
         }
-        return FocusUpdate(journey: result.value, observedAt: result.observedAt, live: result.matched)
+        let live = !scheduled.legs.isEmpty && scheduled.legs.indices.allSatisfy(result.matchedLegIndices.contains)
+        return FocusUpdate(
+            journey: result.value,
+            observedAt: result.observedAt,
+            live: live,
+            matchedLegIndices: result.matchedLegIndices
+        )
     }
 
     func update(baseURL: String) async throws {

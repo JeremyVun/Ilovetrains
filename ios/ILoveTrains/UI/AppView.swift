@@ -41,6 +41,33 @@ private struct TrainAppContent: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("production-inference") {
+                VStack {
+                    HStack {
+                        Button(action: model.requestLocation) {
+                            Color.black.opacity(0.001).frame(width: 44, height: 44)
+                        }
+                        .accessibilityIdentifier("use-location")
+                        .accessibilityLabel("Use my location")
+                        Spacer()
+                    }
+                    Spacer()
+                }
+            }
+            if ProcessInfo.processInfo.arguments.contains("--tracker-case")
+                || ProcessInfo.processInfo.arguments.contains("--tracker-debug") {
+                Text(model.state.trackerDriverStatus)
+                    .font(.system(size: 1))
+                    .foregroundStyle(.clear)
+                    .frame(width: 1, height: 1)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .allowsHitTesting(false)
+                    .accessibilityIdentifier("tracker-driver-status")
+                    .accessibilityLabel(model.state.trackerDriverStatus)
+            }
+            #endif
+
             if model.state.ready, let message = model.state.message {
                 let undo = model.state.undoAvailable
                 Button(action: undo ? model.undoDelete : model.dismissMessage) {

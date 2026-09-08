@@ -16,13 +16,12 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 class MainActivity : ComponentActivity() {
-    private val model by viewModels<TrainViewModel>()
+    private val model by lazy { (application as TrainApplication).model }
     private var locationGeneration = 0L
     private var listener: LocationListener? = null
     private var locating = false
@@ -30,6 +29,15 @@ class MainActivity : ComponentActivity() {
     private var foreground = false
     private val handler = Handler(Looper.getMainLooper())
     private val locationManager get() = getSystemService(LocationManager::class.java)
+    private val notificationPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+        model.notificationPermissionResult()
+    }
+    private val notificationPermissionRequest: () -> Unit = {
+        if (android.os.Build.VERSION.SDK_INT >= 33) notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+    private val locationRequest: () -> Unit = { requestLocationFromSystem() }
+    private val silentLocation: () -> Unit = { if (hasLocation()) takeLocation() }
+    private val locationDisabled: () -> Unit = { stopLocation() }
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
         askingPermission = false
         val granted = permissions.values.any { it } || hasLocation()
@@ -44,24 +52,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        model.onLocationRequest = {
-            if (hasLocation() && !locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) && !locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                model.locationFailed(SetupLocationStatus.ServicesDisabled)
-                startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-            } else if (hasLocation()) takeLocation() else {
-                val asked = getPreferences(MODE_PRIVATE).getBoolean("locationAsked", false)
-                if (isLocationPermissionBlocked(asked, granted = false,
-                        shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_COARSE_LOCATION))) {
-                    model.locationFailed(SetupLocationStatus.Denied)
-                    startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:$packageName")))
-                } else {
-                    askingPermission = true
-                    permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-                }
-            }
-        }
-        model.onSilentLocation = { if (hasLocation()) takeLocation() }
-        model.onLocationDisabled = { stopLocation() }
+        model.attachActivity(this, locationRequest, silentLocation, locationDisabled, notificationPermissionRequest)
+        handleTrackerIntent(intent)
         setContent {
             val state = model.state.collectAsStateWithLifecycle().value
             val dark = when (state.appearance) { Appearance.Dark -> true; Appearance.Light -> false; Appearance.System -> isSystemInDarkTheme() }
@@ -76,6 +68,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         foreground = true
+        model.activityResumed()
         val granted = hasLocation()
         val asked = getPreferences(MODE_PRIVATE).getBoolean("locationAsked", false)
         model.permission(granted, isLocationPermissionBlocked(asked, granted,
@@ -84,7 +77,36 @@ class MainActivity : ComponentActivity() {
         model.resume()
         if (hasLocation() && model.state.value.ready && model.state.value.useLocation) takeLocation()
     }
-    override fun onStop() { foreground = false; stopLocation(); model.pause(); super.onStop() }
+    override fun onStop() { foreground = false; stopLocation(); model.activityStopped(); model.pause(); super.onStop() }
+    override fun onDestroy() {
+        stopLocation()
+        model.detachActivity(this, notificationPermissionRequest)
+        super.onDestroy()
+    }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleTrackerIntent(intent)
+    }
+    private fun handleTrackerIntent(intent: Intent?) {
+        if (intent?.action == TravelTrackerService.ActionOpen) intent.trackerRevision()?.let(model::openTrackedJourney)
+    }
+    private fun requestLocationFromSystem() {
+        if (hasLocation() && !locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) && !locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+            model.locationFailed(SetupLocationStatus.ServicesDisabled)
+            startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+        } else if (hasLocation()) takeLocation() else {
+            val asked = getPreferences(MODE_PRIVATE).getBoolean("locationAsked", false)
+            if (isLocationPermissionBlocked(asked, granted = false,
+                    shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_COARSE_LOCATION))) {
+                model.locationFailed(SetupLocationStatus.Denied)
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:$packageName")))
+            } else {
+                askingPermission = true
+                permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+            }
+        }
+    }
     private fun hasLocation() = checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED || checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     private fun stopLocation() {
         locating = false

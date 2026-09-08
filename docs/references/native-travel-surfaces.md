@@ -76,6 +76,16 @@ Introducing that infrastructure would change this project's device-only
 personal-state boundary and is outside the current proposal.
 [ActivityKit push updates](https://developer.apple.com/documentation/activitykit/starting-and-updating-live-activities-with-activitykit-push-notifications).
 
+Build API audit, 2026-09-08: `update(_:alertConfiguration:timestamp:)` uses
+`timestamp` to reject older observations; it does not schedule future content.
+The scheduled `request(...start:)` API starts a separate activity and requires
+an alert configuration. Neither supplies a timeline of local instruction
+updates for an existing activity. SwiftUI's `TimeDataSource` supports updating
+date text, but that alone does not establish arbitrary phase selection.
+[Update ordering](https://developer.apple.com/documentation/activitykit/activity/update(_:alertconfiguration:timestamp:)),
+[scheduled start](https://developer.apple.com/documentation/activitykit/activity/request(attributes:content:pushtype:style:alertconfiguration:start:)),
+[time data sources](https://developer.apple.com/documentation/swiftui/timedatasource).
+
 ## Engineering questions, not verified capabilities
 
 - Can each OS keep the next instruction useful throughout a multi-leg trip
@@ -116,3 +126,69 @@ treating a browser illustration as implementable system UI.
   recovery or physical-device power behavior. The build begins by proving
   these separately from layout. The accepted browser reference is preserved
   in [the calibration set](../../assets/comps/latest/travel-tracker/README.md).
+
+## Build execution evidence, 2026-09-08
+
+These later isolated probes used advancing wall clocks. They supersede the
+design-session limitation above for the specific behaviors tested, not for
+physical-device delivery or power use.
+
+| Platform/state | Observed behavior |
+| --- | --- |
+| Android 16 QPR2 foreground | `specialUse` service entered foreground; the system applied `PROMOTED_ONGOING`, beyond merely accepting a promotion request. |
+| Android background/locked | A 90-second synthetic journey crossed riding, transfer and final stages, then removed its notification and service. |
+| Android process death | A locked-app SIGKILL was followed by a sticky-service restart about 4.5 seconds later. The new process resumed the saved wall-clock phase and completed the same fixture. This is one observation, not a restart SLA. |
+| Android dismissal | Swiping the promoted card delivered `deleteIntent`; same-focus suppression survived force-stop and relaunch. |
+| Android permission denial | No foreground service started; relaunch did not repeat the notification prompt. |
+| Android 15 | The same APK used ordinary `BigTextStyle` and retained event, platform roles, change time, ETA and source timestamp. |
+| iOS 26.4 lock screen | The sentence composition and stale fallback rendered in ActivityKit; bounded timer and system progress continued with the app process absent. |
+| iOS compact/expanded island | Compact rendered a line label and bounded countdown. A scratch XCUITest long press opened the actual expanded surface; its leading place label clipped at the curved corner, and that prototype omitted destination ETA/progress. This is renderer evidence, not an accepted product exemplar. |
+| iOS minimal island | Two activities from distinct scratch apps produced the original train glyph in the attached island and the competitor glyph in the detached bubble. Both used the native minimal regions. |
+| iOS boundary/relaunch | Timer stopped at zero; no new leg instruction appeared without an update. Relaunch found the stale activity and could update or end it. |
+| iOS custom date formatter | `TimeDataSource` with a custom `DiscreteFormatStyle` compiled but rendered placeholders in the activity; it did not establish a usable instruction timeline. |
+
+Two concurrent same-app activities were accepted by ActivityKit but still
+produced one compact island. Distinct app and extension bundle IDs were needed
+to exercise minimal selection on this simulator; its image had no Clock app for
+a timer-based contention check. Product verification must repeat the native
+surface checks and fix expanded-region width/curvature before accepting
+calibration.
+
+The integrated app subsequently rendered the approved sentence, platform roles,
+destination ETA and trip line on the actual lock screen and expanded island.
+Expanded-region safe insets corrected the clipped leading label and line ends.
+Its system countdown advanced with the app process absent, clamped at zero and
+switched to last-update provenance. However, the custom timer-backed progress
+style kept its marker at the origin: its configuration did not expose a usable
+fraction. The production trip line therefore uses the last app-published
+position. The earlier stock-progress probe does not establish autonomous motion
+for this custom marker. Native product frames are in the
+[iOS tracker gallery](../../assets/comps/latest/travel-tracker/ios/README.md).
+
+Android QPR2 promotion methods require compile SDK 36.1 and a runtime full-SDK
+36.1 guard. `ProgressStyle` itself works from API 36.0. The repository already
+uses AGP 8.13.1, which supports the minor-SDK configuration. QPR2's first long
+subtext clipped the offline timestamp: reserve that field for short provenance,
+move ETA into the title/body, or choose an ordinary expanded template when the
+required facts cannot fit. Android 16.0 itself was not captured by these probes.
+[QPR2 SDK setup](https://developer.android.com/about/versions/16/qpr2/setup-sdk).
+
+The later production-app capture exposed a further limit at font scale 1.3:
+`ProgressStyle` ellipsized destination/arrival text even though accessibility
+reported the full string. BigText with a stock determinate bar preserved all
+facts at that scale and on Android 15 in both schemes. The ordinary collapsed
+lock-screen template may omit the app-name field and truncate text; expanding
+it can open the locked notification shade. Inspect actual pixels and preserve
+collapsed evidence separately from the expanded content check.
+The tested BigText renderer also discarded a final-arrival `StrikethroughSpan`
+that remained present in notification extras. An explicit destination
+cancellation label is required; span metadata is not visual evidence.
+
+Do not use `setTimeoutAfter` to guarantee removal of a foreground-service
+notification. Android 16's timeout handler passes `FLAG_FOREGROUND_SERVICE` in
+the flags that prohibit cancellation. An unbounded countdown chronometer also
+does not advance instruction text. Force-stop and Task Manager stop prevent
+sticky restart until the user returns; deep sleep, OEM policy and battery use
+need physical-device verification.
+[NotificationManagerService](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android16-release/services/core/java/com/android/server/notification/NotificationManagerService.java),
+[sticky service lifecycle](https://developer.android.com/reference/android/app/Service#START_STICKY).

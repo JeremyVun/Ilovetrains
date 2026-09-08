@@ -269,6 +269,37 @@ marks it `LAST KNOWN` on the first run that finds no live update for it, rather
 than waiting out its board's freshness. A matching online journey takes the
 focus over, and the overlay stops refreshing it (owner ruling, 2026-09-07).
 
+Focused overlays track which individual legs matched a fresh update. A partial
+refresh replaces only those legs; unmatched legs retain their last estimates,
+platform assignments and cancellation state. The merged focus stays retained
+with the earlier of its prior source clock and the matched observations. Only a
+refresh matching every leg clears retention
+and advances the focus's source clock to the oldest matched observation. This
+does not change new-route planning: expired or missing updates still use the
+scheduled baseline there. Whole-focus freshness and ride settlement are separate
+decisions; a partial refresh cannot withdraw a completed ride merely because
+some other source is unavailable.
+
+## Native travel tracker data
+
+The Android system tracker projects the existing focus; it neither plans a
+second route nor sends personal tracker state to the API. Refreshes retain the
+focused service's exact identity, source timestamp, delays, platform assignments
+and cancellations. A failed request cannot renew freshness or replace an
+observed estimate with its earlier scheduled time. Background refresh uses the
+followed pair and the same exact-match online/local-overlay ownership rules as
+foreground refresh.
+
+Tracker stages and line progress derive from effective wall-clock times. They
+do not establish observed boarding, alighting or vehicle position. If an incoming
+leg's effective arrival is later than the onward departure, the tracker shows
+the broken connection and never advances into riding that onward leg. The
+destination clock becomes `Planned HH:mm`, rather than an achievable arrival
+estimate. A delayed earlier leg remains visible even if its arrival moves beyond
+the last leg's unchanged arrival. Cancellation retains the chosen service and
+does not select a replacement; only cancellation of the final leg strikes its
+arrival time.
+
 ## Sydney Trains service dates
 
 Sydney Trains trip updates carry no `start_date`. The server resolves one from

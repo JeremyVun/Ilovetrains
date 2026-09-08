@@ -9,6 +9,7 @@ final class TrainViewModel: ObservableObject {
     private let store: DeviceStore
     private let api: TransitAPI
     private let planner: OfflinePlanner
+    private let tracker: TravelTrackerController
     private var data = UserData()
     private var fix: Fix?
     private var explicit = false
@@ -19,6 +20,7 @@ final class TrainViewModel: ObservableObject {
     private var historyTask: Task<Void, Never>?
     private var earlierTask: Task<Void, Never>?
     private var realtimeTask: Task<Void, Never>?
+    private var trackerTask: Task<Void, Never>?
     private var loop: Task<Void, Never>?
     private var writeTask: Task<Void, Never>?
     private var bootstrap: Task<Void, Error>?
@@ -35,28 +37,40 @@ final class TrainViewModel: ObservableObject {
     private var redirectTargetId: String?
     private var pendingDeletion: PendingDeletion?
     private var undoTask: Task<Void, Never>?
+    private var pendingTrackerURL: URL?
     private let undoWindow: Duration
     let location = LocationService()
     #if DEBUG
     var seeded = false
     var networkDisabled = false
+    private var trackerDebugCountdown: String?
     #endif
 
-    init(store: DeviceStore = DeviceStore(), api: TransitAPI = TransitAPI(), planner: OfflinePlanner = OfflinePlanner(), undoWindow: Duration = defaultUndoWindow) {
+    init(
+        store: DeviceStore = DeviceStore(),
+        api: TransitAPI = TransitAPI(),
+        planner: OfflinePlanner = OfflinePlanner(),
+        tracker: TravelTrackerController? = nil,
+        undoWindow: Duration = defaultUndoWindow
+    ) {
         self.api = api; self.planner = planner; self.undoWindow = undoWindow
+        var trackerDirectory: URL?
         #if DEBUG
         if let domain = ProcessInfo.processInfo.environment["ILOVETRAINS_TEST_DOMAIN"], UUID(uuidString: domain) != nil {
             let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("UITests/" + domain)
             self.store = DeviceStore(directory: directory)
+            trackerDirectory = directory
         } else { self.store = store }
         #else
         self.store = store
         #endif
+        self.tracker = tracker ?? TravelTrackerController.live(directory: trackerDirectory)
         location.onPermission = { [weak self] granted, denied in self?.state.locationGranted = granted; self?.state.locationDenied = denied }
         location.onFix = { [weak self] in self?.receiveLocation($0) }
         location.onFailure = { [weak self] in self?.locationFailed($0) }
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--offline") { networkDisabled = true }
+        if configureTrackerCase() { seeded = true; return }
         if configureCalibration() { seeded = true; return }
         #endif
         bootstrap = Task { try await planner.initialize() }
@@ -65,6 +79,9 @@ final class TrainViewModel: ObservableObject {
 
     private func start() async {
         data = await store.load()
+        #if DEBUG
+        if configureTrackerDebugAfterLoad() { try? await store.save(data) }
+        #endif
         state.stations = (try? await store.stations()) ?? []
         if !canNetwork { settleFocus() }
         choosePrediction(); syncPersonal()
@@ -72,6 +89,7 @@ final class TrainViewModel: ObservableObject {
             publish(retainedOfflineBoard(cached), request: generation)
         }
         state.ready = true; state.screen = data.trips.isEmpty ? .setup : .home
+        if let url = pendingTrackerURL { pendingTrackerURL = nil; openTracker(url) }
         refresh(); refreshFlags()
         do { try await bootstrap?.value; state.timetableStatus = await planner.coverageDescription }
         catch { state.timetableStatus = "Offline timetable unavailable. Download it in Settings." }
@@ -114,6 +132,48 @@ final class TrainViewModel: ObservableObject {
         state.recentFrom = data.recentFrom; state.recentTo = data.recentTo
         state.tripMetadata = savedTripMetadata(data: data, fix: fix, selectedTripId: state.selectedTripId, selectedReverse: state.reverse, now: state.now)
         state.homeBoard = focus?.board ?? state.board
+        reconcileTracker(storedFocus: data.focus, visibleFocus: focus)
+    }
+    private func reconcileTracker(storedFocus: FocusedJourney?, visibleFocus: FocusedJourney?) {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if seeded && !arguments.contains("--tracker-case") && !arguments.contains("--tracker-debug") { return }
+        #endif
+        let now = state.now
+        let complete = storedFocus.map { focus in
+            data.rides.contains { $0.tripId == focus.tripId && $0.reverse == focus.reverse && $0.departure == focus.journey.departure }
+        } ?? false
+        #if DEBUG
+        let debugCountdown = trackerDebugCountdown
+        #else
+        let debugCountdown: String? = nil
+        #endif
+        let previous = trackerTask
+        let tracker = tracker
+        #if DEBUG
+        if trackerDebugCommand == "inspect" {
+            trackerTask = Task {
+                await previous?.value
+                let status = await tracker.debugInspect(focus: storedFocus)
+                publishTrackerDebugStatus(status)
+            }
+            return
+        }
+        #endif
+        trackerTask = Task {
+            await previous?.value
+            await tracker.reconcile(
+                focus: storedFocus,
+                visibleFocus: visibleFocus,
+                now: now,
+                recordedComplete: complete,
+                debugStaticCountdown: debugCountdown
+            )
+            #if DEBUG
+            await tracker.awaitPublications()
+            publishTrackerDebugStatus(await tracker.debugStatus())
+            #endif
+        }
     }
     private func choosePrediction() {
         if explicit, data.trips.contains(where: { $0.id == state.selectedTripId && compatible($0, modes: data.modes) }) {
@@ -277,10 +337,10 @@ final class TrainViewModel: ObservableObject {
                 let alternatives = try? await planner.plan(from: focus.board.from, to: focus.board.to, at: state.now - 900_000, modes: allModes, limit: 24, maxTransfers: data.offlineTransferBound)
                 guard !Task.isCancelled, sharedRequest == sharedGeneration, active else { return }
                 if sameFocus(focus) {
-                    // The overlay demotes only a focus it still owns; refreshFocus may have handed it to the API.
-                    let subject = update.live ? focus : data.focus?.demotedForLostOverlay()
-                    if let subject { data.focus = focusAfterRefresh(subject, update: update, alternatives: alternatives) }
-                    settleFocus(judgeClock: update.live); persist(); syncPersonal()
+                    if let subject = data.focus {
+                        data.focus = focusAfterRefresh(subject, update: update, alternatives: alternatives)
+                    }
+                    settleFocus(judgeClock: update.canJudgeClock); persist(); syncPersonal()
                 }
             }
             guard fetched, state.now - lastTimetableCheck >= 21_600_000 else { return }
@@ -417,6 +477,25 @@ final class TrainViewModel: ObservableObject {
             }
         }
         recordHistory(); state.screen = .detail; state.detail = journey
+    }
+    func openTracker(_ url: URL) {
+        guard state.ready else { pendingTrackerURL = url; return }
+        Task {
+            guard let identity = await tracker.focusIdentity(for: url),
+                  let focus = data.focus, focus.trackerIdentity == identity else { return }
+            state.selectedTripId = focus.tripId
+            state.reverse = focus.reverse
+            state.board = focus.board
+            state.homeBoard = focus.board
+            state.detail = focus.journey
+            state.screen = .detail
+            state.receipt = nil
+            state.selectionPredicted = false
+            recordHistory()
+            #if DEBUG
+            publishTrackerDebugStatus(await tracker.debugStatus())
+            #endif
+        }
     }
     func pinJourney(_ journey: Journey) {
         guard !journey.cancelled, let id = state.selectedTripId, var board = state.board, let pair = ends(), board.from.id == pair.0.id, board.to.id == pair.1.id else { return }
@@ -669,6 +748,157 @@ func redirectMatch(for original: Journey, in candidates: [Journey]) -> Journey? 
 
 #if DEBUG
 private extension TrainViewModel {
+    var trackerDebugCommand: String? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "--tracker-debug"), index + 1 < arguments.count else { return nil }
+        return arguments[index + 1]
+    }
+
+    func publishTrackerDebugStatus(_ controllerStatus: String) {
+        state.trackerDriverStatus = controllerStatus
+            + "|focus=\(data.focus?.tripId ?? "none")"
+            + "|screen=\(state.screen.rawValue)"
+            + "|selected=\(state.selectedTripId ?? "none")"
+            + "|pinned=\(data.focus?.pinned.description ?? "none")"
+            + "|by=\(data.focus?.pinned == false ? "inferred" : data.focus == nil ? "none" : "pin")"
+    }
+
+    func configureTrackerDebugAfterLoad() -> Bool {
+        guard let command = trackerDebugCommand else { return false }
+        let now = epochNow()
+        switch command {
+        case "wall-start":
+            data = debugTrackerData(id: "wall-clock", now: now, boundarySeconds: 60)
+        case "dismiss-start":
+            data = debugTrackerData(id: "dismiss-original", now: now)
+        case "permission-start":
+            data = debugTrackerData(id: "permission-focus", now: now)
+        case "replacement":
+            data = debugTrackerData(id: "replacement", now: now, destination: "Rouse Hill Station")
+        case "foreground-end":
+            data.focus = nil
+        case "production-inference":
+            var seeded = debugTrackerData(id: "inferred", now: now)
+            let focus = seeded.focus!
+            seeded.focus = nil
+            seeded.lastAnswer = LastAnswer(
+                tripId: focus.tripId,
+                reverse: focus.reverse,
+                at: focus.journey.effectiveDeparture - 60_000,
+                stationId: focus.board.from.id,
+                board: focus.board,
+                journey: focus.journey
+            )
+            data = seeded
+        case "inspect", "foreground-transfer":
+            return false
+        default:
+            return false
+        }
+        state.now = now
+        return true
+    }
+
+    func debugTrackerData(
+        id: String,
+        now: Millis,
+        boundarySeconds: Double = 600,
+        destination: String = "Kellyville Station"
+    ) -> UserData {
+        let mascot = Station(id: "202010", name: "Mascot Station", lat: -33.9258, lon: 151.1934, modes: ["train"])
+        let central = Station(id: "200060", name: "Central Station", lat: -33.8840, lon: 151.2062, modes: ["train", "metro"])
+        let end = Station(id: "215500", name: destination, lat: -33.7120, lon: 150.9350, modes: ["metro"])
+        let first = Leg(
+            line: "T8", mode: "train", headsign: "City Circle via Airport", from: mascot, to: central,
+            departure: now - 300_000, arrival: now + boundarySeconds * 1_000,
+            estimatedDeparture: now - 300_000, estimatedArrival: now + boundarySeconds * 1_000,
+            fromPlatform: "1", toPlatform: "21"
+        )
+        let last = Leg(
+            line: "M1", mode: "metro", headsign: "Tallawong", from: central, to: end,
+            departure: now + 240_000, arrival: now + 3_600_000,
+            estimatedDeparture: now + 240_000, estimatedArrival: now + 3_600_000,
+            fromPlatform: "26", toPlatform: "2"
+        )
+        let journey = Journey(legs: [first, last])
+        let board = BoardData(from: mascot, to: end, journeys: [journey], generatedAt: now, source: "live")
+        let trip = SavedTrip(id: id, from: mascot, to: end, createdAt: now, lines: ["T8", "M1"])
+        return UserData(
+            trips: [trip],
+            lastTripId: trip.id,
+            focus: FocusedJourney(tripId: trip.id, reverse: false, journey: journey, board: board, pinned: false)
+        )
+    }
+
+    func configureTrackerCase() -> Bool {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "--tracker-case"), index + 1 < arguments.count else { return false }
+        let name = arguments[index + 1]
+        var central = Station(id: "200060", name: "Central Station", modes: ["train", "metro"])
+        let mascot = Station(id: "202010", name: "Mascot Station", modes: ["train"])
+        var kellyville = Station(id: "215500", name: "Kellyville Station", modes: ["metro"])
+        let departure = trackerFixtureTime(hour: 4, minute: 38)
+        let changeArrival = trackerFixtureTime(hour: 4, minute: 49)
+        var onwardDeparture = trackerFixtureTime(hour: 4, minute: 56)
+        let arrival = trackerFixtureTime(hour: 5, minute: 46)
+        var now = trackerFixtureTime(hour: 4, minute: 44)
+        if name == "transfer" { now = trackerFixtureTime(hour: 4, minute: 52) }
+        if name == "final" { now = trackerFixtureTime(hour: 5, minute: 39) }
+        if name == "tight-transfer" { onwardDeparture = trackerFixtureTime(hour: 4, minute: 53) }
+        if name == "missed-connection" { onwardDeparture = trackerFixtureTime(hour: 4, minute: 48) }
+        if name == "long-content" {
+            central.name = "International Airport Station"
+            kellyville.name = "Bondi Junction Station"
+        }
+        var first = Leg(
+            line: "T8", mode: "train", headsign: "City Circle via Airport",
+            from: mascot, to: central, departure: departure, arrival: changeArrival,
+            estimatedDeparture: departure, estimatedArrival: changeArrival,
+            fromPlatform: "1", toPlatform: name == "unknown-platform" ? nil : "21"
+        )
+        var last = Leg(
+            line: "M1", mode: "metro", headsign: "Tallawong",
+            from: central, to: kellyville, departure: onwardDeparture, arrival: arrival,
+            estimatedDeparture: onwardDeparture, estimatedArrival: arrival,
+            fromPlatform: "26", toPlatform: "2"
+        )
+        if name == "first-leg-cancelled" { first.cancelled = true }
+        if name == "final-leg-cancelled" { last.cancelled = true }
+        var journey = Journey(legs: [first, last])
+        let offline = name == "offline-stale"
+        if offline { journey.retained = true }
+        let generatedAt = offline ? trackerFixtureTime(hour: 4, minute: 42) : now
+        let board = BoardData(
+            from: mascot, to: kellyville, journeys: [journey], generatedAt: generatedAt,
+            source: "live", offline: offline
+        )
+        let trip = SavedTrip(id: "tracker-mascot", from: mascot, to: kellyville, createdAt: now, lines: ["T8", "M1"])
+        data = UserData(trips: [trip], lastTripId: trip.id,
+                        focus: FocusedJourney(tripId: trip.id, reverse: false, journey: journey, board: board, pinned: false))
+        state.now = now
+        state.trips = [trip]
+        state.selectedTripId = trip.id
+        state.board = board
+        state.homeBoard = board
+        state.screen = .home
+        state.ready = true
+        trackerDebugCountdown = TravelTrackerState.derive(focus: data.focus!, now: now, generation: 1)?.headline.emphasis ?? ""
+        syncPersonal()
+        return true
+    }
+
+    func trackerFixtureTime(hour: Int, minute: Int) -> Millis {
+        var components = DateComponents()
+        components.calendar = sydneyCalendar
+        components.timeZone = sydneyZone
+        components.year = 2026
+        components.month = 9
+        components.day = 1
+        components.hour = hour
+        components.minute = minute
+        return components.date!.timeIntervalSince1970 * 1_000
+    }
+
     func configureCalibration() -> Bool {
         let arguments = ProcessInfo.processInfo.arguments
         guard let index = arguments.firstIndex(of: "--calibration"), index + 1 < arguments.count else { return false }

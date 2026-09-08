@@ -94,8 +94,9 @@ moves through are binding in `docs/contracts/ui.md`.
    - **Offline is a first-class citizen.** Reception on train lines is
      spotty. The shell installs, the last board is always viewable, a
      focused journey stays viewable after it departs, and a stale board
-     tells the truth (clock times, `OFFLINE · LAST UPDATED X AGO`) rather
-     than counting down from an old cache.
+     tells the truth about its source. Future events retain their numerical
+     countdown and last-known estimates, accompanied by offline/update
+     provenance; connectivity loss never erases an observed delay.
 3. **Routes and transfers just work.** Journey planning must be good enough
    that the user never wants to configure it. The one justified exception is
    the transfer limit, because a journey with more than two changes cannot

@@ -348,25 +348,47 @@ struct FocusUpdate: Equatable, Sendable {
     var journey: Journey
     var observedAt: Millis?
     var live: Bool
+    var matchedLegIndices: Set<Int>
+    var canJudgeClock: Bool { !matchedLegIndices.isEmpty }
 
-    init(journey: Journey, observedAt: Millis? = nil, live: Bool = false) {
+    init(
+        journey: Journey,
+        observedAt: Millis? = nil,
+        live: Bool = false,
+        matchedLegIndices: Set<Int>? = nil
+    ) {
         self.journey = journey
         self.observedAt = observedAt
         self.live = live
+        self.matchedLegIndices = matchedLegIndices ?? (live ? Set(journey.legs.indices) : [])
     }
 }
 
 func focusAfterRefresh(_ focus: FocusedJourney, update: FocusUpdate, alternatives: BoardData?) -> FocusedJourney {
+    guard update.journey.key == focus.journey.key,
+          update.journey.legs.count == focus.journey.legs.count else {
+        var retained = focus.lastKnown()
+        retained.alternatives = alternatives ?? focus.alternatives
+        return retained
+    }
     var result = focus
+    let merged = Journey(legs: focus.journey.legs.enumerated().map { index, leg in
+        update.matchedLegIndices.contains(index) ? update.journey.legs[index] : leg
+    })
     if update.live {
-        result.journey = update.journey
-        result.board.journeys = [update.journey]
+        result.journey = merged
+        result.board.journeys = [merged]
         result.board.generatedAt = update.observedAt ?? focus.board.generatedAt
         result.board.source = "live"
         result.board.offline = false
         result.board.serverStale = false
     } else {
-        result = focus.lastKnown()
+        var retained = merged
+        retained.retained = true
+        result.journey = retained
+        result.board.journeys = [retained]
+        result.board.generatedAt = min(focus.board.generatedAt, update.observedAt ?? focus.board.generatedAt)
+        result.board.offline = true
     }
     if let alternatives { result.alternatives = alternatives }
     return result

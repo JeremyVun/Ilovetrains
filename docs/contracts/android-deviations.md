@@ -12,6 +12,53 @@ This file records deliberate differences between the native Android app and the 
 - Native v1 leaves anonymous analytics counters off. This avoids mixing native renderer adoption and prediction behavior into the existing web-only experiment; functional feedback submission still works.
 - Android stores user state in app-private atomic files and excludes it from cloud backup and device transfer. The native trip list is not capped at the web client’s ten-trip LRU, and each trip has the explicit native deletion menu described above.
 
+## Persistent travel tracker
+
+Automatic inferred travel-mode entry requests notification permission once,
+while foregrounded. Denial preserves in-app travel mode without repeated prompts
+or an invisible foreground service. Permission and lock-screen content settings
+remain under Android's control. Tracker notifications use private visibility;
+the feature requests no background location access or wake lock.
+
+The tracker uses a `specialUse` foreground service and standard notification
+templates. Android 16 supports the segmented progress style. Android 16 QPR2
+(API 36.1) additionally receives a promotion request; promotion is decided by
+the OS. Android 16 without promotion and older releases retain an ordinary
+notification, with an expanded text fallback whenever the progress template
+cannot preserve the required journey facts.
+Enlarged system text uses that fallback: the progress template ellipsizes
+required destination/arrival text at font scale 1.3. For a coherent timetable,
+the ordinary template keeps a single determinate progress bar alongside the
+expanded instructions; Android controls its position and styling.
+An impossible connection always uses that fallback: overlapping effective leg
+times cannot form the sequential segments of Android's progress template. A
+valid trip line has one moving marker and no extra dots at transfer boundaries.
+A missed connection reserves the collapsed title for its status and the body
+for the destination's `Planned` arrival. Its source provenance and explanation
+of the conflicting times remain in expanded content. Other ordinary cards keep
+their provenance subtext. Android controls collapsed and expanded geometry.
+If the final leg is cancelled, the destination line says `Cancelled (HH:mm)`.
+The notification retains a strike span on the clock, but the tested System UI
+strips that styling, so the word carries the meaning. Earlier-leg-only
+cancellation keeps the normal destination ETA.
+
+The title states the next event and numerical countdown. Instructions name the
+alighting and onward boarding platforms with explicit roles, the change window
+or departure deadline, destination and arrival time. Source provenance uses the
+observation clock, never notification-posting time. Keep absolute event and
+update clocks readable in expanded content. There is no unbounded chronometer
+beside an expired instruction or persistent `Live` label. Ferry side-only labels
+remain `Side A`/`Side B`, following the shared platform vocabulary.
+
+The service recomputes presentation from wall time and refreshes the focused
+service while the app is backgrounded. Sticky process restart can restore the
+same session, subject to Android scheduling. Force-stop and Task Manager stop
+prevent execution until the app is opened again. Foreground notifications are
+excluded from notification timeouts; a timeout is not a completion mechanism.
+These are best-effort updates, without a claim of uninterrupted delivery through
+process starvation, Doze or vendor battery restrictions. Session, dismissal and
+completion rules are in [client-storage.md](client-storage.md#native-tracker-sessions).
+
 ## Feedback fixes — 2026-09-07
 
 - Settings gives Use location, Home and Transfer limit 72dp minimum rows with 10dp vertical padding, where the web composition is 56px. Transfer limit uses that row without its icon column, so its title sits at the page margin. Service choices show only `On` or `Off`, without checkmarks, circles or underlines. Appearance keeps the selected checkmark, removes the underline and reserves the System subtitle's space in every option so previews and labels align.

@@ -1,0 +1,109 @@
+{
+  "tripId": "mascot-kellyville",
+  "reverse": false,
+  "base": {
+    "source": "live",
+    "legs": [
+      {
+        "line": "T8", "mode": "train", "headsign": "City Circle via Airport",
+        "from": {"id": "202010", "name": "Mascot Station"},
+        "to": {"id": "200060", "name": "Central Station"},
+        "departure": 1788806280000, "arrival": 1788806940000,
+        "fromPlatform": "1", "toPlatform": "21"
+      },
+      {
+        "line": "M1", "mode": "metro", "headsign": "Tallawong",
+        "from": {"id": "200060", "name": "Central Station"},
+        "to": {"id": "215510", "name": "Kellyville Station"},
+        "departure": 1788807360000, "arrival": 1788810360000,
+        "fromPlatform": "26", "toPlatform": "2"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "ride", "now": 1788806640000,
+      "expected": {
+        "stage": "ride", "activeLeg": 0, "eventName": "Central", "countdown": 5,
+        "headlineLead": "Central in ", "headlineEmphasis": "5 min.",
+        "instruction": "Get off on Platform 21, then take M1 from Platform 26.",
+        "connection": "7 min to change", "destination": "Kellyville", "eta": "about 05:46",
+        "segmentsMinutes": [11, 7, 50], "progressNumerator": 6, "progressDenominator": 68,
+        "platforms": ["alight:Platform 21", "board:Platform 26"], "tight": false,
+        "freshness": "live", "provenance": "Live"
+      }
+    },
+    {
+      "name": "transfer", "now": 1788807120000,
+      "expected": {
+        "stage": "transfer", "activeLeg": 1, "eventName": "M1", "countdown": 4,
+        "headlineLead": "M1 leaves in ", "headlineEmphasis": "4 min.",
+        "instruction": "Go to Platform 26 for Tallawong.", "connection": "Departs 04:56",
+        "destination": "Kellyville", "eta": "about 05:46", "segmentsMinutes": [11, 7, 50],
+        "progressNumerator": 14, "progressDenominator": 68,
+        "platforms": ["board:Platform 26"], "tight": false,
+        "freshness": "live", "provenance": "Live"
+      }
+    },
+    {
+      "name": "final", "now": 1788809940000,
+      "expected": {
+        "stage": "final", "activeLeg": 1, "eventName": "Kellyville", "countdown": 7,
+        "headlineLead": "Kellyville in ", "headlineEmphasis": "7 min.",
+        "instruction": "Get off on Platform 2.", "connection": null,
+        "destination": "Kellyville", "eta": "about 05:46", "segmentsMinutes": [11, 7, 50],
+        "progressNumerator": 61, "progressDenominator": 68,
+        "platforms": ["alight:Platform 2"], "tight": false,
+        "freshness": "live", "provenance": "Live"
+      }
+    },
+    {
+      "name": "unknown-platform", "now": 1788809940000, "finalPlatform": null,
+      "expected": {
+        "stage": "final", "activeLeg": 1, "eventName": "Kellyville", "countdown": 7,
+        "headlineLead": "Kellyville in ", "headlineEmphasis": "7 min.",
+        "instruction": "Get off at Kellyville.", "connection": null,
+        "destination": "Kellyville", "eta": "about 05:46", "segmentsMinutes": [11, 7, 50],
+        "progressNumerator": 61, "progressDenominator": 68,
+        "platforms": [], "tight": false, "freshness": "live", "provenance": "Live"
+      }
+    },
+    {
+      "name": "tight-transfer", "now": 1788807120000, "onwardDeparture": 1788807180000,
+      "expected": {
+        "stage": "transfer", "activeLeg": 1, "eventName": "M1", "countdown": 1,
+        "headlineLead": "M1 leaves in ", "headlineEmphasis": "1 min.",
+        "instruction": "Go to Platform 26 for Tallawong.", "connection": "Tight change · departs 04:53",
+        "destination": "Kellyville", "eta": "about 05:46", "segmentsMinutes": [11, 4, 53],
+        "progressNumerator": 14, "progressDenominator": 68,
+        "platforms": ["board:Platform 26"], "tight": true,
+        "freshness": "live", "provenance": "Live"
+      }
+    },
+    {
+      "name": "offline-stale", "now": 1788806640000, "generatedAt": 1788806520000,
+      "offline": true, "retained": true,
+      "expected": {
+        "stage": "ride", "activeLeg": 0, "eventName": "Central", "countdown": 5,
+        "headlineLead": "Central in ", "headlineEmphasis": "5 min.",
+        "instruction": "Get off on Platform 21, then take M1 from Platform 26.",
+        "connection": "7 min to change", "destination": "Kellyville", "eta": "about 05:46",
+        "segmentsMinutes": [11, 7, 50], "progressNumerator": 6, "progressDenominator": 68,
+        "platforms": ["alight:Platform 21", "board:Platform 26"], "tight": false,
+        "freshness": "offline", "provenance": "Offline · Last updated 04:42"
+      }
+    },
+    {
+      "name": "long-content", "now": 1788806640000, "changeName": "Bondi Junction Station",
+      "expected": {
+        "stage": "ride", "activeLeg": 0, "eventName": "Bondi Junction", "countdown": 5,
+        "headlineLead": "Bondi Junction in ", "headlineEmphasis": "5 min.",
+        "instruction": "Get off on Platform 21, then take M1 from Platform 26.",
+        "connection": "7 min to change", "destination": "Kellyville", "eta": "about 05:46",
+        "segmentsMinutes": [11, 7, 50], "progressNumerator": 6, "progressDenominator": 68,
+        "platforms": ["alight:Platform 21", "board:Platform 26"], "tight": false,
+        "freshness": "live", "provenance": "Live"
+      }
+    }
+  ]
+}

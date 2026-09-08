@@ -396,6 +396,8 @@ When the flag is off, the trip line remains unchanged and does no animation work
   frame and corner radius to end/start overlapping ride paint inside the chip body; do not
   add ground-colour masks or spacer strips (owner ruling, 2026-09-08).
   Temporal anchors and actual dwell gaps remain unchanged.
+  The boarding cap and both transfer chips use a 3px radius on all four
+  corners on web, 3dp on Android and 3pt on iOS (owner ruling, 2026-09-08).
 - A tight change paints the dwell segment of the journey axis in the warning
   colour, and nothing else: never a ride segment, and never on a cancelled row.
   The row does not name the window; journey detail does.
@@ -637,10 +639,12 @@ than left to rot.
 
 An accepted, not-yet-built design may be retained here as an explicitly labelled
 visual target with its reproducible comp source. The 2026-09-08
-[travel tracker target](../../assets/comps/latest/travel-tracker/README.md) is
-such a reference: short prose plus the quiet trip line, accepted for the next
-build session. Its browser frames do not establish shipped native behavior.
-Replace them with verified native exemplars when implementation lands. Platform
+[travel tracker target](../../assets/comps/latest/travel-tracker/README.md) uses
+short prose plus the quiet trip line. Its browser frames remain the iOS visual
+target; [Android calibration](../../assets/comps/latest/travel-tracker/android/README.md)
+contains actual system-rendered cards from the production integration. Neither
+set establishes completion of the remaining native verification gates.
+Replace illustrations with verified native exemplars as implementation lands. Platform
 boxes on that line remain an optional visual follow-up, not part of the accepted
 baseline. The active behavior/design boundary is in its
 [backlog handoff](../backlog/persistent-travel-tracker/design.md).

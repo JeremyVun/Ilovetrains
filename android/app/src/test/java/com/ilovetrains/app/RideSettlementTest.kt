@@ -82,4 +82,37 @@ class RideSettlementTest {
         assertEquals(1, emptyList<Ride>().settled(moved, arrived = later >= moved.journey.effectiveArrival).size)
         assertEquals(1, emptyList<Ride>().settled(stale, arrived = now >= stale.journey.effectiveArrival).size)
     }
+
+    @Test fun aPartialFreshRefreshCanConfirmAPastArrivalWithoutClaimingGlobalFreshness() {
+        val first = Leg("T1", "train", "Central", central, central, now - 30 * 60_000, now - 20 * 60_000)
+        val final = Leg(
+            "M1", "metro", "Parramatta", central, parramatta,
+            now - 15 * 60_000,
+            now - 10 * 60_000,
+            estimatedArrival = now - 5 * 60_000,
+        )
+        val priorJourney = Journey(listOf(first, final))
+        val prior = FocusedJourney(
+            "work",
+            false,
+            priorJourney,
+            BoardData(central, parramatta, listOf(priorJourney), now, source = "live"),
+        )
+        val recorded = emptyList<Ride>().settled(prior, arrived = true)
+        val correctedJourney = Journey(listOf(first, final.copy(estimatedArrival = now - 60_000)))
+        val update = FocusedRefresh(
+            correctedJourney,
+            observedAt = now,
+            live = false,
+            matchedLegIndices = setOf(1),
+        )
+        val corrected = focusAfterRefresh(prior, update, alternatives = null)
+
+        assertFalse(update.live)
+        assertTrue(update.canJudgeClock)
+        assertEquals(
+            now - 60_000,
+            recorded.settled(corrected, arrived = update.canJudgeClock && now >= corrected.journey.effectiveArrival).single().arrival,
+        )
+    }
 }

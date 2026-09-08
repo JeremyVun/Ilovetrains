@@ -1,0 +1,28 @@
+/* Option 1, unchanged hierarchy; a quiet trip trace is the owner-requested addition. */
+:root{--card:#202327;--card-ink:#F4F5F7;--quiet:#ADB0B4;--wall:#10191E;--clock:#DBE2E5;}
+@media(prefers-color-scheme:light){:root{--card:#FAF9F5;--card-ink:#14120E;--quiet:#5C5B58;--wall:#D1DFE4;--clock:#25414D;}}
+html,body,#app{width:100%;height:100%;overflow:hidden}
+body{margin:0;background:var(--wall);color:var(--card-ink);font-family:var(--sans)}
+.lock-screen{height:100%;position:relative;background:linear-gradient(157deg,color-mix(in srgb,var(--wall) 86%,var(--line-M1)),var(--wall) 67%)}
+.status-bar{height:44px;padding:15px 24px 0;display:flex;justify-content:space-between;color:var(--clock);font-size:13px;font-weight:600}
+.lock-clock{text-align:center;padding-top:42px;color:var(--clock)}
+.lock-clock span{display:block;font-size:17px;font-weight:500}
+.lock-clock strong{display:block;margin-top:4px;font-size:76px;letter-spacing:-.045em;font-weight:250;line-height:1}
+.tracker-card{position:absolute;bottom:72px;left:12px;right:12px;height:160px;background:var(--card);border-radius:24px;padding:17px 20px 15px;overflow:hidden;color:var(--card-ink)}
+.tracker-card h1{font-size:23px;font-weight:450;letter-spacing:-.035em;line-height:1.1;margin:0;white-space:nowrap}
+.tracker-card h1 b{font-weight:650}
+.tracker-card p{font-size:15px;line-height:1.3;margin-top:9px;font-weight:400;max-width:326px;color:var(--quiet)}
+.tracker-card p b{font-weight:600;color:var(--card-ink)}
+.connection{display:flex;justify-content:space-between;gap:8px;margin-top:5px;font-size:11px;color:var(--quiet);line-height:15px;white-space:nowrap}
+.provenance{font-size:10px;letter-spacing:-.01em}
+.arrival{position:absolute;left:20px;right:20px;bottom:29px;display:flex;justify-content:space-between;gap:8px;font-size:12px;line-height:15px;color:var(--quiet)}
+.arrival span:last-child{font-variant-numeric:tabular-nums;white-space:nowrap}
+.trip-trace{position:absolute;left:20px;right:20px;bottom:12px;display:flex;height:7px;border-radius:3px;background:var(--rule-2)}
+.trip-trace i{display:block;height:7px}
+.trace-0{background:var(--line-fill-T8);border-radius:3px 0 0 3px}
+.trace-1{background:var(--quiet);opacity:.2}
+.trace-2{background:var(--line-fill-M1);border-radius:0 3px 3px 0}
+.trace-now{position:absolute;left:var(--progress);top:-2px;width:11px;height:11px;transform:translateX(-50%);border-radius:50%;background:var(--card-ink);box-shadow:0 0 0 2px var(--card)}
+.warning h1{color:var(--warn)}
+.home-indicator{position:absolute;bottom:9px;width:132px;left:50%;transform:translateX(-50%);height:5px;border-radius:5px;background:var(--clock);opacity:.7}
+@media(max-height:760px){.lock-clock{padding-top:20px}.lock-clock strong{font-size:66px}.tracker-card{bottom:62px}}

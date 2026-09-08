@@ -13,6 +13,7 @@ struct ILoveTrainsApp: App {
                     if phase == .active { model.resume() } else if phase == .background { model.pause() }
                 }
                 .onAppear { if scenePhase == .active { model.resume() } }
+                .onOpenURL { model.openTracker($0) }
         }
     }
 }

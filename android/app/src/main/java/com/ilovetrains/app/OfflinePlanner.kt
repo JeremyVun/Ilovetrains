@@ -21,7 +21,14 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.zip.ZipInputStream
 
-data class FocusedRefresh(val journey: Journey, val observedAt: Long?, val live: Boolean)
+data class FocusedRefresh(
+    val journey: Journey,
+    val observedAt: Long?,
+    val live: Boolean,
+    val matchedLegIndices: Set<Int> = if (live) journey.legs.indices.toSet() else emptySet(),
+) {
+    val canJudgeClock: Boolean get() = matchedLegIndices.isNotEmpty()
+}
 
 class OfflinePlanner(
     context: Context,
@@ -130,13 +137,18 @@ class OfflinePlanner(
         realtime.refresh(baseUrl)
     }
 
+    suspend fun refreshRealtime(baseUrl: String, sources: Set<String>) {
+        realtime.refresh(baseUrl, sources)
+    }
+
     suspend fun refreshFocused(journey: Journey): FocusedRefresh = withContext(Dispatchers.IO) {
         mutex.withLock {
             ensureOpen()
             val db = checkNotNull(database)
             val scheduled = scheduledFocusBaseline(journey) { source, stopId -> assignmentFor(db, source, stopId)?.platform }
             val result = realtime.overlay(scheduled) { source, stopId -> assignmentFor(db, source, stopId) }
-            FocusedRefresh(result.value, result.observedAt, result.matched)
+            val allLegsMatched = scheduled.legs.isNotEmpty() && scheduled.legs.indices.all { it in result.matchedLegIndices }
+            FocusedRefresh(result.value, result.observedAt, allLegsMatched, result.matchedLegIndices)
         }
     }
 

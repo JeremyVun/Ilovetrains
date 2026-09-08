@@ -60,6 +60,9 @@ struct AppState {
     var messageAutoDismiss = false
     var undoAvailable = false
     var earlierLoading = false
+    #if DEBUG
+    var trackerDriverStatus = "tracker=idle"
+    #endif
     var version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
     var transferLimitOffered: Bool { flags[transferLimitFlagKey] == true }
     var selectedTrip: SavedTrip? { trips.first { $0.id == selectedTripId } }

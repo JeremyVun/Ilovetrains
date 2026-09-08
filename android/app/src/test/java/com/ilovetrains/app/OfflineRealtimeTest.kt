@@ -53,8 +53,132 @@ class OfflineRealtimeTest {
         val result = realtime.overlay(Journey(listOf(leg))) { _, _ -> null }
 
         assertFalse(result.matched)
+        assertTrue(result.matchedLegIndices.isEmpty())
         assertNull(result.value.legs.single().estimatedDeparture)
         assertNull(result.value.legs.single().estimatedArrival)
+    }
+
+    @Test
+    fun focusedPartialSourceRefreshRetainsUnmatchedObservationsUntilEveryLegIsFresh() {
+        val realtime = OfflineRealtime()
+        val now = System.currentTimeMillis()
+        val middle = Station("B", "Bravo")
+        val destination = Station("C", "Charlie")
+        val first = Leg(
+            "T8", "train", "Bravo", from, middle, now + 10 * 60_000, now + 20 * 60_000,
+            estimatedDeparture = now + 11 * 60_000,
+            estimatedArrival = now + 21 * 60_000,
+            fromPlatform = "21",
+            toPlatform = "16",
+            identity = TripIdentity("sydneytrains", "rail", "20260907", "A-stop", "B-stop", 1, 2),
+        )
+        val second = Leg(
+            "M1", "metro", "Charlie", middle, destination, now + 24 * 60_000, now + 40 * 60_000,
+            estimatedDeparture = now + 29 * 60_000,
+            estimatedArrival = now + 45 * 60_000,
+            fromPlatform = "9",
+            toPlatform = "8",
+            cancelled = true,
+            identity = TripIdentity("metro", "metro-trip", "20260907", "B-stop", "C-stop", 1, 2),
+        )
+        val priorJourney = Journey(listOf(first, second))
+        val oldGeneratedAt = now - 60_000
+        val focus = FocusedJourney(
+            "mixed", false, priorJourney,
+            BoardData(from, destination, listOf(priorJourney), oldGeneratedAt, source = "live"),
+        )
+        assertTrue(realtime.accept(
+            snapshot(now, "scheduled", "", source = "sydneytrains", tripId = "rail", delaySeconds = 120),
+            "sydneytrains",
+            now,
+        ))
+
+        val firstBaseline = OfflinePlanner.scheduledFocusBaseline(priorJourney) { _, stop ->
+            mapOf("A-stop" to "1", "B-stop" to "2", "C-stop" to "3")[stop]
+        }
+        val firstOverlay = realtime.overlay(firstBaseline) { _, _ -> null }
+        val partial = focusAfterRefresh(
+            focus,
+            FocusedRefresh(
+                firstOverlay.value,
+                firstOverlay.observedAt,
+                live = false,
+                matchedLegIndices = firstOverlay.matchedLegIndices,
+            ),
+            alternatives = null,
+        )
+
+        assertEquals(setOf(0), firstOverlay.matchedLegIndices)
+        assertTrue(partial.board.offline)
+        assertEquals(first.departure + 120_000, partial.journey.legs[0].estimatedDeparture)
+        assertEquals(second.estimatedDeparture, partial.journey.legs[1].estimatedDeparture)
+        assertEquals(second.estimatedArrival, partial.journey.legs[1].estimatedArrival)
+        assertEquals("9", partial.journey.legs[1].fromPlatform)
+        assertEquals("8", partial.journey.legs[1].toPlatform)
+        assertTrue(partial.journey.legs[1].cancelled)
+        assertTrue(partial.journey.retained)
+        assertEquals(oldGeneratedAt, partial.board.generatedAt)
+
+        assertTrue(realtime.accept(
+            snapshot(now + 1_000, "scheduled", "", source = "metro", tripId = "metro-trip", delaySeconds = 180),
+            "metro",
+            now,
+        ))
+        val secondBaseline = OfflinePlanner.scheduledFocusBaseline(partial.journey) { _, stop ->
+            mapOf("A-stop" to "1", "B-stop" to "2", "C-stop" to "3")[stop]
+        }
+        val secondOverlay = realtime.overlay(secondBaseline) { _, _ -> null }
+        val restored = focusAfterRefresh(
+            partial,
+            FocusedRefresh(
+                secondOverlay.value,
+                secondOverlay.observedAt,
+                live = true,
+                matchedLegIndices = secondOverlay.matchedLegIndices,
+            ),
+            alternatives = null,
+        )
+
+        assertEquals(setOf(0, 1), secondOverlay.matchedLegIndices)
+        assertEquals(second.departure + 180_000, restored.journey.legs[1].estimatedDeparture)
+        assertEquals(second.arrival + 180_000, restored.journey.legs[1].estimatedArrival)
+        assertEquals("2", restored.journey.legs[1].fromPlatform)
+        assertEquals("3", restored.journey.legs[1].toPlatform)
+        assertFalse(restored.journey.legs[1].cancelled)
+        assertFalse(restored.journey.retained)
+        assertFalse(restored.board.offline)
+        assertEquals("live", restored.board.source)
+        assertEquals(now, restored.board.generatedAt)
+    }
+
+    @Test
+    fun partialObservationCannotBorrowANewerTimetableCaptureTime() {
+        val realtime = OfflineRealtime()
+        val now = System.currentTimeMillis()
+        val observedAt = now - 20_000
+        val capturedAt = now - 10_000
+        val destination = Station("C", "Charlie")
+        val first = Leg("T8", "train", "Bravo", from, to, now + 60_000, now + 600_000,
+            identity = TripIdentity("sydneytrains", "rail", "20260907", "A-stop", "B-stop", 1, 2))
+        val second = Leg("M1", "metro", "Charlie", to, destination, now + 900_000, now + 1_800_000,
+            identity = TripIdentity("metro", "metro-trip", "20260907", "B-stop", "C-stop", 1, 2))
+        val journey = Journey(listOf(first, second))
+        val focus = FocusedJourney("scheduled", false, journey,
+            BoardData(from, destination, listOf(journey), capturedAt, source = "schedule", offline = true))
+        assertTrue(realtime.accept(
+            snapshot(observedAt, "scheduled", "", source = "sydneytrains", tripId = "rail", delaySeconds = 120),
+            "sydneytrains", now,
+        ))
+        val overlay = realtime.overlay(journey) { _, _ -> null }
+
+        val partial = focusAfterRefresh(focus,
+            FocusedRefresh(overlay.value, overlay.observedAt, false, overlay.matchedLegIndices), null)
+
+        assertEquals(setOf(0), overlay.matchedLegIndices)
+        assertEquals(first.departure + 120_000, partial.journey.legs[0].estimatedDeparture)
+        assertEquals(observedAt, partial.board.generatedAt)
+        assertTrue(partial.journey.retained)
+        assertTrue(partial.board.offline)
     }
 
     @Test
@@ -180,14 +304,22 @@ class OfflineRealtimeTest {
         }
     }
 
-    private fun snapshot(header: Long, status: String, stops: String, expiresAt: Long = header + 90_000): String {
+    private fun snapshot(
+        header: Long,
+        status: String,
+        stops: String,
+        expiresAt: Long = header + 90_000,
+        source: String = "source",
+        tripId: String = "trip",
+        delaySeconds: Int = 60,
+    ): String {
         val stopArray = if (stops.isBlank()) "[]" else "[$stops]"
         return """{
-          "schemaVersion":1,"source":"source",
+          "schemaVersion":1,"source":"$source",
           "headerTimestamp":"${Instant.ofEpochMilli(header)}",
           "generatedAt":"${Instant.ofEpochMilli(header + 1_000)}",
           "expiresAt":"${Instant.ofEpochMilli(expiresAt)}",
-          "updates":[{"tripId":"trip","serviceDate":"20260907","status":"$status","delaySeconds":60,"stopUpdates":$stopArray}]
+          "updates":[{"tripId":"$tripId","serviceDate":"20260907","status":"$status","delaySeconds":$delaySeconds,"stopUpdates":$stopArray}]
         }"""
     }
 

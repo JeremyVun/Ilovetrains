@@ -68,6 +68,34 @@ iOS implementation requested on 2026-09-07.
 - User state uses atomic app-private files excluded from iCloud backup. iOS
   and the web have separate local trip lists; no account or sync is introduced.
 
+## Persistent travel tracker
+
+Automatic inferred travel-mode entry starts a local Live Activity when the app
+can request one and iOS permits it. Pinning alone does not start tracking;
+replacing an already-tracked focus also replaces its activity. The containing
+app publishes focused journey updates through ActivityKit, and the widget
+extension renders the lock-screen and Dynamic Island surfaces. No push token,
+background location permission or personal server state is introduced.
+
+The accepted short sentence, platform roles, destination arrival and quiet trip
+line remain the visual target. Native system countdowns show a bounded clock
+interval, rather than promising a freshly computed minute label while the app
+is absent. Stale content retains the same card and its observed times with
+last-update provenance. Its current instruction is last known; it does not
+assert that the person is still on that leg. Freshness expires at the earlier
+of source expiry and the next instruction boundary.
+
+The system timer stops at zero. The trip marker shows the last published
+timetable position; it updates with app publications, not autonomously while
+the app is absent, and never represents live location.
+New platform/cancellation information, journey
+stage changes and completion require app execution; they reconcile when the
+app resumes. The activity may remain after expected arrival until the app or
+iOS ends it. A timer reaching zero never records a ride. Dismissal suppresses
+recreation for that focus without clearing the journey, and an old activity's
+tap cannot restore a replaced focus. Session persistence is defined in
+[client-storage.md](client-storage.md#native-tracker-sessions).
+
 The shared behavior remains defined by [ui.md](ui.md),
 [client-storage.md](client-storage.md) and [native-data.md](native-data.md).
 

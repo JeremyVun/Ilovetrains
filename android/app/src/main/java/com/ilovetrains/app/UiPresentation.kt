@@ -30,9 +30,26 @@ fun boardForOpenedJourney(
 } ?: homeBoard ?: board
 
 fun focusAfterRefresh(focus: FocusedJourney, update: FocusedRefresh?, alternatives: BoardData?): FocusedJourney {
-    if (update?.live != true) return focus.lastKnown().copy(alternatives = alternatives ?: focus.alternatives)
-    return focus.copy(journey = update.journey, board = focus.board.copy(
-        journeys = listOf(update.journey),
+    if (update == null || update.journey.key != focus.journey.key || update.journey.legs.size != focus.journey.legs.size) {
+        return focus.lastKnown().copy(alternatives = alternatives ?: focus.alternatives)
+    }
+    val merged = Journey(focus.journey.legs.mapIndexed { index, leg ->
+        update.journey.legs[index].takeIf { index in update.matchedLegIndices } ?: leg
+    })
+    if (!update.live) {
+        val retained = merged.copy(retained = true)
+        return focus.copy(
+            journey = retained,
+            board = focus.board.copy(
+                journeys = listOf(retained),
+                generatedAt = minOf(focus.board.generatedAt, update.observedAt ?: focus.board.generatedAt),
+                offline = true,
+            ),
+            alternatives = alternatives ?: focus.alternatives,
+        )
+    }
+    return focus.copy(journey = merged, board = focus.board.copy(
+        journeys = listOf(merged),
         generatedAt = update.observedAt ?: focus.board.generatedAt,
         source = "live",
         offline = false,

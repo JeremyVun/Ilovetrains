@@ -1,0 +1,7 @@
+simulator=61C74D65-6705-426C-9486-08F72B8589F6
+device=iPhone 17 Pro
+runtime=iOS 26.4
+logical_size=402x874
+capture_pixels=1206x2622
+content_size=large (default)
+clock=DEBUG fixed fixture for visual comparison

@@ -1,8 +1,12 @@
 # Persistent travel tracker
 
-Status: **visual design accepted, 2026-09-08**. Build continues in a fresh
-session using [build_plan.md](build_plan.md), starting with native lifecycle
-and background execution evidence. No product implementation shipped here.
+Status: **build in progress, 2026-09-08**. The accepted visual design is being
+built for iOS and Android using [build_plan.md](build_plan.md). Android has a
+production service and notification integration, with Android 15/16.1 emulator
+layout and lifecycle gates passed. Physical-device delivery and power remain
+unverified. iOS has tested presentation logic and isolated renderer
+probes; product ActivityKit integration and its widget extension are now being
+built under the owner continuation below. No tracker has shipped.
 The accepted layout does not need another concept-selection round.
 
 ## Accepted design and owner ruling
@@ -134,9 +138,12 @@ Checked 2026-09-08:
 - `Models.kt` / `Core/TransitModels.swift` implement `BoardData.isLive`: live
   source, no offline/stale flags and observation age between zero and 90 seconds.
   New presentation code must use source freshness, not notification-posting time.
-- The Android manifest has no notification permission/service declaration.
-  The iOS app has no ActivityKit integration or widget extension. This is new
-  platform integration, not exposure of an existing hidden tracker.
+- Android declares notification permission and `TravelTrackerService` in its
+  manifest. `TrainApplication` owns the shared view model; inferred focus,
+  lifecycle persistence, notification actions and focused background refresh
+  are wired through it. This is production integration, not just a probe.
+- iOS includes `TravelTrackerState.swift` and its tests, but still has no
+  ActivityKit controller, widget extension or tracker entry/tap wiring.
 
 ## Behavior and lifecycle defaults
 
@@ -181,7 +188,7 @@ On Android, verify a justified execution mechanism and notification fallback
 without acquiring location simply to keep a service alive. The selected design
 must be useful through a whole trip, not only while the app stays open.
 
-## Evidence and limits for the next session
+## Design-session evidence and limits
 
 All 28 browser frames passed viewport, text spill, clipping, text-range overlap
 and proportional-axis checks: seven scenarios × two phone sizes (390 × 844,
@@ -218,10 +225,81 @@ No rejected/black diagnostic image is promoted to calibration.
 
 ## Decisions and work carried into the build
 
-The owner accepted the visual baseline and automatic entry. The native
-background mechanism is unresolved engineering work, not a reason to repeat
-visual exploration. Start with Phase 0 of the plan and document evidence for
-refresh, phase changes, stale boundaries, completion and process death.
+### Android execution decisions, 2026-09-08
+
+The isolated Android 16 QPR2 probe obtained actual promotion and updated all
+three stages while backgrounded and locked. A killed process was recreated by
+`START_STICKY` and resumed from saved wall-clock times. Android 15 rendered the
+ordinary notification fallback. Dismissal and notification denial both survived
+relaunch without recreation or repeated prompting.
+
+Use a `specialUse` foreground service with one application-scoped state owner
+and a focused-only refresh path. Do not add location access or a wake lock.
+Ask for notification permission on the first inferred entry while foregrounded;
+denial preserves in-app focus and does not start an invisible service. Persist
+dismissal separately from focus. End the active surface without retaining a
+summary when the focus completes, expires or is removed; do not record a ride
+merely because the tracker timer reaches its endpoint. A mode/cap-hidden focus
+hides the surface without erasing its session or dismissal state.
+
+Keep the numerical event headline, with the effective event clock and source
+update time available in the ordinary expanded presentation. Use the actual
+notification-posting cadence to recompute from wall time. Do not add an
+unbounded chronometer beside a get-off instruction, or label a source `Live`
+indefinitely. A shortened Android provenance such as `Updated 04:42` may occupy
+subtext; destination ETA must move into the title/body when subtext would clip.
+Fall back to an ordinary expanded template when required facts do not fit the
+progress template. Use Android's private lock-screen visibility and respect the
+user's content-visibility setting.
+
+This is best-effort background execution, not a guarantee through arbitrary
+process starvation. Sticky restart timing is controlled by Android; force-stop
+and Task Manager stop prevent it until the app is opened again. Notification
+timeouts explicitly exclude foreground-service notifications. These limits do
+not justify replacing the accepted numeric headline globally: the tested normal
+background/locked path updates it. Keep the absolute event and source clocks
+readable if an update is delayed. Physical-device Doze and power behavior remain
+verification limits rather than a claim established by a short emulator probe.
+
+### iOS implementation continuation, 2026-09-08
+
+The isolated iOS 26.4 probe now has actual lock-screen, compact, expanded and
+minimal island captures. Minimal selection required two distinct scratch apps;
+the expanded prototype still needs width-aware text and the accepted ETA/line.
+These are execution evidence, not final product calibration. Bounded system
+timers and the stock progress control continue with the app process absent.
+The approved custom trip-line marker does not: its native timer-backed style
+received no usable progress fraction. It uses the last published position.
+The current instruction does not advance without a content update;
+`staleDate` changes the surface into its supplied stale presentation. Relaunch
+can find the same stale activity, update it, and end it. A custom
+`TimeDataSource`/`DiscreteFormatStyle` probe compiled but rendered placeholders
+in ActivityKit, so it does not supply a local instruction timeline.
+
+Owner: “ok, first show me the actual android screenshots and then proceed with
+the ios implementation”. This follows the owner's reminder that the round-3
+Option 1 and round-4 trip line were already chosen. Build the accepted design;
+do not ask for another layout selection or substitute the rough whole-itinerary
+engineering prototype.
+
+Implementation policy: use the accepted offline/last-known card when updates
+stop. Retain its last instruction, effective event time, platform roles,
+destination ETA and source timestamp. The next-event system countdown is bounded
+and stops at zero. The trip marker shows the last published timetable position
+and moves when the app publishes an update; it does not imply live location.
+Set `staleDate` to the earlier of freshness expiry and the instruction boundary.
+When stale, show last-update provenance instead of claiming live data. Recompute
+stages, cancellations and completion when the app receives execution. This is
+a retained instruction, not proof that its leg is still current. The card may
+remain after arrival until the app or OS ends it. These OS limits must be
+visible in verification and the platform contract, not hidden by a mock clock.
+
+The user authorized continuing the approved implementation; the policy above
+is the engineering treatment of that design within the proven local-only OS
+constraints. The unapproved whole-itinerary replacement is not being adopted.
+No push infrastructure, personal server state or background location permission
+is introduced. Preserve the distinction between refresh, phase changes, stale
+boundaries, completion and process death in both platforms' verification.
 
 The lifecycle table above records recommended defaults, not separate owner
 rulings. Verify permission timing, dismissal/restart suppression, final-summary
@@ -255,8 +333,9 @@ Rejected concepts are history, not alternative build specifications.
 
 ## Closeout boundary
 
-This session records the design and build handoff only. With implementation,
+With implementation,
 update API/storage/UI/analytics/native contracts where behavior changes, add
 native capture tooling and regression baselines, and run the relevant gates.
 After shipping, migrate surviving rules, delete this backlog folder and deploy
-using the operations runbook. Do not close or deploy this unbuilt feature now.
+using the operations runbook. Do not close or deploy this feature while its
+implementation and required verification remain incomplete.

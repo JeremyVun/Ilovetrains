@@ -7,9 +7,24 @@ if [ -z "${JAVA_HOME:-}" ] && [ -d /opt/homebrew/opt/openjdk@17/libexec/openjdk.
   export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
 fi
 cd "$project_dir/android"
-if [ "${1:-}" != --release ]; then
-  exec ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --console=plain
-fi
+mode="${1:---debug}"
+[ "$#" -eq 0 ] || shift
+case "$mode" in
+  --unit)
+    test_args=()
+    for pattern in "$@"; do
+      [[ "$pattern" != -* ]] || { echo "expected a JUnit class/method pattern, got $pattern" >&2; exit 2; }
+      test_args+=( --tests "$pattern" )
+    done
+    exec "$project_dir/tools/check-log.sh" android-unit ./gradlew :app:testDebugUnitTest ${test_args[@]+"${test_args[@]}"} --console=plain
+    ;;
+  --debug)
+    [ "$#" -eq 0 ] || { echo "--debug takes no arguments" >&2; exit 2; }
+    exec "$project_dir/tools/check-log.sh" android-debug ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --console=plain
+    ;;
+  --release) [ "$#" -eq 0 ] || { echo "--release takes no arguments" >&2; exit 2; } ;;
+  *) echo "Usage: tools/build-android.sh [--debug|--unit [JUnit patterns...]|--release]" >&2; exit 2 ;;
+esac
 signing_dir="${ILOVETRAINS_SIGNING_DIR:-$HOME/.local/share/ilovetrains/android-signing}"
 mkdir -p "$signing_dir"
 chmod 700 "$signing_dir"
@@ -26,7 +41,7 @@ if [ ! -f "$ILOVETRAINS_KEYSTORE" ]; then
     -keypass:file "$ILOVETRAINS_KEYSTORE_PASSWORD_FILE" -noprompt
 fi
 umask 022
-./gradlew :app:assembleRelease :app:testReleaseUnitTest :app:lintRelease --console=plain
+"$project_dir/tools/check-log.sh" android-release ./gradlew :app:assembleRelease :app:testReleaseUnitTest :app:lintRelease --console=plain
 app_version="$(node --input-type=module -e "import { VERSION } from '../web/js/version.js'; process.stdout.write(VERSION)")"
 apk_name="ilovetrains-${app_version}.apk"
 mkdir -p releases

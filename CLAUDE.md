@@ -78,7 +78,20 @@ without `FLAGS_URL` every feature flag reads its default), and
 `ANALYTICS_URL`, `ANALYTICS_PROJECT`, `ANALYTICS_KEY` (optional; without
 `ANALYTICS_URL` the server's accuracy counters stay in its log).
 
-Primary test gates:
+During iteration, run the affected platform's unit suite; add the relevant
+device tests when changing platform integration or gestures. Both helpers
+accept optional test class/method filters and retain complete logs:
+
+```sh
+tools/build-android.sh --unit
+tools/build-ios.sh --unit
+tools/build-ios.sh --ui AppFlowTests/testSwipeRevealsDeleteAndUndoRestoresRow
+```
+
+Before completing a native feature, run the full affected-platform gates once
+on the final sources (plus its instrumented/system integration checks). Do not
+repeat unchanged gates after documentation or baseline-only edits. Shared
+fixtures or behavior changes require all affected clients. Primary full gates:
 
 ```sh
 go test ./...
@@ -100,9 +113,12 @@ particular:
 - `tools/shoot-states.js` seeds and drives the real web client while checking
   geometry, scrolling, tap targets and content reachability.
 - `tools/measure-open.js` measures cached paint and live-data timing.
-- `tools/visual-regression.js` shoots web, Android and iOS and compares every
-  frame with `tools/baselines/`; run it after any change that reaches a screen,
-  and accept and commit the baselines with an intended change.
+- `tools/visual-regression.js` shoots web, Android and iOS and compares frames
+  with `tools/baselines/`. During iteration, use `--platform` and `--screens`
+  for affected screens; shared styling requires the full affected-platform
+  matrix. Run that matrix on final UI sources before completing the feature.
+  Inspect and accept intended changes with `--compare <existing-run> --accept`
+  to reuse the verified captures instead of shooting them again.
 - `tools/probe-tfnsw.sh` makes live upstream requests and requires an API key;
   use captured fixtures for normal tests.
 
@@ -110,6 +126,15 @@ Visual behavior needs a real-client drive at the affected phone sizes and
 schemes. Unit tests alone do not prove layout, service-worker or offline
 behavior. Follow the exact invocation documented by each instrument before
 believing a failure.
+
+Keep independent platforms parallel. Reuse session-owned devices and warm
+build directories; never wipe an entire emulator for routine app-state reset.
+`tools/start-android-emulator.sh AVD_NAME PORT` starts an existing AVD with
+host graphics, 4 GB guest RAM and Quick Boot. Select its printed
+`ANDROID_SERIAL`, and shut it down when the session finishes. Do not reuse,
+reconfigure or stop another session's device. Keep performance measurements
+separate from concurrent build/UI load; wall-clock thresholds under contention
+do not identify app performance regressions.
 
 ## Non-negotiable rules
 

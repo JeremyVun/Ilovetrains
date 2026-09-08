@@ -174,6 +174,89 @@ final class BoardRetentionTests: XCTestCase {
         XCTAssertEqual(result.board.generatedAt, now + 1)
     }
 
+    func testFocusedRefreshRejectsDifferentServiceIdentityAndLegCount() {
+        let focus = FocusedJourney(tripId: "trip", reverse: false, journey: t9, board: previous)
+        var differentService = t9
+        differentService.legs[0].line = "T8"
+        differentService.legs[0].estimatedArrival = now + 40 * 60_000
+        let identityMismatch = focusAfterRefresh(
+            focus,
+            update: FocusUpdate(journey: differentService, observedAt: now + 1, live: true),
+            alternatives: nil
+        )
+        let extraLeg = Leg(
+            line: "M1", mode: "metro", headsign: "Tallawong", from: rhodes, to: townHall,
+            departure: now + 30 * 60_000, arrival: now + 45 * 60_000,
+            estimatedArrival: now + 50 * 60_000, cancelled: true
+        )
+        let wrongCount = Journey(legs: t9.legs + [extraLeg])
+        let countMismatch = focusAfterRefresh(
+            focus,
+            update: FocusUpdate(journey: wrongCount, observedAt: now + 2, live: true),
+            alternatives: nil
+        )
+
+        XCTAssertEqual(identityMismatch.journey.effectiveArrival, t9.effectiveArrival)
+        XCTAssertEqual(identityMismatch.journey.retained, true)
+        XCTAssertEqual(identityMismatch.board.generatedAt, previous.generatedAt)
+        XCTAssertTrue(identityMismatch.board.offline)
+        XCTAssertEqual(countMismatch.journey.legs.count, 1)
+        XCTAssertEqual(countMismatch.journey.effectiveArrival, t9.effectiveArrival)
+        XCTAssertEqual(countMismatch.journey.retained, true)
+        XCTAssertEqual(countMismatch.board.generatedAt, previous.generatedAt)
+        XCTAssertTrue(countMismatch.board.offline)
+    }
+
+    func testPartialObservedRefreshJudgesCompletionAgainstTheMergedFinalArrival() {
+        let middle = Station(id: "change", name: "Change")
+        let first = Leg(
+            line: "T8", mode: "train", headsign: "Change", from: townHall, to: middle,
+            departure: now - 30 * 60_000, arrival: now - 15 * 60_000
+        )
+        let second = Leg(
+            line: "M1", mode: "metro", headsign: "Rhodes", from: middle, to: rhodes,
+            departure: now - 12 * 60_000, arrival: now - 60_000
+        )
+        let journey = Journey(legs: [first, second])
+        let focus = FocusedJourney(
+            tripId: "trip", reverse: false, journey: journey,
+            board: BoardData(from: townHall, to: rhodes, journeys: [journey], generatedAt: now - 60_000, source: "live")
+        )
+        let recorded = [Ride(
+            tripId: "trip", reverse: false, departure: journey.departure,
+            arrival: journey.effectiveArrival, from: townHall, to: rhodes
+        )]
+        var firstOnly = journey.scheduledOnly()
+        firstOnly.legs[0].estimatedArrival = first.arrival + 60_000
+        let firstUpdate = FocusUpdate(
+            journey: firstOnly, observedAt: now, live: false, matchedLegIndices: [0]
+        )
+        let unchangedFinal = focusAfterRefresh(focus, update: firstUpdate, alternatives: nil)
+        let confirmed = settledRides(
+            recorded,
+            focus: unchangedFinal,
+            arrived: firstUpdate.canJudgeClock && now >= unchangedFinal.journey.effectiveArrival
+        )
+
+        XCTAssertEqual(confirmed, recorded)
+        XCTAssertTrue(unchangedFinal.board.offline)
+
+        var finalOnly = journey.scheduledOnly()
+        finalOnly.legs[1].estimatedArrival = now + 2 * 60_000
+        let finalUpdate = FocusUpdate(
+            journey: finalOnly, observedAt: now + 1, live: false, matchedLegIndices: [1]
+        )
+        let movedFuture = focusAfterRefresh(unchangedFinal, update: finalUpdate, alternatives: nil)
+        let withdrawn = settledRides(
+            recorded,
+            focus: movedFuture,
+            arrived: finalUpdate.canJudgeClock && now >= movedFuture.journey.effectiveArrival
+        )
+
+        XCTAssertEqual(movedFuture.journey.effectiveArrival, now + 2 * 60_000)
+        XCTAssertTrue(withdrawn.isEmpty)
+    }
+
     @MainActor
     func testColdOfflineOpenRestoresHeaderWithoutInferringRide() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

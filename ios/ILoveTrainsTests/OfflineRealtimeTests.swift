@@ -80,8 +80,135 @@ final class OfflineRealtimeTests: XCTestCase {
         focused.estimatedArrival = focused.arrival + 60_000
         let result = expired.overlay(Journey(legs: [focused]), now: now) { _, _ in nil }
         XCTAssertFalse(result.matched)
+        XCTAssertTrue(result.matchedLegIndices.isEmpty)
         XCTAssertNil(result.value.legs.first?.estimatedDeparture)
         XCTAssertNil(result.value.legs.first?.estimatedArrival)
+        let planned = expired.overlay([connection(now)], now: now) { _, _ in nil }.first
+        XCTAssertEqual(planned?.effectiveDeparture, connection(now).departure)
+        XCTAssertFalse(planned?.cancelled ?? true)
+    }
+
+    func testFocusedPartialSourceRefreshRetainsUnmatchedObservationsUntilEveryLegIsFresh() throws {
+        let now = 1_800_000_000_000.0
+        let middle = Station(id: "B", name: "Bravo")
+        let destination = Station(id: "C", name: "Charlie")
+        var first = connection(now).asLeg
+        first.line = "T8"
+        first.identity = TripIdentity(
+            source: "sydneytrains", tripId: "rail", serviceDate: "20260907",
+            fromStopId: "A-stop", toStopId: "B-stop", fromSequence: 1, toSequence: 2
+        )
+        first.estimatedDeparture = first.departure + 60_000
+        first.estimatedArrival = first.arrival + 120_000
+        first.fromPlatform = "21"
+        first.toPlatform = "16"
+        let second = Leg(
+            line: "M1", mode: "metro", headsign: "Charlie", from: middle, to: destination,
+            departure: now + 24 * 60_000, arrival: now + 40 * 60_000,
+            estimatedDeparture: now + 29 * 60_000, estimatedArrival: now + 45 * 60_000,
+            fromPlatform: "9", toPlatform: "8", cancelled: true,
+            identity: TripIdentity(
+                source: "metro", tripId: "metro-trip", serviceDate: "20260907",
+                fromStopId: "B-stop", toStopId: "C-stop", fromSequence: 1, toSequence: 2
+            )
+        )
+        let priorJourney = Journey(legs: [first, second])
+        let priorGeneratedAt = now - 30_000
+        let firstObservedAt = now - 60_000
+        let focus = FocusedJourney(
+            tripId: "mixed", reverse: false, journey: priorJourney,
+            board: BoardData(
+                from: from, to: destination, journeys: [priorJourney], generatedAt: priorGeneratedAt,
+                source: "live", serverStale: true
+            )
+        )
+        var realtime = OfflineRealtime()
+        try realtime.accept(
+            json: snapshot(
+                firstObservedAt, status: "scheduled", stops: "", source: "sydneytrains", tripId: "rail",
+                delaySeconds: 120
+            ),
+            expectedSource: "sydneytrains",
+            now: now
+        )
+
+        let firstBaseline = OfflinePlanner.scheduledFocusBaseline(priorJourney) { _, stop in
+            ["A-stop": "1", "B-stop": "2", "C-stop": "3"][stop]
+        }
+        let firstOverlay = realtime.overlay(firstBaseline, now: now) { _, _ in nil }
+        let partial = focusAfterRefresh(
+            focus,
+            update: FocusUpdate(
+                journey: firstOverlay.value,
+                observedAt: firstOverlay.observedAt,
+                live: false,
+                matchedLegIndices: firstOverlay.matchedLegIndices
+            ),
+            alternatives: nil
+        )
+
+        XCTAssertEqual(firstOverlay.matchedLegIndices, Set([0]))
+        XCTAssertEqual(firstOverlay.value.legs[1].effectiveDeparture, second.departure)
+        XCTAssertFalse(firstOverlay.value.legs[1].cancelled)
+        XCTAssertEqual(partial.journey.legs[0].estimatedDeparture, first.departure + 120_000)
+        XCTAssertEqual(partial.journey.legs[1].estimatedDeparture, second.estimatedDeparture)
+        XCTAssertEqual(partial.journey.legs[1].estimatedArrival, second.estimatedArrival)
+        XCTAssertEqual(partial.journey.legs[1].fromPlatform, "9")
+        XCTAssertEqual(partial.journey.legs[1].toPlatform, "8")
+        XCTAssertTrue(partial.journey.legs[1].cancelled)
+        XCTAssertEqual(partial.journey.retained, true)
+        XCTAssertTrue(partial.board.offline)
+        XCTAssertEqual(partial.board.source, "live")
+        XCTAssertTrue(partial.board.serverStale)
+        XCTAssertEqual(partial.board.generatedAt, firstObservedAt)
+        var olderPrior = focus
+        olderPrior.board.generatedAt = now - 120_000
+        let retainedOlderClock = focusAfterRefresh(
+            olderPrior,
+            update: FocusUpdate(
+                journey: firstOverlay.value,
+                observedAt: firstOverlay.observedAt,
+                live: false,
+                matchedLegIndices: firstOverlay.matchedLegIndices
+            ),
+            alternatives: nil
+        )
+        XCTAssertEqual(retainedOlderClock.board.generatedAt, now - 120_000)
+
+        try realtime.accept(
+            json: snapshot(
+                now - 15_000, status: "scheduled", stops: "", source: "metro", tripId: "metro-trip",
+                delaySeconds: 180
+            ),
+            expectedSource: "metro",
+            now: now
+        )
+        let secondBaseline = OfflinePlanner.scheduledFocusBaseline(partial.journey) { _, stop in
+            ["A-stop": "1", "B-stop": "2", "C-stop": "3"][stop]
+        }
+        let secondOverlay = realtime.overlay(secondBaseline, now: now) { _, _ in nil }
+        let restored = focusAfterRefresh(
+            partial,
+            update: FocusUpdate(
+                journey: secondOverlay.value,
+                observedAt: secondOverlay.observedAt,
+                live: secondBaseline.legs.indices.allSatisfy(secondOverlay.matchedLegIndices.contains),
+                matchedLegIndices: secondOverlay.matchedLegIndices
+            ),
+            alternatives: nil
+        )
+
+        XCTAssertEqual(secondOverlay.matchedLegIndices, Set([0, 1]))
+        XCTAssertEqual(restored.journey.legs[1].estimatedDeparture, second.departure + 180_000)
+        XCTAssertEqual(restored.journey.legs[1].estimatedArrival, second.arrival + 180_000)
+        XCTAssertEqual(restored.journey.legs[1].fromPlatform, "2")
+        XCTAssertEqual(restored.journey.legs[1].toPlatform, "3")
+        XCTAssertFalse(restored.journey.legs[1].cancelled)
+        XCTAssertNotEqual(restored.journey.retained, true)
+        XCTAssertFalse(restored.board.offline)
+        XCTAssertEqual(restored.board.source, "live")
+        XCTAssertFalse(restored.board.serverStale)
+        XCTAssertEqual(restored.board.generatedAt, firstObservedAt)
     }
 
     func testSparseDelayCarriesButNoDataSuppressesThatStop() throws {
@@ -249,13 +376,16 @@ final class OfflineRealtimeTests: XCTestCase {
         status: String,
         stops: String,
         expiresAt: Millis? = nil,
-        headerTimestamp: Millis? = nil
+        headerTimestamp: Millis? = nil,
+        source: String = "source",
+        tripId: String = "trip",
+        delaySeconds: Int = 60
     ) -> String {
         let stopArray = stops.isEmpty ? "[]" : "[\(stops)]"
         let expiry = expiresAt ?? header + 90_000
         let timestamp = headerTimestamp ?? header
         return """
-        {"schemaVersion":1,"source":"source","headerTimestamp":\(timestamp),"generatedAt":\(header + 1_000),"expiresAt":\(expiry),"updates":[{"tripId":"trip","serviceDate":"20260907","status":"\(status)","delaySeconds":60,"stopUpdates":\(stopArray)}]}
+        {"schemaVersion":1,"source":"\(source)","headerTimestamp":\(timestamp),"generatedAt":\(header + 1_000),"expiresAt":\(expiry),"updates":[{"tripId":"\(tripId)","serviceDate":"20260907","status":"\(status)","delaySeconds":\(delaySeconds),"stopUpdates":\(stopArray)}]}
         """
     }
 

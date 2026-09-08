@@ -3,17 +3,26 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <application android:allowBackup="false" android:label="ilovetrains"
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <application android:name=".TrainApplication" android:allowBackup="false" android:label="ilovetrains"
         android:dataExtractionRules="@xml/data_extraction_rules" android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true" android:theme="@style/Theme.ILoveTrains"
         android:usesCleartextTraffic="false">
         <activity android:name=".MainActivity" android:exported="true"
-            android:windowSoftInputMode="adjustResize">
+            android:launchMode="singleTop" android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <service android:name=".TravelTrackerService" android:exported="false"
+            android:foregroundServiceType="specialUse" android:stopWithTask="false">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps a user-visible, time-sensitive public transport journey instruction current between app visits; no location, sensors, media, or personal server state." />
+        </service>
     </application>
 </manifest>

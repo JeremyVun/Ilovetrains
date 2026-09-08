@@ -50,8 +50,10 @@ geometric. Observations waiting on an owner ruling:
   take.
 - Disruption and trackwork awareness surfaced on saved trips and in the
   header.
-- Extend native realtime routing to replacement stop patterns, platform changes
-  and added services: [realtime replacements](backlog/realtime-replacements/design.md).
+- Handle replacement stop patterns and platform changes across web, Android
+  and iOS: [replacement trips](backlog/realtime-replacements/design.md).
+- Consider locally routing added services without a static timetable trip;
+  separate from replacement trips and dependent on complete feed metadata.
 - No routing configuration surface beyond the transfer limit row
   (`docs/PROJECT.md`, principle 3). If a case seems to need one, bring it to
   the owner as a routing defect first.
@@ -87,15 +89,17 @@ the last and make the ports mechanical. Still to build:
 ## Native Android and iOS
 Both apps exist (`android/`, `ios/`) and lag the web by one round. Remaining:
 - **[Persistent travel tracker](backlog/persistent-travel-tracker/design.md)**
-  (visual design accepted 2026-09-08; [build handoff](backlog/persistent-travel-tracker/build_plan.md)):
+  (build in progress 2026-09-08; [build handoff](backlog/persistent-travel-tracker/build_plan.md)):
   an ongoing
   notification or lock-screen view, like a food-delivery status, showing the
   next change or get-off station, arrival and progress without reopening the
   app. Android system notification rendering (Live Updates where supported)
   and iOS Live Activities. Accepted baseline: short prose with a quiet trip
   line; [selected frames](../assets/comps/latest/travel-tracker/README.md).
-  Begin with native rendering/background lifecycle evidence, dismissal and
-  journey completion before product integration; the
+  Android's production service and notification integration pass the Android
+  15/16.1 emulator layout and lifecycle gates; physical-device delivery and power
+  remain unverified. The owner has authorized iOS ActivityKit integration
+  against the accepted design; implementation and native verification are in progress. Verify dismissal and journey completion; the
   notification must not imply continuous GPS. Appears automatically when
   travel mode detects travel. Platform boxes on the line are an optional visual
   refinement, not a build prerequisite; pin-triggered entry is a separate

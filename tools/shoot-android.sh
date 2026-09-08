@@ -9,6 +9,13 @@ out="${OUT:-/tmp/ilovetrains-android-${size}-${font_scale}}"
 adb="${ANDROID_HOME:-$HOME/Library/Android/sdk}/platform-tools/adb"
 
 case "$size" in 390x844|412x732) ;; *) echo "usage: $0 [390x844|412x732]" >&2; exit 2;; esac
+instrument_class="${INSTRUMENT_CLASS:-com.ilovetrains.app.UiCalibrationTest}"
+instrument_args=()
+if [ -n "${CALIBRATION_SCREENS:-}" ]; then
+  instrument_class="${INSTRUMENT_CLASS:-com.ilovetrains.app.UiCalibrationTest#captureCanonicalScreens}"
+  [[ "$CALIBRATION_SCREENS" =~ ^[a-z0-9-]+(,[a-z0-9-]+)*$ ]] || { echo "invalid CALIBRATION_SCREENS" >&2; exit 2; }
+  instrument_args=( -e calibrationScreens "$CALIBRATION_SCREENS" )
+fi
 [ "$($adb get-state 2>/dev/null)" = device ] || { echo "one booted Android device is required" >&2; exit 1; }
 
 size_state="$($adb shell wm size | tr -d '\r')"
@@ -43,7 +50,7 @@ if [ -z "${JAVA_HOME:-}" ] && [ -d /opt/homebrew/opt/openjdk@17/libexec/openjdk.
 fi
 (
   cd "$project_dir/android"
-  ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --console=plain
+  "$project_dir/tools/check-log.sh" android-capture-build ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --console=plain
 )
 
 main_apk="$project_dir/android/app/build/outputs/apk/debug/app-debug.apk"
@@ -51,9 +58,16 @@ test_apk="$project_dir/android/app/build/outputs/apk/androidTest/debug/app-debug
 "$adb" install -r "$main_apk" >/dev/null
 "$adb" install -r -t "$test_apk" >/dev/null
 "$adb" shell rm -rf /sdcard/Android/data/com.ilovetrains.app/files/calibration
+# am instrument can exit zero even when JUnit fails. Never pull a partial green run.
 "$adb" shell am instrument -w \
-  -e class "${INSTRUMENT_CLASS:-com.ilovetrains.app.UiCalibrationTest}" \
-  com.ilovetrains.app.test/androidx.test.runner.AndroidJUnitRunner
+  -e class "$instrument_class" ${instrument_args[@]+"${instrument_args[@]}"} \
+  com.ilovetrains.app.test/androidx.test.runner.AndroidJUnitRunner > "$out/instrumentation.log" 2>&1
+cat "$out/instrumentation.log"
+if ! grep -Eq '^OK \([0-9]+ tests?\)' "$out/instrumentation.log" || \
+   grep -Eq 'FAILURES!!!|INSTRUMENTATION_FAILED|Process crashed' "$out/instrumentation.log"; then
+  echo "Android calibration failed; see $out/instrumentation.log" >&2
+  exit 1
+fi
 "$adb" pull /sdcard/Android/data/com.ilovetrains.app/files/calibration/. "$out" >/dev/null
 count="$(find "$out" -name '*.png' -type f | wc -l | tr -d ' ')"
 printf 'Captured %s frames at %s dp, font scale %s: %s\n' "$count" "$size" "$font_scale" "$out"

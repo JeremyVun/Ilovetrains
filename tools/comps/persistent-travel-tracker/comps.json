@@ -1,0 +1,70 @@
+{
+  "round": "persistent-travel-tracker-r4",
+  "title": "Option 1, with the trip line",
+  "frames": {
+    "phone": {
+      "w": 390,
+      "h": 844
+    },
+    "short": {
+      "w": 412,
+      "h": 732
+    }
+  },
+  "concepts": [
+    "c1-sentence"
+  ],
+  "scenarios": [
+    "ontrain",
+    "transfer",
+    "final",
+    "unknown-platform",
+    "tight-transfer",
+    "offline-stale",
+    "long-content"
+  ],
+  "settle": 80,
+  "dsf": 2,
+  "exemplars": "exemplars",
+  "probes": {
+    "tapMin": 44
+  },
+  "jobs": [
+    {
+      "concepts": [
+        "c1-sentence"
+      ],
+      "scenarios": [
+        "ontrain",
+        "transfer",
+        "final",
+        "unknown-platform",
+        "tight-transfer",
+        "offline-stale",
+        "long-content"
+      ],
+      "frames": [
+        "phone",
+        "short"
+      ],
+      "schemes": [
+        "dark",
+        "light"
+      ]
+    }
+  ],
+  "zooms": [
+    {
+      "out": "trip-line",
+      "concept": "c1-sentence",
+      "scenario": "ontrain",
+      "x": 30,
+      "y": 750,
+      "w": 330,
+      "h": 16,
+      "scale": 4,
+      "frame": "phone",
+      "scheme": "dark"
+    }
+  ]
+}

@@ -4,11 +4,13 @@ struct RealtimeResult<Value> {
     var value: Value
     var observedAt: Millis?
     var matched: Bool
+    var matchedLegIndices: Set<Int>
 
-    init(value: Value, observedAt: Millis? = nil, matched: Bool = false) {
+    init(value: Value, observedAt: Millis? = nil, matched: Bool = false, matchedLegIndices: Set<Int> = []) {
         self.value = value
         self.observedAt = observedAt
         self.matched = matched
+        self.matchedLegIndices = matchedLegIndices
     }
 }
 
@@ -196,13 +198,15 @@ struct OfflineRealtime {
     ) -> RealtimeResult<Journey> {
         var observedAt: Millis?
         var matched = false
-        let legs = journey.legs.map { leg -> Leg in
+        var matchedLegIndices = Set<Int>()
+        let legs = journey.legs.enumerated().map { index, leg -> Leg in
             guard let identity = leg.identity,
                   let snapshot = freshSnapshot(identity.source, now: now),
                   let update = snapshot.updates[Self.key(identity.tripId, identity.serviceDate)] else {
                 return leg.scheduledOnly()
             }
             matched = true
+            matchedLegIndices.insert(index)
             observedAt = min(observedAt ?? .greatestFiniteMagnitude, snapshot.headerTimestamp)
             let from = update.stopUpdates.first { $0.matches(id: identity.fromStopId, sequence: identity.fromSequence) }
             let to = update.stopUpdates.first { $0.matches(id: identity.toStopId, sequence: identity.toSequence) }
@@ -228,7 +232,12 @@ struct OfflineRealtime {
                 || to?.scheduleRelationship == "skipped"
             return value
         }
-        return RealtimeResult(value: Journey(legs: legs), observedAt: observedAt, matched: matched)
+        return RealtimeResult(
+            value: Journey(legs: legs),
+            observedAt: observedAt,
+            matched: matched,
+            matchedLegIndices: matchedLegIndices
+        )
     }
 
     @discardableResult

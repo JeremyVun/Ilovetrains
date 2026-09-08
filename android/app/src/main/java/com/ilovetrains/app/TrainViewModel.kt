@@ -14,7 +14,20 @@ import java.time.Instant
 import java.util.UUID
 import kotlin.math.roundToInt
 
-class TrainViewModel @JvmOverloads constructor(application: Application, private val undoWindowMillis: Long = UndoWindowMillis) : AndroidViewModel(application), UiActions {
+class TrainViewModel private constructor(
+    application: Application,
+    private val undoWindowMillis: Long = UndoWindowMillis,
+    trackerStore: TravelTrackerSessionStore = MemoryTravelTrackerSessionStore(),
+    trackerRuntime: TravelTrackerRuntime = DisabledTravelTrackerRuntime,
+) : AndroidViewModel(application), UiActions {
+    @JvmOverloads constructor(application: Application, undoWindowMillis: Long = UndoWindowMillis) :
+        this(application, undoWindowMillis, MemoryTravelTrackerSessionStore(), DisabledTravelTrackerRuntime)
+
+    internal constructor(
+        application: Application,
+        trackerStore: TravelTrackerSessionStore,
+        trackerRuntime: TravelTrackerRuntime,
+    ) : this(application, UndoWindowMillis, trackerStore, trackerRuntime)
     private val store = DeviceStore(application)
     private val api = TransitApi()
     private val planner = OfflinePlanner(application)
@@ -50,6 +63,14 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
     private var redirectTargetId: String? = null
     private var suppressNextLastAnswer = false
     private var hasResumed = false
+    private val tracker = TravelTrackerLifecycle(trackerStore, trackerRuntime)
+    private var trackerRefreshJob: Job? = null
+    private var activityCallbacksOwner: Any? = null
+    private var pendingTrackerOpen: TravelTrackerRevision? = null
+    private var activityForeground = false
+    private var trackerPublicationGeneration = 0L
+    @Volatile private var debugTrackerClock: Long? = null
+    @Volatile private var debugTrackerCaptureMode = false
 
     init {
         viewModelScope.launch {
@@ -59,10 +80,9 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
             data = store.load(); stations = runCatching { store.stations() }.getOrDefault(emptyList())
             syncPersonal(); choosePrediction()
             mutable.value = mutable.value.copy(ready = true, screen = if (data.trips.isEmpty()) Screen.Setup else Screen.Home, stations = stations)
-            refresh()
-            refreshSharedData()
-            readFlags()
-            if (data.useLocation) onSilentLocation?.invoke()
+            syncTracker()
+            pendingTrackerOpen?.let { revision -> pendingTrackerOpen = null; openTrackedJourney(revision) }
+            if (activityForeground) startForegroundWork()
         }
         viewModelScope.launch {
             try {
@@ -76,8 +96,10 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
     }
     private fun persist() { writes.trySend(data) }
     private fun readFlags() {
+        if (debugTrackerCaptureMode) return
         viewModelScope.launch {
             val flags = runCatching { api.flags() }.getOrNull()
+            if (debugTrackerCaptureMode) return@launch
             mutable.value = mutable.value.copy(tinyTrain = flags?.get(TinyTrainFlag) == true)
             if (flags == null || flags == data.flags) return@launch
             val before = data.capped
@@ -91,7 +113,7 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
     private fun message(text: String?, autoDismiss: Boolean = false) {
         mutable.value = mutable.value.copy(message = text, messageAutoDismiss = autoDismiss, undoAvailable = false)
     }
-    private fun visibleFocus(): FocusedJourney? = visibleFocus(data, mutable.value.now)
+    private fun visibleFocus(now: Long = mutable.value.now): FocusedJourney? = visibleFocus(data, now)
         ?.takeIf { it.journey.withinTransferCap(data.capped) }?.let {
             it.copy(board = it.board.withinTransferCap(data.capped), alternatives = it.alternatives?.withinTransferCap(data.capped))
         }
@@ -110,6 +132,190 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
             recentFrom = data.recentFrom, recentTo = data.recentTo,
             tripMetadata = savedTripMetadata(data, fix, mutable.value.selectedTripId, mutable.value.reverse, mutable.value.now),
             homeBoard = focus?.board ?: mutable.value.board)
+        syncTracker()
+    }
+
+    private fun syncTracker(): TravelTrackerState? {
+        val now = trackerNow()
+        val focus = data.focus
+        val recordedComplete = focus?.let { subject ->
+            data.rides.any { it.tripId == subject.tripId && it.reverse == subject.reverse && it.departure == subject.journey.departure }
+        } == true
+        return tracker.reconcile(focus, visibleFocus(now), now, recordedComplete)
+    }
+
+    fun attachActivity(
+        owner: Any,
+        locationRequest: () -> Unit,
+        silentLocation: () -> Unit,
+        locationDisabled: () -> Unit,
+        notificationPermissionRequest: () -> Unit,
+    ) {
+        activityCallbacksOwner = owner
+        onLocationRequest = locationRequest
+        onSilentLocation = silentLocation
+        onLocationDisabled = locationDisabled
+        tracker.attachActivity(notificationPermissionRequest)
+    }
+
+    fun detachActivity(owner: Any, notificationPermissionRequest: () -> Unit) {
+        if (activityCallbacksOwner !== owner) return
+        activityCallbacksOwner = null
+        onLocationRequest = null
+        onSilentLocation = null
+        onLocationDisabled = null
+        tracker.detachActivity(notificationPermissionRequest)
+    }
+
+    fun activityResumed() {
+        activityForeground = true
+        trackerRefreshJob?.cancel()
+        trackerPublicationGeneration++
+        tracker.activityResumed()
+        syncTracker()
+    }
+
+    fun activityStopped() {
+        activityForeground = false
+        tracker.activityStopped()
+    }
+
+    fun notificationPermissionResult() {
+        tracker.permissionResult()
+        syncTracker()
+    }
+
+    internal fun trackerServiceAttached() {
+        tracker.serviceAttached()
+    }
+
+    internal fun trackerActiveRevision(): TravelTrackerRevision? = tracker.activeRevision()
+
+    internal fun trackerServiceDetached() {
+        tracker.serviceDetached()
+        trackerRefreshJob?.cancel()
+        trackerPublicationGeneration++
+    }
+
+    internal fun trackerServiceState(): TravelTrackerServiceState {
+        if (!mutable.value.ready) return TravelTrackerServiceState.Pending
+        mutable.value = mutable.value.copy(now = trackerNow())
+        val presentation = syncTracker() ?: return TravelTrackerServiceState.Stop
+        val focus = visibleFocus()?.takeIf { it.trackerIdentity == presentation.revision.identity }
+            ?: return TravelTrackerServiceState.Stop
+        if (!tracker.accepts(presentation.revision)) return TravelTrackerServiceState.Stop
+        return TravelTrackerServiceState.Active(focus, presentation)
+    }
+
+    internal fun trackerBackgroundRefresh() {
+        if (debugTrackerCaptureMode || activityForeground || !mutable.value.ready || trackerRefreshJob?.isActive == true) return
+        val revision = tracker.activeRevision() ?: return
+        val focus = data.focus?.takeIf { it.trackerIdentity == revision.identity } ?: return
+        val pair = ends(focus.tripId, focus.reverse) ?: return
+        val publication = ++trackerPublicationGeneration
+        trackerRefreshJob = viewModelScope.launch {
+            supervisorScope {
+                val apiResult = async {
+                    runCatching { api.focusedDepartures(pair.first, pair.second, focus.journey.departure.takeIf { it < System.currentTimeMillis() }) }.getOrNull()
+                }
+                val overlayResult = async {
+                    runCatching {
+                        initialized.await()
+                        val sources = focus.journey.legs.mapNotNull { it.identity?.source }.toSet()
+                        if (sources.isNotEmpty()) planner.refreshRealtime(api.baseUrl, sources)
+                        planner.refreshFocused(focus.journey)
+                    }.getOrNull()
+                }
+                val board = apiResult.await()
+                val overlay = overlayResult.await()
+                if (debugTrackerCaptureMode || publication != trackerPublicationGeneration || !tracker.accepts(revision)) return@supervisorScope
+                val current = data.focus?.takeIf { it.trackerIdentity == revision.identity } ?: return@supervisorScope
+                val match = board?.journeys?.find { it.key == revision.identity.serviceKey }
+                val updated = when {
+                    match != null -> current.copy(journey = match, board = board, alternatives = null)
+                    overlay != null -> focusAfterRefresh(current, overlay, current.alternatives)
+                    current.journey.legs.all { it.identity != null } -> current.demotedForLostOverlay()
+                    else -> current.demotedForUnmatchedBoard()
+                } ?: current
+                if (updated != current) {
+                    data = data.copy(focus = updated)
+                    persist()
+                }
+                syncPersonal()
+            }
+        }
+    }
+
+    fun openTrackedJourney(revision: TravelTrackerRevision) {
+        if (!mutable.value.ready) {
+            pendingTrackerOpen = revision
+            return
+        }
+        if (!tracker.accepts(revision)) return
+        val focus = visibleFocus()?.takeIf { it.trackerIdentity == revision.identity } ?: return
+        if (ends(focus.tripId, focus.reverse)?.let { it.first.id == focus.board.from.id && it.second.id == focus.board.to.id } != true) return
+        explicit = true
+        historyRecorded = false
+        mutable.value = mutable.value.copy(
+            selectedTripId = focus.tripId,
+            reverse = focus.reverse,
+            board = focus.board,
+            homeBoard = focus.board,
+            screen = Screen.Detail,
+            detail = focus.journey,
+            receipt = null,
+            justAddedTripId = null,
+        )
+        recordHistory()
+        refreshFocus()
+    }
+
+    internal fun dismissTracker(revision: TravelTrackerRevision): Boolean = tracker.dismiss(revision)
+
+    internal fun debugSetTrackerFocus(focus: FocusedJourney) {
+        check(BuildConfig.DEBUG)
+        val trip = SavedTrip(focus.tripId, focus.board.from, focus.board.to, lines = focus.journey.legs.map { it.line }.distinct())
+        data = data.copy(trips = data.trips.filterNot { it.id == trip.id } + trip, focus = focus)
+        mutable.value = mutable.value.copy(now = trackerNow())
+        persist()
+        syncPersonal()
+    }
+
+    internal fun debugSetTrackerClock(now: Long?) {
+        check(BuildConfig.DEBUG)
+        debugTrackerClock = now
+        mutable.value = mutable.value.copy(now = trackerNow())
+        syncTracker()
+    }
+
+    internal fun debugSetTrackerCaptureMode(enabled: Boolean) {
+        check(BuildConfig.DEBUG)
+        debugTrackerCaptureMode = enabled
+        if (!enabled) return
+        boardJob?.cancel()
+        earlierJob?.cancel()
+        focusJob?.cancel()
+        realtimeJob?.cancel()
+        trackerRefreshJob?.cancel()
+        generation++
+        trackerPublicationGeneration++
+        mutable.value = mutable.value.copy(refreshing = false)
+    }
+
+    private fun trackerNow(): Long = if (BuildConfig.DEBUG) debugTrackerClock ?: System.currentTimeMillis() else System.currentTimeMillis()
+
+    internal fun debugBrowseWithoutChangingTracker(trip: SavedTrip, board: BoardData) {
+        check(BuildConfig.DEBUG)
+        data = data.copy(trips = data.trips.filterNot { it.id == trip.id } + trip)
+        explicit = true
+        mutable.value = mutable.value.copy(
+            selectedTripId = trip.id,
+            reverse = board.from.id == trip.to.id,
+            board = board,
+            screen = Screen.Board,
+            detail = null,
+        )
+        syncPersonal()
     }
     private fun choosePrediction() {
         if (explicit && data.trips.any { it.id == mutable.value.selectedTripId && compatible(it, data.modes) }) return
@@ -129,7 +335,7 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         mutable.value = mutable.value.copy(now = System.currentTimeMillis())
         refreshLoop = viewModelScope.launch {
             var ticks = 0
-            if (mutable.value.ready) { choosePrediction(); refreshSharedData(); refresh(); readFlags(); if (data.useLocation) onSilentLocation?.invoke() }
+            if (mutable.value.ready) startForegroundWork()
             while (isActive) {
                 delay(1000); mutable.value = mutable.value.copy(now = System.currentTimeMillis())
                 if (++ticks % 30 == 0 && mutable.value.ready) { refreshSharedData(); refresh(); readFlags() }
@@ -138,12 +344,20 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
             }
         }
     }
+    private fun startForegroundWork() {
+        choosePrediction()
+        refreshSharedData()
+        refresh()
+        readFlags()
+        if (data.useLocation) onSilentLocation?.invoke()
+    }
     fun pause() {
         refreshLoop?.cancel(); refreshLoop = null; boardJob?.cancel(); earlierJob?.cancel(); focusJob?.cancel(); historyJob?.cancel(); realtimeJob?.cancel(); generation++
         mutable.value = mutable.value.copy(refreshing = false, distanceMetres = null, nearestStation = null)
         fix = null
     }
     private fun refreshSharedData() {
+        if (debugTrackerCaptureMode) return
         val now = mutable.value.now
         if (now - lastRealtimeAttempt < 25_000 || realtimeJob?.isActive == true) return
         lastRealtimeAttempt = now
@@ -152,6 +366,7 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
                 initialized.await()
                 val fetched = try { planner.refreshRealtime(api.baseUrl); true }
                     catch (e: CancellationException) { throw e } catch (_: Exception) { false }
+                if (debugTrackerCaptureMode) return@launch
                 val request = generation; val pair = ends(); val modes = data.modes.toSet()
                 // Replanning on a failed fetch would republish the same rows from the realtime the app already had.
                 if (fetched && pair != null && modes.isNotEmpty() && mutable.value.board?.isLive(mutable.value.now) != true) {
@@ -171,9 +386,8 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
                             return@let
                         }
                         // The overlay demotes only a focus it still owns; refreshFocus may have handed it to the API.
-                        val subject = if (updated?.live == true) focus else data.focus?.demotedForLostOverlay()
-                        if (subject != null) data = data.copy(focus = focusAfterRefresh(subject, updated, alternatives))
-                        settleFocus(judgeClock = updated?.live == true); persist(); syncPersonal()
+                        data.focus?.let { subject -> data = data.copy(focus = focusAfterRefresh(subject, updated, alternatives)) }
+                        settleFocus(judgeClock = updated?.canJudgeClock == true); persist(); syncPersonal()
                     }
                 }
                 if (fetched && now - lastTimetableCheck > 6 * 3_600_000) {
@@ -186,7 +400,7 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         }
     }
     override fun refresh() {
-        if (!mutable.value.ready) return
+        if (debugTrackerCaptureMode || !mutable.value.ready) return
         boardJob?.cancel(); earlierJob?.cancel(); generation++
         val request = generation
         val suppressLastAnswer = suppressNextLastAnswer
@@ -264,12 +478,14 @@ class TrainViewModel @JvmOverloads constructor(application: Application, private
         mutable.value = mutable.value.copy(board = remembered, homeBoard = visibleFocus()?.board ?: remembered, detail = detail)
     }
     private fun refreshFocus() {
+        if (debugTrackerCaptureMode) return
         val focus = data.focus ?: return
         focusJob?.cancel()
         focusJob = viewModelScope.launch {
             val pair = ends(focus.tripId, focus.reverse) ?: return@launch
             val at = focus.journey.departure.takeIf { it < mutable.value.now }
             val result = try { api.focusedDepartures(pair.first, pair.second, at) } catch (e: CancellationException) { throw e } catch (_: Exception) { null }
+            if (debugTrackerCaptureMode) return@launch
             if (data.focus?.journey?.key != focus.journey.key || data.focus?.tripId != focus.tripId || data.focus?.reverse != focus.reverse) return@launch
             val match = result?.journeys?.find { it.key == focus.journey.key }
             if (match != null) data = data.copy(focus = focus.copy(journey = match, board = result, alternatives = null))

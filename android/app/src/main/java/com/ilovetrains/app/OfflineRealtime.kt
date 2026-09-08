@@ -13,7 +13,12 @@ import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
 
-internal data class RealtimeResult<T>(val value: T, val observedAt: Long? = null, val matched: Boolean = false)
+internal data class RealtimeResult<T>(
+    val value: T,
+    val observedAt: Long? = null,
+    val matched: Boolean = false,
+    val matchedLegIndices: Set<Int> = emptySet(),
+)
 internal data class StopAssignment(val platform: String?, val stationId: String)
 
 internal class OfflineRealtime {
@@ -54,8 +59,8 @@ internal class OfflineRealtime {
     private val snapshots = ConcurrentHashMap<String, Snapshot>()
     private val etags = ConcurrentHashMap<String, String>()
 
-    suspend fun refresh(baseUrl: String) = coroutineScope {
-        sourceNames.map { source -> async(Dispatchers.IO) { runCatching { fetch(baseUrl, source) } } }.awaitAll()
+    suspend fun refresh(baseUrl: String, sources: Set<String> = sourceNames.toSet()) = coroutineScope {
+        sourceNames.filter { it in sources }.map { source -> async(Dispatchers.IO) { runCatching { fetch(baseUrl, source) } } }.awaitAll()
     }
 
     fun hasFreshData(): Boolean = snapshots.values.any { it.expiresAt > System.currentTimeMillis() }
@@ -117,13 +122,15 @@ internal class OfflineRealtime {
     fun overlay(journey: Journey, assignment: (String, String) -> StopAssignment?): RealtimeResult<Journey> {
         var observedAt: Long? = null
         var matched = false
-        val legs = journey.legs.map { leg ->
-            val identity = leg.identity ?: return@map leg
+        val matchedLegIndices = mutableSetOf<Int>()
+        val legs = journey.legs.mapIndexed { index, leg ->
+            val identity = leg.identity ?: return@mapIndexed leg
             val snapshot = freshSnapshot(identity.source)
-                ?: return@map leg.copy(estimatedDeparture = null, estimatedArrival = null, cancelled = false)
+                ?: return@mapIndexed leg.copy(estimatedDeparture = null, estimatedArrival = null, cancelled = false)
             val update = snapshot.updates[key(identity.tripId, identity.serviceDate)]
-                ?: return@map leg.copy(estimatedDeparture = null, estimatedArrival = null, cancelled = false)
+                ?: return@mapIndexed leg.copy(estimatedDeparture = null, estimatedArrival = null, cancelled = false)
             matched = true
+            matchedLegIndices += index
             observedAt = minOf(observedAt ?: Long.MAX_VALUE, snapshot.headerTimestamp)
             val from = update.stops.firstOrNull { it.matches(identity.fromStopId, identity.fromSequence) }
             val to = update.stops.firstOrNull { it.matches(identity.toStopId, identity.toSequence) }
@@ -141,7 +148,7 @@ internal class OfflineRealtime {
                 cancelled = update.status == "cancelled" || replacementMissingStop || crossHubAssignment || from?.relationship == "skipped" || to?.relationship == "skipped",
             )
         }
-        return RealtimeResult(Journey(legs), observedAt, matched)
+        return RealtimeResult(Journey(legs), observedAt, matched, matchedLegIndices)
     }
 
     private fun freshSnapshot(source: String): Snapshot? {

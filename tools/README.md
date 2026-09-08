@@ -1,13 +1,32 @@
 # tools
 
-- `build-ios.sh` — build/test the native SwiftUI client or prepare a Release archive.
-  Use `--simulator`, `--test`, `--device` or `--unsigned-archive`; see
+- `build-ios.sh` — build/test the native SwiftUI client, prepare a Release archive, or upload an internal TestFlight build (`--testflight`).
+  `--unit [TestClass[/testMethod]...]` and `--ui [TestClass[/testMethod]...]`
+  select a test target, optionally filtered, for iteration. `--test` retains
+  the full core + UI gate. Also supports `--simulator`, `--device` and `--unsigned-archive`; see
   [iOS operations](../docs/operations/ios.md) for signing and installation.
 - `generate-ios-project.rb` — regenerate the checked-in Xcode project after adding
   files. Requires the `xcodeproj` Ruby gem and reads the canonical web version.
 - `build-android.sh` — build the native app and run its JVM/lint gates. Add
+  `--unit [JUnit-patterns...]` for JVM-only iteration. The default full gate
+  still builds Debug and runs all JVM tests and lint. Add
   `--release` for the signed installable APK and server download copy. See
   [Android operations](../docs/operations/android.md) for SDK and signing setup.
+  The normal gate builds Debug only. Before checking Release stripping, build
+  Release from the current sources and confirm the new production classes or
+  manifest entries exist in that APK. Missing debug hooks in an older Release
+  APK or R8 report prove nothing about the current change.
+- `check-log.sh` — native helpers run through this wrapper to print elapsed
+  time and retain complete compiler/test output in a unique log. Failures
+  retain their exit code and print the last 80 lines. `TEST_VERBOSE=1` streams
+  output; `TEST_LOG_DIR` selects the artifact directory. Command-routing and
+  failure-propagation tests: `python3 -m unittest discover -s tools/test -p test_native_commands.py`.
+- `start-android-emulator.sh AVD_NAME [PORT]` — start an existing session-owned
+  AVD with host GPU, 4 GB RAM and Quick Boot, without wiping it. A running
+  matching AVD/port is reused unchanged; an occupied port fails. Default port
+  is 5554; use the printed `ANDROID_SERIAL` on every drive and stop your device
+  when finished. `ANDROID_EMULATOR_MEMORY` overrides guest RAM. The launcher
+  neither creates AVDs nor changes another running device's renderer.
 - `compile-timetable.py` — compile captured GTFS schedules into the shared
   deterministic SQLite package and the server-only trip index beside it. It
   never loads credentials. Input names, source authority, package validation
@@ -17,9 +36,19 @@
 - `export-android-conformance.mjs` — regenerate committed prediction and row
   expectations from the web implementation: `node tools/export-android-conformance.mjs`.
   Node and Android JVM tests consume the same JSON under `fixtures/conformance/`.
+  Android's production `JSONArray.readEach` drops entries whose callback throws,
+  including assertion failures. Test fixture assertions must use ordinary loops;
+  a green test that puts assertions inside `readEach` is not conformance evidence.
 - `shoot-android.sh` — build and drive the native renderer on one booted Android
   emulator: `tools/shoot-android.sh 390x844` or `tools/shoot-android.sh 412x732`.
   `FONT_SCALE=1.3` exercises enlarged text; `OUT` selects the capture directory.
+  `CALIBRATION_SCREENS=home,board,detail` selects only those canonical frames
+  and their setup/assertions. It defaults to the capture method when filtered;
+  an unfiltered invocation retains the whole calibration class. Unknown names
+  and instrumentation failures fail the command, including JUnit failures
+  that `am instrument` reports with exit zero. The first captured frame writes
+  viewport metrics, so selecting a screen other than Home is valid; a full
+  run retains Home's metrics.
   The script restores display size and font scale on exit. Inputs are mapped
   API captures with declared stress deltas in `fixtures/conformance/calibration.json`;
   test hooks are packaged only in the instrumentation APK.
@@ -42,6 +71,47 @@
   database application-ID rejection, with `cd android && ./gradlew
   :app:connectedDebugAndroidTest
   -Pandroid.testInstrumentationRunnerArguments.class=com.ilovetrains.app.OfflinePlannerInstrumentedTest`.
+- `shoot-travel-tracker-android.sh` — capture the real system notification and
+  lock screen, then drive tracker lifecycle checks. Requires an explicitly owned
+  emulator: `ANDROID_SERIAL=emulator-5556 OUT=/tmp/tracker-<unique>
+  tools/shoot-travel-tracker-android.sh 390x844`. **It clears the app's data on
+  that emulator.** The other size is `412x732`; `FONT_SCALE=1.3` checks large
+  text. `TRACKER_CASES`, `SCHEMES` and `SURFACES` select comma-separated cases,
+  `dark,light` and `shade,lock`; `CAPTURE_ONLY=1` skips the lifecycle lane.
+  Defaults cover the seven accepted cases, missed connection and first/final
+  leg cancellation. Use an empty output directory. The script restores display,
+  font, scheme and lock-screen settings when it exits.
+  Captures use the shared tracker fixture and a Debug-only fixed clock; capture
+  mode blocks external data publication. Background/locked stage transitions
+  use the production wall clock in a separate lane. Lifecycle checks include
+  production inference from a supplied location fix, replacement, stale intents,
+  dismissal persistence, SIGKILL recovery, notification denial and a blocked channel. Driver-only test
+  methods require their matching `trackerDriverStep`; a skipped check fails
+  the script. API 35 ordinary notification rendering requires its own run.
+  Full frames and accessibility/notification dumps are retained; `cards/` crops
+  use the notification bounds observed in the accessibility tree. Cropping
+  removes external system chrome, never product text. Captures prove emulator
+  behavior, not physical-device Doze, OEM delivery or power use.
+  When Android offers expansion, the shooter keeps a `-collapsed` frame before
+  opening it and checking the expanded row. On the tested lock screen, expansion
+  opens the locked notification shade. The accessibility check detects missing
+  facts; pixel review must still check ellipsis and clipping.
+- `shoot-travel-tracker-ios.sh` — capture the app's real ActivityKit surfaces
+  on an explicitly owned, booted simulator. Set `ILOVETRAINS_SIMULATOR_ID`,
+  `ILOVETRAINS_IOS_BUILD_DIR` and an empty `OUT`, then pass `402x874` (Island)
+  or `390x844`. `SURFACES=notification-center,compact,expanded` is the default;
+  Notification Center is not a device-lock test. `TRACKER_CASES`, `SCHEMES` and
+  `CONTENT_SIZE=accessibility-medium` narrow cases, schemes and enlarged text.
+  `CAPTURE_ONLY=1` omits lifecycle drives. Minimal Island requires a distinct
+  ActivityKit app supplied through `MINIMAL_COMPETITOR_APP`.
+  Fixed DEBUG fixtures test layout; the separate wall-clock lane tests retained
+  state and foreground reconciliation. Full frames, recordings and AX dumps
+  remain available on failure. On iOS 26.4, Notification Center can expose only
+  a host `ListCell`, so its container assertion does not prove text visibility:
+  inspect the PNGs for every required fact, clipping and permission overlays.
+  The first-use Allow transition can leave an empty host cell; publish a fresh
+  activity after permission settles. No capture establishes physical-device
+  delivery or power behavior.
 - `shoot-ios.sh` — install and capture seeded SwiftUI states on one booted
   iPhone simulator. Build first, then set `ILOVETRAINS_SIMULATOR_ID`,
   `ILOVETRAINS_IOS_APP` and optionally `OUT`; state arguments replace the
@@ -231,19 +301,32 @@ node tools/visual-regression.js [--platform web,android,ios] [--screens a,b]
         [--out DIR] [--compare DIR] [--accept] [--threshold N] [--fuzz N] [--list]
 ```
 
-The cheap check after a change lands on every client. It shoots the three
+Use `--platform` and `--screens` for affected UI during iteration, then run the
+full affected-platform matrix on final sources. Shared UI changes need every
+affected screen; shared cross-client behavior needs every affected platform.
+Independent platforms remain parallel. The default shoots the three
 platforms in parallel — the web through its own private `localhost` server and
 `shoot-states.js` (plus `check-settings-browser.js` for the Settings frames),
 Android through `shoot-android.sh` on the booted emulator, iOS through
 `shoot-ios.sh` on the booted iPhone simulator — then compares each frame with
-the committed baseline in `tools/baselines/<platform>/<screen>.png`. A whole
-run is about ninety seconds with a warm Gradle cache and a built simulator app
-(`tools/build-ios.sh --simulator` first, or the iOS frames report `MISSING`);
-a cold Android build adds minutes. `--screens home,board,detail` is about
-twenty seconds. `--list` prints the screen table: one row per screen,
+the committed baseline in `tools/baselines/<platform>/<screen>.png`.
+Build the iOS app first (`tools/build-ios.sh --simulator`, or iOS frames report
+`MISSING`). Android screen selection is passed to instrumentation before
+rendering; a three-screen run no longer captures the entire canonical matrix.
+Run duration depends on selected states, device renderer, build cache and
+host contention; the older ninety-second/full and twenty-second/subset figures
+predate the system-notification matrix. `--list` prints the screen table: one row per screen,
 naming the platform-native state that shows it, with `·` where a platform has
 no equivalent. Baselines are named by that shared screen, so the report can
 put the same screen from all three clients side by side.
+
+On 2026-09-08, a warm API 36.1 ARM64 emulator with host graphics took
+16.0 seconds to instrument the original 46-frame sweep versus 5.9 seconds for
+`home,board,detail` with selection (63% less capture time; build/install/pull
+excluded). Those three images matched the original pixels exactly. The full
+46-frame capture and a six-frame 412×732 / font-scale 1.3 drive also passed.
+Setup keyboard insets varied between original runs as well as revised runs;
+selection does not solve that pre-existing screenshot timing instability.
 
 The output directory holds `<platform>/<screen>.png`, `diff/<platform>/` for
 frames that differ, `capture.json` (device, missing frames and why) and
@@ -284,7 +367,14 @@ Traps:
 - iOS frames ignore the top 190 and bottom 60 device px: the simulator status
   bar, whose glyphs shift one channel level between launches, and the home
   indicator, which dims a couple of seconds after launch. An app background
-  change in those bands is not seen.
+  change in those bands is not seen. Tracker card crops have no masks.
+- iOS `tracker-*` frames use the dedicated ActivityKit shooter at 402×874,
+  default text size, with `CAPTURE_ONLY=1` and `SURFACES=notification-center`.
+  Set `ILOVETRAINS_SIMULATOR_ID` explicitly. Baselines crop the actual card
+  bounds attached by XCTest; full frames and AX evidence stay in the reported
+  temporary source directory. Pixel review must confirm the intended fixture
+  and all its content before accepting a crop. Large-text, Island, locked-device
+  and lifecycle checks remain separate lanes.
 - One emulator, one simulator. A peer session mid-drive on either device puts
   its frames, or its display size, into yours; the tool polls for a running
   `shoot-android.sh`, `am instrument` or `shoot-ios.sh` and waits up to ten
@@ -299,14 +389,22 @@ Traps:
   never rebuilds that app: a stale one shoots old code with no error, and the
   Settings frame's version string is the tell (2026-09-08: a 1.2.4 build shot
   a 1.4.0 tree and reported the new row missing).
-- The Android drive runs only `UiCalibrationTest#captureCanonicalScreens`
+- The Android app-screen drive runs only `UiCalibrationTest#captureCanonicalScreens`
   (`INSTRUMENT_CLASS` on `shoot-android.sh`); the class's other tests assert
   behaviour and are the build gate's job. The iOS drive caps the settle at two
   seconds (`SETTLE_SECONDS`) and stops as soon as two shots half a second apart
   are byte-identical. The web drive runs ten `shoot-states.js` processes of
   four states each (`VISUAL_WEB_JOBS`, `VISUAL_WEB_CHUNK`); more than that
   gains nothing on a twelve-core machine.
-- The Android frames are captured by `UiCalibrationTest`, so a new Android
+- Android `tracker-*` frames run the dedicated tracker shooter with
+  `CAPTURE_ONLY=1` and `SURFACES=shade`. Set `ANDROID_SERIAL` explicitly: this
+  lane clears that emulator's app data. Baselines contain the observed system
+  notification card, with a fixed fixture clock; lock-screen, size, large-text
+  and lifecycle coverage belongs to the full tracker shooter. An OS template
+  change needs review against the recorded device, just like a client change.
+  These canonical cards use the expanded presentation where offered; collapsed
+  companions are review evidence from the full shooter, not registered baselines.
+- The Android app frames are captured by `UiCalibrationTest`, so a new Android
   screen needs a `capture()` there and a row in the table; the iOS and web
   states likewise. A frame the table does not name is not checked.
 - `home-services-filtered` is shot from journeys built on the real clock, so
