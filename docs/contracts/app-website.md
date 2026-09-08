@@ -22,6 +22,8 @@ The privacy policy must change with any relevant change to the analytics,
 client-storage or API contracts. Counters' transmitted fields are distinct
 from the analytics service's arrival-time records. Feedback has no automatic
 expiry; the operator can delete it. The marketing site sends no analytics.
+Serve `Cache-Control: no-transform` so Cloudflare preserves public email
+links without injecting a decoding script that the site's CSP blocks.
 
 ## Presentation
 
