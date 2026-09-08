@@ -1,6 +1,0 @@
-A3 iOS: hour-old header with future payload expiry accepted
-A3 iOS: future header accepted, then valid current header rejected
-B2 iOS: distance to API leg endpoint is infinite; saved endpoint is zero at destination
-F8 iOS: persisted empty Journey decodes; caller guards mean a Home crash is not established
-F8 iOS: finite out-of-Int-range departure round-trips; BoardRow's Int conversion is unsafe (trap not executed)
-F8 correction: default JSONDecoder rejects overflowing/non-finite JSON number
