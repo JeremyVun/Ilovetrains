@@ -53,13 +53,15 @@ target in `docker-bake.hcl`. The default target still builds only the train
 app. Its build context is `site/`; native work and API secrets cannot enter
 the image. The infra `ilovetrainsapp` stack runs on `syd1` through the shared
 Caddy edge, without secrets, volumes or a host port.
+Infra pins the numbered image tag so Git names the deployed website release.
 
 Verify all three pages on phone and desktop in both schemes, with loaded
 images, no horizontal overflow, visible keyboard focus and reachable footer
 links. Include a tablet width between phone and desktop layouts. Scroll
 captures must wait for the actual document end; smooth-scroll intermediate
-frames are not bottom-of-page evidence. Verify the actual nginx container and then public HTTPS, health and
-navigation after deployment. See [deployment](../operations/deploy.md).
+frames are not bottom-of-page evidence. Verify the actual nginx container,
+then public HTTPS, health and navigation after deployment.
+See [deployment](../operations/deploy.md).
 
 The public URLs are suitable for the marketing, privacy and support URL
 fields. Store metadata and required links inside each native app remain

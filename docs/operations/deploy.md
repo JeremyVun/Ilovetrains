@@ -19,8 +19,12 @@ app. It needs no API key, database, secrets or persistent volumes.
 ```sh
 GIT_REVISION="$(git rev-parse --short=12 HEAD)" \
   ILOVETRAINSAPP_VERSION=1.0.1 docker buildx bake ilovetrainsapp --push
-(cd ../projects && cli/deploy.sh ilovetrainsapp)
 ```
+
+Set the matching numbered image tag in
+`../projects/stacks/ilovetrainsapp/docker-compose.yml`, commit and push infra,
+then run `(cd ../projects && cli/deploy.sh ilovetrainsapp)`. The host's
+scheduled reconciliation also converges to the pinned image.
 
 Increment the website image tag on later releases. The explicit target builds
 only the website; the default bake group still builds only the Go app.
