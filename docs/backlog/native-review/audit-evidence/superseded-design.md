@@ -143,9 +143,9 @@ actual web rendering and was inadequate as parity evidence.
   The final page-size decision must define the displayed future slice and
   footer for online, scheduled offline and retained boards separately.
 - Recheck B10 against the concurrent `location-row` work before building;
-  that item owns the Settings permission row. `timetable-realtime` owns
-  source service-date/freshness repairs, and `realtime-replacements` owns
-  replacement stop patterns. A1–A6 must preserve their settled contracts.
+  that item owns the Settings permission row. Source service-date and freshness
+  rules live in `docs/contracts/native-data.md`; `realtime-replacements` owns
+  replacement stop patterns. A1–A6 must preserve those contracts.
 - Contract mapping can precede code, but changed behavioral contracts must
   commit with their implementation, not in a standalone advance phase.
 

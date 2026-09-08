@@ -39,6 +39,10 @@ and the package hash is unaffected. A manifest without the field, an absent side
 its recorded SHA-256 leaves every dateless update unresolved and the timetable
 otherwise usable.
 
+The runtime's atomic `current.json` retains the compiler's `tripIndex` and its
+sidecar in the active generation. Only the client-facing manifest strips that
+field; restarting the server must preserve service-date resolution.
+
 There is one aggregate `network` package so trips can transfer between source
 feeds in one indexed query. Compact dates are Sydney service dates in
 `YYYYMMDD`. `generatedAt` records capture time and never becomes fresh merely

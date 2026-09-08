@@ -248,11 +248,11 @@ Browser (localStorage: trips, history, rides, focus, home, searches, cache)
   PWA was rejected because the extra layer costs feel; Flutter was tried and
   deleted because it costs the native feel it was meant to buy. See "Native
   clients" below for how the ports stay in sync.
-- **Web retains TfNSW Trip Planner; offline route planning belongs to native
-  design** (2026-09-06). Web continues caching small journey responses for
-  immediate paint and last-known offline use. Design timetable downloads and
-  local route construction when building Android/iOS; this is not a web or
-  Settings prerequisite. Research is in `docs/backlog/timetable-realtime/`.
+- **Web retains TfNSW Trip Planner; native clients plan offline.** Web caches
+  small journey responses for immediate paint and last-known offline use.
+  Android and iOS bundle a timetable and overlay shared realtime snapshots,
+  with online Trip Planner coverage as specified in
+  [native-data.md](contracts/native-data.md).
 - **Backend: Go.** Single static binary shipped as one image with `web/`
   baked in.
 - **Personalisation is client-side only.** The load-bearing decision:

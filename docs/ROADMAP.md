@@ -50,10 +50,8 @@ geometric. Observations waiting on an owner ruling:
   take.
 - Disruption and trackwork awareness surfaced on saved trips and in the
   header.
-- Close the Sydney Trains realtime service-date join gap: production has
-  returned a fresh snapshot with zero matched updates. See
-  `docs/contracts/native-data.md#sydney-trains-realtime-coverage-gap`.
-  Remaining feed questions are in `docs/backlog/timetable-realtime/design.md`.
+- Extend native realtime routing to replacement stop patterns, platform changes
+  and added services: [realtime replacements](backlog/realtime-replacements/design.md).
 - No routing configuration surface beyond the transfer limit row
   (`docs/PROJECT.md`, principle 3). If a case seems to need one, bring it to
   the owner as a routing defect first.

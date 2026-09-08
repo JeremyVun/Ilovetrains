@@ -1,11 +1,10 @@
 # Native realtime: replacement trips, platform changes and added services
 
-Stage: design. Opened 2026-09-07 from finding 2 of the
-[timetable-realtime reliability investigation](../timetable-realtime/investigation-2026-09-07.md).
-No build plan exists. Depends on the Sydney Trains service-date resolver and
-the per-relationship freshness policy being repaired first under
-`timetable-realtime`; without them the Sydney Trains feed normalizes to zero
-updates and nothing here can be exercised on real data.
+Stage: design. No build plan exists. The Sydney Trains service-date resolver
+and per-relationship freshness policy are implemented; preserve the
+[service-date](../../contracts/native-data.md#sydney-trains-service-dates) and
+[snapshot](../../contracts/native-data.md#realtime-snapshots) contracts while
+extending the native overlay.
 
 ## What and why
 
@@ -65,7 +64,7 @@ terminates early, or omit a replacement service that is actually running.
    trip table) or whether it stays the online fallback's job.
 3. **Structural validity versus prediction freshness.** A changed stop list
    or cancellation stays true for the service day; a delay prediction ages in
-   seconds. Apply the freshness policy settled under `timetable-realtime`
+   seconds. Apply the [snapshot freshness policy](../../contracts/native-data.md#realtime-snapshots)
    so that a fresh snapshot never drops a platform change because its trip
    timestamp is old.
 4. **Focused journeys.** A focus pinned to a static connection must follow
@@ -78,8 +77,8 @@ terminates early, or omit a replacement service that is actually running.
 
 ## Decisions
 
-- 2026-09-07, owner: opened as its own backlog item, separate from the
-  Sydney Trains date-gate and arrival-cache repairs in `timetable-realtime`.
+- Replacement stop patterns and added services are separate scope from the
+  implemented service-date resolution and arrival-aware API caching.
 
 ## Open questions for the owner
 
