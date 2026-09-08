@@ -8,3 +8,6 @@ __pycache__/
 web/downloads/*.apk
 web/downloads/index.html
 *.png
+!site/assets/icon-192.png
+!site/assets/apple-touch-icon-180.png
+!assets/comps/latest/site/*.png

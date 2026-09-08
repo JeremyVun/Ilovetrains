@@ -9,6 +9,33 @@ phone download under `/downloads/`. The infra repository at `../projects` runs t
 Source pushes do not deploy production. Build, push and deployment originate
 from this machine.
 
+## App website
+
+The marketing, privacy and support site at
+`https://ilovetrainsapp.jeremyvun.com/` is a separate static nginx image and
+infra stack, built from `site/`. It uses the same host and Caddy edge as the
+app. It needs no API key, database, secrets or persistent volumes.
+
+```sh
+GIT_REVISION="$(git rev-parse --short=12 HEAD)" \
+  ILOVETRAINSAPP_VERSION=1.0.0 docker buildx bake ilovetrainsapp --push
+(cd ../projects && cli/deploy.sh ilovetrainsapp)
+```
+
+Increment the website image tag on later releases. The explicit target builds
+only the website; the default bake group still builds only the Go app.
+Infra configuration lives in `../projects/stacks/ilovetrainsapp/`, assigned
+to `syd1`. Port 8080 is set explicitly in Compose and drives nginx, the edge
+label and healthcheck. No local `.env` is needed for this build.
+
+For local inspection, build a host-architecture image from `site/`, then run
+it with a loopback port mapping. Verify `/`, `/privacy/`, `/support/`, assets,
+and `/healthz` against nginx, followed by the same public HTTPS paths after
+deploy. All pages revalidate their HTTP cache and have no service worker.
+The site container disables access logs and serves a restrictive CSP with
+local styles and images only. [Website contract](../contracts/app-website.md)
+records copy, privacy and screenshot requirements.
+
 The `timetables` volume at `/data` contains public schedules and source caches,
 never personal client state. The image initializes that directory for its
 unprivileged runtime user. A failed upstream refresh retains the validated

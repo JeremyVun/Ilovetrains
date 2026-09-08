@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://ilovetrainsapp.jeremyvun.com/sitemap.xml

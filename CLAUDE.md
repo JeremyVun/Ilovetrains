@@ -20,6 +20,7 @@ location and focused journeys stay on the device.
   calibration rules.
 - `docs/contracts/analytics.md` — anonymous event vocabulary, experiment
   assignment, privacy controls and aggregate interpretation.
+- `docs/contracts/app-website.md` — public app website, privacy and support.
 - `docs/contracts/native-data.md` — Android timetable, routing and realtime.
 - `docs/contracts/android-deviations.md` — reviewable native differences.
 - `docs/operations/android.md` — Android build, signing and installation.
@@ -48,6 +49,7 @@ references, and delete the entire folder. Git retains any history.
 - `internal/cache/` — TTL cache, single-flight and stale-on-error behavior.
 - `internal/tfnsw/` — TfNSW client, upstream types and response mapping.
 - `web/` — dependency-free vanilla ES-module PWA, service worker and tests.
+- `site/` — independent static app website at `ilovetrainsapp.jeremyvun.com`.
 - `android/` — native Kotlin/Compose app, JVM and emulator tests.
 - `ios/` — native SwiftUI app, Xcode project, XCTest and simulator tests.
 - `internal/native/` — shared timetable publication and realtime ingestion.

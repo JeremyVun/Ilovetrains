@@ -1,0 +1,20 @@
+server {
+    listen ${ILOVETRAINSAPP_PORT};
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+    server_tokens off;
+    # Directory redirects must preserve the public HTTPS origin behind Caddy.
+    absolute_redirect off;
+    # Public documentation needs no per-visitor access log.
+    access_log off;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    add_header Content-Security-Policy "default-src 'none'; img-src 'self'; style-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'" always;
+    add_header Cache-Control "no-cache" always;
+    gzip on;
+    gzip_types text/css application/xml image/svg+xml;
+    location = /healthz { default_type text/plain; return 200 "ok\n"; }
+    location = /health { default_type text/plain; return 200 "ok\n"; }
+    location / { try_files $uri $uri/ =404; }
+}

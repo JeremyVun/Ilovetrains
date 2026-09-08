@@ -1,0 +1,13 @@
+**
+!Dockerfile
+!nginx.conf.template
+!index.html
+!site.css
+!robots.txt
+!sitemap.xml
+!privacy/
+!privacy/**
+!support/
+!support/**
+!assets/
+!assets/**
