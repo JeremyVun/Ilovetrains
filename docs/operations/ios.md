@@ -83,20 +83,21 @@ and [registered-device signing](https://developer.apple.com/documentation/xcode/
 The paid individual membership for Yee Vun (`perch.admin@gmail.com`), team
 `8QYAPRZLHG`, renews on 2027-04-14. The owner accepted the updated Developer
 Program agreement on 2026-09-08 and signed into Xcode with this account.
-Xcode 26.4 successfully archived version 1.5.0 (5), signing both the app and
+Xcode 26.4 successfully archived version 1.6.0 (6), signing both the app and
 Live Activity extension. TestFlight requires an active paid membership.
 
 The App Store Connect record is [ilovetrains, Apple ID 6809801045](https://appstoreconnect.apple.com/apps/6809801045/testflight).
 Both explicit identifiers are registered on the paid team. The record uses
 English (Australia), SKU `ilovetrains-ios`, and Full Access.
-The first internal-only upload succeeded on 2026-09-08 at 22:23 AEST using
-`ios/releases/TestFlight-1.5.0-5.xcarchive`; Apple accepted the package for
-processing. A successful upload alone does not mean the build is installable:
+The latest internal-only upload succeeded on 2026-09-10 at 01:33 AEST from
+source `54e4bc1`, using `ios/releases/TestFlight-1.6.0-6.xcarchive`. All 57
+release input hashes and both signatures were verified; Apple accepted the
+package for processing. A successful upload alone does not mean the build is installable:
 verify TestFlight processing and group assignment before announcing availability.
-The session could not complete that final check because Brave stopped exposing
-page controls to automation. The internal group, owner invitation, and build
-assignment remain pending; create group `Jeremy`, add `perch.admin@gmail.com`,
-and assign the latest processed 1.5.0 build. No tester invitation has been sent.
+Processing and group assignment for build 6 have not been confirmed. The internal
+group and owner invitation were left pending by the initial setup; verify them
+before creating group `Jeremy`, adding `perch.admin@gmail.com`, and assigning the
+latest processed build. This release upload sent no tester invitation.
 
 1. Register explicit identifiers for `com.ilovetrains.ios` and
    `com.ilovetrains.ios.TravelTrackerWidget` under the correct paid team;

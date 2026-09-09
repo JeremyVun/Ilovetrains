@@ -45,9 +45,6 @@ geometric. Observations waiting on an owner ruling:
   all?
 
 ## Routing that just works
-- [Commute feedback](backlog/commute-feedback/build_plan.md): build in progress.
-  Cost-based Home suggestions, Direct only, C1 travelled-line/platform fading,
-  guarded final arrival and the three-client rear cab correction.
 - Tune the server transfer floor (`MIN_CONNECTION_TIME`) from real
   connections rather than defaults; never show a trip the user would not
   take.

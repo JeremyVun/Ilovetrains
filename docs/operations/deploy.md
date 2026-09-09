@@ -149,14 +149,22 @@ read-only container probe verified the actual environment key `prod` and a true
 `tiny_train` evaluation (`FALLTHROUGH`). No `.env` files were read or credentials
 printed; the probe used the container's existing process environment.
 
-Version `1.3.1` (source `e4f25d2`, service worker `v47`) deployed on 2026-09-08
-in job `a887f8acc7f488f53f1f22a0def04090`. Image digest:
-`sha256:fce592e8a9a92b6870d3603e969655add807491e813f68fdc64233ae27809898`.
-Production health, version and shell bytes passed HTTP checks, and the public
-endpoint returned `{"tiny_train":true}`. All 342 web tests, the signed Android
-release build and the four size/scheme interaction checks passed. Seven affected
-Home regression frames matched; no baseline changed. The train starts with six
-cars on the coloured trip line; activating it leaves the line and divider fixed.
+Version `1.6.0` (source `54e4bc1`, service worker `v58`) deployed on 2026-09-10
+in job `a28bc847eeef7a4988471d6603794424`. Image digest:
+`sha256:4586c54a6d1ff791ea6239dc404e92ce1d59805da95c96255e54ae05df83876b`.
+The running container is healthy and carries the expected source revision. All
+38 public shell/download paths match the release bytes. Production cold start,
+returning-shell cache contents and Direct-only offline reload pass. The separate
+recorded v56→v58 upgrade test also passes. Web 436 unit tests and full affected
+web, Android and iOS build/device/visual gates passed after Astra's fixes.
+The signed Android 1.6.0/code 6 APK is published at `/downloads/`; its SHA-256 is
+`dd0835a2105483a40c788558528cd7c25b3574eac4b99b85df605c0205e43145`.
+
+If minting succeeds but deployment returns `401 invalid_token`, use the current
+local deployctl client (`go install .` in `../projects/agent/deployctl`). Infra
+commit `1280d51` adds Authelia's `resource` grant for deployment API paths;
+Authelia 4.39.23 treats `audience` as an exact match. This release needed that
+client correction; host authentication configuration was unchanged.
 
 ## Verify
 
