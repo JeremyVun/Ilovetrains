@@ -71,11 +71,18 @@ geometric. Observations waiting on an owner ruling:
 
 ## Feedback hillclimbing
 Turn the analytics feedback inbox into verified fix pull requests with the
-owner approving every merge and release:
-[design](backlog/feedback-hillclimbing/design.md). This repo's share is the
-fixer contract, version and platform on feedback, a fixture-backed TfNSW
-stub and a checked-in playtest regression suite; the daemon, the playtest
-lease and origin guard and the analytics columns live in their own repos.
+owner approving every merge and release. This repo's share shipped on
+2026-09-10: the [automated fixes contract](contracts/hillclimbing.md),
+platform and version on feedback, the fixture-backed TfNSW stub and the
+checked-in playtest regression suite (`tools/README.md`). What remains lives
+in other repositories: the daemon (a new `hillclimb` repo: intake, sealed
+triage, discovery case writer, repair worker, release worker, GitHub digest),
+playtest's web-driver origin guard and finding repair lease, the analytics
+`platform` and `client_version` columns, and the infra stack pinning the
+numbered image tag. The daemon's design, trust boundaries and the
+cross-repository work table are in git history at
+`docs/backlog/feedback-hillclimbing/design.md` (last at commit d2eee3b);
+start the daemon repo from that document.
 
 ## Design system and tooling as infrastructure
 The comps loop is how the product moves and the native ports copy a design
