@@ -21,6 +21,8 @@ location and focused journeys stay on the device.
 - `docs/contracts/analytics.md` — anonymous event vocabulary, experiment
   assignment, privacy controls and aggregate interpretation.
 - `docs/contracts/app-website.md` — public app website, privacy and support.
+- `docs/contracts/hillclimbing.md` — binding limits, regressions and pull
+  requests for an automated fixer.
 - `docs/contracts/native-data.md` — Android timetable, routing and realtime.
 - `docs/contracts/android-deviations.md` — reviewable native differences.
 - `docs/operations/android.md` — Android build, signing and installation.
@@ -56,6 +58,8 @@ references, and delete the entire folder. Git retains any history.
 - `native-data/bootstrap/` — verified public timetable bundled in the server.
 - `assets/` — durable media; `assets/comps/latest/` is the only comps
   location.
+- `playtest/` — checked-in regression journeys, replayed keyless against the
+  fixture stub.
 - `tools/` — TfNSW probes, captured fixtures and browser verification tools.
 - `Dockerfile` and `docker-bake.hcl` — the production image build.
 - `../projects/stacks/ilovetrains/` — production compose/config in the infra
@@ -80,6 +84,15 @@ without `FLAGS_URL` every feature flag reads its default), and
 `ANALYTICS_URL`, `ANALYTICS_PROJECT`, `ANALYTICS_KEY` (optional; without
 `ANALYTICS_URL` the server's accuracy counters stay in its log).
 
+Without a key, run the server against the fixture stub. Start
+`go run ./tools/tfnsw-stub --port 8420 --fixtures tools/fixtures --routes
+tools/fixtures/stub-routes.json`, then start the server with
+`TFNSW_API_KEY=stub`, `TFNSW_BASE_URL=http://127.0.0.1:8420` and
+`TFNSW_FEED_BASE_URL=http://127.0.0.1:8420`. Every journey it serves comes
+from a captured response and no request reaches TfNSW.
+`tools/tfnsw-stub/smoke.sh` does all of that on free ports and checks the
+board; `tools/README.md` describes the route table and the clock anchors.
+
 During iteration, run the affected platform's unit suite; add the relevant
 device tests when changing platform integration or gestures. Both helpers
 accept optional test class/method filters and retain complete logs:
@@ -88,7 +101,15 @@ accept optional test class/method filters and retain complete logs:
 tools/build-android.sh --unit
 tools/build-ios.sh --unit
 tools/build-ios.sh --ui AppFlowTests/testSwipeRevealsDeleteAndUndoRestoresRow
+tools/playtest-regressions.sh
 ```
+
+`tools/playtest-regressions.sh` replays the checked-in journey suite in
+`playtest/regressions/` against a local server on the fixture stub, with no
+model reachable, so a case that no longer reaches its screen fails instead of
+healing. Run it after any change a user sees on the web client, and once on
+the final sources. It exits 0 on pass, 1 on a gate failure and 2 on an
+infrastructure problem; `tools/README.md` covers recording a new case.
 
 Before completing a native feature, run the full affected-platform gates once
 on the final sources (plus its instrumented/system integration checks). Do not
@@ -98,6 +119,7 @@ fixtures or behavior changes require all affected clients. Primary full gates:
 ```sh
 go test ./...
 (cd web && npm test)
+tools/playtest-regressions.sh
 tools/build-android.sh
 tools/build-ios.sh --test
 ```

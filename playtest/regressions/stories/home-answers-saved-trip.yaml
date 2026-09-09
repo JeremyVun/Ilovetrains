@@ -1,0 +1,9 @@
+description: Home answers for a saved trip
+story: |
+  You saved the trip you ride home, Central to Parramatta, and you are on the
+  concourse now. Open the app and read what its first screen tells you about
+  that trip, without opening anything else.
+success:
+  - element_exists: ".hm-hd"
+  - element_exists: "text=Parramatta"
+  - console_errors: 0

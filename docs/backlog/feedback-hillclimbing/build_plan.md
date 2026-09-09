@@ -42,10 +42,10 @@ The contract states, for any automated fixer working in this repo:
   the voice of `user-facing-copy`; then the finding link, the contract
   cited, gate results and the two regression runs.
 - The release PR is `release/<version>`: bumps `web/js/version.js` and
-  lists each merged fix's first line under the version. The service worker
-  `VERSION` needs no release-time bump because every fix bumped it in its
-  own change. Merging it is the deploy trigger; the daemon deploys that
-  exact merge commit and comments the job id.
+  `web/sw.js`'s `VERSION`, and lists each merged fix's first line under the
+  version. Both bumps happen on every release, because `web/js/version.js`
+  is a `SHELL` file. Merging it is the deploy trigger; the daemon deploys
+  that exact merge commit and comments the job id.
 
 `deploy.md` gains a short "Release pull request" section describing that
 flow next to the existing manual steps, which remain valid, and its step 2
@@ -55,6 +55,8 @@ infra change lands.
 Verify: a reader with only `AGENTS.md` and the contract can answer "may I
 change this file" for every path in the repo. Done marker: the contract
 exists, `AGENTS.md` links it, and `deploy.md` describes the release PR.
+
+Done 2026-09-09 (f538c82).
 
 ## Phase 1: feedback carries platform and version
 
@@ -76,9 +78,14 @@ Seam contract. The submission body becomes exactly
 - Neither field is personal and neither enters `/e`, storage, logs or the
   service worker cache; the existing sentence in `analytics.md` extends to
   them.
-- Size arithmetic: the two fields add at most 60 bytes of encoded JSON.
-  The message cap stays 8,192 bytes and the body cap stays 10,240, so the
-  worst case is 8,192 + 60 + the fixed 70-byte envelope, under the cap.
+- Size arithmetic: measured at version `1.5.1`, the two fields add 41 bytes
+  of encoded JSON on web and iOS and 45 on Android, taking the empty-message
+  envelope from 60 bytes to 101 and 105. Both caps stay as the contract
+  states them, the message at 8,192 UTF-8 bytes and the body at 10,240, and
+  the body cap is what a heavily escaped message hits first. A message that
+  sat exactly at the body cap under the three-field body is now refused with
+  the same "too long" copy; the boundary probes on all three clients pin the
+  new limit.
 - Analytics ignores the fields until its own item stores them; the request
   must succeed with 201 either way (the [verify] item in `design.md`).
 
@@ -87,6 +94,7 @@ feedback fixture) asserts the exact body; `tools/build-android.sh --unit`
 and `tools/build-ios.sh --unit` with the feedback tests asserting the body.
 No visual change, so no visual-regression run. Done marker: all three
 clients' tests pin the five-field body and `analytics.md` states it.
+Done 2026-09-09 (ef73695).
 
 ## Phase 2: fixture-backed TfNSW stub
 
@@ -128,6 +136,8 @@ the fixture's journeys. Done
 marker: the smoke script passes with no `TFNSW_API_KEY` present in the
 environment.
 
+Done 2026-09-09 (08fd2f2).
+
 ## Phase 2p: playtest `app.clock` (in `../playtest`)
 
 Owns: `../playtest/docs/backlog/web-clock/design.md` (the item), the
@@ -137,8 +147,11 @@ core tests, `docs/contracts/engine.md` and `README.md` there. Nothing in
 this repo.
 
 Seam contract: `app.clock: { time: <RFC 3339 instant>, timezone: <IANA> }`
-is a web-only environment key, valid in `playtest.yaml` defaults, a case
-and an `app.envs` overlay like `viewport`. It is applied at browser context
+is a web-only environment key, valid in `playtest.yaml` defaults and a
+case, like `viewport`; not in an `app.envs` overlay and not settable by a
+hosted ring (owner ruling 2026-09-09 after the Fable review found the
+original "wherever viewport is valid, including overlays" sentence
+self-contradictory). It is applied at browser context
 creation for record, act and heal alike: `timezoneId` on the context and
 Playwright's clock API so that `Date.now()` and `new Date()` in the page
 return the fixed instant on every call while timers keep running (the app's
@@ -156,6 +169,20 @@ the given timezone. Done marker: landed on playtest `main`, since
 
 Depends on Phase 2 (the stub) and Phase 2p (`app.clock`, D14). Forks from
 the merged result of both.
+
+Facts from Phase 2 (2026-09-09) that bind this phase: the board endpoint is
+`/api/v1/departures?from=&to=` (there is no `/api/v1/trips`); Central is
+`200060` and Parramatta is `215020`; the Central to Parramatta route's
+anchor is `2026-08-31T22:44:00+10:00` and its first departure
+`22:48`; the server's clock is real and only the browser is pinned, which
+is safe because the client clamps data age at zero and the server drops
+nothing by wall clock when `at` is absent; the past-window fixture is
+unreachable because the server bounds `at` by its own clock, so no case
+uses it; `AGENTS.md` is a symlink to `CLAUDE.md`, so its gate list is
+edited there; the playtest CLI under review lives at
+`/private/tmp/hillclimb-playtest-clock` until it lands on playtest `main`,
+so the script runs `${PLAYTEST_BIN:-playtest}` and the build sets
+`PLAYTEST_BIN` to that checkout's `packages/cli/src/cli.ts` via `node`.
 
 Owns: `playtest/regressions/` (new: `playtest.yaml`, `stories/`, `state/`,
 `results/`), `tools/playtest-regressions.sh` (new), `AGENTS.md` (gate
@@ -200,6 +227,8 @@ broken (no heal, no record), and exits 2 with a clear message when the stub port
 unreachable. Done marker: the script is listed as a gate in `AGENTS.md`
 and passes on the final sources.
 
+Done 2026-09-09 (9f7a1b1).
+
 ## Phase 4: verification wave
 
 Owns nothing. Runs on the final merged sources of Phases 0 to 3:
@@ -215,6 +244,30 @@ tools/playtest-regressions.sh
 The Android and iOS full gates run only if Phase 1 touched anything beyond
 the feedback request body. Done marker: every command exits 0 and the
 results are recorded in this file with the commit they ran against.
+
+Results on `29c8cf9` (the wave 1 fix commit, final sources), 2026-09-09:
+`go test ./...` ok in every package including `tools/tfnsw-stub` (21 tests);
+web 372 pass, 0 fail; Android unit 119 tests, 0 failures across 20 classes;
+iOS unit 137 tests, 0 failures; `tools/tfnsw-stub/smoke.sh` pass with no
+key; `tools/playtest-regressions.sh` exit 0 on the landed playtest CLI
+(`home-answers-saved-trip` pass, not healed, not changed). The full native
+gates were not run: Phase 1 changed only the feedback request body and its
+tests. Done 2026-09-09 (29c8cf9).
+
+## Landing (parked 2026-09-09, owner ruling)
+
+Every phase is done and verified on branch `hillclimb/stack` (worktree
+`/private/tmp/hillclimb-stack`). Landing on `main` was parked by the owner
+because main held uncommitted peer edits (the commute-feedback work) on
+`web/js/settings.js`, `web/js/version.js`, `web/sw.js`, `tools/README.md`
+and `ios/ILoveTrains.xcodeproj/project.pbxproj`. To land once main is clean
+on those files: merge `hillclimb/stack`, keep the higher of each version
+(`web/js/version.js` 1.5.1 on both sides; `web/sw.js` `VERSION` is v55 here
+and v56 in the peer edit, so v56 or higher wins), resolve the pbxproj by
+regenerating with `tools/generate-ios-project.rb`, rerun `(cd web && npm
+test)` and `tools/playtest-regressions.sh`, then run the close stage of
+the `backlog-item` skill. The playtest `app.clock` change is already on
+playtest `main` (94da9e8), so the gate uses the plain `playtest` on PATH.
 
 ## Closeout
 

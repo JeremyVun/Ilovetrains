@@ -1,0 +1,46 @@
+{
+  "accepted_at": "2026-09-09T12:43:23.279Z",
+  "run_id": "2026-09-09T1242-3ae2",
+  "run_dir": "/private/tmp/hillclimb-p3/runs/2026-09-09T1242-3ae2/home-answers-saved-trip",
+  "healed_from_run_id": null,
+  "pins": {
+    "harness_version": "0.1.0",
+    "step_schema_version": 8,
+    "snapshot_format": "a11y-text-v6",
+    "settle": {
+      "name": "settle-v1",
+      "dom_quiet_ms": 500,
+      "net_quiet_ms": 500,
+      "max_ms": 10000
+    },
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "driver": "web",
+    "actor_model": "claude-gpt-5.6-terra",
+    "grader_model": "claude-gpt-5.6-terra",
+    "gateway": "http://127.0.0.1:8900",
+    "headed": false,
+    "vision": false
+  },
+  "story_hash": "2089629c36b09c24",
+  "base_url": "http://127.0.0.1:8460",
+  "verdicts": [
+    {
+      "spec": "element_exists: .hm-hd",
+      "pass": true,
+      "detail": "element present"
+    },
+    {
+      "spec": "element_exists: text=Parramatta",
+      "pass": true,
+      "detail": "element present"
+    },
+    {
+      "spec": "console_errors: 0",
+      "pass": true,
+      "detail": "0 console error(s)"
+    }
+  ]
+}

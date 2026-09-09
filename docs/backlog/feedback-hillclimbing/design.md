@@ -273,8 +273,7 @@ built and nothing is tunnelled:
   the finding not-fixed with the close comment.
 - The pending changelog is one standing **release PR** the daemon keeps
   open and rebuilds after every merged fix: it bumps `web/js/version.js`
-  (and `web/sw.js` `VERSION` when a shell file changed) and collates one
-  line per merged fix. Merging the release PR is the cut. The daemon sees
+  and `web/sw.js` `VERSION`, always, and collates one line per merged fix. Merging the release PR is the cut. The daemon sees
   the merge, builds and pushes the image, runs `deploy.sh`, and comments
   the deploy job id and digest on the PR.
 - Parked feature requests and not-reproduced rows go to a daily digest
@@ -520,8 +519,10 @@ prerequisites.
 | D10 | Playtest MCP | Later, one MCP per privilege, tool list bound to token role. Not required for version one. | **Agreed in principle**, owner 2026-09-09. |
 | D11 | Who arbitrates a finding between daemons? | A repair claim (lease) on the finding row in playtest; the daemon renews it while its fixer runs; queue is the findings list, events only wake the daemon. | **Agreed as unavoidable**, owner 2026-09-09. |
 | D12 | How the daemon drives Codex | `@openai/codex-sdk` (same binary and sandbox as `codex exec`, plus typed events and thread resume). Not the OpenAI Agents SDK, which bills API usage. | open, no objection raised 2026-09-09 |
-| D14 | How a regression case pins the browser clock | Add `app.clock` (fixed instant and timezone, applied with Playwright's clock API at context creation) to playtest's web driver. It is generic, every project replaying time-dependent screens needs it, and it keeps test hooks out of the app. The alternative is an app-side override read from storage state on non-production hosts, which ships without a playtest change but puts a test seam in the product. | **Playtest `app.clock`**, owner 2026-09-09. Same day, at build start, the owner ruled it is built in `../playtest` as part of this run (its own item, `docs/backlog/web-clock/` there) so Phase 3 records its baseline now rather than waiting. |
 | D13 | Connectivity of the mac mini | Outbound HTTPS only, to analytics, playtest and GitHub. No inbound path, no tunnel. | Owner 2026-09-09: no tunnel; satisfied by D6. |
+| D14 | How a regression case pins the browser clock | Add `app.clock` (fixed instant and timezone, applied with Playwright's clock API at context creation) to playtest's web driver. It is generic, every project replaying time-dependent screens needs it, and it keeps test hooks out of the app. The alternative is an app-side override read from storage state on non-production hosts, which ships without a playtest change but puts a test seam in the product. | **Playtest `app.clock`**, owner 2026-09-09. Same day, at build start, the owner ruled it is built in `../playtest` as part of this run (its own item, `docs/backlog/web-clock/` there) so Phase 3 records its baseline now rather than waiting. |
+| D15 | Does the release PR bump the service worker? | Always, because version.js is a SHELL file | Orchestrator 2026-09-09 after Fable review; follows the AGENTS.md non-negotiable rule |
+| D16 | May a fixer change `site/`? | No in version one: the release worker deploys only the app image | Orchestrator 2026-09-09 |
 
 ## Relationship to `commute-feedback`
 

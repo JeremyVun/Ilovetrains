@@ -31,7 +31,7 @@ export function feedbackPayload(draft) {
   if (!feedback) return { error: 'Write a message before you send it.' };
   if (feedback.includes('\0')) return { error: 'Remove the unsupported character and try again.' };
   if (bytes(feedback) > FEEDBACK_LIMIT) return { error: 'Your message is too long. Shorten it and try again.' };
-  const body = JSON.stringify({ project: 'ilovetrains', category, feedback });
+  const body = JSON.stringify({ project: 'ilovetrains', category, feedback, platform: 'web', clientVersion: VERSION });
   if (bytes(body) > FEEDBACK_BODY_LIMIT) return { error: 'Your message is too long. Shorten it and try again.' };
   return { body };
 }

@@ -3,6 +3,7 @@ import Foundation
 struct TransitAPI: Sendable {
     var baseURL = "https://ilovetrains.jeremyvun.com"
     var session: URLSession = .shared
+    var clientVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
 
     struct DeparturePage: Sendable {
         var board: BoardData
@@ -57,7 +58,8 @@ struct TransitAPI: Sendable {
     func feedback(text: String, category: String) async throws {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, text.utf8.count <= 8192, !text.contains("\0"), ["problem", "suggestion", "other"].contains(category) else { throw TransitError.invalid }
-        let bytes = try JSONSerialization.data(withJSONObject: ["project": "ilovetrains", "category": category, "feedback": text])
+        let bytes = try JSONSerialization.data(withJSONObject: ["project": "ilovetrains", "category": category, "feedback": text,
+                                                               "platform": "ios", "clientVersion": clientVersion])
         guard bytes.count <= 10_240 else { throw TransitError.invalid }
         var request = URLRequest(url: URL(string: "https://analytics.jeremyvun.com/feedback")!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12)
         request.httpMethod = "POST"; request.httpBody = bytes

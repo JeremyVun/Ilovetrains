@@ -12,7 +12,9 @@ import java.net.URI
 import java.net.URLEncoder
 import java.time.Instant
 
-class TransitApi(baseUrl: String = BuildConfig.API_BASE) {
+const val FEEDBACK_ENDPOINT = "https://analytics.jeremyvun.com/feedback"
+
+class TransitApi(baseUrl: String = BuildConfig.API_BASE, private val feedbackUrl: String = FEEDBACK_ENDPOINT) {
     val baseUrl = baseUrl.trimEnd('/')
     suspend fun departures(from: Station, to: Station, modes: Set<String>, at: Long? = null, transferLimit: Int? = null): BoardData = withContext(Dispatchers.IO) {
         val args = linkedMapOf("from" to from.id, "to" to to.id, "limit" to "10", "modes" to modes.sorted().joinToString(","))
@@ -52,13 +54,14 @@ class TransitApi(baseUrl: String = BuildConfig.API_BASE) {
     }
     suspend fun feedback(message: String, category: String = "problem") = withContext(Dispatchers.IO) {
         require(message.isNotBlank() && message.toByteArray().size <= 8192 && !message.contains('\u0000') && category in setOf("problem", "suggestion", "other"))
-        val connection = URI("https://analytics.jeremyvun.com/feedback").toURL().openConnection() as HttpURLConnection
+        val connection = URI(feedbackUrl).toURL().openConnection() as HttpURLConnection
         connection.requestMethod = "POST"; connection.doOutput = true
         connection.connectTimeout = 5000; connection.readTimeout = 12_000
         connection.instanceFollowRedirects = false
         connection.setRequestProperty("Content-Type", "application/json")
         try {
-            val body = JSONObject().put("project", "ilovetrains").put("category", category).put("feedback", message).toString()
+            val body = JSONObject().put("project", "ilovetrains").put("category", category).put("feedback", message)
+                .put("platform", "android").put("clientVersion", BuildConfig.VERSION_NAME).toString()
             require(body.toByteArray().size <= 10_240)
             connection.outputStream.use { it.write(body.toByteArray()) }
             check(connection.responseCode == 201) { "Couldn’t send feedback. Check your connection and try again." }

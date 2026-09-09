@@ -906,7 +906,9 @@ function feedbackScript() {
     assert(requests.every(({ init }) => init.method === 'POST' && init.credentials === 'omit'
       && init.referrerPolicy === 'no-referrer'), 'feedback request privacy options changed');
     const payload = JSON.parse(requests.at(-1).init.body);
-    assert(Object.keys(payload).sort().join(',') === 'category,feedback,project', 'feedback payload has extra fields');
+    assert(Object.keys(payload).sort().join(',') === 'category,clientVersion,feedback,platform,project', 'feedback payload has extra fields');
+    assert(payload.platform === 'web', 'feedback payload did not name the web client');
+    assert(payload.clientVersion === ${JSON.stringify(canonicalVersion)}, 'feedback payload did not carry the canonical version');
     assert(!localStorage.getItem('trains.analytics.v1'), 'feedback created an analytics queue on localhost');
 
     const message = document.querySelector('[data-role="feedback-message"]');

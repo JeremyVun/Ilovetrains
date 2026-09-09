@@ -179,11 +179,18 @@ verification commands live in [tools/README.md](../../tools/README.md).
 
 Settings sends user-authored feedback directly to
 `https://analytics.jeremyvun.com/feedback` using POST JSON with exactly
-`{project: "ilovetrains", category, feedback}`. The labels Problem, Suggestion
-and Other send `problem`, `suggestion` and `other`; category and message are
-required after trimming. NUL is rejected;
+`{project: "ilovetrains", category, feedback, platform, clientVersion}`. The
+labels Problem, Suggestion and Other send `problem`, `suggestion` and `other`;
+category and message are required after trimming. `platform` is the fixed
+string `web`, `android` or `ios` naming the client that sent the message.
+`clientVersion` is that client's released version string: `VERSION` from
+`web/js/version.js` on web, `BuildConfig.VERSION_NAME` on Android and
+`CFBundleShortVersionString` on iOS, all kept equal by the release process.
+NUL is rejected;
 message is limited to 8,192 UTF-8 bytes and encoded JSON to 10,240 bytes.
-Requests omit credentials and referrer. No message enters `/e`, the train API,
+Requests omit credentials and referrer. Unknown fields are ignored by the
+service, so a submission is sent successfully on 201 whether or not it stores
+them. No message, platform or version enters `/e`, the train API,
 localStorage, logs or the service-worker cache. This deliberate submission is
 independent of anonymous-counter enablement and sends no analytics event.
 

@@ -174,6 +174,35 @@
   to `fixtures/` (needs `TFNSW_API_KEY` already in the environment; never
   sources `.env`; ~5 requests). `--ferries` captures four stop searches
   and five ferry/mixed journey responses using verified Trip Planner IDs.
+- `tfnsw-stub/` — replay captured TfNSW responses so the server runs with no
+  API key, no quota and no network:
+
+  ```sh
+  go run ./tools/tfnsw-stub --port 8420 --fixtures tools/fixtures --routes tools/fixtures/stub-routes.json
+  ```
+
+  Point the server at it with `TFNSW_BASE_URL=http://127.0.0.1:8420`,
+  `TFNSW_FEED_BASE_URL=http://127.0.0.1:8420` and any non-empty
+  `TFNSW_API_KEY`. The Trip Planner client appends `/trip` to the base, so the
+  base URL carries no path. `fixtures/stub-routes.json` is an ordered list of
+  routes: a request matches when the path is equal and every listed query key
+  holds that value, so the date, time and output format the server computes
+  from its own clock are ignored, and the first match wins. Fixtures are served
+  verbatim, so each route records an `anchor`, the instant a few minutes before
+  its fixture's first departure in Sydney standard time, which a regression
+  case pins the browser clock to. That departure is the first service leg's
+  estimated time when the leg is realtime-controlled and its planned time
+  otherwise, because that is the time Home reads. `--list-anchors` prints
+  `path query fixture anchor` for every route and exits. An unmatched request
+  is a 404 JSON body naming the path and query, which is how a fixer learns
+  which fixture to capture with `probe-tfnsw.sh`. The GTFS schedule paths have
+  no fixture: the server logs the 404, keeps the bundled bootstrap timetable
+  and answers the board normally. The server's clock stays real, so
+  `generatedAt` is today whatever a fixture's date is, and the past window
+  `trip_central_parramatta_past.json` is only reachable while `at` is inside
+  the server's last 24 hours. Tests are `go test ./tools/tfnsw-stub/...`;
+  `tools/tfnsw-stub/smoke.sh` boots stub and server on free ports with no key
+  and asserts the Central to Parramatta board comes from the fixture.
 - `probe-gtfs.py` — capture five source schedule bundles, two rounds of
   trip updates and four alert feeds for timetable/realtime design evidence.
   Requires an already-exported `TFNSW_API_KEY`; never reads `.env`. Run
@@ -211,6 +240,9 @@
   `gtfs_realtime_sydneytrains_20260906.json` records its URL, timestamps,
   headers and SHA-256, which the Go test re-checks before replaying it. Every
   other realtime fixture is synthetic and keeps its synthetic dates.
+- `playtest-regressions.sh` — replay the checked-in journey suite in
+  `playtest/regressions/` against a local server on the stub, keyless, as a
+  gate. Read "playtest-regressions.sh" below.
 - `visual-regression.js` — one command that shoots the web, Android and iOS
   clients, compares every frame pixel for pixel with `tools/baselines/`, and
   writes a report with baseline | current | diff composites. Read
@@ -281,6 +313,60 @@ reuse those ports after each parallel batch.
 The feedback frames cover 390×844 and 412×732 in both schemes after the
 typed draft survives navigation away and back. Each calibration filename has
 one writer so later assertion-only cases cannot overwrite the reviewed state.
+
+## playtest-regressions.sh
+
+`playtest/regressions/` is the checked-in journey suite: one Playtest case per
+user-visible regression, living in the same branch as the fix it guards.
+`tools/playtest-regressions.sh` is the gate that runs it. It builds the server
+and the TfNSW stub into a temporary directory, boots them with no API key on
+`127.0.0.1:8460` and `127.0.0.1:8461` with `TZ=Australia/Sydney`, waits for
+`/healthz`, replays the suite and tears both processes down. It exits 0 on a
+pass, 1 when a case fails its gate, and 2 for anything infrastructural,
+including either port already being in use.
+
+The ports are fixed because the browser seeds under
+`playtest/regressions/state/` are Playwright storage-state files keyed by
+origin: a seed only loads on the origin it names. `PLAYTEST_REGRESSIONS_PORT`
+and `PLAYTEST_REGRESSIONS_STUB_PORT` exist to escape a collision, but changing
+the server port means every seed's origin has to change with it. Run
+evidence is written outside the checkout, under
+`$TMPDIR/ilovetrains-playtest-runs`, and the failing run directory named in
+the JSON summary holds the screenshot and accessibility snapshot per step.
+
+The gate runs `playtest ./playtest/regressions --no-grade --json` with
+`PLAYTEST_LLM_BASE_URL` and every model key unset. That is Playtest's only
+keyless path: a committed saved path replays step for step, and a case that
+drifted fails rather than healing or silently recording a new one. It follows
+that cases may only use checks that replay without a model —
+`element_exists`, `url_matches`, `api_called`, `console_errors`,
+`accessibility_violations` and `invariant`. The script refuses to run, with
+exit 2, when a case uses any other kind or a natural-language `assert:`.
+
+Every case pins `app.clock` to the anchor its fixtures were captured at, from
+`fixtures/stub-routes.json`, because Home prints absolute times and a saved
+path only replays if the browser reads the same instant every run. The
+server's clock stays real; the client clamps data age at zero, so the header
+reads "Live" rather than an age that changes per run.
+
+Recording is explicit and separate:
+
+```sh
+tools/playtest-regressions.sh --record [case-id]
+```
+
+That run points `PLAYTEST_LLM_BASE_URL` at the local codex gateway on
+`127.0.0.1:8900` and passes `--fresh`, then prints where the saved path
+landed: `playtest/regressions/results/<case>.baseline.jsonl` and its
+`.baseline.json` metadata, both committed with the case. A case that already
+has a saved path keeps it — Playtest only writes a new one when the case has
+none or its story changed, so replacing a reviewed path stays the human
+`playtest baseline refresh` action. Never edit a case's `story:` or `success:`
+to make a failure pass, and never run `playtest baseline accept` or `reject`
+on someone's behalf.
+
+`PLAYTEST_BIN` overrides the Playtest command, which is otherwise `playtest`
+on `PATH`.
 
 ## comps/
 

@@ -89,7 +89,9 @@ generation; the bundled bootstrap serves a new volume immediately.
    `../projects/stacks/ilovetrains/`, then commit and push the infra repository.
    The stack uses `docker-compose.yml` and `config.env`. Its pre-commit hook
    seals the gitignored `secrets.env` into the committed `secrets.env.age`;
-   the VM decrypts it during reconciliation.
+   the VM decrypts it during reconciliation. Once the infra change lands,
+   `config.env` will pin the released numbered image tag instead of `latest`,
+   as the app website stack already does; it has not landed yet.
 
 3. Deploy through the infra repository:
 
@@ -99,6 +101,23 @@ generation; the bundled bootstrap serves a new volume immediately.
 
    Build the deploy client with `make build` in that repository if required,
    or set `DEPLOYCTL_BIN=agent/deployctl/deployctl`.
+
+## Release pull request
+
+A release can also be cut from a pull request on branch `release/<version>`. It
+bumps `web/js/version.js` and `web/sw.js`'s `VERSION`, and lists, under that
+version, the first line of each fix pull request merged since the last release.
+Both bumps happen on every release, because `web/js/version.js` is listed in
+`web/sw.js`'s `SHELL` array and `AGENTS.md` requires the service worker bump in
+the same change as any `SHELL` file edit.
+
+Merging that pull request is the deploy trigger. The steps above are what runs,
+against that exact merge commit, and the deploy job id is recorded on the pull
+request. Nothing on GitHub deploys anything: the daemon on the mac mini watches
+for that merge and runs the same build, push and deploy steps from here. The
+manual steps stay valid and are how a release is cut or repeated by hand.
+[Automated fixes](../contracts/hillclimbing.md) states what a fix pull request
+must contain for its line to appear here.
 
 ## Feature flags
 

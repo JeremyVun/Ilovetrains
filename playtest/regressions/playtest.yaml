@@ -1,0 +1,10 @@
+app:
+  driver: web
+  base_url: http://127.0.0.1:8460
+  storage_state: ./state/central-parramatta.json
+  clock:
+    time: "2026-08-31T22:44:00+10:00"
+    timezone: Australia/Sydney
+mode: journey
+actor_model: claude-gpt-5.6-terra
+grader_model: claude-gpt-5.6-terra

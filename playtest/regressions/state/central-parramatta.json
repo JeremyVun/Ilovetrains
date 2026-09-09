@@ -1,0 +1,14 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://127.0.0.1:8460",
+      "localStorage": [
+        {
+          "name": "trains.v1",
+          "value": "{\"schemaVersion\":1,\"trips\":[{\"id\":\"trip-central-parramatta\",\"from\":{\"id\":\"200060\",\"name\":\"Central Station\",\"location\":{\"lat\":-33.884024,\"lon\":151.206203}},\"to\":{\"id\":\"215020\",\"name\":\"Parramatta Station\",\"location\":{\"lat\":-33.817551,\"lon\":151.005133}},\"createdAt\":\"2026-08-01T00:00:00+10:00\"}],\"history\":[],\"rides\":[],\"searches\":{\"from\":[{\"id\":\"200060\",\"name\":\"Central Station\",\"location\":{\"lat\":-33.884024,\"lon\":151.206203}}],\"to\":[{\"id\":\"215020\",\"name\":\"Parramatta Station\",\"location\":{\"lat\":-33.817551,\"lon\":151.005133}}]},\"home\":null,\"lastViewed\":{\"tripId\":\"trip-central-parramatta\",\"direction\":\"forward\"},\"cache\":{}}"
+        }
+      ]
+    }
+  ]
+}

@@ -11,6 +11,7 @@ import {
 import { homeHtml, homeModel } from '../js/home.js';
 import { cacheKey, emptyDoc } from '../js/storage.js';
 import { SUPPORTED_MODES } from '../js/preferences.js';
+import { VERSION } from '../js/version.js';
 import { ferryBody, transferJourneys } from './fixture.js';
 
 const RHODES = { id: '213820', name: 'Rhodes Station' };
@@ -24,7 +25,7 @@ test('feedback validates the trimmed UTF-8 request before sending', () => {
   assert.equal(feedbackPayload(draft).error, 'Write a message before you send it.');
   draft.message = ' café ';
   assert.deepEqual(JSON.parse(feedbackPayload(draft).body), {
-    project: 'ilovetrains', category: 'problem', feedback: 'café'
+    project: 'ilovetrains', category: 'problem', feedback: 'café', platform: 'web', clientVersion: VERSION
   });
   draft.message = 'x'.repeat(FEEDBACK_LIMIT + 1);
   assert.equal(feedbackPayload(draft).error, 'Your message is too long. Shorten it and try again.');

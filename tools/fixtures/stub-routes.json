@@ -1,0 +1,107 @@
+[
+  {
+    "path": "/trip",
+    "query": {
+      "name_origin": "200060",
+      "name_destination": "215020",
+      "itdDate": "20260901"
+    },
+    "fixture": "trip_central_parramatta_past.json",
+    "anchor": "2026-09-01T17:30:00+10:00"
+  },
+  {
+    "path": "/trip",
+    "query": {
+      "name_origin": "200060",
+      "name_destination": "215020"
+    },
+    "fixture": "trip_central_parramatta.json",
+    "anchor": "2026-08-31T22:44:00+10:00"
+  },
+  {
+    "path": "/trip",
+    "query": {
+      "name_origin": "2155384",
+      "name_destination": "206710"
+    },
+    "fixture": "trip_tallawong_chatswood.json",
+    "anchor": "2026-08-31T22:46:00+10:00"
+  },
+  {
+    "path": "/trip",
+    "query": {
+      "name_origin": "213820",
+      "name_destination": "202210"
+    },
+    "fixture": "trip_rhodes_bondijunction.json",
+    "anchor": "2026-09-01T09:20:00+10:00"
+  },
+  {
+    "path": "/trip",
+    "query": {
+      "name_origin": "200020",
+      "name_destination": "209573"
+    },
+    "fixture": "trip_circularquay_manly.json",
+    "anchor": "2026-09-05T15:36:00+10:00"
+  },
+  {
+    "path": "/trip",
+    "query": {
+      "name_origin": "209573",
+      "name_destination": "200020"
+    },
+    "fixture": "trip_manly_circularquay.json",
+    "anchor": "2026-09-05T15:26:00+10:00"
+  },
+  {
+    "path": "/trip",
+    "query": {
+      "name_origin": "200080",
+      "name_destination": "209573"
+    },
+    "fixture": "trip_wynyard_manly.json",
+    "anchor": "2026-09-05T15:24:00+10:00"
+  },
+  {
+    "path": "/trip",
+    "query": {
+      "name_origin": "200020",
+      "name_destination": "20414"
+    },
+    "fixture": "trip_circularquay_balmaineast.json",
+    "anchor": "2026-09-05T15:53:00+10:00"
+  },
+  {
+    "path": "/trip",
+    "query": {
+      "name_origin": "2000441",
+      "name_destination": "204157"
+    },
+    "fixture": "trip_barangaroo_balmain.json",
+    "anchor": "2026-09-05T16:01:00+10:00"
+  },
+  {
+    "path": "/trip",
+    "query": {
+      "name_origin": "20004",
+      "name_destination": "209573"
+    },
+    "fixture": "trip_gtfs_circularquay_manly.json",
+    "anchor": ""
+  },
+  {
+    "path": "/trip",
+    "query": {
+      "name_origin": "209573",
+      "name_destination": "20004"
+    },
+    "fixture": "trip_manly_gtfs_circularquay.json",
+    "anchor": ""
+  },
+  {
+    "path": "/v2/gtfs/realtime/sydneytrains",
+    "fixture": "gtfs_realtime_sydneytrains_20260906.pb",
+    "anchor": "2026-09-06T01:33:00+10:00"
+  }
+]
