@@ -5,10 +5,13 @@ Status: **R9 A selected; full-phone Live Activity refinement ready for review, 1
 ## Current instruction: retake the F1 in-app tracker now
 
 Owner: “retake the curcular quay to manly wharf follow your trip screen.”
-This brings the previously deferred native screenshot task into the current
-pass. Recapture the real iOS F1 screen in both schemes, verify dimming behind
-the progress marker, and replace active website/comp image assets. Preserve
-the selected layout and the separate Chatswood → Bondi Junction Live Activity.
+Completed: fresh current-renderer iOS captures in both schemes show the
+travelled 8/22 (36.4%) segment dimmed up to the progress marker and 14 minutes
+remaining. Full 1206×2622 screens replace the old tracker assets in the
+selected preview, durable comp and website source. The old image predated
+the native travelled overlay; no new app code fix was necessary. Capture
+provenance is in `comps/native-f1-tracker/`. Selected layout and the separate
+Chatswood → Bondi Junction Live Activity remain unchanged.
 
 ## Latest steer: show the Live Activity on a phone
 
@@ -43,9 +46,8 @@ visual date. This fixture artifact is recorded in
 `comps/native-live-activity/`; it is not live website travel data. Both site
 schemes reuse the same real system screen. No native product code was edited.
 
-The existing F1 in-app screenshot still requires the separate dimmed-line
-verification and recapture during the build. This steer does not reopen the
-hero, icon, copy or other selected A decisions.
+The F1 retake was subsequently completed under the instruction above. The
+hero, icon, copy and other selected A decisions remain unchanged.
 
 ## Current verdict: A selected, with final steers
 
@@ -189,9 +191,9 @@ https://ilovetrainsapp.jeremyvun.com from selected R9 A and the owner's final
 header/Live Activity steers. Improve phone spacing, readable screenshots, public copy and device
 CTAs. Adopt the selected four-colour Sleepers app icon. The actual trip-planning
 app at https://ilovetrains.jeremyvun.com keeps its existing screen design and
-behavior; its icon assets change alongside native launcher assets. The one
-additional native prerequisite is verifying/fixing the tracker line dimming
-before recapturing the website's illustrative F1 screenshot.
+behavior; its icon assets change alongside native launcher assets. The F1 screenshot
+was retaken with the current native travelled-line dimming; no app behavior
+change was needed for that capture.
 
 The selected reference is consolidated in `comps/`, with normalized page
 routes, `r9.css`, `site.js`, `r9.js` and real image material. It matches refined
@@ -249,13 +251,12 @@ F1 Circular Quay → Manly Wharf; T9/T4 Rhodes → Bondi Junction via Town Hall.
 The board uses the corresponding inbound journey, and detail is the real
 Rhodes → Bondi Junction transfer screen. The F1 active tracker capture shows
 Circular Quay 15:45 Wharf 3 Side A → Manly 16:07, eight minutes into the trip.
-These are illustrative captures, never live marketing data. The current F1
-image is a temporary comp asset: its travelled line is not dimmed. Before
-release, verify the native `.travelled` overlay and its stacking in
-`ios/ILoveTrains/UI/Common.swift` / `JourneyAxisLayout.swift`, fixing only if
-still broken, and retake both schemes from the real app. These files already
-contain unrelated working changes; preserve their ownership and do not assume
-a new native edit is required just because the old screenshot is wrong.
+These are illustrative captures, never live marketing data. The F1
+screens were retaken on 10 September from the current real iOS renderer.
+The travelled segment is visibly dimmed in both schemes. Native source hashes,
+the isolated marketing fixture, full captures and lossless derivative
+verification are recorded in `comps/native-f1-tracker/`. Keep these replacement
+bytes; the old R3 tracker captures lacked the travelled overlay.
 
 Showcase the actual iOS Live Activity on a complete iPhone system screen,
 alongside the full F1 app tracker phone. The selected example is Chatswood →
@@ -272,7 +273,7 @@ Inbound images came from `/tmp/trains-site-material-r4/output`; their scheduled
 morning response came from `/tmp/trains-site-material-r4/source/parramatta-central-0830.json`.
 Estimated times were null; the board says Scheduled. The hero's LIVE badge is
 an existing native freshness display in the capture, not invented realtime.
-F1 captures came from `/tmp/trains-site-material-r3/output`. The selected image
+F1 captures now come from `/tmp/trains-site-material-r9-f1-current/output`. The selected image
 bytes are bundled in `comps/assets/`, so the build does not need temporary
 capture tools or an API key. Convert screenshots to lossless WebP for the site
 and verify decoded pixel equivalence. Below-fold pictures may load lazily.

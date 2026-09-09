@@ -18,7 +18,7 @@ app. It needs no API key, database, secrets or persistent volumes.
 
 ```sh
 GIT_REVISION="$(git rev-parse --short=12 HEAD)" \
-  ILOVETRAINSAPP_VERSION=1.0.1 docker buildx bake ilovetrainsapp --push
+  ILOVETRAINSAPP_VERSION=1.0.2 docker buildx bake ilovetrainsapp --push
 ```
 
 Set the matching numbered image tag in
@@ -42,7 +42,7 @@ it with a loopback port mapping. Verify `/`, `/privacy/`, `/support/`, assets,
 and `/healthz` against nginx, followed by the same public HTTPS paths after
 deploy. All pages revalidate their HTTP cache and have no service worker.
 The site container disables access logs and serves a restrictive CSP with
-local styles and images only. `Cache-Control: no-cache, no-transform` keeps
+local scripts, styles and images only. `Cache-Control: no-cache, no-transform` keeps
 Cloudflare from replacing email links with script-dependent obfuscation.
 [Website contract](../contracts/app-website.md)
 records copy, privacy and screenshot requirements.

@@ -11,9 +11,9 @@ function deviceKind() {
 }
 
 function enhanceAction() {
-  const action = document.querySelector('[data-device-action]');
+  const actions = [...document.querySelectorAll('[data-device-action]')];
   const dialog = document.querySelector('[data-store-dialog]');
-  if (typeof HTMLDialogElement !== 'function' || !(action instanceof HTMLAnchorElement) || !(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') return;
+  if (typeof HTMLDialogElement !== 'function' || !actions.length || actions.some((action) => !(action instanceof HTMLAnchorElement)) || !(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') return;
 
   const title = dialog.querySelector('[data-dialog-title]');
   const body = dialog.querySelector('[data-dialog-body]');
@@ -25,28 +25,29 @@ function enhanceAction() {
   if (kind === 'web') return;
 
   const ios = kind === 'ios';
-  action.textContent = ios ? 'Download on the App Store' : 'Get it on Google Play';
   title.textContent = ios ? 'App Store' : 'Google Play';
   body.textContent = ios
     ? "The iPhone app isn't available in the App Store yet. You can use ilovetrains in your browser."
     : "The Android app isn't available on Google Play yet. You can use ilovetrains in your browser.";
 
-  const alternative = document.createElement('a');
-  alternative.className = 'web-alternative';
-  alternative.href = WEB_APP;
-  alternative.textContent = 'Use the web app';
-  action.after(alternative);
-
   let opener = null;
-  action.addEventListener('click', (event) => {
-    try {
-      dialog.showModal();
-    } catch {
-      return;
-    }
-    event.preventDefault();
-    opener = action;
-  });
+  for (const action of actions) {
+    action.textContent = ios ? 'Download on the App Store' : 'Get it on Google Play';
+    const alternative = document.createElement('a');
+    alternative.className = 'web-alternative';
+    alternative.href = WEB_APP;
+    alternative.textContent = 'Use the web app';
+    action.after(alternative);
+    action.addEventListener('click', (event) => {
+      try {
+        dialog.showModal();
+      } catch {
+        return;
+      }
+      event.preventDefault();
+      opener = action;
+    });
+  }
   close.addEventListener('click', () => dialog.close());
   dialog.addEventListener('close', () => {
     if (opener?.isConnected) opener.focus();
@@ -111,7 +112,7 @@ function attachTrain() {
 
   triggers.forEach((trigger) => trigger.addEventListener('click', run));
   reduced.addEventListener?.('change', clear);
-  addEventListener('pagehide', clear, { once: true });
+  addEventListener('pagehide', clear);
 }
 
 enhanceAction();

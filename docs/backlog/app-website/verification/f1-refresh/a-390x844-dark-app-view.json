@@ -1,0 +1,76 @@
+{
+  "frame": {
+    "tag": "390x844-dark",
+    "w": 390,
+    "h": 844,
+    "scheme": "dark",
+    "mobile": true
+  },
+  "assetSha256": "4cba1a821e3e6925b8d9161b10c947b058fbdceee43a8160ac923b9a60024b22",
+  "proof": [
+    {
+      "before": 0,
+      "after": 700,
+      "delta": 700
+    },
+    {
+      "before": 700,
+      "after": 1400,
+      "delta": 700
+    },
+    {
+      "before": 1400,
+      "after": 2100,
+      "delta": 700
+    },
+    {
+      "before": 2100,
+      "after": 2800,
+      "delta": 700
+    },
+    {
+      "before": 2800,
+      "after": 3500,
+      "delta": 700
+    },
+    {
+      "before": 3500,
+      "after": 4054,
+      "delta": 553.84375
+    }
+  ],
+  "data": {
+    "viewport": [
+      390,
+      844,
+      2
+    ],
+    "document": [
+      390,
+      5686
+    ],
+    "scrollY": 4054,
+    "follow": {
+      "top": 11.84375,
+      "bottom": 730.765625,
+      "width": 326,
+      "height": 718.921875
+    },
+    "imgs": [
+      {
+        "src": "http://127.0.0.1:54891/assets/tracker-dark.webp",
+        "natural": [
+          1206,
+          2622
+        ],
+        "painted": [
+          300,
+          652.234375
+        ],
+        "ratioDelta": 0.0000031247103132736598,
+        "complete": true
+      }
+    ],
+    "overflow": []
+  }
+}

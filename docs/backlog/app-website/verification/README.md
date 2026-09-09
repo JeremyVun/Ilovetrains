@@ -4,7 +4,7 @@ The pre-refinement R9 round covered all three concepts at320×740,390×844,412×
 
 Historical card refinement (subsequently rejected): after the owner selected A and requested the green dot, header Sleepers icon and native iOS Live Activity, bounded checks were rerun under `refinement/`:390dark/1440light landing and tracker,320header both schemes,privacy390light andsupport390dark. All reference locked source9c565b3f71b89f29ef2bba8091fb81eb04c095a53d7dce350989eb30b2aac75d. No overflow or distorted/unloaded images; current header/actions remain reachable. Activity1122×480 scales proportionally; complete app screens remain1206×2622. Root and designer inspected final pixels.
 
-Current image calibration lives in assets/comps/latest/site. Original workshop capture files and driver are under /tmp/trains-comps-site-r9/verification. Native source provenance is recorded in comps/README.md. These are prototype checks, not production release gates. The F1 travelled-line bug remains a mandatory later-build native verification/fix and light/dark recapture task.
+Current image calibration lives in assets/comps/latest/site. Original workshop capture files and driver are under /tmp/trains-comps-site-r9/verification. Native source provenance is recorded in comps/README.md. These are prototype checks, not production release gates. The F1 image was subsequently retaken from the current renderer in both schemes; see the F1 recapture evidence below.
 
 ## Current full-phone refinement
 
@@ -21,3 +21,13 @@ this refinement did not restart or replace the full matrix.
 The actual native screenshot passed the scratch fixture capture test; its
 route, exact PNG hash and simulator date limitation are recorded under
 `../comps/native-live-activity/`. The screenshot is complete and unpainted.
+
+## F1 tracker recapture
+
+The owner brought the deferred screenshot retake into this pass. Real iOS
+captures in both schemes show a dimmed travelled segment at 8/22 progress
+with 14 minutes remaining. No product source correction was necessary: the
+old R3 capture preceded the native travelled overlay. The new full PNGs and
+lossless WebP derivatives are recorded in `../comps/native-f1-tracker/`.
+Bounded website captures are in `f1-refresh/`; unchanged geometry and behavior
+retain the earlier full-phone and full-matrix evidence.

@@ -1,10 +1,9 @@
 # App website build plan
 
-**R9 A SELECTED — full-phone Live Activity refinement ready for review, 10 September 2026.**
+**R9 A approved for commit, push and website deployment, 10 September 2026.**
 The green dot, Sleepers header icon and complete iPhone Live Activity showcase are
-consolidated in `comps/` and current site calibration. The owner explicitly
-deferred the dimmed-line fix verification and fresh
-“Follow your trip” screenshots to the build. Preserve earlier implementation
+consolidated in `comps/` and current site calibration. The owner subsequently requested the F1 retake immediately; both schemes
+now contain fresh full-screen native captures with verified line dimming. Preserve earlier implementation
 and icon assets; replace its superseded R6 composition when building. Do not
 release or close this item before the gates below.
 
@@ -18,8 +17,8 @@ Historical deployment hazards are retained at the end of `design.md`.
 
 Read AGENTS.md, docs/PROJECT.md, app-website/UI/analytics/client-storage
 contracts and tools/README.md before implementation. Use backlog-item build
-and close stages, user-facing-copy, and deploy-stack for deployment. The build
-starts in a fresh context after design. Model defaults in the owner's supplied
+and close stages, user-facing-copy, and deploy-stack for deployment. The owner explicitly authorized committing, pushing and deploying the approved
+website. The selected design is ported unchanged into the production package. Model defaults in the owner's supplied
 AGENTS instructions override unavailable skill models: Sol for UI/review and
 all computer use; Terra is suitable for mechanical isolated asset work.
 Comments are rare and short, one line of why where the reason is non-obvious,
@@ -51,32 +50,25 @@ requirements if sanctioned tools hit an access boundary.
 Gate: Sleepers PNG hash matches design.md; selected prototype has updated
 192px/180px icons; no product implementation inferred from prototype checks.
 
-## Phase 0a — correct and recapture native tracker material
+## Phase 0a — native tracker material completed
 
-Owner files: only necessary iOS travelled-line correction in
-`ios/ILoveTrains/UI/Common.swift` / `JourneyAxisLayout.swift`, real capture
-outputs and website image derivatives. Inspect current dirty diffs first;
-the travelled overlay already exists and may already be fixed by other work.
+- [x] Recaptured F1 Circular Quay → Manly at eight minutes into its 22-minute
+  journey in both schemes. The travelled 8/22 segment is dimmed, the remaining
+  segment retains its route colour, and 14 minutes remain.
+- [x] Verified current native rendering. No product fix was necessary: the old
+  R3 source lacked the travelled overlay; current clean UI sources include it.
+- [x] Captured complete 1206×2622 native screens with saved trips, navigation
+  and fixed example timestamps intact. No pixel repainting or CSS dimming.
+- [x] Exported lossless WebPs and replaced tracker assets in `comps/assets/`,
+  `site/assets/` and the selected preview. Decoded RGBA pixels match the PNGs
+  exactly; evidence and native provenance are in `comps/native-f1-tracker/`.
+- [x] Retained the complete native iPhone Live Activity screen for Chatswood →
+  Bondi Junction via Martin Place, with recorded fixture and provenance.
 
-- [ ] Reproduce F1 Circular Quay → Manly at eight minutes into its 22-minute
-  journey. Confirm the line behind the marker is dimmed and the remaining
-  line retains its route colour, with marker/timing unchanged.
-- [ ] If still broken, fix the native rendering, preserving other tasks'
-  changes; run affected iOS tests and real-client visual checks in both schemes.
-- [ ] Retake complete light/dark tracker screenshots from the real iOS app.
-  Preserve full1206×2622 proportions, saved trips, navigation and timestamps.
-  Do not repaint the old bitmap or fake dimming with website CSS.
-- [ ] Export lossless WebP and replace the comp's known-defective tracker
-  images in the final package. Verify decoded pixel equivalence.
-- [ ] Use the complete real iPhone Live Activity system screenshot for
-  Chatswood → Bondi Junction via Martin Place, with recorded fixture and
-  native-capture provenance. Keep the full screen in a proportional phone;
-  standalone card crops and Kellyville examples are rejected. If recapturing,
-  use the native renderer and preserve the verified timetable/platform values.
-
-Gate: actual final native screenshots visibly show correct travelled-line
-dimming in both schemes; website package contains those new bytes. Existing
-buggy tracker images are a release blocker even if all layout tests pass.
+Gate passed for image material: both F1 schemes visibly dim the travelled
+segment and every active asset copy contains the verified new bytes. Preserve
+these bytes through packaging; later layout or image exports must not restore
+the rejected R3 screenshot. Production package verification remains in Phase 3.
 
 ## Phase 1 — website implementation
 
@@ -84,23 +76,23 @@ Owner files: site/index.html, site/privacy/index.html, site/support/index.html,
 site/site.css, new site/site.js, site/assets/*, site/Dockerfile,
 site/.dockerignore, site/nginx.conf.template, docs/contracts/app-website.md.
 
-- [ ] Port refined R9 A with clean CSS: complete proportional phones, paired
+- [x] Port refined R9 A with clean CSS: complete proportional phones, paired
   departure/detail stages, green tracker stage with native iOS Live Activity,
   coherent privacy/support and final device CTA. Remove stale R6/R8 geometry.
-- [ ] Convert selected real screenshot material to lossless WebP; verify
+- [x] Convert selected real screenshot material to lossless WebP; verify
   decoded pixels, intrinsic aspect ratios, scheme selection and lazy loading.
   Remove obsolete shipped assets only after checking their references.
-- [ ] Wire Sleepers site icons and the icon beside the header wordmark;
+- [x] Wire Sleepers site icons and the icon beside the header wordmark;
   restore green dot beside “Made for Sydney” on the homepage. Preserve44px
   home-link/navigation targets and narrow header fit.
-- [ ] Add progressive device CTA and accessible store dialog with real web
+- [x] Add progressive device CTA and accessible store dialog with real web
   fallback for no-JS/unknown/unsupported enhancement. No public APK action,
   coming-soon banner or invented store URL.
-- [ ] Port line-tap train, both 44px targets, keyboard/focus/repeat/cleanup and
+- [x] Port line-tap train, both 44px targets, keyboard/focus/repeat/cleanup and
   reduced-motion complete lead car. No remote resources, network or state.
-- [ ] Include external local site.js in image allowlist/COPY; allow only
+- [x] Include external local site.js in image allowlist/COPY; allow only
   script-src self in CSP and preserve no-cache/no-transform/contact links.
-- [ ] Update website contract to actual copy/actions/JS/privacy behavior in
+- [x] Update website contract to actual copy/actions/JS/privacy behavior in
   the same change, including full screenshot presentation and new header.
   Preserve existing health/SEO/HTTPS metadata routes.
 
@@ -224,3 +216,12 @@ A real external access blocker does not justify undoing completed design/build.
 
 Gate: no stale live references to deleted backlog paths; required work verified,
 no unreported production mismatch, unrelated work preserved.
+
+## Current release scope
+
+The owner approved “commit, push, deploy” for the completed website. This
+release packages only `site/` as website version 1.0.2. The main app remains on
+its independent 1.6.0 release; no unrelated native or web-client behavior is
+included in the website image. Native/PWA Sleepers artwork was committed in
+427b27c; its independent distribution/launcher gates remain outside this
+website release and must not be represented as completed by nginx checks.

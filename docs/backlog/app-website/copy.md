@@ -22,9 +22,10 @@ browser icon; the cab proposals are dropped.
 The tracker section also shows an actual **iPhone Live Activity** on a complete
 iPhone screen, using Chatswood → Bondi Junction with a change at Martin Place.
 Use “On iPhone, see the next stop and platform outside the app.” Standalone card
-crops and the Kellyville example are rejected. The existing
-F1 app screenshot has a known line-dimming defect and must be replaced during
-build. This is an internal handoff note, never public-facing copy.
+crops and the Kellyville example are rejected. The F1 app screenshot was retaken from the current native renderer in both
+schemes, with the travelled segment correctly dimmed. Use the replacement
+assets recorded in `comps/native-f1-tracker/`. This is an internal handoff note,
+never public-facing copy.
 
 Replace the multi-platform download table with one device-aware action and
 the compact web alternative on phones. Desktop primary: **Open the web app**.

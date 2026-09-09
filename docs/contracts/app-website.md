@@ -6,10 +6,10 @@ web app at `https://ilovetrains.jeremyvun.com/`.
 
 ## Public pages
 
-- `/` introduces the app with real, illustrative client screenshots and one
-  usable link to the web app. On Android and iOS, local enhancement relabels
-  the primary action for Google Play or the App Store and adds a second `Use
-  the web app` link. Until a public store listing exists, the store action
+- `/` introduces the app with real, illustrative client screenshots and web
+  app links in the hero and closing section. On Android and iOS, local
+  enhancement relabels both actions for Google Play or the App Store and adds
+  a `Use the web app` alternative beside each. Until a public store listing exists, the store action
   opens a local availability dialog whose primary action is the real web link.
   There is no public APK action or invented store URL.
 - `/privacy/` covers the website and all three app clients. It identifies
@@ -21,7 +21,8 @@ web app at `https://ilovetrains.jeremyvun.com/`.
 
 The privacy policy changes with any relevant change to the analytics,
 client-storage or API contracts. It covers device-held saved trips, history,
-preferences, offline timetables and location; station-pair and requested-time
+preferences, offline timetables and location; nearby-station lookup and
+foreground-only arrival confirmation with no background location; station-pair and requested-time
 departure requests; brief server caching; hosting-provider IP and request
 logs; anonymous web-app counts and Do Not Track; deliberate feedback and
 service arrival timestamps; indefinite feedback retention and deletion by
@@ -58,16 +59,26 @@ and system fonts. The CSP allows only same-origin images, styles and scripts;
 all other default sources remain closed. Privacy, support and navigation work
 without JavaScript. The app's dark ground `#0A0B0D`, light paper `#FAF9F5`,
 primary ink and transport colours carry through to phone and desktop layouts in
-both system colour schemes. The header keeps the plain uppercase `ilovetrains`
-wordmark.
+both system colour schemes. The header pairs the Sleepers icon with the uppercase
+`ilovetrains` wordmark; a green live dot sits beside “Made for Sydney”.
+The complete hero phone sits over the continuous four-colour line. Departure
+and transfer phones share the next stage, followed by the green tracker stage.
+Phone layouts stack the screens in ordinary scrolling, without gallery controls.
 
 Real iOS simulator screenshots are served in the matching colour scheme and
 must not be redrawn as invented app UI. The hero shows Parramatta to Central;
-the tracker shows the F1 ferry from Circular Quay to Manly; the board and
-journey-detail examples retain their captured routes. The public WebP copies
+the in-app tracker shows the F1 ferry from Circular Quay to Manly, with the
+travelled segment dimmed at 8/22 progress. The iPhone Live Activity shows
+Chatswood to Bondi Junction, changing from M1 to T4 at Martin Place. Both
+tracker examples appear as complete proportional phones, side by side on
+desktop and stacked on mobile. The ActivityKit screenshot is a real native
+Notification Center capture with a fixed example clock, reused in both site
+schemes; it does not claim continuously advancing background instructions.
+The board and journey-detail examples retain their captured routes. The public WebP copies
 use lossless encoding and decode to the source pixels. HTML `picture` selects
 the scheme, and below-fold screenshots load lazily. Screenshot widths retain
-`height: auto`; crop windows may reposition them but never stretch them. Every
+`height: auto`; show complete screens without fixed-height crop windows,
+translation masks or stretching. Every
 screenshot retains its 1206×2622 intrinsic dimensions.
 
 The selected icon is the four-colour Sleepers railway motif. Its canonical
