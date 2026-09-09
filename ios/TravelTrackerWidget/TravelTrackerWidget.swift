@@ -143,8 +143,10 @@ private struct TrackerContextRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var provenance: String? {
-        let value = stale ? state.staleProvenance : state.provenance
-        return value.caseInsensitiveCompare("Live") == .orderedSame ? nil : value
+        if stale || state.provenance.caseInsensitiveCompare("Live") == .orderedSame {
+            return state.staleProvenance
+        }
+        return state.provenance
     }
 
     var body: some View {
@@ -442,7 +444,10 @@ private struct TrackerPalette {
     }
 
     static func showsJourneyLine(_ state: TravelTrackerActivityAttributes.ContentState) -> Bool {
-        state.stage != .missedTransfer && state.eventKind != .missedConnection && !state.segments.isEmpty
+        state.stage != .missedTransfer
+            && state.eventKind != .missedConnection
+            && !state.segments.isEmpty
+            && !state.segments.contains { $0.endFraction < $0.startFraction }
     }
 
     private static func activeRide(

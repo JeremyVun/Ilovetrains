@@ -622,8 +622,12 @@ function accept(results, capture) {
   for (const platform of touched) {
     const previous = manifest[platform] || {};
     const shot = capture[platform] || {};
-    manifest[platform] = { commit, date: new Date().toISOString().slice(0, 10), device: shot.device || previous.device || '' };
-    if (shot.simulator || previous.simulator) manifest[platform].simulator = shot.simulator || previous.simulator;
+    const trackerOnly = results.filter((r) => r.platform === platform && r.status === 'accepted')
+      .every((r) => r.screen.startsWith('tracker-'));
+    const prior = trackerOnly ? (previous.tracker || {}) : previous;
+    const metadata = { commit, date: new Date().toISOString().slice(0, 10), device: shot.device || prior.device || '' };
+    if (shot.simulator || prior.simulator) metadata.simulator = shot.simulator || prior.simulator;
+    manifest[platform] = trackerOnly ? { ...previous, tracker: metadata } : { ...previous, ...metadata };
   }
   fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 2) + '\n');
   return touched;

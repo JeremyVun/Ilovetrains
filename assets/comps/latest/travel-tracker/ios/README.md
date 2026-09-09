@@ -1,13 +1,32 @@
 # iOS tracker — native captures
 
-These are actual ActivityKit surfaces from the app, using the accepted review
-fixture. The fixed screenshot clock is a DEBUG-only aid; these frames do not
-prove unattended stage updates or physical-device delivery.
+[Open the screenshot gallery](index.html). Each card links to its unchanged
+full system frame; card crops use bounds reported by XCTest and preserve all
+tracker content. These are actual ActivityKit surfaces from the implemented
+app, using the accepted fixed-clock journey fixtures.
 
-- [Lock screen](26.4-402x874-default/tracker-ride-dark-lock.png)
+Current default-text frames cover all ten states in both simulator appearances.
+Enlarged-text verification remains open: the simulator publishes an activity
+but exposes an invisible host instead of the tracker card. Notification Center frames are labelled as such; they do not
+claim a locked-device drive. The system uses a dark activity surface in both
+simulator appearances.
+
+- Device: iPhone 17 Pro, iOS 26.4, 402×874 points / 1206×2622 pixels.
 - [Compact Dynamic Island](26.4-402x874-default/tracker-ride-dark-island-compact.png)
-- [Expanded Dynamic Island](26.4-402x874-default/tracker-ride-dark-island-expanded.png)
+  is unchanged by the later provenance and trip-line corrections. The final
+  expanded Island is captured in [dark](26.4-402x874-default/tracker-ride-dark-island-expanded.png)
+  and [light](26.4-402x874-default/tracker-ride-light-island-expanded.png) appearance.
+- Actual locked-screen rendering was separately observed during integration.
+  Its earlier frames preceded the final always-visible source time and are not
+  retained as current calibration.
 
-The iPhone 17 Pro renders at 402×874 points, 1206×2622 pixels. Native capture and
-lifecycle verification are still in progress; the expanded frame has been
-reviewed for platform/time visibility and safe insets around the system corners.
+Separate wall-clock tests observed timer advancement and clamping with the app
+absent, same-activity recovery, foreground transfer publication and removal.
+The marker shows the last published timetable position. Instructions do not
+advance without app execution; source time remains visible from publication.
+Cold-tap routing, the 390-point phone drive, enlarged-text rendering, minimal
+Island and actual VoiceOver traversal remain unverified. Simulator captures do not establish physical-device delivery or
+power use.
+
+See the [build handoff](../../../../../docs/backlog/persistent-travel-tracker/build_plan.md)
+for completed gates and remaining verification.

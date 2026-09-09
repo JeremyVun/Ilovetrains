@@ -97,14 +97,20 @@ background location permission or personal server state is introduced.
 The accepted short sentence, platform roles, destination arrival and quiet trip
 line remain the visual target. Native system countdowns show a bounded clock
 interval, rather than promising a freshly computed minute label while the app
-is absent. Stale content retains the same card and its observed times with
-last-update provenance. Its current instruction is last known; it does not
+is absent. The quiet context row includes last-update provenance from
+publication onward, including while source data is fresh. This avoids relying
+on the system to redraw stale presentation exactly at `staleDate`; the
+authorization host was observed showing zero before switching that state.
+Stale content retains the same card and its observed times. Its current
+instruction is last known; it does not
 assert that the person is still on that leg. Freshness expires at the earlier
 of source expiry and the next instruction boundary.
 
 The system timer stops at zero. The trip marker shows the last published
 timetable position; it updates with app publications, not autonomously while
-the app is absent, and never represents live location.
+the app is absent, and never represents live location. A missed connection
+with overlapping leg times omits the trip line and labels the destination ETA
+as planned, including before the current train reaches the change station.
 New platform/cancellation information, journey
 stage changes and completion require app execution; they reconcile when the
 app resumes. The activity may remain after expected arrival until the app or

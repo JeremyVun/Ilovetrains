@@ -8,6 +8,15 @@ The product should answer the likely journey on open, make correction one tap,
 and never present inferred or stale information as observed fact. Precise state
 and API semantics live in `client-storage.md` and `api.md`.
 
+## Product identity
+
+The install and launcher icon is Sleepers: four rounded orange, teal, green and
+red sleepers crossed by two white rails on the near-black ground. The canonical
+vector is `assets/brand/sleepers.svg`; platform rasters derive from it and its
+locked opaque 1024px master. System corner masks are never baked into native
+source artwork, and Android adaptive output keeps the drawing inside its safe
+zone.
+
 ## Core flow
 
 - Home is the open state. Its smart header is the zero-tap answer for the
@@ -222,8 +231,11 @@ When the flag is off, the trip line remains unchanged and does no animation work
   in 12px italic in place of `SHOWN ABOVE`, with the distance beside it as
   usual; the mark is gone by the next open. Rows carry both stacked
   line-colour rules and coloured line-code badges for known lines, in journey
-  order. With no known lines, show names and the arrow without an invented
-  badge or colour rule; retain the empty line-column space so names align
+  order. Native clients update saved line codes with the first displayed cached,
+  local or online board; they do not wait for all refresh sources to finish.
+  This also applies when a deleted pair is saved again. With no known lines,
+  show names and the arrow without an invented badge or colour rule; retain
+  the empty line-column space so names align
   with other saved trips. The web list is capped by
   the storage contract's ten-trip LRU. Other-row metadata may ellipsise inside
   the remaining track; station names and the `Just added` mark with its

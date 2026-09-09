@@ -1,0 +1,73 @@
+{
+  "concept": "a",
+  "page": "support",
+  "frame": {
+    "tag": "390x844-dark",
+    "w": 390,
+    "h": 844,
+    "scheme": "dark",
+    "mobile": true
+  },
+  "url": "http://127.0.0.1:54891/a/support/",
+  "sourceSha256": "9c565b3f71b89f29ef2bba8091fb81eb04c095a53d7dce350989eb30b2aac75d",
+  "top": {
+    "viewport": {
+      "w": 390,
+      "h": 844,
+      "dsf": 2
+    },
+    "document": {
+      "w": 390,
+      "h": 884,
+      "max": 40
+    },
+    "scrollY": 0,
+    "overflow": [],
+    "images": [
+      {
+        "src": "http://127.0.0.1:54891/assets/sleepers.svg",
+        "alt": "",
+        "natural": {
+          "w": 1024,
+          "h": 1024,
+          "ratio": 1
+        },
+        "layout": {
+          "w": 28,
+          "h": 28,
+          "ratio": 1,
+          "scaleX": 0.02734375,
+          "scaleY": 0.02734375
+        },
+        "axisAligned": {
+          "w": 28,
+          "h": 28,
+          "ratio": 1
+        },
+        "transform": "none",
+        "device": null,
+        "complete": true,
+        "distorted": false
+      }
+    ],
+    "smallTapTargets": [],
+    "textSpill": [],
+    "interactiveReachable": true,
+    "textReachable": true,
+    "footer": {
+      "x": 20,
+      "y": 790.609375,
+      "width": 350,
+      "height": 93,
+      "top": 790.609375,
+      "right": 370,
+      "bottom": 883.609375,
+      "left": 20
+    }
+  },
+  "static": true,
+  "gestureProofReusedFrom": [
+    "390x844-dark",
+    "1440x900-light"
+  ]
+}

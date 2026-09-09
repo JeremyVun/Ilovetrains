@@ -30,7 +30,6 @@ fun TrainApp(state: AppState, actions: UiActions) {
 @Composable
 private fun TrainAppContent(state: AppState, actions: UiActions) {
     val c = LocalTrainColors.current
-    val accessibilityManager = LocalAccessibilityManager.current
     Box(Modifier.fillMaxSize().background(c.ground).testTag("train-app-root").windowInsetsPadding(WindowInsets.safeDrawing)) {
         if (!state.ready) {
             Box(Modifier.fillMaxSize().padding(PagePadding), contentAlignment = Alignment.CenterStart) {
@@ -47,27 +46,36 @@ private fun TrainAppContent(state: AppState, actions: UiActions) {
             Screen.Setup -> if (state.selectingHome) SettingsScreen(state, actions) else SetupScreen(state, actions)
             Screen.Settings -> SettingsScreen(state, actions)
         }
-        state.message?.takeIf { state.ready }?.let { message ->
-            LaunchedEffect(message, state.messageAutoDismiss, accessibilityManager) {
-                if (state.messageAutoDismiss) {
-                    val timeout = accessibilityManager?.calculateRecommendedTimeoutMillis(
-                        originalTimeoutMillis = FeedbackSuccessTimeoutMillis,
-                        containsIcons = false,
-                        containsText = true,
-                        containsControls = true,
-                    ) ?: FeedbackSuccessTimeoutMillis
-                    delay(timeout)
-                    actions.dismissMessage()
-                }
+        if (state.screen != Screen.Home) {
+            MessageBar(state, actions, Modifier.align(Alignment.BottomCenter))
+        }
+    }
+}
+
+@Composable
+internal fun MessageBar(state: AppState, actions: UiActions, modifier: Modifier = Modifier) {
+    val c = LocalTrainColors.current
+    val accessibilityManager = LocalAccessibilityManager.current
+    state.message?.takeIf { state.ready }?.let { message ->
+        LaunchedEffect(message, state.messageAutoDismiss, accessibilityManager) {
+            if (state.messageAutoDismiss) {
+                val timeout = accessibilityManager?.calculateRecommendedTimeoutMillis(
+                    originalTimeoutMillis = FeedbackSuccessTimeoutMillis,
+                    containsIcons = false,
+                    containsText = true,
+                    containsControls = true,
+                ) ?: FeedbackSuccessTimeoutMillis
+                delay(timeout)
+                actions.dismissMessage()
             }
-            Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(c.ink)
-                .heightIn(min = 52.dp).clickable(role = Role.Button, onClick = if (state.undoAvailable) actions::undoDelete else actions::dismissMessage)
-                .padding(horizontal = PagePadding), verticalAlignment = Alignment.CenterVertically) {
-                Text(message, Modifier.weight(1f), color = c.ground, fontSize = 14.sp, fontWeight = FontWeight.Normal,
-                    maxLines = if (state.undoAvailable) 2 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.width(12.dp))
-                Label(if (state.undoAvailable) "Undo" else "Dismiss", color = c.ground)
-            }
+        }
+        Row(modifier.fillMaxWidth().testTag("message-bar").background(c.ink)
+            .heightIn(min = 52.dp).clickable(role = Role.Button, onClick = if (state.undoAvailable) actions::undoDelete else actions::dismissMessage)
+            .padding(horizontal = PagePadding, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(message, Modifier.weight(1f), color = c.ground, fontSize = 14.sp, fontWeight = FontWeight.Normal,
+                maxLines = if (state.undoAvailable) 2 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.width(12.dp))
+            Label(if (state.undoAvailable) "Undo" else "Dismiss", color = c.ground)
         }
     }
 }

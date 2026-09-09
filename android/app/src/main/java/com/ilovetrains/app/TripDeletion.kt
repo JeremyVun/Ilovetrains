@@ -1,6 +1,6 @@
 package com.ilovetrains.app
 
-const val UndoWindowMillis = 4_000L
+const val UndoWindowMillis = 6_000L
 
 data class PendingDeletion(val trip: SavedTrip, val index: Int, val history: List<ViewEvent>,
     val focus: FocusedJourney?, val lastAnswer: LastAnswer?, val lastTripId: String?)

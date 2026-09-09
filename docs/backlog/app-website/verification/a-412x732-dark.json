@@ -1,0 +1,438 @@
+{
+  "concept": "a",
+  "frame": {
+    "tag": "412x732-dark",
+    "w": 412,
+    "h": 732,
+    "scheme": "dark",
+    "mobile": true
+  },
+  "url": "http://127.0.0.1:54891/a/",
+  "sourceSha256": "0baf8d565fbdee4c4dd572c67200bd69b43479f67c4469e906784710072436ba",
+  "top": {
+    "viewport": {
+      "w": 412,
+      "h": 732,
+      "dsf": 2
+    },
+    "document": {
+      "w": 412,
+      "h": 4727,
+      "max": 3995
+    },
+    "scrollY": 0,
+    "overflow": [],
+    "images": [
+      {
+        "src": "http://127.0.0.1:54891/assets/hero-dark.webp",
+        "alt": "The home screen, with Parramatta to Central and four saved train, metro and ferry trips",
+        "natural": {
+          "w": 1206,
+          "h": 2622,
+          "ratio": 0.459954233409611
+        },
+        "layout": {
+          "w": 290,
+          "h": 630,
+          "ratio": 0.4603174603174603,
+          "scaleX": 0.24046434494195687,
+          "scaleY": 0.2402745995423341
+        },
+        "axisAligned": {
+          "w": 290,
+          "h": 630.484375,
+          "ratio": 0.459963817501425
+        },
+        "transform": "none",
+        "device": {
+          "className": "device hero-device",
+          "layoutW": 300,
+          "layoutH": 640,
+          "layoutRatio": 0.46875,
+          "axisW": 300,
+          "axisH": 640.484375,
+          "axisRatio": 0.46839550145153813,
+          "overflow": "hidden",
+          "borderTop": "5px",
+          "transform": "none"
+        },
+        "complete": true,
+        "distorted": false
+      },
+      {
+        "src": "http://127.0.0.1:54891/assets/board-dark.webp",
+        "alt": "The departure board for Parramatta to Central, showing times and platforms",
+        "natural": {
+          "w": 1206,
+          "h": 2622,
+          "ratio": 0.459954233409611
+        },
+        "layout": {
+          "w": 260,
+          "h": 565,
+          "ratio": 0.46017699115044247,
+          "scaleX": 0.2155887230514096,
+          "scaleY": 0.2154843630816171
+        },
+        "axisAligned": {
+          "w": 260,
+          "h": 565.265625,
+          "ratio": 0.4599607485418913
+        },
+        "transform": "none",
+        "device": {
+          "className": "device board-device",
+          "layoutW": 270,
+          "layoutH": 575,
+          "layoutRatio": 0.46956521739130436,
+          "axisW": 270,
+          "axisH": 575.265625,
+          "axisRatio": 0.4693483988374936,
+          "overflow": "hidden",
+          "borderTop": "5px",
+          "transform": "none"
+        },
+        "complete": true,
+        "distorted": false
+      },
+      {
+        "src": "http://127.0.0.1:54891/assets/detail-dark.webp",
+        "alt": "The complete Rhodes to Bondi Junction trip, with a change at Town Hall and the Pin this train action",
+        "natural": {
+          "w": 1206,
+          "h": 2622,
+          "ratio": 0.459954233409611
+        },
+        "layout": {
+          "w": 260,
+          "h": 565,
+          "ratio": 0.46017699115044247,
+          "scaleX": 0.2155887230514096,
+          "scaleY": 0.2154843630816171
+        },
+        "axisAligned": {
+          "w": 260,
+          "h": 565.265625,
+          "ratio": 0.4599607485418913
+        },
+        "transform": "none",
+        "device": {
+          "className": "device detail-device",
+          "layoutW": 270,
+          "layoutH": 575,
+          "layoutRatio": 0.46956521739130436,
+          "axisW": 270,
+          "axisH": 575.265625,
+          "axisRatio": 0.4693483988374936,
+          "overflow": "hidden",
+          "borderTop": "5px",
+          "transform": "none"
+        },
+        "complete": true,
+        "distorted": false
+      },
+      {
+        "src": "http://127.0.0.1:54891/assets/tracker-dark.webp",
+        "alt": "The F1 trip from Circular Quay to Manly Wharf pinned on the home screen, with 14 minutes to go",
+        "natural": {
+          "w": 1206,
+          "h": 2622,
+          "ratio": 0.459954233409611
+        },
+        "layout": {
+          "w": 248,
+          "h": 539,
+          "ratio": 0.4601113172541744,
+          "scaleX": 0.20563847429519072,
+          "scaleY": 0.2055682684973303
+        },
+        "axisAligned": {
+          "w": 248,
+          "h": 539.171875,
+          "ratio": 0.45996464485466715
+        },
+        "transform": "none",
+        "device": {
+          "className": "device tracker-device",
+          "layoutW": 258,
+          "layoutH": 549,
+          "layoutRatio": 0.46994535519125685,
+          "axisW": 258,
+          "axisH": 549.171875,
+          "axisRatio": 0.4697982758130139,
+          "overflow": "hidden",
+          "borderTop": "5px",
+          "transform": "none"
+        },
+        "complete": true,
+        "distorted": false
+      },
+      {
+        "src": "http://127.0.0.1:54891/assets/sleepers.svg",
+        "alt": "",
+        "natural": {
+          "w": 1024,
+          "h": 1024,
+          "ratio": 1
+        },
+        "layout": {
+          "w": 60,
+          "h": 60,
+          "ratio": 1,
+          "scaleX": 0.05859375,
+          "scaleY": 0.05859375
+        },
+        "axisAligned": {
+          "w": 60,
+          "h": 60,
+          "ratio": 1
+        },
+        "transform": "none",
+        "device": null,
+        "complete": true,
+        "distorted": false
+      }
+    ],
+    "smallTapTargets": [],
+    "textSpill": [],
+    "interactiveReachable": true,
+    "textReachable": true,
+    "footer": {
+      "x": 20,
+      "y": 4633.65625,
+      "width": 372,
+      "height": 93,
+      "top": 4633.65625,
+      "right": 392,
+      "bottom": 4726.65625,
+      "left": 20
+    }
+  },
+  "bottom": {
+    "viewport": {
+      "w": 412,
+      "h": 732,
+      "dsf": 2
+    },
+    "document": {
+      "w": 412,
+      "h": 4727,
+      "max": 3995
+    },
+    "scrollY": 3995,
+    "overflow": [],
+    "images": [
+      {
+        "src": "http://127.0.0.1:54891/assets/hero-dark.webp",
+        "alt": "The home screen, with Parramatta to Central and four saved train, metro and ferry trips",
+        "natural": {
+          "w": 1206,
+          "h": 2622,
+          "ratio": 0.459954233409611
+        },
+        "layout": {
+          "w": 290,
+          "h": 630,
+          "ratio": 0.4603174603174603,
+          "scaleX": 0.24046434494195687,
+          "scaleY": 0.2402745995423341
+        },
+        "axisAligned": {
+          "w": 290,
+          "h": 630.484375,
+          "ratio": 0.459963817501425
+        },
+        "transform": "none",
+        "device": {
+          "className": "device hero-device",
+          "layoutW": 300,
+          "layoutH": 640,
+          "layoutRatio": 0.46875,
+          "axisW": 300,
+          "axisH": 640.484375,
+          "axisRatio": 0.46839550145153813,
+          "overflow": "hidden",
+          "borderTop": "5px",
+          "transform": "none"
+        },
+        "complete": true,
+        "distorted": false
+      },
+      {
+        "src": "http://127.0.0.1:54891/assets/board-dark.webp",
+        "alt": "The departure board for Parramatta to Central, showing times and platforms",
+        "natural": {
+          "w": 1206,
+          "h": 2622,
+          "ratio": 0.459954233409611
+        },
+        "layout": {
+          "w": 260,
+          "h": 565,
+          "ratio": 0.46017699115044247,
+          "scaleX": 0.2155887230514096,
+          "scaleY": 0.2154843630816171
+        },
+        "axisAligned": {
+          "w": 260,
+          "h": 565.265625,
+          "ratio": 0.4599607485418913
+        },
+        "transform": "none",
+        "device": {
+          "className": "device board-device",
+          "layoutW": 270,
+          "layoutH": 575,
+          "layoutRatio": 0.46956521739130436,
+          "axisW": 270,
+          "axisH": 575.265625,
+          "axisRatio": 0.4693483988374936,
+          "overflow": "hidden",
+          "borderTop": "5px",
+          "transform": "none"
+        },
+        "complete": true,
+        "distorted": false
+      },
+      {
+        "src": "http://127.0.0.1:54891/assets/detail-dark.webp",
+        "alt": "The complete Rhodes to Bondi Junction trip, with a change at Town Hall and the Pin this train action",
+        "natural": {
+          "w": 1206,
+          "h": 2622,
+          "ratio": 0.459954233409611
+        },
+        "layout": {
+          "w": 260,
+          "h": 565,
+          "ratio": 0.46017699115044247,
+          "scaleX": 0.2155887230514096,
+          "scaleY": 0.2154843630816171
+        },
+        "axisAligned": {
+          "w": 260,
+          "h": 565.265625,
+          "ratio": 0.4599607485418913
+        },
+        "transform": "none",
+        "device": {
+          "className": "device detail-device",
+          "layoutW": 270,
+          "layoutH": 575,
+          "layoutRatio": 0.46956521739130436,
+          "axisW": 270,
+          "axisH": 575.265625,
+          "axisRatio": 0.4693483988374936,
+          "overflow": "hidden",
+          "borderTop": "5px",
+          "transform": "none"
+        },
+        "complete": true,
+        "distorted": false
+      },
+      {
+        "src": "http://127.0.0.1:54891/assets/tracker-dark.webp",
+        "alt": "The F1 trip from Circular Quay to Manly Wharf pinned on the home screen, with 14 minutes to go",
+        "natural": {
+          "w": 1206,
+          "h": 2622,
+          "ratio": 0.459954233409611
+        },
+        "layout": {
+          "w": 248,
+          "h": 539,
+          "ratio": 0.4601113172541744,
+          "scaleX": 0.20563847429519072,
+          "scaleY": 0.2055682684973303
+        },
+        "axisAligned": {
+          "w": 248,
+          "h": 539.171875,
+          "ratio": 0.45996464485466715
+        },
+        "transform": "none",
+        "device": {
+          "className": "device tracker-device",
+          "layoutW": 258,
+          "layoutH": 549,
+          "layoutRatio": 0.46994535519125685,
+          "axisW": 258,
+          "axisH": 549.171875,
+          "axisRatio": 0.4697982758130139,
+          "overflow": "hidden",
+          "borderTop": "5px",
+          "transform": "none"
+        },
+        "complete": true,
+        "distorted": false
+      },
+      {
+        "src": "http://127.0.0.1:54891/assets/sleepers.svg",
+        "alt": "",
+        "natural": {
+          "w": 1024,
+          "h": 1024,
+          "ratio": 1
+        },
+        "layout": {
+          "w": 60,
+          "h": 60,
+          "ratio": 1,
+          "scaleX": 0.05859375,
+          "scaleY": 0.05859375
+        },
+        "axisAligned": {
+          "w": 60,
+          "h": 60,
+          "ratio": 1
+        },
+        "transform": "none",
+        "device": null,
+        "complete": true,
+        "distorted": false
+      }
+    ],
+    "smallTapTargets": [],
+    "textSpill": [],
+    "interactiveReachable": true,
+    "textReachable": true,
+    "footer": {
+      "x": 20,
+      "y": 638.65625,
+      "width": 372,
+      "height": 93,
+      "top": 638.65625,
+      "right": 392,
+      "bottom": 731.65625,
+      "left": 20
+    }
+  },
+  "gestureProof": [
+    {
+      "kind": "touch",
+      "before": 0,
+      "after": 708
+    },
+    {
+      "kind": "touch",
+      "before": 708,
+      "after": 1417
+    },
+    {
+      "kind": "touch",
+      "before": 1417,
+      "after": 2139
+    },
+    {
+      "kind": "touch",
+      "before": 2139,
+      "after": 3027
+    },
+    {
+      "kind": "touch",
+      "before": 3027,
+      "after": 3995
+    }
+  ],
+  "features": {}
+}

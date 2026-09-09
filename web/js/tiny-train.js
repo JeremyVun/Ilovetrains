@@ -133,7 +133,10 @@ export function attachTinyTrain(host) {
     host.classList.add('tiny-train-lane-active');
     consist = document.createElement('span');
     consist.className = 'tiny-train-consist';
-    for (let i = 1; i < CARRIAGES; i += 1) consist.append(carriage(false));
+    const rear = carriage(true);
+    rear.style.transform = 'scaleX(-1)';
+    consist.append(rear);
+    for (let i = 1; i < CARRIAGES - 1; i += 1) consist.append(carriage(false));
     consist.append(carriage(true));
     consist.dataset.carriages = String(CARRIAGES);
     stage.append(consist);

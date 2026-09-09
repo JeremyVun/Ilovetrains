@@ -103,7 +103,7 @@ class TrainViewModel private constructor(
                 mutable.value = mutable.value.copy(timetableStatus = planner.coverageDescription)
             } catch (_: Exception) {
                 initialized.completeExceptionally(IllegalStateException("Offline timetable unavailable"))
-                mutable.value = mutable.value.copy(timetableStatus = "Offline timetable unavailable. Download it in Settings.")
+                mutable.value = mutable.value.copy(timetableStatus = "Offline timetable unavailable.")
             }
         }
     }

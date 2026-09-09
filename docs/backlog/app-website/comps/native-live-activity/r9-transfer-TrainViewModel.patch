@@ -1,0 +1,70 @@
+diff --git a/Users/jeremy/projects/trains_app/ios/ILoveTrains/Core/TrainViewModel.swift b/tmp/trains-r9-native-capture/ios/ILoveTrains/Core/TrainViewModel.swift
+index 2e804ed..77d95c3 100644
+--- a/Users/jeremy/projects/trains_app/ios/ILoveTrains/Core/TrainViewModel.swift
++++ b/tmp/trains-r9-native-capture/ios/ILoveTrains/Core/TrainViewModel.swift
+@@ -1246,6 +1246,46 @@ private extension TrainViewModel {
+         let arguments = ProcessInfo.processInfo.arguments
+         guard let index = arguments.firstIndex(of: "--tracker-case"), index + 1 < arguments.count else { return false }
+         let name = arguments[index + 1]
++        if name == "r9-transfer" {
++            let chatswood = Station(id: "206710", name: "Chatswood Station", modes: ["metro"])
++            let martinPlace = Station(id: "200030", name: "Martin Place Station", modes: ["metro", "train"])
++            let bondiJunction = Station(id: "202210", name: "Bondi Junction Station", modes: ["train"])
++            let now = trackerFixtureTime(day: 10, hour: 8, minute: 28)
++            let first = Leg(
++                line: "M1", mode: "metro", headsign: "Sydenham",
++                from: chatswood, to: martinPlace,
++                departure: trackerFixtureTime(day: 10, hour: 8, minute: 22, second: 7),
++                arrival: trackerFixtureTime(day: 10, hour: 8, minute: 32, second: 37),
++                estimatedDeparture: trackerFixtureTime(day: 10, hour: 8, minute: 22, second: 7),
++                estimatedArrival: trackerFixtureTime(day: 10, hour: 8, minute: 32, second: 37),
++                fromPlatform: "2", toPlatform: "3"
++            )
++            let last = Leg(
++                line: "T4", mode: "train", headsign: "Bondi Junction",
++                from: martinPlace, to: bondiJunction,
++                departure: trackerFixtureTime(day: 10, hour: 8, minute: 37),
++                arrival: trackerFixtureTime(day: 10, hour: 8, minute: 45),
++                estimatedDeparture: trackerFixtureTime(day: 10, hour: 8, minute: 37),
++                estimatedArrival: trackerFixtureTime(day: 10, hour: 8, minute: 45),
++                fromPlatform: "2", toPlatform: "1"
++            )
++            let journey = Journey(legs: [first, last])
++            let board = BoardData(from: chatswood, to: bondiJunction, journeys: [journey], generatedAt: now, source: "live")
++            let trip = SavedTrip(id: "tracker-mascot", from: chatswood, to: bondiJunction, createdAt: now, lines: ["M1", "T4"])
++            data = UserData(trips: [trip], lastTripId: trip.id,
++                            focus: FocusedJourney(tripId: trip.id, reverse: false, journey: journey, board: board, pinned: false))
++            state.now = now
++            state.trips = [trip]
++            state.selectedTripId = trip.id
++            state.board = board
++            state.homeBoard = board
++            state.screen = .home
++            state.ready = true
++            trackerDebugCountdown = TravelTrackerState.derive(focus: data.focus!, now: now, generation: 1)?.headline.emphasis ?? ""
++            seeded = true
++            syncPersonal()
++            return true
++        }
+         var central = Station(id: "200060", name: "Central Station", modes: ["train", "metro"])
+         let mascot = Station(id: "202010", name: "Mascot Station", modes: ["train"])
+         var kellyville = Station(id: "215500", name: "Kellyville Station", modes: ["metro"])
+@@ -1300,15 +1340,16 @@ private extension TrainViewModel {
+         return true
+     }
+ 
+-    func trackerFixtureTime(hour: Int, minute: Int) -> Millis {
++    func trackerFixtureTime(day: Int = 1, hour: Int, minute: Int, second: Int = 0) -> Millis {
+         var components = DateComponents()
+         components.calendar = sydneyCalendar
+         components.timeZone = sydneyZone
+         components.year = 2026
+         components.month = 9
+-        components.day = 1
++        components.day = day
+         components.hour = hour
+         components.minute = minute
++        components.second = second
+         return components.date!.timeIntervalSince1970 * 1_000
+     }
+ 

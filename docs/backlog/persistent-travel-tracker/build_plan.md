@@ -143,8 +143,23 @@ seams rather than repeating the implementation in assertions.
 - [ ] iOS final integration gate. ActivityKit controller, protected session
   persistence, widget extension, app publication and exact deep links are
   implemented. All 131 unit tests passed, including nine controller tests and
-  six presentation tests. Initial native ride/compact/expanded captures passed;
-  full lifecycle and layout gates remain in progress.
+  six presentation tests; all ten existing UI tests also passed. Focused real
+  client checks passed automatic inference, fresh-install permission denial,
+  terminated-app timer clamping, same-activity recovery, foreground transfer
+  publication and activity removal. Twenty default-text native card frames
+  were reviewed and accepted as baselines, including the corrected missed
+  connection. Final expanded Island captures passed in both schemes. Cold-tap
+  routing and enlarged-text rendering remain open. The
+  enlarged-text drive publishes an activity but exposes an invisible system
+  host; it is not a successful layout check or proof of an OS limitation.
+  The final routing attempt stopped at missing DEBUG fixture status before
+  dismissal or tap; cold-tap coverage remains unverified. Its harness now uses
+  the normal app container and visible detail assertions, so a real OS launch
+  does not depend on XCTest-only environment or arguments. Direct simulator
+  launch preserved those arguments on the same installed app; the isolated
+  XCTest launch instead opened ordinary setup. The 390-point, minimal Island
+  and actual VoiceOver drives also remain open. Both owned simulators were
+  shut down after verification.
 - [x] iOS unsigned Release archive built with the embedded widget. Both app
   and extension declare iOS 17 minimum support; binary inspection found no
   DEBUG tracker arguments, status overlay or fixed-countdown hooks. The app's

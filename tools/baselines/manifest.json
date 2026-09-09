@@ -8,7 +8,13 @@
     "commit": "a21dbec",
     "date": "2026-09-09",
     "device": "Codex-commute-feedback-01 1206x2622px, content size large",
-    "simulator": "Codex-commute-feedback-01"
+    "simulator": "Codex-commute-feedback-01",
+    "tracker": {
+      "commit": "116efdc",
+      "date": "2026-09-08",
+      "device": "iPhone 17 Pro iOS 26.4, 402x874 pt, 3x; observed ActivityKit card crops; default text; dark and light simulator appearance",
+      "simulator": "ILoveTrains Tracker Audit 20260908"
+    }
   },
   "android": {
     "commit": "a21dbec",

@@ -3,87 +3,91 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="description" content="The next Sydney train, metro or ferry to take, as soon as you open the app.">
+  <meta name="description" content="Sydney train, metro and ferry trips ready when you open the app.">
   <link rel="canonical" href="https://ilovetrainsapp.jeremyvun.com/">
   <link rel="icon" href="/assets/icon-192.png">
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon-180.png">
   <title>ilovetrains — Sydney departures</title>
   <link rel="stylesheet" href="/site.css">
 </head>
-<body>
+<body class="site-page">
   <header class="site-nav">
-    <a class="brand" href="/">ilovetrains</a>
+    <a class="brand" href="/" aria-label="ilovetrains home">ilovetrains</a>
     <nav aria-label="Main navigation"><a href="/privacy/">Privacy</a><a href="/support/">Support</a></nav>
   </header>
 
   <main>
-    <section class="hero" data-block>
+    <section class="hero">
       <div class="hero-copy">
         <p class="eyebrow"><span class="live">●</span>&nbsp; Made for Sydney</p>
-        <h1><span class="hero-line">Your next train.</span></h1>
-        <p>Sydney trains, metro and ferries. Your usual trips, ready when you open the app.</p>
-        <div class="actions">
-          <a class="button" href="https://ilovetrains.jeremyvun.com">Open the web app</a>
-          <a class="button secondary" href="https://ilovetrains.jeremyvun.com/downloads/">Android APK</a>
-          <p class="availability">App Store and Google Play · Coming soon</p>
-        </div>
+        <h1>Your next trip.</h1>
+        <p class="hero-lede">Sydney trains, metro and ferries. Your usual trips are ready when you open the app.</p>
+        <div class="actions"><a class="button" data-device-action href="https://ilovetrains.jeremyvun.com">Open the web app</a></div>
       </div>
-      <div class="hero-stage" aria-label="ilovetrains showing the next train from Central to Parramatta">
-        <div class="phone"><picture>
-          <source media="(prefers-color-scheme: dark)" srcset="/assets/home-dark.webp">
-          <img src="/assets/home-light.webp" width="1206" height="2622" fetchpriority="high" alt="Example ilovetrains home screen showing a train from Central to Parramatta in three minutes">
+      <div class="hero-media">
+        <div class="hero-rail" data-train-rail>
+          <span class="train-stage" data-train-stage></span>
+          <button class="line-hit line-hit-left" data-train-trigger type="button" aria-label="Run a train along the coloured line"></button>
+          <button class="line-hit line-hit-right" data-train-trigger type="button" aria-label="Run a train along the coloured line"></button>
+        </div>
+        <div class="screen phone"><picture>
+          <source media="(prefers-color-scheme: dark)" srcset="/assets/hero-dark.webp">
+          <img src="/assets/hero-light.webp" width="1206" height="2622" fetchpriority="high" alt="Example home screen showing Parramatta to Central and four saved Sydney trips">
         </picture></div>
       </div>
     </section>
 
-    <section class="answer-band" aria-label="What the app does">
-      <div class="answer-inner">
-        <article class="answer-item"><b>Answers on open</b><p>Your usual trip is ready when the app opens.</p></article>
-        <article class="answer-item"><b>Works offline</b><p>iPhone and Android can plan trips without reception.</p></article>
-        <article class="answer-item"><b>Stays on your device</b><p>Saved trips, history and location stay with you.</p></article>
-      </div>
-    </section>
+    <section class="facts" aria-label="What the app does"><div class="facts-inner">
+      <article class="fact"><b>Answers on open</b><p>The next trip is ready when the app opens.</p></article>
+      <article class="fact"><b>Works offline</b><p>iPhone and Android can plan trips without reception.</p></article>
+      <article class="fact"><b>Stays on your device</b><p>Saved trips, history and location stay with you.</p></article>
+    </div></section>
 
-    <section class="feature">
-      <div class="screen-window board-window">
-        <picture><source media="(prefers-color-scheme: dark)" srcset="/assets/board-dark.webp"><img src="/assets/board-light.webp" width="1206" height="2622" loading="lazy" alt="Example Central to Parramatta departure board"></picture>
-      </div>
+    <section class="feature tracker-feature">
+      <div class="screen tracker-shot"><picture>
+        <source media="(prefers-color-scheme: dark)" srcset="/assets/tracker-dark.webp">
+        <img loading="lazy" src="/assets/tracker-light.webp" width="1206" height="2622" alt="Travel tracker for the F1 ferry from Circular Quay to Manly">
+      </picture></div>
       <div class="feature-copy">
-        <p class="section-tag">Live departures</p>
-        <h2>Read the board at a glance.</h2>
-        <p>See departure times, platforms and delays in one place.</p>
+        <p class="eyebrow">F1 ferry · Travel tracker</p>
+        <div class="route-pills" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        <h2>Follow your trip.</h2>
+        <p>Pin the trip and the next instruction stays on your phone as you travel.</p>
       </div>
     </section>
 
-    <section class="feature reverse">
-      <div class="feature-copy">
-        <p class="section-tag">Journey detail</p>
-        <h2>Know every change before you leave.</h2>
-        <p>See where to change and which platform to find. Pin a train to follow it as you travel.</p>
-      </div>
-      <div class="screen-window detail-window">
-        <picture><source media="(prefers-color-scheme: dark)" srcset="/assets/detail-dark.webp"><img src="/assets/detail-light.webp" width="1206" height="2622" loading="lazy" alt="Example journey detail from Rhodes to Bondi Junction with one change at Town Hall"></picture>
-      </div>
+    <section class="feature feature-grid">
+      <article class="feature-panel">
+        <div class="panel-copy"><p class="eyebrow">Live departures</p><h3>Times, platforms and delays.</h3><p>Read the board without digging through menus.</p></div>
+        <div class="screen panel-shot"><picture>
+          <source media="(prefers-color-scheme: dark)" srcset="/assets/board-dark.webp">
+          <img loading="lazy" src="/assets/board-light.webp" width="1206" height="2622" alt="Example T1 departure board from Parramatta to Central">
+        </picture></div>
+      </article>
+      <article class="feature-panel">
+        <div class="panel-copy"><p class="eyebrow">Journey detail</p><h3>Every change before you leave.</h3><p>See where to change and which platform to find.</p></div>
+        <div class="screen panel-shot"><picture>
+          <source media="(prefers-color-scheme: dark)" srcset="/assets/detail-dark.webp">
+          <img loading="lazy" src="/assets/detail-light.webp" width="1206" height="2622" alt="Example journey detail from Rhodes to Bondi Junction via Town Hall">
+        </picture></div>
+      </article>
     </section>
 
-    <section class="privacy-callout">
-      <div class="privacy-callout-inner">
-        <h2>Your trips stay on your device.</h2>
-        <div><p>No accounts. No ads.</p><a href="/privacy/">Read the privacy policy&nbsp; →</a></div>
-      </div>
-    </section>
-
-    <section class="get-app" id="get">
-      <div><p class="section-tag">Get ilovetrains</p><h2>Open ilovetrains.</h2></div>
-      <div class="download-list">
-        <div class="download-row"><span class="platform">Web app</span><span class="status">Ready in your browser</span><a href="https://ilovetrains.jeremyvun.com">Open ↗</a></div>
-        <div class="download-row"><span class="platform">Android</span><span class="status">Direct APK download</span><a href="https://ilovetrains.jeremyvun.com/downloads/">Download ↓</a></div>
-        <div class="download-row"><span class="platform">iPhone</span><span class="status">Coming soon</span><span class="coming-badge">App Store<br>Coming soon</span></div>
-        <div class="download-row"><span class="platform">Android store</span><span class="status">Coming soon</span><span class="coming-badge">Google Play<br>Coming soon</span></div>
-      </div>
-    </section>
+    <section class="privacy-callout"><div class="privacy-inner">
+      <div><h2>Your trips stay on your device.</h2><p>No accounts. No ads.</p></div>
+      <a class="text-link" href="/privacy/">Read the privacy policy&nbsp; →</a>
+    </div></section>
   </main>
 
-  <footer class="site-footer"><div class="footer-inner"><a href="/privacy/">Privacy policy</a><a href="/support/">Support</a><span class="operator">Jeremy Vun</span></div></footer>
+  <footer class="site-footer"><div class="footer-inner"><a href="/privacy/">Privacy</a><a href="/support/">Support</a></div></footer>
+
+  <dialog class="store-dialog" data-store-dialog aria-labelledby="store-title" aria-describedby="store-body">
+    <div class="dialog-inner">
+      <h2 id="store-title" data-dialog-title>App Store</h2>
+      <p id="store-body" data-dialog-body></p>
+      <div class="dialog-actions"><a class="button" href="https://ilovetrains.jeremyvun.com">Open the web app</a><button class="dialog-close" data-dialog-close type="button">Close</button></div>
+    </div>
+  </dialog>
+  <script src="/site.js"></script>
 </body>
 </html>

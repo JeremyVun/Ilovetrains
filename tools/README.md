@@ -125,7 +125,10 @@
   or `390x844`. `SURFACES=notification-center,compact,expanded` is the default;
   Notification Center is not a device-lock test. `TRACKER_CASES`, `SCHEMES` and
   `CONTENT_SIZE=accessibility-medium` narrow cases, schemes and enlarged text.
-  `CAPTURE_ONLY=1` omits lifecycle drives. Minimal Island requires a distinct
+  `CAPTURE_ONLY=1` omits lifecycle drives. The full drive uninstalls the test
+  app on the named simulator before denial testing, clearing that app's data
+  so the permission lane cannot silently skip its first-use precondition.
+  Minimal Island requires a distinct
   ActivityKit app supplied through `MINIMAL_COMPETITOR_APP`.
   Fixed DEBUG fixtures test layout; the separate wall-clock lane tests retained
   state and foreground reconciliation. Full frames, recordings and AX dumps
@@ -772,9 +775,10 @@ against `overflow: hidden` and reports the unreachable pixels at 412x732.
 paint and live data, in ms — from a cold open and then a warm, worker-served
 one. It also requires a successful API response and fresh, non-offline data, so
 cached rows plus a failed request cannot pass the bar. It exits non-zero if the
-bar is missed. `make-icons.sh` regenerates `web/icons/*` from
-`tools/icon.html` (a canvas drawing whose proportions are query-tunable) at the
-exact sizes the manifest promises.
+bar is missed. `make-icons.sh` regenerates the web, iOS and Android icon entry
+points from `assets/brand/sleepers.svg` and its locked opaque 1024px master.
+Web sizes render through Chromium at their promised dimensions; the PWA
+maskable and Android foreground outputs retain the established 62% safe scale.
 
 ## build-stations.js
 

@@ -1,6 +1,15 @@
 package com.ilovetrains.app
 
 import android.app.Application
+import android.graphics.Bitmap
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
+import org.junit.Rule
 import android.content.Context
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
@@ -26,6 +35,7 @@ import java.util.UUID
 
 @RunWith(AndroidJUnit4::class)
 class ControllerParityInstrumentedTest {
+    @get:Rule val compose = createComposeRule()
     private var owner: TestOwner? = null
 
     @After
@@ -155,6 +165,45 @@ class ControllerParityInstrumentedTest {
         assertEquals(alternatives.generatedAt, alternativeModel.state.value.board?.generatedAt)
         assertTrue(alternativeModel.state.value.focus?.pinned == true)
         assertEquals(focusedBoard.generatedAt, alternativeModel.state.value.focus?.board?.generatedAt)
+    }
+
+    @Test
+    fun savedTripLinesPublishWithCachedBoardBeforeRefreshFinishesAndAfterReadding() = runBlocking {
+        val now = System.currentTimeMillis()
+        val first = journey(primaryTrip.from, primaryTrip.to, now + 600_000, now + 1_800_000, "T1")
+        val board = BoardData(primaryTrip.from, primaryTrip.to, listOf(first), now, source = "live")
+        val model = model(UserData(useLocation = false))
+        DeviceStore(application).cache(board, AllModes)
+
+        val rendered = mutableStateOf(model.state.value)
+        compose.setContent { TrainApp(rendered.value, model) }
+        repeat(2) { attempt ->
+            model.saveTrip(primaryTrip.from, primaryTrip.to)
+            val published = withTimeout(5_000) {
+                model.state.first { it.board?.generatedAt == now }
+            }
+            assertTrue("cached board publishes before refresh completes, attempt $attempt", published.refreshing)
+            assertEquals(listOf("T1"), published.trips.single().lines)
+            assertEquals(Screen.Home, published.screen)
+            for (appearance in listOf(Appearance.Dark, Appearance.Light)) {
+                compose.runOnIdle { rendered.value = published.copy(appearance = appearance) }
+                val row = compose.onNodeWithTag("trip-${published.trips.single().id}").captureToImage()
+                val density = application.resources.displayMetrics.density
+                val stripe = row.toPixelMap()[(23 * density).toInt(), row.height / 2]
+                assertEquals("T1 stripe red, attempt $attempt", 249 / 255f, stripe.red, .01f)
+                assertEquals("T1 stripe green, attempt $attempt", 157 / 255f, stripe.green, .01f)
+                assertEquals("T1 stripe blue, attempt $attempt", 28 / 255f, stripe.blue, .01f)
+                val directory = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "calibration")
+                directory.mkdirs()
+                File(directory, "saved-trip-$attempt-${appearance.name.lowercase()}.png").outputStream().use {
+                    compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
+                }
+            }
+            if (attempt == 0) {
+                model.deleteTrip(published.trips.single().id)
+                assertTrue(model.state.value.trips.isEmpty())
+            }
+        }
     }
 
     @Test

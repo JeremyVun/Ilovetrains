@@ -27,6 +27,7 @@ import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -401,6 +402,41 @@ class UiCalibrationTest {
         compose.onNodeWithTag(row).performTouchInput { swipeLeft(centerRight.x, centerRight.x - width * 0.75f, durationMillis = 2_000) }
         compose.waitUntil(5_000) { actions.deleted.size == 2 }
         compose.onNodeWithTag(row).assertDoesNotExist()
+    }
+
+    @Test fun homeMessageReservesSpaceAndFooterRemainsClickable() {
+        val fixture = Fixtures()
+        val state = mutableStateOf(fixture.home)
+        var newTrips = 0
+        var settingsOpens = 0
+        var undos = 0
+        val actions = object : UiActions by NoActions {
+            override fun newTrip() { newTrips++ }
+            override fun openSettings() { settingsOpens++ }
+            override fun undoDelete() { undos++ }
+        }
+        compose.setContent { TrainApp(state.value, actions) }
+
+        val footerBefore = compose.onNodeWithText("NEW TRIP").fetchSemanticsNode().boundsInRoot
+        compose.runOnIdle { state.value = fixture.deletedState }
+        val footerWithMessage = compose.onNodeWithText("NEW TRIP").assertHasClickAction()
+            .fetchSemanticsNode().boundsInRoot
+        val message = compose.onNodeWithTag("message-bar").assertIsDisplayed().assertHasClickAction()
+            .fetchSemanticsNode().boundsInRoot
+
+        assertEquals("New trip moved when the message appeared", footerBefore.top, footerWithMessage.top, 0.5f)
+        assertEquals("New trip moved when the message appeared", footerBefore.bottom, footerWithMessage.bottom, 0.5f)
+        assertTrue("message bar overlaps the Home footer: message=$message footer=$footerWithMessage",
+            message.bottom <= footerWithMessage.top)
+
+        compose.onNodeWithText("NEW TRIP").performTouchInput { click() }
+        compose.onNodeWithText("SETTINGS").assertHasClickAction().performTouchInput { click() }
+        compose.onNodeWithText("UNDO").performTouchInput { click() }
+        compose.runOnIdle {
+            assertEquals(1, newTrips)
+            assertEquals(1, settingsOpens)
+            assertEquals(1, undos)
+        }
     }
 
     @Test fun settingsOmitsOfflineTimetableAndTransferLimitShowsOnlyCurrentValue() {

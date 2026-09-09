@@ -41,7 +41,7 @@ mkdir -p "$out/logs" "$out/results" "$out/attachments" "$out/dumps"
 cleanup() {
   xcrun simctl terminate "$simulator" "$bundle" >/dev/null 2>&1 || true
   xcrun simctl terminate "$simulator" "$competitor_bundle" >/dev/null 2>&1 || true
-  for name in TRACKER_CASES TRACKER_SCHEME TRACKER_SURFACES TRACKER_MINIMAL_COMPETITOR; do
+  for name in TRACKER_CASES TRACKER_SCHEME TRACKER_SURFACES TRACKER_MINIMAL_COMPETITOR TRACKER_EXPECT_PERMISSION_PROMPT; do
     xcrun simctl spawn "$simulator" launchctl unsetenv "$name" >/dev/null 2>&1 || true
   done
   xcrun simctl status_bar "$simulator" clear >/dev/null 2>&1 || true
@@ -94,7 +94,7 @@ export_attachments() {
 }
 
 run_ui_test() {
-  local lane="$1" method="$2" scheme="$3"
+  local lane="$1" method="$2" scheme="$3" expect_permission_prompt="${4:-0}"
   local result="$out/results/$lane.xcresult" log="$out/logs/$lane.log" status export_status=0
   rm -rf "$result"
   xcrun simctl spawn "$simulator" launchctl setenv TRACKER_CASES "$cases"
@@ -102,9 +102,11 @@ run_ui_test() {
   xcrun simctl spawn "$simulator" launchctl setenv TRACKER_SURFACES "$surfaces"
   xcrun simctl spawn "$simulator" launchctl setenv TRACKER_MINIMAL_COMPETITOR \
     "$([ -n "$competitor_app" ] && printf 1 || printf 0)"
+  xcrun simctl spawn "$simulator" launchctl setenv TRACKER_EXPECT_PERMISSION_PROMPT "$expect_permission_prompt"
   set +e
   env TRACKER_CASES="$cases" TRACKER_SCHEME="$scheme" TRACKER_SURFACES="$surfaces" \
     TRACKER_MINIMAL_COMPETITOR="$([ -n "$competitor_app" ] && printf 1 || printf 0)" \
+    TRACKER_EXPECT_PERMISSION_PROMPT="$expect_permission_prompt" \
     xcodebuild "${project[@]}" -resultBundlePath "$result" \
       "-only-testing:ILoveTrainsUITests/TravelTrackerFlowTests/$method" test 2>&1 | tee "$log"
   status=${PIPESTATUS[0]}
@@ -127,7 +129,8 @@ if [ "${CAPTURE_ONLY:-0}" != 1 ]; then
   run_ui_test lifecycle-inference testAutomaticTravelModeStartsTracker "${requested_schemes[0]}"
   run_ui_test lifecycle-clock testWallClockStaleBoundaryAndForegroundLifecycle "${requested_schemes[0]}"
   run_ui_test lifecycle-routing testDismissalReplacementAndColdTap "${requested_schemes[0]}"
-  run_ui_test lifecycle-permission testLiveActivityDenialPreservesFocus "${requested_schemes[0]}"
+  xcrun simctl uninstall "$simulator" "$bundle"
+  run_ui_test lifecycle-permission testLiveActivityDenialPreservesFocus "${requested_schemes[0]}" 1
 fi
 
 for scheme in "${requested_schemes[@]}"; do

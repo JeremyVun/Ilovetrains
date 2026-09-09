@@ -1,0 +1,624 @@
+{
+  "concept": "a",
+  "frame": {
+    "tag": "390x844-dark",
+    "w": 390,
+    "h": 844,
+    "scheme": "dark",
+    "mobile": true
+  },
+  "url": "http://127.0.0.1:54891/a/",
+  "sourceSha256": "58193d5cc9c861a3d1d7906fd87f2a61c6b770e0b3b28cbdf3b3070830b5504a",
+  "top": {
+    "viewport": {
+      "w": 390,
+      "h": 844,
+      "dsf": 2
+    },
+    "document": {
+      "w": 390,
+      "h": 5686,
+      "max": 4842
+    },
+    "scrollY": 0,
+    "overflow": [],
+    "images": [
+      {
+        "src": "http://127.0.0.1:54891/assets/sleepers.svg",
+        "alt": "",
+        "natural": {
+          "w": 1024,
+          "h": 1024,
+          "ratio": 1
+        },
+        "layout": {
+          "w": 28,
+          "h": 28,
+          "ratio": 1,
+          "scaleX": 0.02734375,
+          "scaleY": 0.02734375
+        },
+        "axisAligned": {
+          "w": 28,
+          "h": 28,
+          "ratio": 1
+        },
+        "transform": "none",
+        "device": null,
+        "complete": true,
+        "distorted": false
+      },
+      {
+        "src": "http://127.0.0.1:54891/assets/hero-dark.webp",
+        "alt": "The home screen, with Parramatta to Central and four saved train, metro and ferry trips",
+        "natural": {
+          "w": 1206,
+          "h": 2622,
+          "ratio": 0.459954233409611
+        },
+        "layout": {
+          "w": 290,
+          "h": 630,
+          "ratio": 0.4603174603174603,
+          "scaleX": 0.24046434494195687,
+          "scaleY": 0.2402745995423341
+        },
+        "axisAligned": {
+          "w": 290,
+          "h": 630.484375,
+          "ratio": 0.459963817501425
+        },
+        "transform": "none",
+        "device": {
+          "className": "device hero-device",
+          "layoutW": 300,
+          "layoutH": 640,
+          "layoutRatio": 0.46875,
+          "axisW": 300,
+          "axisH": 640.484375,
+          "axisRatio": 0.46839550145153813,
+          "overflow": "hidden",
+          "borderTop": "5px",
+          "transform": "none"
+        },
+        "complete": true,
+        "distorted": false
+      },
+      {
+        "src": "http://127.0.0.1:54891/assets/board-dark.webp",
+        "alt": "The departure board for Parramatta to Central, showing times and platforms",
+        "natural": {
+          "w": 1206,
+          "h": 2622,
+          "ratio": 0.459954233409611
+        },
+        "layout": {
+          "w": 260,
+          "h": 565,
+          "ratio": 0.46017699115044247,
+          "scaleX": 0.2155887230514096,
+          "scaleY": 0.2154843630816171
+        },
+        "axisAligned": {
+          "w": 260,
+          "h": 565.265625,
+          "ratio": 0.4599607485418913
+        },
+        "transform": "none",
+        "device": {
+          "className": "device board-device",
+          "layoutW": 270,
+          "layoutH": 575,
+          "layoutRatio": 0.46956521739130436,
+          "axisW": 270,
+          "axisH": 575.265625,
+          "axisRatio": 0.4693483988374936,
+          "overflow": "hidden",
+          "borderTop": "5px",
+          "transform": "none"
+        },
+        "complete": true,
+        "distorted": false
+      },
+      {
+        "src": "http://127.0.0.1:54891/assets/detail-dark.webp",
+        "alt": "The complete Rhodes to Bondi Junction trip, with a change at Town Hall and the Pin this train action",
+        "natural": {
+          "w": 1206,
+          "h": 2622,
+          "ratio": 0.459954233409611
+        },
+        "layout": {
+          "w": 260,
+          "h": 565,
+          "ratio": 0.46017699115044247,
+          "scaleX": 0.2155887230514096,
+          "scaleY": 0.2154843630816171
+        },
+        "axisAligned": {
+          "w": 260,
+          "h": 565.265625,
+          "ratio": 0.4599607485418913
+        },
+        "transform": "none",
+        "device": {
+          "className": "device detail-device",
+          "layoutW": 270,
+          "layoutH": 575,
+          "layoutRatio": 0.46956521739130436,
+          "axisW": 270,
+          "axisH": 575.265625,
+          "axisRatio": 0.4693483988374936,
+          "overflow": "hidden",
+          "borderTop": "5px",
+          "transform": "none"
+        },
+        "complete": true,
+        "distorted": false
+      },
+      {
+        "src": "http://127.0.0.1:54891/assets/ios-activity-phone-dark.png",
+        "alt": "Complete iPhone screen with the Chatswood to Bondi Junction Live Activity and the change at Martin Place",
+        "natural": {
+          "w": 1206,
+          "h": 2622,
+          "ratio": 0.459954233409611
+        },
+        "layout": {
+          "w": 300,
+          "h": 652,
+          "ratio": 0.4601226993865031,
+          "scaleX": 0.24875621890547264,
+          "scaleY": 0.2486651411136537
+        },
+        "axisAligned": {
+          "w": 300,
+          "h": 652.234375,
+          "ratio": 0.4599573581199243
+        },
+        "transform": "none",
+        "device": {
+          "className": "device activity-phone",
+          "layoutW": 310,
+          "layoutH": 662,
+          "layoutRatio": 0.46827794561933533,
+          "axisW": 310,
+          "axisH": 662.234375,
+          "axisRatio": 0.468112214803105,
+          "overflow": "hidden",
+          "borderTop": "5px",
+          "transform": "none"
+        },
+        "complete": true,
+        "distorted": false
+      },
+      {
+        "src": "http://127.0.0.1:54891/assets/tracker-dark.webp",
+        "alt": "The F1 trip from Circular Quay to Manly Wharf pinned on the home screen, with 14 minutes to go",
+        "natural": {
+          "w": 1206,
+          "h": 2622,
+          "ratio": 0.459954233409611
+        },
+        "layout": {
+          "w": 300,
+          "h": 652,
+          "ratio": 0.4601226993865031,
+          "scaleX": 0.24875621890547264,
+          "scaleY": 0.2486651411136537
+        },
+        "axisAligned": {
+          "w": 300,
+          "h": 652.234375,
+          "ratio": 0.4599573581199243
+        },
+        "transform": "none",
+        "device": {
+          "className": "device tracker-device",
+          "layoutW": 310,
+          "layoutH": 662,
+          "layoutRatio": 0.46827794561933533,
+          "axisW": 310,
+          "axisH": 662.234375,
+          "axisRatio": 0.468112214803105,
+          "overflow": "hidden",
+          "borderTop": "5px",
+          "transform": "none"
+        },
+        "complete": true,
+        "distorted": false
+      },
+      {
+        "src": "http://127.0.0.1:54891/assets/sleepers.svg",
+        "alt": "",
+        "natural": {
+          "w": 1024,
+          "h": 1024,
+          "ratio": 1
+        },
+        "layout": {
+          "w": 60,
+          "h": 60,
+          "ratio": 1,
+          "scaleX": 0.05859375,
+          "scaleY": 0.05859375
+        },
+        "axisAligned": {
+          "w": 60,
+          "h": 60,
+          "ratio": 1
+        },
+        "transform": "none",
+        "device": null,
+        "complete": true,
+        "distorted": false
+      }
+    ],
+    "interactiveReachable": true,
+    "textReachable": true,
+    "footer": {
+      "x": 20,
+      "y": 5592.875,
+      "width": 350,
+      "height": 93,
+      "top": 5592.875,
+      "right": 370,
+      "bottom": 5685.875,
+      "left": 20
+    }
+  },
+  "bottom": {
+    "viewport": {
+      "w": 390,
+      "h": 844,
+      "dsf": 2
+    },
+    "document": {
+      "w": 390,
+      "h": 5686,
+      "max": 4842
+    },
+    "scrollY": 4842,
+    "overflow": [],
+    "images": [
+      {
+        "src": "http://127.0.0.1:54891/assets/sleepers.svg",
+        "alt": "",
+        "natural": {
+          "w": 1024,
+          "h": 1024,
+          "ratio": 1
+        },
+        "layout": {
+          "w": 28,
+          "h": 28,
+          "ratio": 1,
+          "scaleX": 0.02734375,
+          "scaleY": 0.02734375
+        },
+        "axisAligned": {
+          "w": 28,
+          "h": 28,
+          "ratio": 1
+        },
+        "transform": "none",
+        "device": null,
+        "complete": true,
+        "distorted": false
+      },
+      {
+        "src": "http://127.0.0.1:54891/assets/hero-dark.webp",
+        "alt": "The home screen, with Parramatta to Central and four saved train, metro and ferry trips",
+        "natural": {
+          "w": 1206,
+          "h": 2622,
+          "ratio": 0.459954233409611
+        },
+        "layout": {
+          "w": 290,
+          "h": 630,
+          "ratio": 0.4603174603174603,
+          "scaleX": 0.24046434494195687,
+          "scaleY": 0.2402745995423341
+        },
+        "axisAligned": {
+          "w": 290,
+          "h": 630.484375,
+          "ratio": 0.459963817501425
+        },
+        "transform": "none",
+        "device": {
+          "className": "device hero-device",
+          "layoutW": 300,
+          "layoutH": 640,
+          "layoutRatio": 0.46875,
+          "axisW": 300,
+          "axisH": 640.484375,
+          "axisRatio": 0.46839550145153813,
+          "overflow": "hidden",
+          "borderTop": "5px",
+          "transform": "none"
+        },
+        "complete": true,
+        "distorted": false
+      },
+      {
+        "src": "http://127.0.0.1:54891/assets/board-dark.webp",
+        "alt": "The departure board for Parramatta to Central, showing times and platforms",
+        "natural": {
+          "w": 1206,
+          "h": 2622,
+          "ratio": 0.459954233409611
+        },
+        "layout": {
+          "w": 260,
+          "h": 565,
+          "ratio": 0.46017699115044247,
+          "scaleX": 0.2155887230514096,
+          "scaleY": 0.2154843630816171
+        },
+        "axisAligned": {
+          "w": 260,
+          "h": 565.265625,
+          "ratio": 0.4599607485418913
+        },
+        "transform": "none",
+        "device": {
+          "className": "device board-device",
+          "layoutW": 270,
+          "layoutH": 575,
+          "layoutRatio": 0.46956521739130436,
+          "axisW": 270,
+          "axisH": 575.265625,
+          "axisRatio": 0.4693483988374936,
+          "overflow": "hidden",
+          "borderTop": "5px",
+          "transform": "none"
+        },
+        "complete": true,
+        "distorted": false
+      },
+      {
+        "src": "http://127.0.0.1:54891/assets/detail-dark.webp",
+        "alt": "The complete Rhodes to Bondi Junction trip, with a change at Town Hall and the Pin this train action",
+        "natural": {
+          "w": 1206,
+          "h": 2622,
+          "ratio": 0.459954233409611
+        },
+        "layout": {
+          "w": 260,
+          "h": 565,
+          "ratio": 0.46017699115044247,
+          "scaleX": 0.2155887230514096,
+          "scaleY": 0.2154843630816171
+        },
+        "axisAligned": {
+          "w": 260,
+          "h": 565.265625,
+          "ratio": 0.4599607485418913
+        },
+        "transform": "none",
+        "device": {
+          "className": "device detail-device",
+          "layoutW": 270,
+          "layoutH": 575,
+          "layoutRatio": 0.46956521739130436,
+          "axisW": 270,
+          "axisH": 575.265625,
+          "axisRatio": 0.4693483988374936,
+          "overflow": "hidden",
+          "borderTop": "5px",
+          "transform": "none"
+        },
+        "complete": true,
+        "distorted": false
+      },
+      {
+        "src": "http://127.0.0.1:54891/assets/ios-activity-phone-dark.png",
+        "alt": "Complete iPhone screen with the Chatswood to Bondi Junction Live Activity and the change at Martin Place",
+        "natural": {
+          "w": 1206,
+          "h": 2622,
+          "ratio": 0.459954233409611
+        },
+        "layout": {
+          "w": 300,
+          "h": 652,
+          "ratio": 0.4601226993865031,
+          "scaleX": 0.24875621890547264,
+          "scaleY": 0.2486651411136537
+        },
+        "axisAligned": {
+          "w": 300,
+          "h": 652.234375,
+          "ratio": 0.4599573581199243
+        },
+        "transform": "none",
+        "device": {
+          "className": "device activity-phone",
+          "layoutW": 310,
+          "layoutH": 662,
+          "layoutRatio": 0.46827794561933533,
+          "axisW": 310,
+          "axisH": 662.234375,
+          "axisRatio": 0.468112214803105,
+          "overflow": "hidden",
+          "borderTop": "5px",
+          "transform": "none"
+        },
+        "complete": true,
+        "distorted": false
+      },
+      {
+        "src": "http://127.0.0.1:54891/assets/tracker-dark.webp",
+        "alt": "The F1 trip from Circular Quay to Manly Wharf pinned on the home screen, with 14 minutes to go",
+        "natural": {
+          "w": 1206,
+          "h": 2622,
+          "ratio": 0.459954233409611
+        },
+        "layout": {
+          "w": 300,
+          "h": 652,
+          "ratio": 0.4601226993865031,
+          "scaleX": 0.24875621890547264,
+          "scaleY": 0.2486651411136537
+        },
+        "axisAligned": {
+          "w": 300,
+          "h": 652.234375,
+          "ratio": 0.4599573581199243
+        },
+        "transform": "none",
+        "device": {
+          "className": "device tracker-device",
+          "layoutW": 310,
+          "layoutH": 662,
+          "layoutRatio": 0.46827794561933533,
+          "axisW": 310,
+          "axisH": 662.234375,
+          "axisRatio": 0.468112214803105,
+          "overflow": "hidden",
+          "borderTop": "5px",
+          "transform": "none"
+        },
+        "complete": true,
+        "distorted": false
+      },
+      {
+        "src": "http://127.0.0.1:54891/assets/sleepers.svg",
+        "alt": "",
+        "natural": {
+          "w": 1024,
+          "h": 1024,
+          "ratio": 1
+        },
+        "layout": {
+          "w": 60,
+          "h": 60,
+          "ratio": 1,
+          "scaleX": 0.05859375,
+          "scaleY": 0.05859375
+        },
+        "axisAligned": {
+          "w": 60,
+          "h": 60,
+          "ratio": 1
+        },
+        "transform": "none",
+        "device": null,
+        "complete": true,
+        "distorted": false
+      }
+    ],
+    "interactiveReachable": true,
+    "textReachable": true,
+    "footer": {
+      "x": 20,
+      "y": 750.875,
+      "width": 350,
+      "height": 93,
+      "top": 750.875,
+      "right": 370,
+      "bottom": 843.875,
+      "left": 20
+    }
+  },
+  "gestureProof": [
+    {
+      "kind": "touch",
+      "before": 0,
+      "after": 764
+    },
+    {
+      "kind": "touch",
+      "before": 764,
+      "after": 1734
+    },
+    {
+      "kind": "touch",
+      "before": 1734,
+      "after": 2892
+    },
+    {
+      "kind": "touch",
+      "before": 2892,
+      "after": 3724
+    },
+    {
+      "kind": "touch",
+      "before": 3724,
+      "after": 4690
+    },
+    {
+      "kind": "wheel",
+      "before": 4690,
+      "after": 4842
+    }
+  ],
+  "features": {
+    "tracker": {
+      "selector": ".follow",
+      "target": 3007.84375,
+      "scrollY": 3008,
+      "proof": [
+        {
+          "kind": "touch",
+          "before": 0,
+          "after": 761
+        },
+        {
+          "kind": "touch",
+          "before": 761,
+          "after": 1555
+        },
+        {
+          "kind": "touch",
+          "before": 1555,
+          "after": 2534
+        },
+        {
+          "kind": "touch",
+          "before": 2534,
+          "after": 3727
+        },
+        {
+          "kind": "touch",
+          "before": 3727,
+          "after": 3013
+        },
+        {
+          "kind": "wheel",
+          "before": 3013,
+          "after": 2896
+        },
+        {
+          "kind": "wheel",
+          "before": 2896,
+          "after": 2828
+        },
+        {
+          "kind": "wheel",
+          "before": 2828,
+          "after": 2791
+        },
+        {
+          "kind": "wheel",
+          "before": 2791,
+          "after": 2773
+        },
+        {
+          "kind": "wheel",
+          "before": 2773,
+          "after": 2769
+        },
+        {
+          "kind": "wheel",
+          "before": 2769,
+          "after": 3008
+        }
+      ]
+    }
+  }
+}

@@ -24,8 +24,8 @@ final class TravelTrackerFlowTests: XCTestCase {
         let cases = environmentList("TRACKER_CASES", fallback: [CaptureCase.ride.rawValue])
         let requested = cases.compactMap(CaptureCase.init(rawValue:))
         XCTAssertEqual(requested.count, cases.count, "TRACKER_CASES contains an unknown case")
-
         var domain = UUID().uuidString
+
         for captureCase in requested {
             var app = launch(["--tracker-case", captureCase.rawValue], domain: domain)
             assertStatus(app, contains: ["activities=1", "focus=tracker-mascot"])
@@ -59,7 +59,9 @@ final class TravelTrackerFlowTests: XCTestCase {
                 attachSystem(name: "tracker-ride-\(scheme)-island-compact")
             }
             if surfaces.contains("expanded") {
+                app.terminate()
                 let springboard = XCUIApplication(bundleIdentifier: springboardBundle)
+                springboard.activate()
                 springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.04)).press(forDuration: 1.5)
                 assertSystemContains(["Central", "Platform 21", "Platform 26", "Kellyville", "05:46"])
                 attachSystem(name: "tracker-ride-\(scheme)-island-expanded")
@@ -85,7 +87,8 @@ final class TravelTrackerFlowTests: XCTestCase {
         app.terminate()
 
         showNotificationCenter()
-        if acceptLiveActivityPromptIfPresent() {
+        for _ in 0..<2 {
+            guard acceptLiveActivityPromptIfPresent() else { break }
             Thread.sleep(forTimeInterval: 1)
             app = launch(["--tracker-debug", "wall-start"], domain: domain)
             initial = assertStatus(app, contains: ["stage=ride", "activities=1"])
@@ -97,10 +100,14 @@ final class TravelTrackerFlowTests: XCTestCase {
         XCTAssertNotNil(activityId)
         assertNotificationCard()
         attachSystem(name: "tracker-lifecycle-before-stale")
-        let staleDeadline = publishedAt.addingTimeInterval(61)
+        let staleDeadline = publishedAt.addingTimeInterval(75)
         while Date() < staleDeadline { Thread.sleep(forTimeInterval: 0.5) }
         assertNotificationCard()
         attachSystem(name: "tracker-lifecycle-after-stale-boundary")
+        let lateStaleDeadline = publishedAt.addingTimeInterval(105)
+        while Date() < lateStaleDeadline { Thread.sleep(forTimeInterval: 0.5) }
+        assertNotificationCard()
+        attachSystem(name: "tracker-lifecycle-late-stale-boundary")
 
         app = launch(["--tracker-debug", "inspect"], domain: domain)
         let recovered = assertStatus(app, contains: ["state=stale", "stage=ride", "activities=1"])
@@ -292,7 +299,7 @@ final class TravelTrackerFlowTests: XCTestCase {
         let allow = system.buttons.matching(NSPredicate(
             format: "label IN[c] %@", ["Allow", "Always Allow", "Allow Live Activities"]
         )).firstMatch
-        guard allow.waitForExistence(timeout: 1) else { return false }
+        guard allow.waitForExistence(timeout: 2.5) else { return false }
         allow.tap()
         return true
     }

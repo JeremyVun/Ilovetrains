@@ -1,0 +1,226 @@
+# App website build plan
+
+**R9 A SELECTED — full-phone Live Activity refinement ready for review, 10 September 2026.**
+The green dot, Sleepers header icon and complete iPhone Live Activity showcase are
+consolidated in `comps/` and current site calibration. The owner explicitly
+deferred the dimmed-line fix verification and fresh
+“Follow your trip” screenshots to the build. Preserve earlier implementation
+and icon assets; replace its superseded R6 composition when building. Do not
+release or close this item before the gates below.
+
+Approved 9 September 2026. Execute with `design.md`, `copy.md`, `comps/`,
+`verification/` and `assets/comps/latest/site/`; no conversation is needed.
+The owner approved continuing through implementation, verification and
+public deployment. This replaces the obsolete pre-redesign rollout checklist.
+Historical deployment hazards are retained at the end of `design.md`.
+
+## Ownership and execution
+
+Read AGENTS.md, docs/PROJECT.md, app-website/UI/analytics/client-storage
+contracts and tools/README.md before implementation. Use backlog-item build
+and close stages, user-facing-copy, and deploy-stack for deployment. The build
+starts in a fresh context after design. Model defaults in the owner's supplied
+AGENTS instructions override unavailable skill models: Sol for UI/review and
+all computer use; Terra is suitable for mechanical isolated asset work.
+Comments are rare and short, one line of why where the reason is non-obvious,
+never narrating what the code does.
+
+Record baseline git status/diffs before writing. This checkout contains other
+native, widget, storage, feedback and tiny-train changes. Do not stage, revert
+or ship those changes. Use explicit file/hunk ownership. Any released app
+image must use a clean isolated source snapshot containing only its intended
+release; website build context is already isolated to site/. Do not create
+or move a user-owned Codex task without an explicit request.
+
+Code and verification are separate waves. Keep independent native packaging
+parallel with website work if resources allow; performance tests must not
+compete with builds. Own all temporary browsers/simulators and clean them up.
+Never read/source .env or secrets.env, print credentials, or change shared
+authentication in an attempt to fix deployment. Follow actual deploy skill
+requirements if sanctioned tools hit an access boundary.
+
+## Phase 0 — approved handoff
+
+- [x] Record selection of R9 A and the dot/header/Live Activity/recapture steers.
+- [x] Consolidate refined A into comps/ and replace old site calibration with
+  the selected full-page frames. Keep Sleepers master unchanged.
+- [x] Preserve final prototype QA and native Live Activity image provenance.
+- [x] Replace rejected standalone card with a complete iPhone screen for
+  Chatswood → Bondi Junction via Martin Place; preserve route/capture fixture.
+
+Gate: Sleepers PNG hash matches design.md; selected prototype has updated
+192px/180px icons; no product implementation inferred from prototype checks.
+
+## Phase 0a — correct and recapture native tracker material
+
+Owner files: only necessary iOS travelled-line correction in
+`ios/ILoveTrains/UI/Common.swift` / `JourneyAxisLayout.swift`, real capture
+outputs and website image derivatives. Inspect current dirty diffs first;
+the travelled overlay already exists and may already be fixed by other work.
+
+- [ ] Reproduce F1 Circular Quay → Manly at eight minutes into its 22-minute
+  journey. Confirm the line behind the marker is dimmed and the remaining
+  line retains its route colour, with marker/timing unchanged.
+- [ ] If still broken, fix the native rendering, preserving other tasks'
+  changes; run affected iOS tests and real-client visual checks in both schemes.
+- [ ] Retake complete light/dark tracker screenshots from the real iOS app.
+  Preserve full1206×2622 proportions, saved trips, navigation and timestamps.
+  Do not repaint the old bitmap or fake dimming with website CSS.
+- [ ] Export lossless WebP and replace the comp's known-defective tracker
+  images in the final package. Verify decoded pixel equivalence.
+- [ ] Use the complete real iPhone Live Activity system screenshot for
+  Chatswood → Bondi Junction via Martin Place, with recorded fixture and
+  native-capture provenance. Keep the full screen in a proportional phone;
+  standalone card crops and Kellyville examples are rejected. If recapturing,
+  use the native renderer and preserve the verified timetable/platform values.
+
+Gate: actual final native screenshots visibly show correct travelled-line
+dimming in both schemes; website package contains those new bytes. Existing
+buggy tracker images are a release blocker even if all layout tests pass.
+
+## Phase 1 — website implementation
+
+Owner files: site/index.html, site/privacy/index.html, site/support/index.html,
+site/site.css, new site/site.js, site/assets/*, site/Dockerfile,
+site/.dockerignore, site/nginx.conf.template, docs/contracts/app-website.md.
+
+- [ ] Port refined R9 A with clean CSS: complete proportional phones, paired
+  departure/detail stages, green tracker stage with native iOS Live Activity,
+  coherent privacy/support and final device CTA. Remove stale R6/R8 geometry.
+- [ ] Convert selected real screenshot material to lossless WebP; verify
+  decoded pixels, intrinsic aspect ratios, scheme selection and lazy loading.
+  Remove obsolete shipped assets only after checking their references.
+- [ ] Wire Sleepers site icons and the icon beside the header wordmark;
+  restore green dot beside “Made for Sydney” on the homepage. Preserve44px
+  home-link/navigation targets and narrow header fit.
+- [ ] Add progressive device CTA and accessible store dialog with real web
+  fallback for no-JS/unknown/unsupported enhancement. No public APK action,
+  coming-soon banner or invented store URL.
+- [ ] Port line-tap train, both 44px targets, keyboard/focus/repeat/cleanup and
+  reduced-motion complete lead car. No remote resources, network or state.
+- [ ] Include external local site.js in image allowlist/COPY; allow only
+  script-src self in CSP and preserve no-cache/no-transform/contact links.
+- [ ] Update website contract to actual copy/actions/JS/privacy behavior in
+  the same change, including full screenshot presentation and new header.
+  Preserve existing health/SEO/HTTPS metadata routes.
+
+Seam: static HTML contains usable navigation and a working web anchor before
+JS; script only enhances the current device CTA and local train. Missing or
+unsupported enhancement cannot remove the usable anchor. Dialog focus is
+restored; repeated train input cannot create another consist. Styles retain
+real screenshot proportions and the final rail stacking behavior.
+
+Gate: static reference/link/package validation plus one local smoke at
+390×844; unit checks only for meaningful device/fallback/lifecycle behavior.
+Do not build a test that merely repeats the markup. Keep empirical matrix in
+Phase 3. Mark done only after resulting files are inspectable.
+
+## Phase 2 — shared icon integration
+
+Owner files: assets/brand/*, web/icons/*, web/manifest.webmanifest and icon
+links only if needed, web/sw.js VERSION; iOS existing AppIcon assets under
+ios/ILoveTrains/Resources/Assets.xcassets; Android existing launcher resources;
+relevant UI/deviation contract identity notes. No unrelated source changes.
+
+- [ ] Derive web sizes and platform-specific icon assets from locked Sleepers
+  SVG/master. Preserve native corner masking and Android safe zones, and use
+  existing resource references wherever possible.
+- [ ] Bump worker VERSION for changed cached icon files without overwriting
+  concurrent worker edits. Change no behavior in app screens or tiny-train.
+- [ ] Update the icon identity contract and reproducible asset-generation
+  path if the repo already has one; keep the vector as the canonical source.
+
+Seam: every platform resolves the same approved motif at its existing icon
+entry point. No corner mask baked into iOS source; Android adaptive icon is
+verified under actual launcher clipping. Manifest/theme behavior stays valid.
+Gate: generated asset metadata/hashes/reference checks, then native packaging
+and renderer verification in Phase 4. Web returning-client check in Phase 3.
+
+## Phase 3 — packaged website and web verification
+
+Owner files: focused site verification tooling/tests only where reusable,
+tools/README.md if adding an instrument, approved site calibration updates.
+Scratch captures/reports stay in /tmp until final frames replace calibration.
+
+- [ ] Build/run actual site nginx container on an owned loopback port. Check
+  /, /privacy/, /support/, health aliases, all assets, MIME/CSP/cache headers,
+  mailto links and canonical/sitemap/robots metadata. Verify JS is packaged.
+- [ ] Real browser matrix: 320×740, 390×844, 412×732, 900×900, 1440×900, light
+  and dark. Verify exact viewport, no overflow, loaded images, undistorted
+  content, readable headings, footer reachability and no excessive gaps.
+- [ ] Device matrix: desktop, Android, iPhone, iPad UA, touch MacIntel iPadOS,
+  ordinary desktop Mac and unknown/no-JS. Check real anchors and unsupported
+  dialog fallback; click/open/Close/Escape, focus restoration and Tab order.
+- [ ] Real pointer and keyboard line activation at both ends; 44px hit targets,
+  one consist for repeats, complete cleanup, reduced-motion visible full lead
+  car at 320px, no console errors, network or storage writes from the action.
+- [ ] Inspect privacy/support public prose and email destinations, without
+  adding headings or disclosures beyond approved facts unless code requires it.
+- [ ] Run web unit suite and applicable icon/cache checks. Verify a cold and
+  returning service-worker-controlled profile picks up new icon bytes; isolate
+  known unrelated failures instead of altering their owner’s work.
+
+Gate: packaged site matrix and flows pass; selected final screenshots compared
+with approved calibration. Save final frames only, replace prior exemplar
+rather than keeping rejected variants. Prototype evidence is guidance, not
+proof of production packaging. Do not repeat unchanged matrices after docs.
+
+## Phase 4 — native packaging and independent review
+
+Owner files: isolated build outputs, only genuine icon resource fixes,
+verification notes in this plan; review code wave with Sol before fixes.
+
+- [ ] Run affected native build/test gates per AGENTS on final icon resources
+  and inspect actual iOS SpringBoard plus Android launcher output. Reuse owned
+  warm devices; do not touch another session’s device or install on owner phone.
+- [ ] Use actual launcher masks for Android and iOS; no screenshot-only fake
+  mask claim. Verify resource/catalog packaging and no icon clipping. Do not
+  re-run application screenshot matrices for unchanged screens without cause.
+- [ ] Independent review: selected layout/copy preserved, progressive fallback,
+  CSP/package integrity, rail hit testing/reduced pixels, icon safe zones,
+  no personal state/network, no unrelated staged changes. Fix concrete defects
+  and rerun only the gates they invalidate.
+
+Gate: review has no unresolved actionable defects; native asset builds and
+actual renderer frames pass. Record pre-existing test failures with evidence
+and whether they prevent this change. Native store publishing is out of scope:
+there are no listings. Do not claim compiled resources are distributed apps.
+
+## Phase 5 — release and public verification
+
+Owner files: task-owned commits in trains_app; ../projects/stacks/ilovetrainsapp
+image pin and necessary website-only infra docs; docs/operations/deploy.md.
+Read deploy-stack and applicable infra instructions first.
+
+- [ ] Commit only approved task paths/hunks. Choose next unused numbered
+  website version after checking current source/registry/infra; do not overwrite
+  old 1.0.1 just because historical notes name it. Build from committed source.
+- [ ] Build/push explicit ilovetrainsapp target, update numbered infra pin,
+  commit/push infra and use sanctioned deploy command. No secrets required.
+- [ ] Verify public HTTPS all pages/health/assets, actual deployed bytes/version,
+  no-transform header, readable mailto destinations, absence of injected
+  blocked email-decoding script/CSP errors. Drive real public phone and desktop.
+- [ ] For PWA icon delivery, release only a clean isolated app snapshot with
+  the intended icon/cache change using the app runbook. Do not inadvertently
+  include unrelated native/client working-tree work. If existing coordinated
+  release work owns this, record the safe handoff rather than claiming shipped.
+- [ ] Report website deployment separately from native artifact distribution.
+  Never treat registry push or source push alone as proof of deployment.
+
+Gate: public website exactly reflects the verified release; any deployment
+access failure is stated explicitly with the action and actual reason. Inspect
+old 401/email issue anew; do not modify shared authentication or read .env.
+A real external access blocker does not justify undoing completed design/build.
+
+## Phase 6 — closeout
+
+- [ ] Migrate current durable website/icon rules into app-website/UI contracts
+  and deploy runbook; retain only authoritative assets/calibration.
+- [ ] Update ROADMAP references for this item without disturbing other work.
+- [ ] Delete entire docs/backlog/app-website folder after deployment and all
+  required work are complete. Backlog prototype/evidence/history is disposable.
+- [ ] Final report: public URL, what changed, verification, source/infra release
+  identifiers and exact remaining distribution/access limitations, if any.
+
+Gate: no stale live references to deleted backlog paths; required work verified,
+no unreported production mismatch, unrelated work preserved.

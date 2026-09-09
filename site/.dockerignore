@@ -3,6 +3,7 @@
 !nginx.conf.template
 !index.html
 !site.css
+!site.js
 !robots.txt
 !sitemap.xml
 !privacy/

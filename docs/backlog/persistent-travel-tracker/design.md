@@ -4,9 +4,11 @@ Status: **build in progress, 2026-09-08**. The accepted visual design is being
 built for iOS and Android using [build_plan.md](build_plan.md). Android has a
 production service and notification integration, with Android 15/16.1 emulator
 layout and lifecycle gates passed. Physical-device delivery and power remain
-unverified. iOS has tested presentation logic and isolated renderer
-probes; product ActivityKit integration and its widget extension are now being
-built under the owner continuation below. No tracker has shipped.
+unverified. iOS now has the product ActivityKit controller, persisted sessions,
+widget extension and exact journey links. Its 131 unit tests, existing app UI
+suite, automatic-inference, permission-denial and wall-clock lifecycle checks
+passed; final routing and visual calibration remain in progress. No tracker
+has been shipped by this work.
 The accepted layout does not need another concept-selection round.
 
 ## Accepted design and owner ruling
@@ -288,7 +290,9 @@ destination ETA and source timestamp. The next-event system countdown is bounded
 and stops at zero. The trip marker shows the last published timetable position
 and moves when the app publishes an update; it does not imply live location.
 Set `staleDate` to the earlier of freshness expiry and the instruction boundary.
-When stale, show last-update provenance instead of claiming live data. Recompute
+Show last-update provenance in the existing quiet row from publication onward,
+including while fresh: the system's authorization host was observed clamping
+the timer before visibly switching stale state. Recompute
 stages, cancellations and completion when the app receives execution. This is
 a retained instruction, not proof that its leg is still current. The card may
 remain after arrival until the app or OS ends it. These OS limits must be

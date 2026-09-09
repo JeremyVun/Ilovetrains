@@ -10,7 +10,7 @@ server {
     access_log off;
     add_header X-Content-Type-Options nosniff always;
     add_header Referrer-Policy strict-origin-when-cross-origin always;
-    add_header Content-Security-Policy "default-src 'none'; img-src 'self'; style-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'" always;
+    add_header Content-Security-Policy "default-src 'none'; img-src 'self'; script-src 'self'; style-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'" always;
     # Keep public contact links intact: Cloudflare email rewriting needs JS.
     add_header Cache-Control "no-cache, no-transform" always;
     gzip on;

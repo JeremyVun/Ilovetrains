@@ -88,6 +88,7 @@ fun HomeScreen(state: AppState, actions: UiActions) {
             items(state.trips, key = { it.id }) { trip -> SavedTripRow(trip, state, actions, Modifier.animateItem()) }
             item("end") { Label("— End of trips", Modifier.padding(start = PagePadding, end = PagePadding, top = 14.dp, bottom = 6.dp)) }
         }
+        MessageBar(state, actions)
         HomeFooter(actions)
     }
 }

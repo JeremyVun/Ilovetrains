@@ -23,7 +23,7 @@ Android retains trips until the user deletes them. Swiping a saved trip row
 away, or choosing `Delete trip` from its long-press menu, deletes it at once:
 the trip, its view history, focus and last-answer evidence leave persisted
 state immediately, and completed rides remain. The deletion is reversible from
-the bottom bar for the undo window: 4 s, extended by the accessibility
+the bottom bar for the undo window: 6 s, extended by the accessibility
 recommended timeout. Undo restores the trip at its original position with its
 history, and restores focus, last answer and last trip id only where nothing
 has replaced them. The trip's cached boards are purged when the window ends,

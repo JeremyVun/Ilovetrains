@@ -69,6 +69,14 @@ geometric. Observations waiting on an owner ruling:
   shows five whole services instead of six on a 390 board. Only reachable
   under `No limit`.
 
+## Feedback hillclimbing
+Turn the analytics feedback inbox into verified fix pull requests with the
+owner approving every merge and release:
+[design](backlog/feedback-hillclimbing/design.md). This repo's share is the
+fixer contract, version and platform on feedback, a fixture-backed TfNSW
+stub and a checked-in playtest regression suite; the daemon, the playtest
+lease and origin guard and the analytics columns live in their own repos.
+
 ## Design system and tooling as infrastructure
 The comps loop is how the product moves and the native ports copy a design
 truth from it (PROJECT.md, "Native clients"). Make one round cost less than
@@ -102,8 +110,9 @@ Both apps exist (`android/`, `ios/`) and lag the web by one round. Remaining:
   line; [selected frames](../assets/comps/latest/travel-tracker/README.md).
   Android's production service and notification integration pass the Android
   15/16.1 emulator layout and lifecycle gates; physical-device delivery and power
-  remain unverified. The owner has authorized iOS ActivityKit integration
-  against the accepted design; implementation and native verification are in progress. Verify dismissal and journey completion; the
+  remain unverified. iOS ActivityKit integration is implemented against the
+  accepted design; final routing and visual calibration remain in progress.
+  Its unit, inference, denial and wall-clock lifecycle checks passed. The
   notification must not imply continuous GPS. Appears automatically when
   travel mode detects travel. Platform boxes on the line are an optional visual
   refinement, not a build prerequisite; pin-triggered entry is a separate

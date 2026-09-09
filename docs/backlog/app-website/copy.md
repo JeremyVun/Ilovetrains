@@ -1,127 +1,144 @@
-<!-- Drafted by Codex gpt-6-astra on 2026-09-08 from design.md facts. Pending owner verdict; comps use it verbatim. -->
+# App website copy — approved 9 September 2026
 
-# Landing
+Use this copy in the production website. It replaces the earlier long privacy/support
+draft. Heading count is deliberate; layout may combine sections visually but
+must not turn each paragraph into another heading. Operator identification
+belongs in the final contact line, not the introduction. Links named
+**Email support** or **Email about privacy** use `mailto:admin@jeremyvun.com`.
+No literal `[email protected]`, APK promotion or coming-soon banners.
 
-## What train should I take right now?
+## Landing
 
-ilovetrains answers the moment you open it, with no account, no ads and no search each time. For Sydney trains, metro and ferries.
+Keep selected R9 A's “Your next trip.” and its supporting sentence. Restore
+the green dot beside “Made for Sydney”. Add Sleepers beside the header's
+ilovetrains wordmark. Use the captured
+Parramatta → Central screenshot. Keep the mixed saved trips
+and F1 tracker. Restore the continuous background line behind the hero.
+Use r3's rounded, separated orange, teal, green and red bars as restrained
+section accents, per the owner's latest clarification. Screenshots retain
+their original transport colours and complete app context. Sleepers is the selected app and
+browser icon; the cab proposals are dropped.
 
-## App Store
+The tracker section also shows an actual **iPhone Live Activity** on a complete
+iPhone screen, using Chatswood → Bondi Junction with a change at Martin Place.
+Use “On iPhone, see the next stop and platform outside the app.” Standalone card
+crops and the Kellyville example are rejected. The existing
+F1 app screenshot has a known line-dimming defect and must be replaced during
+build. This is an internal handoff note, never public-facing copy.
 
-Not yet listed. [Use the web app](https://ilovetrains.jeremyvun.com).
+Replace the multi-platform download table with one device-aware action and
+the compact web alternative on phones. Desktop primary: **Open the web app**.
+Android primary: **Get it on Google Play**. iOS primary: **Download on the
+App Store**. Phone secondary: **Use the web app**. Native buttons open the local availability dialog until real public
+listings exist; never link to invented listings.
 
-## Google Play
+Store action dialog title: **App Store** or **Google Play**.
+Body: **The iPhone app isn't available in the App Store yet. You can use
+ilovetrains in your browser.** Android equivalent: **The Android app isn't
+available on Google Play yet. You can use ilovetrains in your browser.**
+Primary: **Open the web app**. Close action: **Close**.
 
-Not yet listed. [Use the web app](https://ilovetrains.jeremyvun.com).
+The reviewed dialog is the approved temporary unavailable state. Do not
+show the internal word “mock” or “preview” inside the product page.
 
-## Web app
+## Privacy page
 
-[Open ilovetrains](https://ilovetrains.jeremyvun.com) in your browser.
+### Title
 
-## Android APK
+Privacy policy
 
-[Download the Android APK](https://ilovetrains.jeremyvun.com/downloads/).
+### Intro
 
-## Your daily trips
+Your saved trips stay on your device. No accounts. No ads.
 
-The app remembers your trips and suggests the way home.
+### Scope and date
 
-## Offline timetables
+For the ilovetrains website, web app, iPhone app and Android app.
+Updated 9 September 2026.
 
-The iOS and Android apps can plan journeys using a timetable stored on your phone.
+### On your device
 
-## On your device
+Your saved trips, history, preferences and offline timetables stay on your
+device. The app uses them to suggest your next trip and the way home.
 
-Your saved trips, ride history and location stay on your device.
+If you allow location access, the app uses it to find a nearby station.
+Your location and travel updates are handled on your device. Your location,
+saved-trip list and history aren't uploaded.
 
-# Privacy policy
+### When you connect
 
-Effective date: 8 September 2026.
+For online departures, the app sends the stations and requested time to our
+server. It gets results from Transport for NSW and briefly caches them,
+without creating a personal trip profile. Connections use HTTPS. Our hosting
+providers, including Cloudflare, receive your IP address and request details
+and may keep access logs.
 
-Jeremy Vun operates ilovetrains and this website. This policy covers the iOS, Android and web apps, and the website.
+The web app sends anonymous usage counts to improve suggestions and compare
+interface changes. They contain no user or device identifier, trip details
+or location. The service records when counts arrive. Your browser's Do Not
+Track setting stops these counts.
 
-## Accounts and advertising
+This website has no analytics scripts or advertising cookies. It checks your device type in
+your browser to choose a download button, without storing a profile or
+sending an extra request. Your data is never sold.
 
-There are no accounts, ads or tracking SDKs. We do not sell your data.
+### Messages you send
 
-## Data on your device
+In-app feedback sends your message, its category and the app name. It
+doesn't attach your location, trips or device identifiers. The service
+records when the message arrives. Feedback is sent only when you submit it,
+including when Do Not Track is enabled.
 
-The app stores your saved trips, search and ride history, preferences and timetable cache on your device. It also keeps the information used to predict your next trip, suggest your way home and follow a journey you have selected.
+If you email support, we receive your email address and message.
+We use feedback and support messages to help you and improve the app.
+Feedback stays stored until deleted; it has no automatic expiry. You can
+request deletion by email. Leave out personal details that aren't needed.
 
-Your saved trips, history and location are never uploaded. The server does not keep a personal profile or a cloud copy of this information.
+### Your choices and contact
 
-## Location and travel updates
+You can turn off location access in your device settings. Uninstalling the
+native app, or clearing the web app's site data, removes its local data.
+Saved trips have no cloud backup and can't be recovered afterwards.
 
-If you allow location access, the app uses your position on your device to choose a nearby station. Your position is never sent to the server.
+For a privacy question or to request deletion of a message, **Email about
+privacy**. Include enough of the message to identify it.
 
-Android travel notifications and iOS Live Activities run on your phone. They do not use a push service or send travel-tracker information off the phone.
+Privacy contact: Jeremy Vun.
 
-## Departure requests
+Updates to this policy appear here with a new date.
 
-When the app requests departures online, it sends the starting station, destination station and time to our server. The server relays the request to Transport for NSW Open Data and temporarily caches the answer.
+## Support page
 
-These requests do not upload your saved-trip list, history or location coordinates. Connections use HTTPS to encrypt data in transit.
+### Title
 
-## Anonymous usage counters
+Support
 
-The web app sends anonymous counters to our analytics service to help assess its suggestions. Each counter contains only the app name, an event name, categories such as a usage band or experiment variant, and a repeat count.
+### Intro
 
-Counters contain no device or session identifiers, timestamps, stations, trips, coordinates or browser user-agent information. Sending stops when your browser has Do Not Track enabled.
+Get help with ilovetrains.
 
-## Feedback you choose to send
+### Primary contact
 
-The feedback form under Settings sends your chosen category and message to `analytics.jeremyvun.com/feedback`, together with the app name. It does not attach your location, saved trips, history or device identifiers.
+**Email support**
 
-Jeremy Vun can view, export and delete submissions. Feedback is sent only when you submit it, including when Do Not Track is enabled. Any personal information you put in the message will be included, so leave out details you do not want to share.
+Tell us what happened, which app you use and your app version. For a
+departure problem, include the stations and time. A screenshot helps.
 
-If you email support, Jeremy Vun receives your email address and anything you include in your message.
+### In the app
 
-## Server access logs
+Open Settings to send feedback or suggest a change.
 
-Our servers and Cloudflare receive your IP address when you connect. Ordinary access logs may record it alongside request information. This is separate from the anonymous usage counters described above.
+### Saved trips
 
-## Deleting your data
+Trips are saved on your device. They can't be recovered after you uninstall
+the app or clear the web app's site data.
 
-Uninstall the iOS or Android app to delete its local data. For the web app, clear its site data in your browser.
+## Easter egg
 
-Saved trips have no cloud backup and cannot be recovered after deletion.
-
-To request deletion of a feedback submission, email [admin@jeremyvun.com](mailto:admin@jeremyvun.com). Include enough of the message to identify the submission.
-
-## Children
-
-ilovetrains is not directed at children and does not ask children to provide personal information. The app does not collect personal data through its anonymous counters. Access logs and messages sent voluntarily are described above.
-
-## Changes to this policy
-
-Updates will appear on this page with a revised effective date.
-
-## Contact
-
-For privacy questions or deletion requests, contact Jeremy Vun at [admin@jeremyvun.com](mailto:admin@jeremyvun.com).
-
-# Support
-
-## Get help
-
-Email Jeremy Vun at [admin@jeremyvun.com](mailto:admin@jeremyvun.com) for help with ilovetrains.
-
-## Report a problem
-
-Please include:
-
-- Whether you use iOS, Android or the web app.
-- Your app version and operating system, or browser.
-- What you were doing, what you expected and what happened.
-- For a departure problem, the stations and date and time.
-- A screenshot if it helps explain the problem.
-
-Include only details you are comfortable sharing.
-
-## Send feedback in the app
-
-Open Settings and choose the feedback form to report a problem or suggest a change.
-
-## Saved trips
-
-Saved trips live only on your device and cannot be recovered after you uninstall the app or clear the web app’s site data.
+No explanatory paragraph or separate arrow trigger in the page. The coloured
+hero background line itself is the control; give it an accessible name such as **Run a train**,
+an invisible 44px minimum hit area and a visible keyboard focus. Use a small
+train built from the app's existing design language. One activation runs
+one train along the coloured rail, then settles; repeated taps don't build
+up trains. Reduced motion shows a stationary train. No audio, analytics,
+cookies or local storage.

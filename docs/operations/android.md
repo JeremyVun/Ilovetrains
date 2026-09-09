@@ -19,7 +19,7 @@ tools/build-android.sh --release  # signed/shrunk APK, release tests and lint
 
 No build script reads or sources an `.env` file. The offline bootstrap is
 bundled in the application, so installing and creating a trip does not require
-a first online session. Its coverage is visible in Settings.
+a first online session. Timetable updates run automatically.
 
 Build helpers retain full output in the printed log path and report elapsed
 time. Set `TEST_VERBOSE=1` to stream it or `TEST_LOG_DIR` to retain CI artifacts.

@@ -8,7 +8,7 @@ COPY index.html /usr/share/nginx/html/index.html
 COPY privacy /usr/share/nginx/html/privacy
 COPY support /usr/share/nginx/html/support
 COPY assets /usr/share/nginx/html/assets
-COPY site.css robots.txt sitemap.xml /usr/share/nginx/html/
+COPY site.css site.js robots.txt sitemap.xml /usr/share/nginx/html/
 LABEL org.opencontainers.image.title="ilovetrains app website" \
       org.opencontainers.image.revision="$GIT_REVISION"
 EXPOSE 8080
