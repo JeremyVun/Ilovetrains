@@ -525,11 +525,11 @@ prerequisites.
 
 ## Relationship to `commute-feedback`
 
-`docs/backlog/commute-feedback/` (a peer session, 2026-09-09) is a batch of
-product changes from the owner's own commute notes: rear cab, lowest-cost
-header choice, direct-only, tracker honesty. It is what this loop is meant
-to produce automatically, not part of the loop. It stays a separate item
-and is a good calibration sample: when the daemon runs, its triage of those
+The commute-feedback feature covers product changes from the owner's commute
+notes: rear cab, lowest-cost header choice, direct-only, tracker honesty.
+Its rules live in the [storage](../../contracts/client-storage.md) and
+[UI](../../contracts/ui.md) contracts. It is a calibration sample for this
+loop: when the daemon runs, its triage of those
 same notes should classify the cab as a bug and the other three as
 features needing the owner.
 

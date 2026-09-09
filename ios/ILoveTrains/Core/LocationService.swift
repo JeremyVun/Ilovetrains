@@ -2,7 +2,21 @@ import CoreLocation
 import UIKit
 
 @MainActor
-final class LocationService: NSObject, @preconcurrency CLLocationManagerDelegate {
+protocol LocationProviding: AnyObject {
+    var onPermission: ((Bool, Bool) -> Void)? { get set }
+    var onFix: ((Fix) -> Void)? { get set }
+    var onFailure: ((SetupLocationStatus) -> Void)? { get set }
+    var isMonitoring: Bool { get }
+    func refreshPermission()
+    func openSettings()
+    func request(prompt: Bool)
+    func monitoringPermitted() async -> Bool
+    func startMonitoring() -> Bool
+    func stop()
+}
+
+@MainActor
+final class LocationService: NSObject, LocationProviding, @preconcurrency CLLocationManagerDelegate {
     var onPermission: ((Bool, Bool) -> Void)?
     var onFix: ((Fix) -> Void)?
     var onFailure: ((SetupLocationStatus) -> Void)?
@@ -10,6 +24,9 @@ final class LocationService: NSObject, @preconcurrency CLLocationManagerDelegate
     private var timeout: Task<Void, Never>?
     private var availabilityCheck: Task<Void, Never>?
     private var pending = false
+    private var continuous = false
+
+    var isMonitoring: Bool { pending && continuous && manager != nil }
 
     func refreshPermission() {
         let status = CLLocationManager().authorizationStatus
@@ -28,7 +45,7 @@ final class LocationService: NSObject, @preconcurrency CLLocationManagerDelegate
             if status == .denied || status == .restricted { onFailure?(.denied) }
             return
         }
-        manager = current; pending = true
+        manager = current; pending = true; continuous = false
         // Core Location's device-wide availability check can block. Keep it off the UI thread.
         availabilityCheck = Task { [weak self] in
             let enabled = await Task.detached { CLLocationManager.locationServicesEnabled() }.value
@@ -49,8 +66,26 @@ final class LocationService: NSObject, @preconcurrency CLLocationManagerDelegate
             else { current.requestLocation(); self.scheduleTimeout() }
         }
     }
+    func monitoringPermitted() async -> Bool {
+        let enabled = await Task.detached { CLLocationManager.locationServicesEnabled() }.value
+        let status = CLLocationManager().authorizationStatus
+        let granted = status == .authorizedAlways || status == .authorizedWhenInUse
+        onPermission?(granted, status == .denied || status == .restricted)
+        return enabled && granted
+    }
+    func startMonitoring() -> Bool {
+        let current = CLLocationManager()
+        let status = current.authorizationStatus
+        guard status == .authorizedAlways || status == .authorizedWhenInUse else { return false }
+        stop()
+        manager = current; pending = true; continuous = true
+        current.delegate = self
+        current.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        current.startUpdatingLocation()
+        return true
+    }
     func stop() {
-        pending = false; timeout?.cancel(); timeout = nil
+        pending = false; continuous = false; timeout?.cancel(); timeout = nil
         availabilityCheck?.cancel(); availabilityCheck = nil
         manager?.stopUpdatingLocation(); manager?.delegate = nil; manager = nil
     }
@@ -63,18 +98,25 @@ final class LocationService: NSObject, @preconcurrency CLLocationManagerDelegate
         let status = manager.authorizationStatus
         let granted = status == .authorizedWhenInUse || status == .authorizedAlways
         onPermission?(granted, status == .denied || status == .restricted)
-        if granted { manager.requestLocation(); scheduleTimeout() }
+        if granted {
+            if continuous { manager.startUpdatingLocation() }
+            else { manager.requestLocation(); scheduleTimeout() }
+        }
         else if status != .notDetermined { fail(.denied) }
     }
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard manager === self.manager, pending, let location = locations.last, location.horizontalAccuracy >= 0 else { return }
         let fix = Fix(lat: location.coordinate.latitude, lon: location.coordinate.longitude, at: location.timestamp.timeIntervalSince1970 * 1000, speed: location.speed >= 0 ? location.speed : nil, accuracyMetres: location.horizontalAccuracy)
-        stop(); onFix?(fix)
+        if !continuous { stop() }
+        onFix?(fix)
     }
     private func fail(_ status: SetupLocationStatus) {
         stop(); onFailure?(status)
     }
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        if manager === self.manager { fail(.unavailable) }
+        if manager === self.manager {
+            if continuous { onFailure?(.unavailable) }
+            else { fail(.unavailable) }
+        }
     }
 }

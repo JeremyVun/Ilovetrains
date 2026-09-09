@@ -1,0 +1,35 @@
+{
+  "round": "commute-feedback-cab",
+  "title": "Commute feedback · eight-car cab correction",
+  "frames": {
+    "phone": { "w": 390, "h": 844, "note": "standard phone" },
+    "short": { "w": 412, "h": 732, "note": "owner phone with browser chrome" }
+  },
+  "concepts": ["c1-fade"],
+  "scenarios": ["cab"],
+  "settle": 260,
+  "dsf": 2,
+  "probes": { "tapMin": 44 },
+  "jobs": [
+    {
+      "concept": "c1-fade",
+      "frames": ["phone", "short"],
+      "scenarios": ["cab"],
+      "schemes": ["dark", "light"]
+    }
+  ],
+  "zooms": [
+    {
+      "out": "cab-outward",
+      "concept": "c1-fade",
+      "scenario": "cab",
+      "x": 30,
+      "y": 132,
+      "w": 350,
+      "h": 24,
+      "scale": 4,
+      "frame": "phone",
+      "scheme": "dark"
+    }
+  ]
+}

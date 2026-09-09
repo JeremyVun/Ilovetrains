@@ -1,0 +1,177 @@
+{
+  "date": "2026-09-10",
+  "version": "1.6.0",
+  "serviceWorker": "v58",
+  "builtCommand": "node tools/check-commute-feedback.js --url http://localhost:<port> --out <tmp-dir>",
+  "fixtures": "tools/check-commute-feedback.js",
+  "frames": [
+    {
+      "file": "c1-fade-390x844-direct-light.png",
+      "kind": "illustrative target",
+      "width": 780,
+      "height": 1688,
+      "sha256": "a6fb7c37cdd6edcf24b4899ba388a529e81b770aa7ffebef4b4b1c04e007b11a"
+    },
+    {
+      "file": "c1-fade-390x844-direct.png",
+      "kind": "illustrative target",
+      "width": 780,
+      "height": 1688,
+      "sha256": "82ae85c4841d7092c24c6cc27f8b1105a748a392f07f03ee94f04feb0b9ad002"
+    },
+    {
+      "file": "c1-fade-390x844-missing-telemetry-light.png",
+      "kind": "built web client",
+      "width": 780,
+      "height": 1688,
+      "sha256": "d08c5c67046f11bda69cb801b61b59c96ba2b22d3f4d880c57523fbf8304e19f"
+    },
+    {
+      "file": "c1-fade-390x844-missing-telemetry.png",
+      "kind": "built web client",
+      "width": 780,
+      "height": 1688,
+      "sha256": "1bf4976c0807dd5f1926d27f6882a3f9c84d552ede439e09b67221386fe868f6"
+    },
+    {
+      "file": "c1-fade-390x844-overdue-moving-light.png",
+      "kind": "illustrative target",
+      "width": 780,
+      "height": 1688,
+      "sha256": "ecd13ed94950ed6779fa6bd022888763d8cc2dc8c30596bff19410785661c0c4"
+    },
+    {
+      "file": "c1-fade-390x844-overdue-moving.png",
+      "kind": "illustrative target",
+      "width": 780,
+      "height": 1688,
+      "sha256": "253358452166d6c3c5940d6e052a557f349ba13f141f6770244e2e87872e62f0"
+    },
+    {
+      "file": "c1-fade-390x844-transfer-after-light.png",
+      "kind": "built web client",
+      "width": 780,
+      "height": 1688,
+      "sha256": "ecdbd1fb93a2b55c686df56b8f638a9e6d1adae62e4efca63e9bce0fb266d339"
+    },
+    {
+      "file": "c1-fade-390x844-transfer-after.png",
+      "kind": "built web client",
+      "width": 780,
+      "height": 1688,
+      "sha256": "3247a40e3a7cdfb65da24d514c4370ed9424d8e26ca5e972491fade154521b3d"
+    },
+    {
+      "file": "c1-fade-390x844-transfer-before-light.png",
+      "kind": "built web client",
+      "width": 780,
+      "height": 1688,
+      "sha256": "e7b08e8d187015dd84948507d53b287f2c5dc4e10992b8d18349d16edf8a6f08"
+    },
+    {
+      "file": "c1-fade-390x844-transfer-before.png",
+      "kind": "built web client",
+      "width": 780,
+      "height": 1688,
+      "sha256": "5f06d20530aacc119dc55e17ac18c132d78403102829f4a0fc01638bfafccfa3"
+    },
+    {
+      "file": "c1-fade-390x844-transfer-during-light.png",
+      "kind": "built web client",
+      "width": 780,
+      "height": 1688,
+      "sha256": "dab93af5ee7e4e293b95a0a4de15fd338378e7089f45be4e1b6115a1e27b5498"
+    },
+    {
+      "file": "c1-fade-390x844-transfer-during.png",
+      "kind": "built web client",
+      "width": 780,
+      "height": 1688,
+      "sha256": "6c8179e331b51b57bdec998b3f454f164f68a7507117a7c1c47acb2a2236a8d8"
+    },
+    {
+      "file": "c1-fade-412x732-direct-light.png",
+      "kind": "illustrative target",
+      "width": 824,
+      "height": 1464,
+      "sha256": "d4a287bc6f69333d90f8492bfc2eb79857de3590b40a7cf613a20975d82c38a8"
+    },
+    {
+      "file": "c1-fade-412x732-direct.png",
+      "kind": "illustrative target",
+      "width": 824,
+      "height": 1464,
+      "sha256": "7e6e253fc31e3e47ad96d196cc0a46b3dd63c5820fa6113df0042642c0d7d740"
+    },
+    {
+      "file": "c1-fade-412x732-missing-telemetry-light.png",
+      "kind": "built web client",
+      "width": 824,
+      "height": 1464,
+      "sha256": "1f2bbc3fe99a91ec6315f03eee81437f7521d6786b550d33cdd3c3c568ab4c81"
+    },
+    {
+      "file": "c1-fade-412x732-missing-telemetry.png",
+      "kind": "built web client",
+      "width": 824,
+      "height": 1464,
+      "sha256": "0d2b8bfa02ae7498b4a21addc8731ec4acdad084926d4c453e5ebc3d5bbb9afd"
+    },
+    {
+      "file": "c1-fade-412x732-overdue-moving-light.png",
+      "kind": "illustrative target",
+      "width": 824,
+      "height": 1464,
+      "sha256": "3b87a92844c3e28ae08578305da6b9468e4550f7f28c6522669192b9d43a70b6"
+    },
+    {
+      "file": "c1-fade-412x732-overdue-moving.png",
+      "kind": "illustrative target",
+      "width": 824,
+      "height": 1464,
+      "sha256": "9b961bd5152b656a9796812c1584896eb4e13f6489a50ccf672c2bfa08a6efcc"
+    },
+    {
+      "file": "c1-fade-412x732-transfer-after-light.png",
+      "kind": "built web client",
+      "width": 824,
+      "height": 1464,
+      "sha256": "7e7e6543e5e44826c9cc67a1a19ec0287c9f6f306aa4d0e61367896d6cefe458"
+    },
+    {
+      "file": "c1-fade-412x732-transfer-after.png",
+      "kind": "built web client",
+      "width": 824,
+      "height": 1464,
+      "sha256": "7482110741745af2378719907baa7d109d3a094b0609d1c455d7477c5c711926"
+    },
+    {
+      "file": "c1-fade-412x732-transfer-before-light.png",
+      "kind": "built web client",
+      "width": 824,
+      "height": 1464,
+      "sha256": "f5cec1adae1a8d63f5bfa580702114e50ab86b3ce65bd4ea2705c7a6274953ef"
+    },
+    {
+      "file": "c1-fade-412x732-transfer-before.png",
+      "kind": "built web client",
+      "width": 824,
+      "height": 1464,
+      "sha256": "6cf49aa7e576c1a76e84299f88e071e87882786586f8024bbfcf31673cff4fee"
+    },
+    {
+      "file": "c1-fade-412x732-transfer-during-light.png",
+      "kind": "built web client",
+      "width": 824,
+      "height": 1464,
+      "sha256": "ede332e62dbe303483a65c722dd7db4ada88f16004cf89fca46619052758990d"
+    },
+    {
+      "file": "c1-fade-412x732-transfer-during.png",
+      "kind": "built web client",
+      "width": 824,
+      "height": 1464,
+      "sha256": "3abca4648fd089c3fdbdbb6890b44901b77c29893a04401e7cafe775e749e35f"
+    }
+  ]
+}

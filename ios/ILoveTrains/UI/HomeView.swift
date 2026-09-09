@@ -9,13 +9,14 @@ struct HomeView: View {
         if let focus = model.state.focus {
             let alternatives = focus.alternatives ?? focus.board
             if focus.journey.cancelled, model.state.now < focus.journey.effectiveDeparture,
-               let replacement = alternatives.journeys.first(where: {
-                   journeyAllowed($0, modes: model.state.enabledModes) && !$0.cancelled
-                       && $0.effectiveDeparture > focus.journey.effectiveDeparture
-               }) {
+               let replacement = selectRecommendation(
+                   recommendationCandidates(alternatives).filter { $0.journey.effectiveDeparture > focus.journey.effectiveDeparture },
+                   now: model.state.now, modes: model.state.enabledModes,
+                   maxTransfers: model.state.transferLimitOffered ? (model.state.transferLimit == .direct ? 0 : model.state.transferLimit == .two ? 2 : nil) : nil
+               ) {
                 return HomePresentation(
-                    journey: replacement,
-                    board: alternatives,
+                    journey: replacement.journey,
+                    board: replacement.board,
                     alternatives: alternatives,
                     cancelledLeadTime: focus.journey.effectiveDeparture
                 )
@@ -29,14 +30,18 @@ struct HomeView: View {
         }
         guard let board else { return nil }
         let retained = retainedHomeJourney(board, now: model.state.now)
-        let firstFuture = retained ?? board.journeys.first { $0.effectiveDeparture >= model.state.now }
-        let firstRunning = retained.flatMap { $0.cancelled ? nil : $0 }
+        let recommendation = model.state.recommendation.flatMap { value in
+            value.board.from.id == board.from.id && value.board.to.id == board.to.id ? value : nil
+        }
+        let firstFuture = retained ?? recommendation?.journey
+            ?? board.journeys.first { $0.effectiveDeparture >= model.state.now }
+        let firstRunning = retained.flatMap { $0.cancelled ? nil : $0 } ?? recommendation?.journey
             ?? board.journeys.first { !$0.cancelled && $0.effectiveDeparture >= model.state.now }
         guard let journey = firstRunning ?? firstFuture else { return nil }
         return HomePresentation(
             journey: journey,
-            board: board,
-            alternatives: nil,
+            board: recommendation?.journey.key == journey.key ? recommendation!.board : board,
+            alternatives: board,
             cancelledLeadTime: firstFuture?.cancelled == true && firstRunning != nil ? firstFuture?.effectiveDeparture : nil
         )
     }
@@ -126,6 +131,7 @@ private struct SmartLoadingHeader: View {
         if model.state.enabledModes.isEmpty { return "Turn on a service in Settings" }
         if model.state.refreshing { return "Getting the next trains…" }
         if board?.offline == true { return "No saved board for this trip yet" }
+        if model.state.transferLimitOffered, model.state.transferLimit == .direct { return "No direct services found" }
         return "No services in the next few hours"
     }
 }
@@ -143,7 +149,8 @@ private struct SmartHeader: View {
     private var focused: Bool { focus != nil && cancelledLeadTime == nil }
     private var pinned: Bool { focused && focus?.pinned == true }
     private var departed: Bool { focused && model.state.now >= journey.effectiveDeparture }
-    private var complete: Bool { model.state.focusComplete || model.state.now >= journey.effectiveArrival }
+    private var arrival: ArrivalResult? { focused ? model.state.arrival : nil }
+    private var complete: Bool { focused ? model.state.focusComplete : model.state.now >= journey.effectiveArrival }
     private var late: Bool {
         focused ? focusJourneyIsLate(journey, board: board, now: model.state.now)
             : minutesBetween(journey.departure, journey.effectiveDeparture) > 0
@@ -167,6 +174,7 @@ private struct SmartHeader: View {
                 Spacer(); FreshnessView(board: board, now: model.state.now)
             }.padding(.horizontal, pagePadding).frame(minHeight: pinned ? 44 : 22)
 
+            Button { model.openJourney(journey) } label: {
             HStack(alignment: .top, spacing: 14) {
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(alignment: .lastTextBaseline, spacing: 2) {
@@ -183,9 +191,16 @@ private struct SmartHeader: View {
                     endpoint(journey.legs.last?.to.shortName ?? "", clockTime(journey.effectiveArrival), arrival: true)
                 }
             }.padding(.horizontal, pagePadding).padding(.vertical, 10)
+            }.buttonStyle(.plain).accessibilityIdentifier("open-recommended-journey")
 
-            JourneyAxis(journey: journey, large: true, showCap: !departed,
-                        progress: departed && !complete ? (model.state.now - journey.effectiveDeparture) / max(1, journey.effectiveArrival - journey.effectiveDeparture) : nil, tinyTrain: model.state.tinyTrain)
+            JourneyAxis(
+                journey: journey,
+                large: true,
+                showCap: !departed,
+                progress: axisProgress,
+                showProgressMarker: showProgressMarker,
+                tinyTrain: model.state.tinyTrain
+            )
                 .padding(.horizontal, pagePadding)
 
             Group {
@@ -233,6 +248,8 @@ private struct SmartHeader: View {
 
     private var status: String {
         if cancelledLeadTime != nil && focus != nil { return "Cancelled" }
+        if arrival?.state == .checkingArrival { return "Checking arrival" }
+        if arrival?.state == .arrivalUnconfirmed { return arrival?.moving == true ? "Arrival uncertain" : "Arrival unconfirmed" }
         if focused, let focus { return focusStatus(focus, now: model.state.now, complete: complete) }
         if let retained = retainedHeaderStatus(board: board, journey: journey, hasFocus: focus != nil, now: model.state.now) {
             return retained
@@ -243,6 +260,7 @@ private struct SmartHeader: View {
     }
 
     private var displayFigure: Figure {
+        if let figure = arrivalFigure(arrival, journey: journey, now: model.state.now) { return figure }
         if departed && !complete {
             return directionFigureFor(journey, now: model.state.now) ?? figureFor(journey, board: board, now: model.state.now)
         }
@@ -251,6 +269,14 @@ private struct SmartHeader: View {
 
     private var instruction: String {
         if let cancelledLeadTime { return "\(clockTime(cancelledLeadTime)) cancelled · next \(genericModeName(first.mode))" }
+        if let instruction = arrivalInstruction(arrival, destination: journey.legs.last?.to.shortName ?? "destination") {
+            return instruction
+        }
+        if complete, arrival?.basis == .estimate {
+            return journey.legs.last?.estimatedArrival == nil
+                ? "The scheduled trip has ended. The return trip is ready."
+                : "The last arrival estimate has passed. The return trip is ready."
+        }
         if complete { return "The journey has finished" }
         if departed { return focusedInstruction(journey, now: model.state.now) }
         return first.headsign.isEmpty ? first.to.shortName : first.headsign
@@ -258,11 +284,33 @@ private struct SmartHeader: View {
 
     private var nextJourney: (journey: Journey, board: BoardData)? {
         let source = alternatives ?? board
-        return source.journeys.first { candidate in
-            journeyAllowed(candidate, modes: model.state.enabledModes) && !candidate.cancelled
-                && candidate.effectiveDeparture > journey.effectiveDeparture &&
-            !(candidate.departure == journey.departure && candidate.legs.first?.line == journey.legs.first?.line)
-        }.map { (journey: $0, board: source) }
+        let candidates = recommendationCandidates(source)
+        return earliestAlternative(
+            candidates,
+            recommended: journey,
+            now: model.state.now,
+            modes: model.state.enabledModes,
+            maxTransfers: model.state.transferLimitOffered
+                ? (model.state.transferLimit == .direct ? 0 : model.state.transferLimit == .two ? 2 : nil)
+                : nil
+        ).map { (journey: $0.journey, board: $0.board) }
+    }
+
+    private var axisProgress: Double? {
+        guard departed, !complete else { return nil }
+        let duration = max(1, journey.effectiveArrival - journey.effectiveDeparture)
+        if arrival?.state == .checkingArrival || arrival?.state == .arrivalUnconfirmed {
+            if model.state.now >= journey.effectiveArrival { return 0.98 }
+            let flooredNow = floor(model.state.now / 60_000) * 60_000
+            return min(0.999, max(0, (flooredNow - journey.effectiveDeparture) / duration))
+        }
+        return (model.state.now - journey.effectiveDeparture) / duration
+    }
+
+    private var showProgressMarker: Bool {
+        guard let arrival, model.state.now >= journey.effectiveArrival,
+              arrival.state == .checkingArrival || arrival.state == .arrivalUnconfirmed else { return true }
+        return arrival.moving
     }
 
     private func endpoint(_ station: String, _ time: String, arrival: Bool) -> some View {
@@ -359,7 +407,7 @@ func savedTripFocusStatus(_ focus: FocusedJourney, now: Millis, complete: Bool) 
 }
 
 func focusStatus(_ focus: FocusedJourney, now: Millis, complete: Bool) -> String {
-    if complete || now >= focus.journey.effectiveArrival { return "Trip over" }
+    if complete { return "Trip over" }
     if focus.journey.cancelled { return "Cancelled" }
     if focusJourneyIsLate(focus.journey, board: focus.board, now: now) { return "Running late" }
     if focus.pinned, now < focus.journey.effectiveDeparture { return "Pinned" }

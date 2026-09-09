@@ -25,8 +25,8 @@ final class TravelTrackerFlowTests: XCTestCase {
         let requested = cases.compactMap(CaptureCase.init(rawValue:))
         XCTAssertEqual(requested.count, cases.count, "TRACKER_CASES contains an unknown case")
 
+        var domain = UUID().uuidString
         for captureCase in requested {
-            let domain = UUID().uuidString
             var app = launch(["--tracker-case", captureCase.rawValue], domain: domain)
             assertStatus(app, contains: ["activities=1", "focus=tracker-mascot"])
             acceptLiveActivityPromptIfPresent()
@@ -34,8 +34,10 @@ final class TravelTrackerFlowTests: XCTestCase {
 
             if surfaces.contains("notification-center") {
                 showNotificationCenter()
-                if acceptLiveActivityPromptIfPresent() {
+                for _ in 0..<2 {
+                    guard acceptLiveActivityPromptIfPresent() else { break }
                     Thread.sleep(forTimeInterval: 1)
+                    domain = UUID().uuidString
                     app = launch(["--tracker-case", captureCase.rawValue], domain: domain)
                     assertStatus(app, contains: ["activities=1", "focus=tracker-mascot"])
                     app.terminate()
@@ -150,8 +152,41 @@ final class TravelTrackerFlowTests: XCTestCase {
     }
 
     @MainActor
-    func testDismissalReplacementAndColdTap() {
+    func testGuardedOverdueFocusSurvivesRealLocationAndColdResume() {
+        XCUIDevice.shared.location = XCUILocation(location: CLLocation(
+            coordinate: CLLocationCoordinate2D(latitude: -33.9, longitude: 151.19),
+            altitude: 0, horizontalAccuracy: 20, verticalAccuracy: 20,
+            course: 0, speed: 10, timestamp: Date()
+        ))
+        defer { XCUIDevice.shared.location = nil }
         let domain = UUID().uuidString
+        var app = XCUIApplication(bundleIdentifier: bundle)
+        app.resetAuthorizationStatus(for: .location)
+        app = launch(["--tracker-debug", "production-inference"], domain: domain)
+        app.buttons["use-location"].tap()
+        let allow = XCUIApplication(bundleIdentifier: springboardBundle).buttons["Allow While Using App"]
+        XCTAssertTrue(allow.waitForExistence(timeout: 5))
+        allow.tap()
+        assertStatus(app, contains: ["focus=inferred", "activities=1"])
+        app = launch(["--tracker-debug", "guarded-overdue"], domain: domain)
+        assertStatus(app, contains: ["focus=guarded-overdue", "arrival=arrivalUnconfirmed", "guard=true", "rides=0", "monitoring=true", "activities=1"])
+        let deadline = Date().addingTimeInterval(17)
+        while Date() < deadline { Thread.sleep(forTimeInterval: 0.5) }
+        assertStatus(app, contains: ["arrival=arrivalUnconfirmed", "rides=0", "monitoring=true", "activities=1"])
+        attach(XCUIScreen.main.screenshot(), name: "commute-guarded-overdue")
+        app.terminate()
+        showNotificationCenter()
+        acceptLiveActivityPromptIfPresent()
+        app = launch(["--tracker-debug", "guarded-resume"], domain: domain)
+        assertStatus(app, contains: ["focus=guarded-overdue", "arrival=arrivalUnconfirmed", "guard=true", "rides=0", "monitoring=true", "activities=1"])
+        attach(XCUIScreen.main.screenshot(), name: "commute-guarded-cold-resume")
+        app.terminate()
+        app.resetAuthorizationStatus(for: .location)
+    }
+
+    @MainActor
+    func testDismissalReplacementAndColdTap() {
+        let domain: String? = nil
         var app = launch(["--tracker-debug", "dismiss-start"], domain: domain)
         let original = assertStatus(app, contains: ["activities=1", "focus=dismiss-original"])
         let staleSession = try! XCTUnwrap(statusField("session", in: original))
@@ -182,7 +217,9 @@ final class TravelTrackerFlowTests: XCTestCase {
         let replacementCard = assertNotificationCard()
         replacementCard.tap()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 8), "Live Activity tap did not cold launch the app")
-        assertStatus(app, contains: ["focus=replacement", "screen=detail", "selected=replacement"])
+        XCTAssertTrue(app.staticTexts["JOURNEY"].waitForExistence(timeout: 8), "Live Activity tap did not open journey detail")
+        XCTAssertTrue(app.staticTexts["Mascot → Rouse Hill"].waitForExistence(timeout: 8),
+                      "cold-launched detail lost the replacement journey")
     }
 
     @MainActor
@@ -209,10 +246,11 @@ final class TravelTrackerFlowTests: XCTestCase {
     }
 
     @MainActor
-    private func launch(_ arguments: [String], domain: String, awaitReady: Bool = true) -> XCUIApplication {
-        let app = XCUIApplication(bundleIdentifier: bundle)
+    private func launch(_ arguments: [String], domain: String?, awaitReady: Bool = true) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.terminate()
         app.launchArguments = ["--offline"] + arguments
-        app.launchEnvironment["ILOVETRAINS_TEST_DOMAIN"] = domain
+        if let domain { app.launchEnvironment["ILOVETRAINS_TEST_DOMAIN"] = domain }
         app.launch()
         if awaitReady {
             XCTAssertTrue(app.descendants(matching: .any)["tracker-driver-status"].waitForExistence(timeout: 12),

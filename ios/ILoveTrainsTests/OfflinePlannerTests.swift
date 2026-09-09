@@ -12,12 +12,15 @@ final class OfflinePlannerTests: XCTestCase {
 
         let sunday = sydneyMillis(year: 2026, month: 9, day: 6, hour: 10)
         let monday = sydneyMillis(year: 2026, month: 9, day: 7, hour: 10)
-        let train = try await planner.plan(
+        let trainResult = try await planner.planResult(
             from: station("200060", "Central Station", "train", "metro"),
             to: station("215020", "Parramatta Station", "train"),
-            at: sunday,
-            modes: ["train"]
+            at: sunday - 900_000,
+            modes: ["train"],
+            recommendationAt: sunday
         )
+        let train = trainResult.board
+        XCTAssertGreaterThanOrEqual(try XCTUnwrap(trainResult.recommendation).journey.effectiveDeparture, sunday)
         let metro = try await planner.plan(
             from: station("2155384", "Tallawong Station", "metro"),
             to: station("206710", "Chatswood Station", "train", "metro"),

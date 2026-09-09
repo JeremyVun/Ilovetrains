@@ -79,7 +79,10 @@ export function journeyBarHtml(spec, opts = {}) {
   let cursor = 0;
   let html = `<span class="sy-spec" data-mins="${esc(axisSignature(spec))}"></span>`;
   let caps = '';
+  let progress = '';
   const travelling = ['ride', 'ride2', 'dwell'].includes(opts.progress?.phase);
+  const progressBearing = travelling || opts.progress?.phase === 'done';
+  const completedTransfers = new Set(opts.progress?.completedTransfers || []);
 
   spec.legs.forEach((leg, index) => {
     const start = cursor / total * 100;
@@ -94,6 +97,7 @@ export function journeyBarHtml(spec, opts = {}) {
       const dwellEnd = (cursor + dwell) / total * 100;
       html += `<span class="sy-g0${tight ? ' warn' : ''}" data-seg data-transfer-gap="${index}"${tight ? ' data-tight-gap="true"' : ''} style="left:${dwellStart}%;width:${dwellEnd - dwellStart}%"></span>`;
       const next = spec.legs[index + 1];
+      const completed = completedTransfers.has(index) ? ' completed' : '';
       const station = opts.stations && change && change.station
         ? `<span class="sy-pstn${travelling ? ' travelling' : ''}" data-transfer-station data-transfer-index="${index}" data-midpoint="${(dwellStart + dwellEnd) / 2}" style="left:${(dwellStart + dwellEnd) / 2}%">${esc(change.station)}</span>` : '';
       const ferryTransfer = leg.mode === 'ferry' || next.mode === 'ferry';
@@ -103,8 +107,8 @@ export function journeyBarHtml(spec, opts = {}) {
       if (opts.caps !== false && locationsKnown) {
         const paint = (key) => `background:${lineFill(key || 'T7')};color:${chipInk(key)}`;
         if (!ferryTransfer) {
-          caps += `<span class="sy-p a" data-pin="a" data-line-code="${esc(leg.code)}" data-transfer-index="${index}" aria-label="${esc(`${leg.toLabel} · ${leg.code}`)}" style="right:${100 - dwellStart}%;${paint(leg.colourKey)}">${esc(leg.toChip)}</span>`
-            + `<span class="sy-p b" data-pin="b" data-next-platform-marker data-transfer-platform data-line-code="${esc(next.code)}" data-transfer-index="${index}" aria-label="${esc(`${next.fromLabel} · ${next.code}`)}" style="left:${dwellEnd}%;${paint(next.colourKey)}"><span class="sy-pv">${esc(next.fromChip)}</span></span>`;
+          caps += `<span class="sy-p a${completed}" data-pin="a" data-line-code="${esc(leg.code)}" data-transfer-index="${index}" aria-label="${esc(`${leg.toLabel} · ${leg.code}`)}" style="right:${100 - dwellStart}%;${paint(leg.colourKey)}">${esc(leg.toChip)}</span>`
+            + `<span class="sy-p b${completed}" data-pin="b" data-next-platform-marker data-transfer-platform data-line-code="${esc(next.code)}" data-transfer-index="${index}" aria-label="${esc(`${next.fromLabel} · ${next.code}`)}" style="left:${dwellEnd}%;${paint(next.colourKey)}"><span class="sy-pv">${esc(next.fromChip)}</span></span>`;
         } else {
           const alightFerry = leg.mode === 'ferry';
           const boardFerry = next.mode === 'ferry';
@@ -115,12 +119,12 @@ export function journeyBarHtml(spec, opts = {}) {
             ? ferryTransferHtml(next.fromLabel, next.fromChip, 'board', next.fromStop)
             : `<span class="sy-pv">${esc(next.fromChip)}</span>`;
           if (leg.toLabel) {
-            caps += `<span class="sy-p a" data-pin="a" data-line-code="${esc(leg.code)}" data-transfer-index="${index}" aria-label="${esc(`${leg.toLabel} · ${leg.code}`)}" style="right:${100 - dwellStart}%;${paint(leg.colourKey)}">${alight}</span>`;
+            caps += `<span class="sy-p a${completed}" data-pin="a" data-line-code="${esc(leg.code)}" data-transfer-index="${index}" aria-label="${esc(`${leg.toLabel} · ${leg.code}`)}" style="right:${100 - dwellStart}%;${paint(leg.colourKey)}">${alight}</span>`;
           }
           if (next.fromLabel) {
-            caps += `<span class="sy-p b" data-pin="b" data-next-platform-marker data-transfer-platform data-line-code="${esc(next.code)}" data-transfer-index="${index}" aria-label="${esc(`${next.fromLabel} · ${next.code}`)}" style="left:${dwellEnd}%;${paint(next.colourKey)}">${board}</span>`;
+            caps += `<span class="sy-p b${completed}" data-pin="b" data-next-platform-marker data-transfer-platform data-line-code="${esc(next.code)}" data-transfer-index="${index}" aria-label="${esc(`${next.fromLabel} · ${next.code}`)}" style="left:${dwellEnd}%;${paint(next.colourKey)}">${board}</span>`;
           } else if (!leg.toLabel && station) {
-            caps += `<span class="sy-p b" data-pin="b" data-next-platform-marker data-transfer-platform data-line-code="${esc(next.code)}" data-transfer-index="${index}" aria-label="— · ${esc(next.code)}" style="left:${dwellEnd}%;${paint(next.colourKey)}"><span class="sy-pv">—</span></span>`;
+            caps += `<span class="sy-p b${completed}" data-pin="b" data-next-platform-marker data-transfer-platform data-line-code="${esc(next.code)}" data-transfer-index="${index}" aria-label="— · ${esc(next.code)}" style="left:${dwellEnd}%;${paint(next.colourKey)}"><span class="sy-pv">—</span></span>`;
           }
         }
         caps += station;
@@ -129,14 +133,14 @@ export function journeyBarHtml(spec, opts = {}) {
     }
   });
 
-  if (travelling) {
+  if (progressBearing) {
     const at = Math.max(0, Math.min(1, opts.progress.at || 0));
-    if (at > 0) html += `<span class="sy-dim" style="width:${at * 100}%"></span>`;
-    html += `<span class="sy-mk ${esc(opts.progress.phase || 'pre')}" style="left:${at * 100}%"><i></i></span>`;
+    if (at > 0) progress += `<span class="sy-progress-dim" style="width:${at * 100}%"></span>`;
+    if (travelling && opts.progress.showMarker !== false) {
+      progress += `<span class="sy-mk ${esc(opts.progress.phase || 'pre')}" style="left:${at * 100}%"><i></i></span>`;
+    }
   }
-  // Platform numerals paint last. They remain readable when the continuous
-  // marker passes through their territory and never inherit the travelled dim.
-  return html + caps;
+  return html + caps + progress;
 }
 
 export function journeyDeviceHtml(journey, opts = {}) {

@@ -37,8 +37,9 @@ struct SettingsTransferLimitPresentation: Equatable {
 
     init(limit: TransferLimit) {
         switch limit {
-        case .two: subtitle = "Up to 2"; mark = "NO LIMIT"; next = .any
-        case .any: subtitle = "No limit"; mark = "UP TO 2"; next = .two
+        case .direct: subtitle = "Direct only"; mark = "Change"; next = .two
+        case .two: subtitle = "Up to 2"; mark = "Change"; next = .any
+        case .any: subtitle = "No limit"; mark = "Change"; next = .direct
         }
     }
 }

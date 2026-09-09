@@ -154,7 +154,7 @@ read/write atomic and migration simple):
   malformed `homeOverride` drops; and `enabledModes` keeps only `train`,
   `metro` and `ferry` in that stable order. Missing or non-array modes means
   all three, while an explicit `[]` remains all-off. `transferLimit` accepts
-  only `two` and `any`; anything else, or its absence, reads as `two`. The
+  only `direct`, `two` and `any`; anything else, or its absence, reads as `two`. The
   schema stays version 1. The preference document never leaves the device; the
   selected mode allow-list and, while capped, the transfer limit are sent only
   with the stateless departures query they shape.
@@ -165,17 +165,14 @@ read/write atomic and migration simple):
   before a board request, and the stored value is what that open draws with.
   A flag is the backend's decision about this build, never about this device,
   so it carries no identity and is not a stored preference.
-- The transfer cap is `flags.transferLimit` and `preferences.transferLimit`
-  together: capped means the flag is on and the choice is `two`. While capped
-  the client hides every journey with more than two changes wherever it applies
-  the mode allow-list — the board, the smart header, the next-service rail,
-  cancellation replacements, focus alternatives and past pages all derive from
-  that filtered body — and asks the departures API for `transferLimit=2`. The
-  cap is not part of the cache key: a body cached under the other setting is
-  filtered on read and healed by the refetch every change already triggers.
-  Changing either the flag or the choice takes the mode-change path: eligible
-  cached rows are kept, replacements are fetched, and an excluded journey is
-  never restored by a failed fetch.
+- Transfer caps are numeric or absent, never boolean: flag on with `direct`
+  means 0, `two` means 2, and `any` means absent; flag off always means absent.
+  Zero is a real cap at request, cache-read, focus, replacement and rail
+  boundaries. Native solver bounds are respectively 0, 2 and 4 with the flag
+  on, and 2 with it off. The existing directed/mode cache keys remain intact.
+  Every read filters current modes/cap. Widening a cap makes a narrower cached
+  answer incomplete. Changing choice or flag invalidates base and supplementary
+  generations, including A→B→A; a failed fetch cannot restore an excluded row.
 - `cache` holds the last successful raw departures response per saved directed
   pair and served-mode set, used for instant first paint and offline. All three
   modes retain the legacy `<from>-<to>` key; each subset has the canonical
@@ -319,6 +316,59 @@ lasts for the page load and is never persisted, and it never writes `focus`. A
 location fix arriving afterwards re-predicts only when nothing explicit was
 chosen.
 
+## Journey recommendation
+
+For the selected saved pair and direction, choose the minimum tuple:
+
+`(A + 300000 * changes, changes, A, D, stableJourneyKey)`
+
+`A` and `D` are effective final arrival and initial departure, using each
+leg's estimate when present, otherwise its timetable. Count service changes,
+not stops or walking links. Existing mapped service-leg count minus one is
+canonical; malformed times, negative duration, overlapping service legs, cancelled journeys and
+incompatible modes/caps are ineligible. A new suggestion must have `D >= now`.
+Do not invent a walking-to-origin threshold in this item.
+
+A direct arriving at 10:04 beats a one-change arriving at 10:00. A direct
+arriving at 10:10 loses to that one-change trip. At equal total cost, fewer
+changes wins. Exact ties use the existing stable full-journey identity.
+For cross-client ordering, compare that identity as an ordered sequence of
+`(line name, scheduled departure milliseconds)` pairs: line names by Unicode
+code point, timestamps numerically, then sequence length. Do not sort each
+platform's serialized key string; JSON and delimiter encodings can order the
+same services differently. Existing key encodings remain valid for matching
+and deduplication.
+
+Keep explicit/inferred focus and the existing retained offline answer ahead
+of this selector. Choosing a different saved pair still follows existing
+selection rules. Merely recommending a service does not pin it or infer a ride.
+Cancellation replacements before departure use the same cost rule among
+eligible alternatives; preserve the cancelled-service explanation. Post-
+departure transfer recovery remains outside this item.
+
+The board retains its current row count, chronology, past paging and scroll
+behavior. Separate candidate data from board presentation. Home, its saved-trip
+status, `lastOpen`, opening detail and pinning must all refer to the actual
+chosen candidate, even if it is outside the visible six web board rows.
+
+The pre-departure alternative rail uses the earliest catchable service with a
+different first-service identity. It may leave before the recommendation:
+label it `Earlier train` / `Earlier ferry` in that case, otherwise retain
+`Next train` / `Next ferry`. Use its own times and freshness. The rail opens
+that exact service; it must not silently pin another train. Preserve the
+existing 44px rail composition and accessibility description.
+
+Persist up to two supplementary raw pages with the existing directed cache
+entry as optional `recommendationPages`. Each carries `at`, raw body,
+`serverStale`, and the numeric/null cap used to fetch it; modes come from the
+parent cache key. Missing means none. Preserve each body's `generatedAt`.
+Read/filter before painting. Cap mismatch makes a page incomplete for the new
+search: eligible rows may be a provisional fallback, but cannot establish a
+fresh completed search. Discard superseded pages on the next successful search
+and delete them with their parent cache entry. Other clients may use their
+native encoded equivalent; the bounded content and provenance are the seam.
+
+
 ## Focused journey
 
 The document may contain an optional `focus` field for a pinned or inferred service:
@@ -340,10 +390,10 @@ The document may contain an optional `focus` field for a pinned or inferred serv
   nothing else writes it. `Pinned` on home and `Unpin this train` (or ferry)
   in detail remove an explicit focus without deleting the saved trip. They
   clear the in-memory followed source and persisted `lastOpen` evidence so
-  a subsequent fix cannot immediately restore the released journey. No schema
-  change or new persistent state is needed. Focus also clears itself once
-  now > the journey's effective arrival + 30 min, and accepting the return
-  offer that a finished focus produces clears it too.
+  a subsequent fix cannot immediately restore the released journey. Accepting
+  the return offer clears completed focus. Completed or never-guarded focus
+  expires at effective arrival plus 30 minutes; unresolved armed focus follows
+  the later retention deadline in the final-arrival contract below.
 - `journey` is a full snapshot so directions and detail stay viewable after
   departure and offline. On each refresh the client re-matches it in fresh
   data by the ordered list of every service leg’s `(line.name,
@@ -383,8 +433,8 @@ Travel mode IS the focused journey, whichever way it was entered. Every rule
 above applies to both kinds: the header follows the service, with directions
 once it departs. Explicit choice is labelled `Pinned`; inference is not.
 The status describes the service, browsing another trip never replaces it, refresh
-re-matches the snapshot, expiry is effective arrival + 30 min, and the way-back
-offer follows a finished journey.
+re-matches the snapshot, expiry follows the shared final-arrival decision, and
+the way-back offer follows a completed journey.
 
 **Inferred entry** is evaluated when a valid fix arrives on home, including an
 open or a return to visibility, and `lastOpen` exists and nothing is focused.
@@ -427,13 +477,9 @@ Inference attaches to the journey that was SHOWN, so a rider who missed it and
 took the next one gets directions one service off. That is a known and accepted
 gap, not a defect.
 
-**Exits** are the expiry above, the way-back acceptance above, and one more: a
-fix within 200 m of `Z` when `now ≥ A − 5 min` marks the trip over
-immediately, so the return offer arrives as the rider steps off rather than up
-to half an hour later. That completion writes the ride immediately, including
-offline, so the done state survives reload and accepting the way back. A
-recorded ride for the same trip, direction and scheduled departure cannot be
-inferred again from an older `lastOpen`.
+**Exits** use the shared final-arrival reducer below. One nearby fix no longer
+ends a journey. A recorded ride for the same trip, direction and scheduled
+departure cannot be inferred again from an older `lastOpen`.
 
 **Correction.** An inferred header carries one control, `Change destination`,
 which opens the new-trip sheet with From set to `O`. Saving there re-enters
@@ -443,6 +489,144 @@ that pair's board when none does. `departureKey` owns this identity, independent
 of the full-journey key used for refreshes and board rows. Browsing another trip
 never exits travel mode, and there is no "not on it" control: a wrong entry
 that is not a redirect ends by expiry or by `Pin this train`.
+
+## Final-arrival decision
+
+Each client uses one pure arrival reducer with the same constants and
+`tools/fixtures/conformance/commute-feedback.json` cases. Inputs are focus identity, effective times, current
+clock, persisted arrival metadata, permission/preference state, and the
+in-memory evidence window. Output is an arrival state plus explicit proposed
+writes. Rendering, tracker timers and location callbacks do not write rides.
+The existing serialized controller applies writes and publishes one result to
+Home, detail, expiry, ride history and tracker reconciliation.
+
+States: `travelling`, `checkingArrival`, `arrivalUnconfirmed`, `arrived`, and
+`expiredUnconfirmed`. `arrived` carries basis `location` or `estimate`.
+Cancellation presentation retains priority and never creates a completed ride.
+
+Arm the guard for this focus once the app begins permitted location sampling
+while it is under way. A successful prior current-focus fix also arms it.
+Persist that fact before clock settlement. A focus which never had permitted
+location monitoring uses the existing estimate-based completion behavior;
+this item does not leave every location-disabled trip permanently unfinished.
+On restoring an old focus with no new metadata, initialize the guard before
+settlement when permission is known granted. While permission is unresolved,
+do not let an initial paint/clock tick settle it; query silently first.
+Permission failure/denial permits the never-armed fallback, without prompting.
+
+Once armed, loss of GPS, permission, app visibility or the location preference
+never turns time alone into arrival. Turning location off immediately stops
+collection and clears all raw evidence; the guard's boolean remains. An
+already recorded legacy ride is not revoked merely by migration.
+
+### Sampling and evidence constants
+
+Sample only while the app is foreground/visible, a stored focused journey has
+departed, location is enabled and already permitted, and it is not complete
+or expired. This applies while browsing detail/Settings as well as Home.
+Use provider updates with a target interval of ten seconds; accept no more
+than one sample per five seconds. Keep at most 24 samples over 120 seconds.
+Use watchPosition/clearWatch on web and foreground update subscriptions on
+native. Keep one provider owner so setup lookups and monitoring do not race.
+Stop on background, replacement/unpin/deletion, completion, expiry or disabled
+permission/preference; reject callbacks from earlier generations. Resume with
+an empty window and a new generation. Never request background location.
+
+A position needs finite in-range coordinates, a finite timestamp no more than
+five seconds in the future and 30 seconds old, and accuracy in `(0, 100] m`.
+Discard duplicate/out-of-order samples. Speed is independently optional:
+accept finite values in `[0, 100] m/s`; an invalid speed does not discard an
+otherwise useful position. Missing speed is never interpreted as zero.
+
+Use a time-weighted mean of adjacent valid speed samples (trapezoidal average).
+It needs at least three samples spanning 30 seconds, no adjacent gap over
+30 seconds, and a last sample at most 30 seconds old. Missing/invalid speed
+breaks the contiguous speed window. Mean speed at least 8 m/s is sustained
+vehicle-like movement; at most 2 m/s is low speed. These thresholds classify
+evidence, not a vehicle identity. Do not derive train speed from GPS jitter.
+
+Let `d` be distance to the saved destination coordinate and `r` accuracy.
+`d - r >= 300 m` is credible away evidence. Destination confirmation requires
+all positions in its confirmation window to have `r <= 50 m` and
+`d + r <= 200 m`. Between these regions is uncertain; passing through is not
+arrival. A missing destination coordinate cannot confirm arrival.
+
+Confirm with a contiguous 30-second near-destination window and low mean
+speed, using at least three positions. When speed is unavailable, require
+60 seconds near destination, at least four positions, no gap over 30 seconds,
+and at most 50 m separation between any pair. A known speed above 2 m/s
+breaks the stationary confirmation window. Evaluate the most recent contiguous
+60-second window; older motion outside it does not prevent confirmation. Confirmation may start no earlier than
+`max(D, A - 5 minutes)`; all counted samples must be within that interval.
+
+### Clock, loss and completion transitions
+
+Apply a successful matching service refresh before evaluating arrival on that
+turn. Failed/unmatched refresh retains its snapshot and honest freshness.
+
+| Situation | State / action |
+| --- | --- |
+| Already confirmed at destination | Remain arrived; a later ETA cannot undo physical arrival. |
+| Destination confirmation window passes | Arrived with location basis, including before ETA. |
+| Guard armed, `now < A`, no destination confirmation | Travelling. |
+| Guard armed, `now >= A`, fresh credible away evidence | Arrival unconfirmed immediately, whether moving or stopped. |
+| Guard armed, no decisive evidence, `A <= now < A + 3 min` | Checking arrival. |
+| Guard armed, no decisive evidence, `now >= A + 3 min` | Arrival unconfirmed; no automatic completion. |
+| Guard never armed, accepted snapshot's ETA passed | Arrived with estimate basis, preserving the existing refresh-before-settlement rule. |
+| ETA moves back into future without location confirmation | Return to travelling; withdraw an estimate-only ride as existing correction does. |
+
+The buffer gives location resolution a chance to settle; it is not a grace
+period after which contradictory evidence is ignored. A stopped train away
+from destination stays unconfirmed even without a high speed reading. Losing
+fresh evidence changes the copy classification, never fabricates arrival.
+
+### Persisted metadata, expiry and correction
+
+Extend focus with optional `arrivalGuard` metadata: `armed`, `retainedAt`,
+`basis` (`location` / `estimate`, only after completion), `confirmedAt`
+(only for location completion). Use the existing platform time encoding;
+these fields describe state/timing only. Do not persist raw coordinates,
+speeds, an evidence window or motion classifications. Missing metadata is
+backward compatible; malformed individual fields are discarded and cannot
+create a completion. Keep metadata tied to the full focus identity.
+Location basis requires a valid `confirmedAt` no later than the current clock
+plus five seconds. A lone basis string cannot confirm arrival. If `armed` is
+true but `retainedAt` is missing/invalid, use the earlier of the last effective
+arrival and now as its fallback; do not renew a corrupt checkpoint on every
+reload. Clamp a future retention checkpoint to now before using its deadline.
+
+Initialize `retainedAt` when armed. While foregrounded and guarded, checkpoint
+it at most once a minute only on useful near/away position evidence or a
+matching refresh whose ETA is still in the future. This is retention evidence,
+not arrival evidence; an old/stale estimate or a render does not renew it.
+An unconfirmed focus expires after both `A + 30 min` and `retainedAt + 2 h`
+have passed. Use the later deadline. A continuing delayed train with useful
+foreground evidence keeps its focus; reopening an old trip without evidence
+does not renew it. Evaluate fresh evidence before expiry when available on
+resume, allowing the normal provider lookup up to 15 seconds before applying
+an overdue expiry. Expiry is silent removal, not “Arrived,” no return offer,
+no ride record. Clear matching `lastOpen` so it cannot immediately reinfer.
+Completed/never-guarded focus keeps the existing ETA-plus-30-minute expiry.
+
+Location confirmation is persisted atomically with its ride write. Ride
+identity/deduplication and endpoint snapshots stay unchanged. Existing ride
+arrival fields retain the service's effective arrival estimate, not the phone
+sample timestamp; `confirmedAt` separately supplies the location completion
+latch. A matching refresh can update the ride's effective times after physical
+arrival without removing it. Estimate-only rides remain revisable/withdrawable.
+Guarded unconfirmed/expired trips never enter completed-ride history. An
+existing same-identity recorded ride restores the old completion behavior when
+there is no new metadata; migration does not rewrite past rides. A plain
+restore preserves a legacy ride even before ETA; a successful matching refresh
+that moves ETA into the future may withdraw it under the existing correction
+rule. A stale render or unmatched/failed refresh cannot perform that withdrawal.
+
+No new “I'm not on this” or “I've arrived” control. Explicit pins retain their
+existing unpin action. Pinning another service, inferred Change destination,
+and deletion keep their existing correction roles. New focus identity clears
+the old guard/window and starts independently. Browsing another board does
+not complete, replace or renew focus by itself.
+
 
 ### Native tracker sessions
 
@@ -642,29 +826,25 @@ from <home>.`); a `usual` leap prints no receipt, because it explains itself.
 
 ## Completed rides
 
-`rides` records a focused journey once its effective arrival has passed. It is
-capped at 100 and deduplicated by trip, direction and `scheduledDeparture`;
-`departedAt` and `arrivedAt` retain the effective times. Completion is decided
-only after that arrival has had its chance to move: a refresh applies its
-journey to the focus before the ride is settled, and a client that cannot
-reach the network settles from the snapshot it holds. A ride takes the
-`arrivedAt` a refresh moves it to, earlier or later, once the journey has
-arrived, and is withdrawn when the refreshed arrival is still ahead and no fix
-places the phone at the destination, which leaves the trip no longer over; a
-fix within 200 m still records the ride before the timetable agrees. A ride
-stores both endpoint snapshots so later trip edits or deletion do not rewrite
-the evidence. Completed rides therefore survive deletion or LRU eviction of
-their saved-trip entry; prediction history and cached boards do not. They are
-what the last-ridden line and the reverse receipt cite.
+`rides` records a focused journey only when the shared arrival reducer proposes
+completion. It is capped at 100 and deduplicated by trip, direction and
+`scheduledDeparture`. `departedAt` and `arrivedAt` retain effective service
+times; the location sample timestamp is stored separately as `confirmedAt` in
+focus metadata. Endpoint snapshots survive later edits or deletion. Apply a
+matching service refresh before reducing evidence, then apply metadata and
+ride writes atomically through the existing personal-document owner.
 
-A focused trip is OVER once `now` is later than its effective arrival, or once
-a fix places the phone within 200 m of the destination from `A − 5 min`. Home
-may then offer the opposite direction, and accepting that offer is the one path
-other than expiry that clears a focus; it then fetches a real return journey.
-Transfer platforms therefore come from that return response; they are never
-produced by reversing the outbound snapshot. Focusing a journey is the user's
-consent to directions mode, and focusing another is the correction — there is
-no separate “I’m not on this” state. Explicit pins can be removed manually.
+Location-confirmed rides stay completed when an ETA moves forward; matching
+refreshes can correct their effective times. Estimate-only rides remain
+correctable and withdraw when their accepted ETA moves back into the future.
+Guarded unconfirmed or silently expired journeys never become rides. An old
+same-identity ride with no arrival metadata restores legacy completion rather
+than being revoked by migration.
+
+The return offer requires the shared arrived result. It fetches a real opposite
+direction journey and uses that response's platforms. Explicit pins retain
+Unpin, inferred focus retains Change destination; no additional correction
+control is introduced.
 
 Invariants:
 - Deterministic given (storage document, current time) — testable.

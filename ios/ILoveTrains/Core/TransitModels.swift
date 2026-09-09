@@ -211,6 +211,9 @@ struct BoardData: Codable, Equatable, Sendable {
     var coverage: String
     var error: String?
     var homeJourneyKey: String?
+    var requestMaxTransfers: Int?
+    var recommendationPages: [RecommendationPage]?
+    var recommendation: RecommendationPage?
 
     init(
         from: Station,
@@ -222,7 +225,10 @@ struct BoardData: Codable, Equatable, Sendable {
         serverStale: Bool = false,
         coverage: String = "",
         error: String? = nil,
-        homeJourneyKey: String? = nil
+        homeJourneyKey: String? = nil,
+        requestMaxTransfers: Int? = nil,
+        recommendationPages: [RecommendationPage]? = nil,
+        recommendation: RecommendationPage? = nil
     ) {
         self.from = from
         self.to = to
@@ -234,6 +240,52 @@ struct BoardData: Codable, Equatable, Sendable {
         self.coverage = coverage
         self.error = error
         self.homeJourneyKey = homeJourneyKey
+        self.requestMaxTransfers = requestMaxTransfers
+        self.recommendationPages = recommendationPages
+        self.recommendation = recommendation
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case from, to, journeys, generatedAt, source, offline, serverStale, coverage, error
+        case homeJourneyKey, requestMaxTransfers, recommendationPages, recommendation
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        from = try container.decode(Station.self, forKey: .from)
+        to = try container.decode(Station.self, forKey: .to)
+        journeys = try container.decode([Journey].self, forKey: .journeys)
+        generatedAt = try container.decode(Millis.self, forKey: .generatedAt)
+        source = (try? container.decodeIfPresent(String.self, forKey: .source)) ?? "schedule"
+        offline = (try? container.decodeIfPresent(Bool.self, forKey: .offline)) ?? false
+        serverStale = (try? container.decodeIfPresent(Bool.self, forKey: .serverStale)) ?? false
+        coverage = (try? container.decodeIfPresent(String.self, forKey: .coverage)) ?? ""
+        error = try? container.decodeIfPresent(String.self, forKey: .error)
+        homeJourneyKey = try? container.decodeIfPresent(String.self, forKey: .homeJourneyKey)
+        requestMaxTransfers = try? container.decodeIfPresent(Int.self, forKey: .requestMaxTransfers)
+        recommendationPages = try? container.decodeIfPresent([RecommendationPage].self, forKey: .recommendationPages)
+        recommendation = try? container.decodeIfPresent(RecommendationPage.self, forKey: .recommendation)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(from, forKey: .from)
+        try container.encode(to, forKey: .to)
+        try container.encode(journeys, forKey: .journeys)
+        try container.encode(generatedAt, forKey: .generatedAt)
+        try container.encode(source, forKey: .source)
+        try container.encode(offline, forKey: .offline)
+        try container.encode(serverStale, forKey: .serverStale)
+        try container.encode(coverage, forKey: .coverage)
+        try container.encodeIfPresent(error, forKey: .error)
+        try container.encodeIfPresent(homeJourneyKey, forKey: .homeJourneyKey)
+        if let requestMaxTransfers {
+            try container.encode(requestMaxTransfers, forKey: .requestMaxTransfers)
+        } else {
+            try container.encodeNil(forKey: .requestMaxTransfers)
+        }
+        try container.encodeIfPresent(recommendationPages, forKey: .recommendationPages)
+        try container.encodeIfPresent(recommendation, forKey: .recommendation)
     }
 
     func isLive(_ now: Double) -> Bool {
@@ -248,6 +300,78 @@ struct BoardData: Codable, Equatable, Sendable {
         copy.serverStale = false
         return copy
     }
+}
+
+struct RecommendationPage: Codable, Equatable, Sendable {
+    var at: Millis
+    var rawBody: Data
+    var journeys: [Journey]
+    var generatedAt: Millis
+    var source: String
+    var serverStale: Bool
+    var maxTransfers: Int?
+
+    init(at: Millis, rawBody: Data = Data(), board: BoardData, maxTransfers: Int?) {
+        self.at = at
+        self.rawBody = rawBody
+        journeys = board.journeys
+        generatedAt = board.generatedAt
+        source = board.source
+        serverStale = board.serverStale
+        self.maxTransfers = maxTransfers
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case at, rawBody, journeys, generatedAt, source, serverStale, maxTransfers
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        at = try container.decode(Millis.self, forKey: .at)
+        rawBody = (try? container.decodeIfPresent(Data.self, forKey: .rawBody)) ?? Data()
+        journeys = try container.decode([Journey].self, forKey: .journeys)
+        generatedAt = try container.decode(Millis.self, forKey: .generatedAt)
+        source = try container.decode(String.self, forKey: .source)
+        serverStale = (try? container.decodeIfPresent(Bool.self, forKey: .serverStale)) ?? false
+        maxTransfers = try? container.decodeIfPresent(Int.self, forKey: .maxTransfers)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(at, forKey: .at)
+        try container.encode(rawBody, forKey: .rawBody)
+        try container.encode(journeys, forKey: .journeys)
+        try container.encode(generatedAt, forKey: .generatedAt)
+        try container.encode(source, forKey: .source)
+        try container.encode(serverStale, forKey: .serverStale)
+        if let maxTransfers {
+            try container.encode(maxTransfers, forKey: .maxTransfers)
+        } else {
+            try container.encodeNil(forKey: .maxTransfers)
+        }
+    }
+
+    func board(from: Station, to: Station) -> BoardData {
+        BoardData(
+            from: from,
+            to: to,
+            journeys: journeys,
+            generatedAt: generatedAt,
+            source: source,
+            serverStale: serverStale,
+            requestMaxTransfers: maxTransfers
+        )
+    }
+}
+
+struct JourneyRecommendation: Equatable, Sendable {
+    var journey: Journey
+    var board: BoardData
+}
+
+struct OfflinePlanResult: Equatable, Sendable {
+    var board: BoardData
+    var recommendation: JourneyRecommendation?
 }
 
 private let pastBoardRetention: Millis = 86_400_000
@@ -284,13 +408,31 @@ func retainedOfflineBoard(_ board: BoardData) -> BoardData {
         retained.retained = true
         return retained
     }
+    copy.recommendationPages = copy.recommendationPages?.map { page in
+        var page = page
+        page.journeys = page.journeys.map { journey in
+            var journey = journey
+            journey.retained = true
+            return journey
+        }
+        return page
+    }
+    if var recommendation = copy.recommendation {
+        recommendation.journeys = recommendation.journeys.map { journey in
+            var journey = journey
+            journey.retained = true
+            return journey
+        }
+        copy.recommendation = recommendation
+    }
     return copy
 }
 
 /// An offline open keeps the answer the rider last saw without inferring a ride.
 func retainedHomeJourney(_ board: BoardData?, now: Millis) -> Journey? {
     guard let board, board.offline, let key = board.homeJourneyKey else { return nil }
-    return board.journeys.first { $0.key == key && now <= $0.effectiveArrival + 1_800_000 }
+    return (board.journeys + (board.recommendation?.journeys ?? []))
+        .first { $0.key == key && now <= $0.effectiveArrival + 1_800_000 }
 }
 
 func nextHomeJourney(_ board: BoardData, now: Millis) -> Journey? {
@@ -340,6 +482,14 @@ func mergeBoardResults(previous: BoardData?, local: BoardData?, online: BoardDat
     var merged = base
     merged.journeys = rows.values.sorted { $0.effectiveDeparture < $1.effectiveDeparture }
     merged.homeJourneyKey = prior?.homeJourneyKey
+    if online == nil, merged.recommendation == nil, var saved = prior?.recommendation {
+        saved.journeys = saved.journeys.map { journey in
+            var retained = journey
+            retained.retained = true
+            return retained
+        }
+        merged.recommendation = saved
+    }
     merged.homeJourneyKey = nextHomeJourney(merged, now: now)?.key
     return merged
 }

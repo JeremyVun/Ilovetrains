@@ -1,4 +1,5 @@
 import { SUPPORTED_MODES, flagsOf, normalizeModes, preferencesOf } from './preferences.js';
+import { normalizeArrivalGuard } from './arrival.js';
 
 /* localStorage document per docs/contracts/client-storage.md.
    Everything above the load/save pair is pure: document in, new document out.
@@ -51,6 +52,19 @@ function stopOf(stop) {
   const location = locationOf(stop);
   if (location) out.location = location;
   return out;
+}
+
+function recommendationPagesOf(value) {
+  if (!Array.isArray(value)) return [];
+  return value.filter((page) => page && Number.isFinite(page.at)
+      && page.body && typeof page.body === 'object'
+      && (page.maxTransfers === null || Number.isInteger(page.maxTransfers) && page.maxTransfers >= 0))
+    .slice(0, 2).map((page) => ({
+      at: page.at,
+      body: page.body,
+      serverStale: page.serverStale === true,
+      maxTransfers: page.maxTransfers
+    }));
 }
 
 /** Tolerant parse: a corrupt or foreign value must never brick the app. */
@@ -143,6 +157,8 @@ export function parseDoc(raw) {
     doc.focus = {
       tripId: f.tripId, direction: f.direction, focusedAt: f.focusedAt, by, journey: f.journey
     };
+    const arrivalGuard = normalizeArrivalGuard(f.arrivalGuard);
+    if (arrivalGuard) doc.focus.arrivalGuard = arrivalGuard;
   }
   if (v.locationAsk && typeof v.locationAsk.declinedAt === 'string') {
     doc.locationAsk = { declinedAt: v.locationAsk.declinedAt };
@@ -161,6 +177,11 @@ export function parseDoc(raw) {
       if (entry && typeof entry.fetchedAt === 'string' && entry.body && typeof entry.body === 'object') {
         doc.cache[k] = { fetchedAt: entry.fetchedAt, body: entry.body };
         if (entry.serverStale === true) doc.cache[k].serverStale = true;
+        if (entry.maxTransfers === null || Number.isInteger(entry.maxTransfers) && entry.maxTransfers >= 0) {
+          doc.cache[k].maxTransfers = entry.maxTransfers;
+        }
+        const recommendationPages = recommendationPagesOf(entry.recommendationPages);
+        if (recommendationPages.length) doc.cache[k].recommendationPages = recommendationPages;
       }
     }
   }
@@ -404,7 +425,9 @@ export function recordLastOpen(doc, { station, tripId, direction, journey }, now
 }
 
 /** Cache is capped to saved pairs and their eight possible mode combinations. */
-export function putCache(doc, key, body, atMs, { serverStale = false } = {}) {
+export function putCache(doc, key, body, atMs, {
+  serverStale = false, maxTransfers = null, recommendationPages = []
+} = {}) {
   const allowed = new Set();
   for (const t of doc.trips) {
     for (const cacheKey of cacheKeysForPair(t.from.id, t.to.id)) allowed.add(cacheKey);
@@ -415,6 +438,9 @@ export function putCache(doc, key, body, atMs, { serverStale = false } = {}) {
   if (allowed.has(key)) {
     cache[key] = { fetchedAt: new Date(atMs).toISOString(), body };
     if (serverStale) cache[key].serverStale = true;
+    cache[key].maxTransfers = Number.isInteger(maxTransfers) && maxTransfers >= 0 ? maxTransfers : null;
+    const pages = recommendationPagesOf(recommendationPages);
+    if (pages.length) cache[key].recommendationPages = pages;
   }
   return { ...doc, cache };
 }

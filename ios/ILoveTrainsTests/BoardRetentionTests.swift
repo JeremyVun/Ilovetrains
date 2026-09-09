@@ -57,6 +57,119 @@ final class BoardRetentionTests: XCTestCase {
         XCTAssertEqual(result.journeys[0].retained, true)
     }
 
+    func testOutsidePrefixRecommendationPersistsWithItsOwnSource() throws {
+        let outside = shiftedT9(departure: now + 10 * 60_000, arrival: now + 20 * 60_000)
+        let source = BoardData(
+            from: townHall, to: rhodes, journeys: [outside], generatedAt: now,
+            source: "live", requestMaxTransfers: 2
+        )
+        let page = RecommendationPage(
+            at: now + 10_000, rawBody: Data("supplement".utf8), board: source, maxTransfers: 2
+        )
+        let board = BoardData(
+            from: townHall, to: rhodes, journeys: [t9], generatedAt: now - 20_000,
+            source: "live", homeJourneyKey: outside.key, requestMaxTransfers: 2,
+            recommendation: page
+        )
+
+        let restored = try JSONDecoder().decode(BoardData.self, from: JSONEncoder().encode(board))
+        let selected = try XCTUnwrap(selectRecommendation(
+            recommendationCandidates(restored), now: now, modes: allModes, maxTransfers: 2
+        ))
+
+        XCTAssertEqual(selected.journey.key, outside.key)
+        XCTAssertEqual(selected.board.generatedAt, source.generatedAt)
+        XCTAssertEqual(selected.board.requestMaxTransfers, 2)
+        XCTAssertEqual(restored.recommendation?.rawBody, Data("supplement".utf8))
+        XCTAssertEqual(retainedHomeJourney(retainedOfflineBoard(restored), now: now)?.key, outside.key)
+    }
+
+    func testRecommendationDedupKeepsNewerMatchingObservation() throws {
+        var observed = t9
+        observed.legs[0].estimatedArrival = now + 35 * 60_000
+        let older = RecommendationPage(
+            at: now - 20_000,
+            board: BoardData(from: townHall, to: rhodes, journeys: [t9], generatedAt: now - 20_000, source: "live"),
+            maxTransfers: nil
+        )
+        let board = BoardData(
+            from: townHall, to: rhodes, journeys: [observed], generatedAt: now,
+            source: "live", recommendationPages: [older]
+        )
+
+        let match = try XCTUnwrap(recommendationCandidates(board).first { $0.journey.key == t9.key })
+        XCTAssertEqual(match.journey.effectiveArrival, observed.effectiveArrival)
+        XCTAssertEqual(match.board.generatedAt, now)
+    }
+
+    func testCandidateFreshnessUsesEachSourcesTransferCap() throws {
+        let pageJourney = shiftedT9(departure: now + 12 * 60_000, arrival: now + 24 * 60_000)
+        let page = RecommendationPage(
+            at: now,
+            board: BoardData(
+                from: townHall, to: rhodes, journeys: [pageJourney], generatedAt: now,
+                source: "live", requestMaxTransfers: 2
+            ),
+            maxTransfers: 2
+        )
+        let board = BoardData(
+            from: townHall, to: rhodes, journeys: [t9], generatedAt: now,
+            source: "live", requestMaxTransfers: nil, recommendationPages: [page]
+        )
+
+        let selected = try XCTUnwrap(selectRecommendation(
+            recommendationCandidates(board), now: now, modes: allModes, maxTransfers: 2
+        ))
+        XCTAssertEqual(selected.journey.key, pageJourney.key)
+        XCTAssertEqual(selected.board.requestMaxTransfers, 2)
+    }
+
+    func testFreshIneligibleCandidateDoesNotDisplaceRetainedAnswer() throws {
+        var retained = t9
+        retained.retained = true
+        var cancelled = shiftedT9(departure: now + 5 * 60_000, arrival: now + 15 * 60_000)
+        cancelled.legs[0].cancelled = true
+        let candidates = [
+            JourneyRecommendation(
+                journey: retained,
+                board: BoardData(from: townHall, to: rhodes, journeys: [retained], generatedAt: now - 120_000, source: "live")
+            ),
+            JourneyRecommendation(
+                journey: cancelled,
+                board: BoardData(from: townHall, to: rhodes, journeys: [cancelled], generatedAt: now, source: "live")
+            )
+        ]
+
+        XCTAssertEqual(
+            selectRecommendation(candidates, now: now, modes: allModes, maxTransfers: nil)?.journey.key,
+            retained.key
+        )
+    }
+
+    func testStaticReplanRetainsOutsidePrefixObservation() throws {
+        var observed = t9
+        observed.legs[0].estimatedArrival = now + 31 * 60_000
+        let previous = BoardData(
+            from: townHall, to: rhodes, generatedAt: now - 30_000, source: "live",
+            homeJourneyKey: observed.key,
+            recommendation: RecommendationPage(
+                at: now - 30_000,
+                board: BoardData(from: townHall, to: rhodes, journeys: [observed], generatedAt: now - 30_000, source: "live"),
+                maxTransfers: nil
+            )
+        )
+        let localJourney = shiftedT9(departure: now + 8 * 60_000, arrival: now + 18 * 60_000)
+        let local = BoardData(
+            from: townHall, to: rhodes, journeys: [localJourney], generatedAt: now,
+            source: "schedule", offline: true
+        )
+
+        let merged = try XCTUnwrap(mergeBoardResults(previous: previous, local: local, online: nil, now: now))
+        XCTAssertEqual(merged.recommendation?.journeys.first?.effectiveArrival, observed.effectiveArrival)
+        XCTAssertEqual(merged.recommendation?.journeys.first?.retained, true)
+        XCTAssertEqual(merged.recommendation?.source, "live")
+    }
+
     func testOnlineFutureReplacesCacheButKeepsDepartedTrain() throws {
         let later = shiftedT9(departure: now + 20 * 60_000, arrival: now + 45 * 60_000)
         let online = BoardData(from: townHall, to: rhodes, journeys: [later], generatedAt: now + 9 * 60_000, source: "live")

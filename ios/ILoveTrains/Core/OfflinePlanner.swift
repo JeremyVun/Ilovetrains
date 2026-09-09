@@ -98,10 +98,31 @@ actor OfflinePlanner {
         limit: Int = 24,
         maxTransfers: Int = 2
     ) async throws -> BoardData {
+        try await planResult(
+            from: from,
+            to: to,
+            at: at,
+            modes: modes,
+            limit: limit,
+            maxTransfers: maxTransfers,
+            includeRecommendation: false
+        ).board
+    }
+
+    func planResult(
+        from: Station,
+        to: Station,
+        at: Millis,
+        modes: Set<String>,
+        limit: Int = 24,
+        maxTransfers: Int = 2,
+        recommendationAt: Millis? = nil,
+        includeRecommendation: Bool = true
+    ) async throws -> OfflinePlanResult {
         guard let active = activePackage, let database else { throw OfflineCoreError.notInitialized }
         let date = Self.compactDate(containing: at)
         if date < active.serviceDateFrom || date > active.serviceDateTo {
-            return BoardData(
+            return OfflinePlanResult(board: BoardData(
                 from: from,
                 to: to,
                 generatedAt: active.generatedAt,
@@ -109,19 +130,19 @@ actor OfflinePlanner {
                 offline: true,
                 coverage: coverageDescription,
                 error: "The offline timetable does not cover this date"
-            )
+            ), recommendation: nil)
         }
         guard !modes.isEmpty,
               !from.modes.intersection(modes).isEmpty,
               !to.modes.intersection(modes).isEmpty else {
-            return BoardData(
+            return OfflinePlanResult(board: BoardData(
                 from: from,
                 to: to,
                 generatedAt: active.generatedAt,
                 source: "schedule",
                 offline: true,
                 coverage: coverageDescription
-            )
+            ), recommendation: nil)
         }
 
         var assignments: [String: StopAssignment] = [:]
@@ -138,43 +159,96 @@ actor OfflinePlanner {
             return realtime.overlay(scheduled, assignment: assigned).sorted(by: Self.connectionOrder)
         }
 
-        var routed = router.route(
+        let initialConnections = try connections(Self.initialHorizonHours)
+        let generation = dataGeneration
+        var observationRealtime = realtime
+        var (routed, recommended) = try await Self.solve(
+            router: router, from: from, to: to, at: at, recommendationAt: recommendationAt ?? at,
+            connections: initialConnections, limit: limit, maxTransfers: maxTransfers,
+            includeRecommendation: includeRecommendation
+        )
+        guard generation == dataGeneration else { throw CancellationError() }
+        let recommendationNeedsHorizon = includeRecommendation && (recommended.flatMap(recommendationCost).map { cost in
+            (initialConnections.last?.effectiveDeparture ?? -.infinity) < cost
+        } ?? true)
+        if routed.isEmpty || routed.contains(where: Self.hasLongWait) || recommendationNeedsHorizon {
+            try Task.checkCancellation()
+            let extendedConnections = try connections(Self.maximumHorizonHours)
+            observationRealtime = realtime
+            (routed, recommended) = try await Self.solve(
+                router: router, from: from, to: to, at: at, recommendationAt: recommendationAt ?? at,
+                connections: extendedConnections, limit: limit, maxTransfers: maxTransfers,
+                includeRecommendation: includeRecommendation
+            )
+            guard generation == dataGeneration else { throw CancellationError() }
+        }
+        try Task.checkCancellation()
+        func observedEnvelope(_ values: [Journey]) -> ([Journey], Millis?, Bool) {
+            var observedAt: Millis?
+            var matched = false
+            let journeys = values.map { journey in
+                let result = observationRealtime.observation(journey)
+                matched = matched || result.matched
+                if let observation = result.observedAt {
+                    observedAt = min(observedAt ?? .greatestFiniteMagnitude, observation)
+                }
+                return result.value
+            }
+            return (journeys, observedAt, matched)
+        }
+        let boardEnvelope = observedEnvelope(routed)
+        let recommendationEnvelope = observedEnvelope(recommended.map { [$0] } ?? [])
+        let observedRecommendation = recommendationEnvelope.0.first
+        let board = BoardData(
             from: from,
             to: to,
-            at: at,
-            connections: try connections(Self.initialHorizonHours),
-            limit: limit,
-            maxTransfers: maxTransfers
+            journeys: boardEnvelope.0,
+            generatedAt: boardEnvelope.1 ?? active.generatedAt,
+            source: boardEnvelope.2 ? "live" : "schedule",
+            offline: !boardEnvelope.2,
+            coverage: coverageDescription,
+            requestMaxTransfers: maxTransfers
         )
-        if routed.isEmpty || routed.contains(where: Self.hasLongWait) {
-            routed = router.route(
+        let recommendationBoard = observedRecommendation.map { journey in
+            BoardData(
                 from: from,
                 to: to,
-                at: at,
-                connections: try connections(Self.maximumHorizonHours),
-                limit: limit,
-                maxTransfers: maxTransfers
+                journeys: [journey],
+                generatedAt: recommendationEnvelope.1 ?? active.generatedAt,
+                source: recommendationEnvelope.2 ? "live" : "schedule",
+                offline: !recommendationEnvelope.2,
+                coverage: coverageDescription,
+                requestMaxTransfers: maxTransfers
             )
         }
-        var observedAt: Millis?
-        var matched = false
-        let journeys = routed.map { journey in
-            let result = realtime.observation(journey)
-            matched = matched || result.matched
-            if let observation = result.observedAt {
-                observedAt = min(observedAt ?? .greatestFiniteMagnitude, observation)
+        return OfflinePlanResult(
+            board: board,
+            recommendation: observedRecommendation.flatMap { journey in
+                recommendationBoard.map { JourneyRecommendation(journey: journey, board: $0) }
             }
-            return result.value
-        }
-        return BoardData(
-            from: from,
-            to: to,
-            journeys: journeys,
-            generatedAt: observedAt ?? active.generatedAt,
-            source: matched ? "live" : "schedule",
-            offline: !matched,
-            coverage: coverageDescription
         )
+    }
+
+    private nonisolated static func solve(
+        router: OfflineRouter, from: Station, to: Station, at: Millis, recommendationAt: Millis,
+        connections: [ScheduledConnection], limit: Int, maxTransfers: Int, includeRecommendation: Bool
+    ) async throws -> ([Journey], Journey?) {
+        let task = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
+            let board = router.route(from: from, to: to, at: at, connections: connections,
+                                     limit: limit, maxTransfers: maxTransfers, isCancelled: { Task.isCancelled })
+            try Task.checkCancellation()
+            let recommendation = includeRecommendation
+                ? router.recommendation(from: from, to: to, at: recommendationAt, connections: connections,
+                                        maxTransfers: maxTransfers, isCancelled: { Task.isCancelled }) : nil
+            try Task.checkCancellation()
+            return (board, recommendation)
+        }
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+        }
     }
 
     func refreshRealtime(baseURL: String) async throws {

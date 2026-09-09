@@ -12,7 +12,8 @@ import { journeyDeviceHtml, clampJourneyBars, chipInk } from './journeybar.js';
 import { cacheKey, leg } from './storage.js';
 import { AT_STATION_KM, distanceKm } from './stations.js';
 import { dayTypeMatch, homeOf, HOME_VOTES_NEEDED, hourProximity, isWeekend, rankTrips } from './predict.js';
-import { journeyAllowed, preferencesOf, tripsForModes, SUPPORTED_MODES } from './preferences.js';
+import { effectiveCap, journeyAllowed, preferencesOf, tripsForModes, SUPPORTED_MODES } from './preferences.js';
+import { selectRecommendation } from './recommendation.js';
 
 const RECEIPT_EVIDENCE = 3;
 
@@ -31,6 +32,26 @@ export function nextService(journeys, lead, nowMs, stale = false) {
     journey: candidate, key: journeyKey(candidate), label: `Next ${vehicle}`,
     figure: countdownFigure(minutesUntil(departureMs(candidate), nowMs)),
     depTime: clock(departureMs(candidate)), arrTime: arrival === null ? '—' : clock(arrival), stale
+  };
+}
+
+function alternativeService(value, lead, nowMs) {
+  const journey = value?.journey || value;
+  if (!journey || departureMs(journey) < nowMs) return null;
+  const mode = String(legsOf(journey)[0]?.line?.mode || '').toLowerCase();
+  const earlier = departureMs(journey) < departureMs(lead);
+  const vehicle = earlier ? modeWords(mode).vehicle
+    : ['train', 'metro', 'ferry'].includes(mode) ? mode : 'service';
+  const arrival = arrivalMs(journey);
+  return {
+    journey,
+    key: journeyKey(journey),
+    label: `${earlier ? 'Earlier' : 'Next'} ${vehicle}`,
+    figure: countdownFigure(minutesUntil(departureMs(journey), nowMs)),
+    depTime: clock(departureMs(journey)),
+    arrTime: arrival === null ? '—' : clock(arrival),
+    stale: value?.stale === true,
+    source: value?.source
   };
 }
 
@@ -76,7 +97,7 @@ function cachedJourney(doc, trip, direction, modes) {
     const entry = doc.cache && doc.cache[key];
     const journeys = entry && entry.body && Array.isArray(entry.body.journeys)
       ? entry.body.journeys : [];
-    const eligible = journeys.find((journey) => journeyAllowed(journey, modes));
+    const eligible = journeys.find((journey) => journeyAllowed(journey, modes, effectiveCap(doc)));
     if (eligible) return eligible;
   }
   return null;
@@ -101,38 +122,43 @@ function savedThisOpen(trip, loadedAt) {
 export function homeModel(doc, selection, body, nowMs, opts = {}) {
   const preferences = preferencesOf(doc);
   const enabledModes = preferences.enabledModes;
-  const activeFocus = visibleFocus(doc, nowMs, opts.stations);
+  const activeFocus = visibleFocus(doc, nowMs, opts.stations, opts.resumeWaitUntilMs);
   const trip = doc.trips.find((item) => item.id === selection.tripId) || doc.trips[0];
   const ends = leg(trip, selection.direction);
+  const maxTransfers = effectiveCap(doc);
   const journeys = body && Array.isArray(body.journeys)
-    ? body.journeys.filter((item) => journeyAllowed(item, enabledModes)) : [];
+    ? body.journeys.filter((item) => journeyAllowed(item, enabledModes, maxTransfers)) : [];
   const focusJourneys = opts.focusBody && Array.isArray(opts.focusBody.journeys)
-    ? opts.focusBody.journeys.filter((item) => journeyAllowed(item, enabledModes)) : [];
-  const liveLead = journeys[0] || null;
-  const nextRunning = journeys.find((item) => !journeyCancelled(item)) || null;
+    ? opts.focusBody.journeys.filter((item) => journeyAllowed(item, enabledModes, maxTransfers)) : [];
+  const liveLead = journeys.find(item => departureMs(item) >= nowMs) || null;
+  const nextRunning = selectRecommendation(journeys, nowMs, { modes: enabledModes, maxTransfers });
   const focusDep = activeFocus ? departureMs(activeFocus.journey) : null;
   // Cancelled before it leaves, the header shows the next running service
   // while the status still reads CANCELLED.
   const sameFocusedPair = activeFocus && selection.tripId === activeFocus.tripId
     && selection.direction === activeFocus.direction;
-  const candidateReplacement = sameFocusedPair && journeyCancelled(activeFocus.journey)
-    && focusDep !== null && nowMs < focusDep
-    ? journeys.find((item) => !journeyCancelled(item)
-      && departureMs(item) !== null && departureMs(item) > focusDep) || null : null;
-  const focusReplacement = !candidateReplacement && activeFocus && journeyCancelled(activeFocus.journey)
-    && focusDep !== null && nowMs < focusDep
-    ? focusJourneys.find((item) => !journeyCancelled(item)
-      && departureMs(item) !== null && departureMs(item) > focusDep) || null : null;
+  const replacementObservation = activeFocus && journeyCancelled(activeFocus.journey)
+    && focusDep !== null && nowMs < focusDep ? selectRecommendation([
+      ...(sameFocusedPair ? [
+        ...(opts.recommendation ? [opts.recommendation] : []),
+        ...journeys.map(journey => ({ journey, source: opts.candidateSource, stale: opts.candidateSource?.stale }))
+      ] : []),
+      ...focusJourneys.map(journey => ({ journey, source: opts.focusSource, stale: opts.focusSource?.stale, fromFocus: true }))
+    ].filter(value => departureKey(value.journey) !== departureKey(activeFocus.journey)),
+    nowMs, { modes: enabledModes, maxTransfers }) : null;
+  const candidateReplacement = replacementObservation && !replacementObservation.fromFocus ? replacementObservation.journey : null;
+  const focusReplacement = replacementObservation?.fromFocus ? replacementObservation.journey : null;
   const replacement = candidateReplacement || focusReplacement;
   const displaySource = activeFocus
-    ? replacement ? (focusReplacement ? opts.focusSource : opts.candidateSource) : opts.focusSource
-    : opts.candidateSource;
+    ? replacement ? replacementObservation.source : opts.focusSource
+    : opts.recommendation?.source ? opts.recommendation.source : opts.candidateSource;
   const displayStale = displaySource ? Boolean(displaySource.stale) : Boolean(opts.stale);
   const cancelledTime = replacement ? clock(focusDep)
     : !activeFocus && liveLead && journeyCancelled(liveLead) && nextRunning && nextRunning !== liveLead
       && departureMs(liveLead) !== null ? clock(departureMs(liveLead)) : '';
   const journey = activeFocus ? replacement || activeFocus.journey
-    : nextRunning || liveLead || (!body ? cachedJourney(doc, trip, selection.direction, enabledModes) : null);
+    : opts.recommendation?.journey || nextRunning || liveLead
+      || (!body ? cachedJourney(doc, trip, selection.direction, enabledModes) : null);
   const firstJourneyLeg = legsOf(journey)[0] || {};
   const selected = activeFocus
     ? { tripId: activeFocus.tripId, direction: activeFocus.direction } : selection;
@@ -162,13 +188,16 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
       : `You usually travel from ${shortName(home.station.name)}.`;
   }
 
-  const over = Boolean(activeFocus) && (tripIsOver(activeFocus, nowMs) || Boolean(opts.arrived));
+  const over = Boolean(activeFocus) && ('arrivalDecision' in opts
+    ? opts.arrivalDecision?.state === 'arrived'
+    : tripIsOver(activeFocus, nowMs) || Boolean(opts.arrived));
   const directions = journey ? directionsModel(journey, nowMs, {
     stale: displayStale,
     fromName: selectedEnds.from.name,
     toName: selectedEnds.to.name,
     leave: opts.leave || '',
     arrived: over,
+    arrivalDecision: opts.arrivalDecision,
     cancelledTime,
     receipt
   }) : {
@@ -180,7 +209,8 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     instruction: !enabledModes.length ? 'Turn on a service in Settings'
       : opts.offline ? 'Couldn’t refresh this trip. Try again when connected.'
         : opts.stale ? 'No services on the last board we could load'
-          : body ? modeSubset ? 'No journeys with these services' : 'No services in the next few hours'
+          : body ? maxTransfers === 0 ? 'No direct services found'
+            : modeSubset ? 'No journeys with these services' : 'No services in the next few hours'
             : 'Getting the next trains…',
     progress: { at: 0, phase: 'pre' }, showBoardingPlatform: true, receipt: '',
     settingsAction: !enabledModes.length || Boolean(body && modeSubset && !opts.offline && !opts.stale),
@@ -206,7 +236,9 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
   const status = activeFocus ? focusStatus(activeFocus.journey, {
     activeLeg: directions.activeLeg,
     stale: displayStale,
-    over
+    over,
+    arrivalState: opts.arrivalDecision?.state,
+    moving: opts.arrivalDecision?.moving
   }) : null;
   const strip = activeFocus && activeFocus.by === 'inferred' ? {
     origin: selectedEnds.from,
@@ -221,8 +253,11 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
   const followingBody = useFocusSource ? opts.focusBody : body;
   const followingStale = followingSource ? Boolean(followingSource.stale) : displayStale;
   const following = directions.phase === 'pre' && !over
-    ? nextService(useFocusSource ? focusJourneys : journeys, journey, nowMs, followingStale) : null;
-  if (following) following.source = {
+    ? !activeFocus && opts.alternative
+      ? alternativeService(opts.alternative, journey, nowMs)
+      : nextService(useFocusSource ? focusJourneys : journeys, journey, nowMs, followingStale)
+    : null;
+  if (following && !following.source) following.source = {
     body: followingBody, offline: followingStale, serverStale: followingSource?.dot === 'stale'
   };
   return {
@@ -245,7 +280,8 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     over,
     freshness: waiting ? '' : displaySource?.freshness || (displayStale ? 'Offline' : 'Live'),
     dot: waiting ? 'idle' : displaySource?.dot || (displayStale ? 'stale' : 'live'),
-    askLocation: Boolean(opts.askLocation)
+    askLocation: Boolean(opts.askLocation),
+    displaySource
   };
 }
 
@@ -283,11 +319,11 @@ export function homeHtml(model) {
       ${topHtml(model)}
       <span class="hm-fresh"><span class="pulse ${esc(model.dot)}"></span><span class="lbl">${esc(model.freshness)}</span></span>
     </div>
-    <section class="hm-hd${String(d.figure).length > 2 ? ' wide' : ''}${d.provenanceWarn ? ' late' : ''}${late ? ' active-late' : ''}" style="${device.vars}" data-active-late="${late}">
+    <section class="hm-hd${String(d.figure).length > 2 ? ' wide' : ''}${d.provenanceWarn ? ' late' : ''}${late ? ' active-late' : ''}" style="${device.vars}" data-active-late="${late}"${journey ? ` data-act="recommendation-detail" data-tap role="button" tabindex="0" aria-label="Open ${esc(d.from)} to ${esc(d.to)} journey"` : ''}>
       <span class="hm-fig"><span class="hm-n">${figureHtml(d.figure, 'hm-u')}</span><span class="hm-st${d.warn || d.provenanceWarn ? ' warn' : ''}">${esc(provenance || '')}</span></span>
       <span class="hm-ends">
         <span class="hm-e from"><span class="hm-stn" data-fit-box data-fit-name="${esc(d.from)}">${esc(d.from)}</span><span class="hm-t">${esc(d.depTime)}</span></span>
-        <span class="hm-e to"><span class="hm-stn" data-fit-box data-fit-name="${esc(d.to)}">${esc(d.to)}</span><span class="hm-t">${esc(d.arrTime)}</span></span>
+        <span class="hm-e to"><span class="hm-stn" data-fit-box data-fit-name="${esc(d.to)}">${esc(d.to)}</span><span class="hm-t">${esc(d.arrTime)}</span>${d.lastEstimate ? '<span class="hm-estimate">Last estimate</span>' : ''}</span>
       </span>
       ${device.html}
       <span class="hm-sign${d.warn ? ' note' : d.act ? ' hm-act' : ''}">${d.allServicesOff

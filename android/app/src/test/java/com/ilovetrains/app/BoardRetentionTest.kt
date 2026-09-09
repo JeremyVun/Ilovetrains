@@ -22,6 +22,22 @@ class BoardRetentionTest {
         assertFalse(restored.board.isLive(now))
     }
 
+    @Test fun cachedRecommendationKeepsItsOwnSourceButCannotLookFreshOffline() {
+        val source = previous.copy(journeys = listOf(t9), generatedAt = now)
+        val cached = previous.copy(journeys = emptyList(), homeJourneyKey = t9.key,
+            recommendation = RecommendationResult(t9, source)).lastKnown()
+
+        assertEquals(t9.key, nextHomeJourney(cached, now)?.key)
+        assertTrue(cached.recommendation!!.journey.retained)
+        assertTrue(cached.recommendation.source.offline)
+        assertFalse(cached.recommendation.source.isLive(now))
+        assertEquals(t9.key, nextHomeJourney(cached, now + 9 * 60_000)?.key)
+        val scheduled = previous.copy(journeys = emptyList(), source = "schedule", offline = true,
+            recommendation = RecommendationResult(Journey(t9.legs.map { it.copy(estimatedArrival = null) }), previous))
+        val reopened = requireNotNull(mergeBoardResults(cached, scheduled, null, now + 9 * 60_000))
+        assertEquals(t9.effectiveArrival, nextHomeJourney(reopened, now + 9 * 60_000)?.effectiveArrival)
+    }
+
     @Test fun aCachedBoardLosesItsThreeChangeRowsOnlyWhileTheCapIsOn() {
         val hub = Station("200060", "Central Station")
         fun leg(from: Station, to: Station, index: Int) = Leg("T1", "train", to.name, from, to,
@@ -29,11 +45,11 @@ class BoardRetentionTest {
         val threeChanges = Journey(listOf(leg(townHall, hub, 0), leg(hub, rhodes, 1), leg(rhodes, hub, 2), leg(hub, rhodes, 3)))
         val cached = Wire.board(JSONObject(Wire.board(previous.copy(journeys = listOf(t9, threeChanges))).toString()))
 
-        assertEquals(listOf(t9.key), cached.withinTransferCap(true).journeys.map { it.key })
-        assertEquals(listOf(t9.key, threeChanges.key), cached.withinTransferCap(false).journeys.map { it.key })
-        assertFalse(threeChanges.withinTransferCap(true))
-        assertTrue(threeChanges.withinTransferCap(false))
-        assertTrue(t9.withinTransferCap(true))
+        assertEquals(listOf(t9.key), cached.withinTransferCap(2).journeys.map { it.key })
+        assertEquals(listOf(t9.key, threeChanges.key), cached.withinTransferCap(null).journeys.map { it.key })
+        assertFalse(threeChanges.withinTransferCap(2))
+        assertTrue(threeChanges.withinTransferCap(null))
+        assertTrue(t9.withinTransferCap(2))
     }
 
     @Test fun delayedTrainSurvivesOfflineReopenFiveMinutesAfterDeparture() {

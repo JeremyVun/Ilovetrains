@@ -55,6 +55,7 @@ function endMark(rows) {
 
 export function emptyCopy(model) {
   if (model.status === 'services-off') return 'Turn on a service in Settings';
+  if (model.status === 'direct-empty') return 'No direct services found';
   if (model.status === 'services-empty') return 'No journeys with these services';
   if (model.status === 'loading') return 'Getting the next trains…';
   if (model.status === 'offline') return 'No board saved for this trip yet';

@@ -44,17 +44,27 @@ struct FocusedJourney: Codable, Equatable, Sendable {
     var board: BoardData
     var pinned: Bool
     var alternatives: BoardData?
+    var arrivalGuard: ArrivalGuard?
 
-    init(tripId: String, reverse: Bool, journey: Journey, board: BoardData, pinned: Bool = true, alternatives: BoardData? = nil) {
+    init(
+        tripId: String,
+        reverse: Bool,
+        journey: Journey,
+        board: BoardData,
+        pinned: Bool = true,
+        alternatives: BoardData? = nil,
+        arrivalGuard: ArrivalGuard? = nil
+    ) {
         self.tripId = tripId
         self.reverse = reverse
         self.journey = journey
         self.board = board
         self.pinned = pinned
         self.alternatives = alternatives
+        self.arrivalGuard = arrivalGuard
     }
 
-    private enum CodingKeys: String, CodingKey { case tripId, reverse, journey, board, pinned, alternatives }
+    private enum CodingKeys: String, CodingKey { case tripId, reverse, journey, board, pinned, alternatives, arrivalGuard }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -64,6 +74,7 @@ struct FocusedJourney: Codable, Equatable, Sendable {
         board = try container.decode(BoardData.self, forKey: .board)
         pinned = (try? container.decodeIfPresent(Bool.self, forKey: .pinned)) ?? true
         alternatives = try? container.decodeIfPresent(BoardData.self, forKey: .alternatives)
+        arrivalGuard = try? container.decodeIfPresent(ArrivalGuard.self, forKey: .arrivalGuard)
     }
 }
 
@@ -266,13 +277,29 @@ struct UserData: Codable, Equatable, Sendable {
         return value
     }
 
-    var capped: Bool { flags[transferLimitFlagKey] == true && transferLimit == .two }
-    var requestTransferLimit: Int? { capped ? 2 : nil }
-    var offlineTransferBound: Int { flags[transferLimitFlagKey] == true && transferLimit == .any ? 4 : 2 }
-    func withinTransferLimit(_ journey: Journey) -> Bool { !capped || journey.legs.count <= 3 }
+    var requestTransferLimit: Int? {
+        guard flags[transferLimitFlagKey] == true else { return nil }
+        return switch transferLimit {
+        case .direct: 0
+        case .two: 2
+        case .any: nil
+        }
+    }
+    var capped: Bool { requestTransferLimit != nil }
+    var offlineTransferBound: Int {
+        guard flags[transferLimitFlagKey] == true else { return 2 }
+        return switch transferLimit {
+        case .direct: 0
+        case .two: 2
+        case .any: 4
+        }
+    }
+    func withinTransferLimit(_ journey: Journey) -> Bool {
+        requestTransferLimit.map { journey.legs.count - 1 <= $0 } ?? true
+    }
     func withinTransferLimit(_ board: BoardData) -> BoardData {
         var value = board
-        value.journeys = board.journeys.filter(withinTransferLimit)
+        value.journeys = board.journeys.filter { withinTransferLimit($0) && journeyAllowed($0, modes: modes) }
         return value
     }
 

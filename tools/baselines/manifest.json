@@ -1,18 +1,18 @@
 {
   "web": {
-    "commit": "bd9e6bd",
-    "date": "2026-09-08",
-    "device": "Google Chrome 152.0.7977.82, 390x844 css @2x"
+    "commit": "a21dbec",
+    "date": "2026-09-09",
+    "device": "Google Chrome 152.0.7977.84, 390x844 css @2x"
   },
   "ios": {
-    "commit": "7a589f2",
-    "date": "2026-09-07",
-    "device": "ILoveTrains Location Baselines 1206x2622px, content size large",
-    "simulator": "ILoveTrains Location Baselines"
+    "commit": "a21dbec",
+    "date": "2026-09-09",
+    "device": "Codex-commute-feedback-01 1206x2622px, content size large",
+    "simulator": "Codex-commute-feedback-01"
   },
   "android": {
-    "commit": "277aa43",
-    "date": "2026-09-08",
+    "commit": "a21dbec",
+    "date": "2026-09-09",
     "device": "sdk_gphone64_arm64 API 36, configuredRoot=390x844dp configuredSafeDrawing=0,0,0,0dp configuredContent=390x844dp density=2.625 fontScale=1.0 capturedBitmap=1024x2216px capturedLogical=390x844dp"
   }
 }

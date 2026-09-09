@@ -1,7 +1,25 @@
 import XCTest
+import SwiftUI
 @testable import ILoveTrains
 
 final class TinyTrainTests: XCTestCase {
+    func testWaratahFormationGeometry() {
+        XCTAssertEqual(tinyTrainCarCount, 8)
+        XCTAssertEqual(tinyTrainLength, 327)
+    }
+
+    func testCarBodiesAreFilledAndReducedConsistFitsItsLane() {
+        for cab in [false, true] {
+            let path = tinyTrainCarBody(cab: cab)
+            XCTAssertTrue(path.contains(CGPoint(x: 20, y: 9)))
+            XCTAssertTrue(path.contains(CGPoint(x: 2, y: 14)))
+            XCTAssertEqual(path.contains(CGPoint(x: 39, y: 4)), !cab)
+        }
+        let lane: CGFloat = 180
+        let scale = lane / tinyTrainLength
+        XCTAssertEqual(tinyTrainCarOffset(7, scale: scale) + tinyTrainCarWidth * scale, lane, accuracy: 0.001)
+    }
+
     func testTheToyReadsTheFlagsAnswerAndRequiresLiteralTrue() throws {
         func flag(_ raw: String) throws -> Bool { try TransitWire.flags(Data(raw.utf8))[tinyTrainFlagKey] == true }
         XCTAssertTrue(try flag(#"{"tiny_train":true,"unrelated":"value"}"#))

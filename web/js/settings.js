@@ -170,15 +170,16 @@ function serviceButton(mode, label, on, disabled = false) {
 }
 
 const TRANSFER_VALUES = {
-  two: { value: 'Up to 2', mark: 'No limit', label: 'Transfer limit, Up to 2 transfers, Change to no limit' },
-  any: { value: 'No limit', mark: 'Up to 2', label: 'Transfer limit, No limit on transfers, Change to up to 2 transfers' }
+  direct: { value: 'Direct only', label: 'Transfer limit, Direct only, Change' },
+  two: { value: 'Up to 2', label: 'Transfer limit, Up to 2, Change' },
+  any: { value: 'No limit', label: 'Transfer limit, No limit, Change' }
 };
 
 /** The Personal rows' composition without an icon column: no glyph in the set
     means this, and an invented one would not be a borrow. */
 export function transferRow(transferLimit) {
   const words = TRANSFER_VALUES[transferLimit] || TRANSFER_VALUES.two;
-  return `<button class="st-person-row st-transfer-row" data-act="transfer-limit" aria-label="${esc(words.label)}"><span class="st-copy"><span class="st-name">Transfer limit</span><span class="st-value">${words.value}</span></span><span class="st-state">${words.mark}</span></button>`;
+  return `<button class="st-person-row st-transfer-row" data-act="transfer-limit" aria-label="${esc(words.label)}"><span class="st-copy"><span class="st-name">Transfer limit</span><span class="st-value">${words.value}</span></span><span class="st-state">Change</span></button>`;
 }
 
 export function services(enabledModes, transferLimit = null) {
@@ -232,7 +233,8 @@ function paintMain(root, ctx, permission) {
     }
     if (action === 'transfer-limit') {
       const current = preferencesOf(ctx.doc).transferLimit;
-      ctx.setPreferences({ transferLimit: current === 'two' ? 'any' : 'two' });
+      const next = current === 'direct' ? 'two' : current === 'two' ? 'any' : 'direct';
+      ctx.setPreferences({ transferLimit: next });
       paintMain(root, ctx, permission);
       return;
     }

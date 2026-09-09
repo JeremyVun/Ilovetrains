@@ -12,7 +12,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -65,34 +65,46 @@ internal fun TinyTrainLane(modifier: Modifier = Modifier, flag: Boolean = LocalT
         } else Modifier)) {
         if (!running || !enabled) return@Canvas
         val unit = 1.dp.toPx()
-        val trainWidth = 197 * unit
+        val logicalWidth = 327f
+        val fitScale = minOf(1f, size.width / (logicalWidth * unit))
+        val trainWidth = logicalWidth * unit * fitScale
         val left = if (reduced) (size.width - trainWidth) / 2 else
             -trainWidth - 4 * unit + progress * (size.width + trainWidth + 8 * unit)
         val body = if (colors.dark) Color(0xFFB6BAB8) else Color(0xFF9DA3A1)
         val window = if (colors.dark) Color(0xFF4A3328) else Color(0xFF3B2A22)
         clipRect(0f, 0f, size.width, 18 * unit) {
-            repeat(6) { car ->
-                translate(left + car * 33 * unit, 0f) {
+            repeat(8) { car ->
+                withTransform({
+                    translate(left + car * 41 * unit * fitScale, 0f)
+                    scale(fitScale, fitScale, Offset.Zero)
+                    if (car == 0) scale(-1f, 1f, Offset(20 * unit, 0f))
+                }) {
                     fun rect(x: Float, y: Float, w: Float, h: Float, color: Color) =
                         drawRect(color, Offset(x * unit, y * unit), Size(w * unit, h * unit))
-                    val lead = car == 5
+                    val lead = car == 0 || car == 7
                     val shape = Path().apply {
-                        moveTo(unit, 3 * unit); lineTo((if (lead) 25 else 31) * unit, 3 * unit)
-                        if (lead) lineTo(31 * unit, 7 * unit)
-                        lineTo(31 * unit, 15 * unit); lineTo(unit, 15 * unit); close()
+                        moveTo(unit, 3 * unit); lineTo((if (lead) 33 else 39) * unit, 3 * unit)
+                        if (lead) lineTo(39 * unit, 7 * unit)
+                        lineTo(39 * unit, 15 * unit); lineTo(unit, 15 * unit); close()
                     }
                     drawPath(shape, body)
-                    for (y in listOf(5f, 9f)) for (x in listOf(4f, 9f, 14f, 19f)) rect(x, y, 3f, 2f, if (y == 5f) window else if (colors.dark) Color(0xFF2A1D18) else Color(0xFF241713))
+                    for (x in listOf(6f, 28f)) {
+                        rect(x, 4f, 5f, 11f, if (colors.dark) Color(0xFFF9B928) else Color(0xFFE4A20C))
+                        drawLine(body.copy(alpha = .7f), Offset((x + 2.5f) * unit, 4 * unit), Offset((x + 2.5f) * unit, 15 * unit), .6f * unit)
+                        rect(x + .5f, 5f, 1.5f, 3f, window)
+                        rect(x + 3f, 5f, 1.5f, 3f, window)
+                    }
+                    for (y in listOf(5f, 9f)) for (x in listOf(12.5f, 16.5f, 20.5f, 24.5f)) rect(x, y, 2.5f, 2f, window)
                     if (lead) {
                         val nose = Path().apply {
-                            moveTo(24 * unit, 3 * unit); lineTo(26 * unit, 3 * unit); lineTo(31 * unit, 7 * unit)
-                            lineTo(31 * unit, 15 * unit); lineTo(24 * unit, 15 * unit); close()
+                            moveTo(33 * unit, 3 * unit); lineTo(39 * unit, 7 * unit)
+                            lineTo(39 * unit, 15 * unit); lineTo(33 * unit, 15 * unit); close()
                         }
                         drawPath(nose, if (colors.dark) Color(0xFFF9B928) else Color(0xFFE4A20C))
-                        rect(25f, 5f, 3f, 4f, window)
-                        rect(29f, 12f, 1f, 1f, if (colors.dark) Color(0xFFFFF1AE) else Color(0xFFFFF3B3))
-                    } else rect(25f, 5f, 3f, 8f, if (colors.dark) Color(0xFF939896) else Color(0xFF747B79))
-                    for (x in listOf(7f, 25f)) drawCircle(Color(0xFF201C1A), 1.5f * unit, Offset(x * unit, 16 * unit))
+                        rect(34f, 5f, 3f, 4f, window)
+                        rect(37f, 12f, 1f, 1f, if (colors.dark) Color(0xFFFFF1AE) else Color(0xFFFFF3B3))
+                    }
+                    for (x in listOf(8f, 32f)) drawCircle(Color(0xFF201C1A), 1.5f * unit, Offset(x * unit, 16 * unit))
                 }
             }
         }

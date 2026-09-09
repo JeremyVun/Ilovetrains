@@ -27,7 +27,7 @@ that feeds it or a place to fall back to when it is wrong.
 
 What "reading the user's mind" means in practice:
 
-- Opening the app on the way to work shows the next train to work, from the
+- Opening the app on the way to work recommends the train to work, from the
   station the user is actually near, enriched by location, past rides,
   behaviour and likely intent.
 - Opening the app later that day shows the way home: the reverse trip and
@@ -100,8 +100,10 @@ moves through are binding in `docs/contracts/ui.md`.
 3. **Routes and transfers just work.** Journey planning must be good enough
    that the user never wants to configure it. The one justified exception is
    the transfer limit, because a journey with more than two changes cannot
-   name its change stations under a journey line this narrow: the board keeps
-   to two changes and Settings carries the single row that lifts the cap.
+   name its change stations under a journey line this narrow: Settings offers
+   Direct only, Up to 2 and No limit in one row, behind the existing flag.
+   Recommendations compare arrival plus five minutes per change; boards
+   remain chronological.
    There is still no "prefer fewer changes" toggle and no numeric stepper.
    The server applies a tuneable minimum connection time so unreasonably
    tight trips are never shown; the UI's tight-change treatment fires only
@@ -147,7 +149,10 @@ moves through are binding in `docs/contracts/ui.md`.
 - **Focus** returns you to home and turns the header into directions:
   `TO CHANGE` / `TO GO`, the boarding platform cap disappears once boarded,
   a continuous progress marker travels the bar driven by timetable and live
-  estimates (never continuous tracking). Once the trip is over, home offers
+  estimates (never continuous tracking), with completed route and platform
+  colours faded. Foreground location evidence guards final arrival once
+  permitted monitoring begins; missing GPS never completes an armed trip.
+  Once arrival is confirmed, or an unguarded estimate passes, home offers
   "Show the way back", which fetches a REAL return journey with its own
   transfer platforms.
 - **Setup and add-trip**: recent searches per field, fuzzy-ranked station
@@ -304,7 +309,8 @@ it. The native Android (Kotlin, Compose) and iOS (Swift, SwiftUI) apps are
 ported afterwards, against those exemplars, and deliberately lag by one
 round. They exist for what the browser cannot give at native quality: cold
 launch, widgets, background location for ride detection, notifications,
-preloaded assets.
+preloaded assets. This feature uses foreground location only; it requests no
+background location access.
 
 Android lives in `android/` and iOS in `ios/`. Each bundles a validated timetable for new offline
 journeys, refreshes exact source identities with realtime data, and uses the

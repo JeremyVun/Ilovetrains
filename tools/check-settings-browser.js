@@ -171,7 +171,7 @@ function geometryScript(extra = '') {
 }
 
 function transferRowScript(choice) {
-  const words = { two: { value: 'Up to 2', mark: 'No limit' }, any: { value: 'No limit', mark: 'Up to 2' } }[choice];
+  const words = { direct: { value: 'Direct only', mark: 'Change' }, two: { value: 'Up to 2', mark: 'Change' }, any: { value: 'No limit', mark: 'Change' } }[choice];
   return `
     const transferRow = document.querySelector('.st-transfer-row');
     assert(transferRow instanceof HTMLButtonElement, 'transfer limit row is not one button');
@@ -1197,6 +1197,9 @@ try {
     flags: { transferLimit: true }
   });
   await Promise.all([
+    run('transfer-limit-direct-390', transferSeed('direct'), geometryScript(transferRowScript('direct')), firstPort + 4, {
+      permission: 'granted', out: frame('settings-390x844-transfer-limit-direct.png') || undefined
+    }),
     run('transfer-limit-390', transferSeed('two'), geometryScript(transferRowScript('two')), firstPort, {
       permission: 'granted', out: frame('settings-390x844-transfer-limit.png') || undefined
     }),

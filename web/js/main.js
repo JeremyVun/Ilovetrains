@@ -11,8 +11,8 @@ import { boardModel, promotedRow } from './rowmodel.js';
 import { journeyDetail, journeyKey, departureKey, legsOf, arrivalMs, departureMs } from './journey.js';
 import {
   focusOf, visibleFocus, setFocus, clearFocus, isFocused, focusExpired, matchJourney,
-  settleRefreshedFocus, settleRide,
-  directionsModel, inferTravel, arrived, journeyCancelled, TRAVEL_LATE_MS
+  applyFocusSnapshot, applyArrivalResult,
+  directionsModel, inferTravel, journeyCancelled, TRAVEL_LATE_MS
 } from './focus.js';
 import * as Board from './board.js';
 import { clampJourneyBars } from './journeybar.js';
@@ -28,6 +28,8 @@ import {
   tripAllowed, tripsForModes, stationAllowed, SUPPORTED_MODES,
   preferencesOf, setPreferences, setFlags, effectiveCap, journeyAllowed, filterBody
 } from './preferences.js';
+import { reduceArrival } from './arrival.js';
+import { earliestAlternative, nextRecommendationCursor, selectRecommendation } from './recommendation.js';
 import {
   createAnalytics, install as installAnalytics, isEnabled, variant, EXPERIMENTS
 } from './analytics.js';
@@ -37,7 +39,11 @@ const FLAGS_TIMEOUT_MS = 3_000;
 const TICK_MS = 1_000;
 const VIEW_QUALIFIES_MS = 5_000;
 const LIMIT = 6;
-const CAPPED_CHANGES = 2;
+const RECOMMENDATION_LIMIT = 10;
+const RECOMMENDATION_PAGES = 2;
+const RECOMMENDATION_DEADLINE_MS = 12_000;
+const RECOMMENDATION_THROTTLE_MS = 60_000;
+const ARRIVAL_RESUME_WAIT_MS = 15_000;
 const PAST_STEP_MS = 60 * 60_000;
 const PAST_BOUND_MS = 24 * 60 * 60_000;
 const FIX_MAX_AGE_MS = 5 * 60_000;
@@ -92,6 +98,7 @@ const state = {
   view: null,
   journey: null,
   detailHandoff: null,
+  detailSource: null,
   initialBoardLanding: true,
   loadingPast: false,
   pastExhausted: false,
@@ -116,6 +123,14 @@ const state = {
   askedPanel: false,
   setupSaved: false
 };
+state.recommendation = null;
+state.recommendationCandidates = [];
+state.recommendationPages = [];
+state.arrivalDecision = null;
+state.arrivalWindow = null;
+state.arrivalResumeWaitUntil = null;
+state.arrivalPermissionPending = false;
+state.focusRefreshPending = null;
 
 const analyticsEnabled = isEnabled({
   hostname: location.hostname,
@@ -162,11 +177,16 @@ const timers = { tick: null, refresh: null, view: null };
 let inflight = null;
 let pastInflight = null;
 let focusInflight = null;
+let recommendationInflight = null;
 let requestGeneration = 0;
 let preserveSelection = false;
 let suppressPreferenceEvents = false;
 let geoGeneration = 0;
 let routeGeneration = 0;
+let arrivalGeneration = 0;
+let arrivalWatch = null;
+let geoPermissionStatus = null;
+const recommendationStartedAt = new Map();
 /* A tick may not rewrite a view whose markup is unchanged: the write would
    discard the element a wheel is scrolling and cancel a smooth scroll. */
 const painted = { home: null, board: null, detail: null };
@@ -203,7 +223,7 @@ const ctx = {
   get useLocation() { return preferencesOf(state.doc).useLocation; },
   setPreferences(patch) {
     const before = preferencesOf(state.doc);
-    const wasCapped = capped();
+    const wasCapped = maxTransfers();
     ctx.update(setPreferences(state.doc, patch));
     const after = preferencesOf(state.doc);
     globalThis.trainsAppearance?.apply(after.appearance);
@@ -211,6 +231,7 @@ const ctx = {
     if (before.useLocation !== after.useLocation) {
       geoGeneration += 1;
       state.fix = null;
+      stopArrivalMonitoring();
     }
     if (before.homeOverride?.id !== after.homeOverride?.id || before.useLocation !== after.useLocation) {
       if (!focusSelection() && state.predicted) {
@@ -218,9 +239,10 @@ const ctx = {
         preserveSelection = false;
       }
     }
-    if (before.enabledModes.join(',') !== after.enabledModes.join(',') || wasCapped !== capped()) {
+    if (before.enabledModes.join(',') !== after.enabledModes.join(',') || wasCapped !== maxTransfers()) {
       refetchEligible();
     }
+    syncArrivalMonitoring();
     return state.doc;
   },
   async requestLocation() {
@@ -249,6 +271,8 @@ const ctx = {
     if (generation !== routeGeneration || state.view !== 'setup') return;
     analytics.track('saved_setup', { f: match ? 'redirect' : 'redirect_lost' });
     if (!match) return ctx.go('#/board');
+    stopArrivalMonitoring();
+    state.arrivalDecision = null;
     ctx.update(setFocus(state.doc, state.selection, match, now(), 'inferred'));
     ctx.go('#/');
   }
@@ -272,7 +296,7 @@ async function redirectJourney(trip, redirect) {
       at: redirect.departureMs - 60_000, limit: LIMIT, modes: enabledModes(),
       transferLimit: transferLimit()
     });
-    return (body.journeys || []).find((item) => journeyAllowed(item, enabledModes(), capped()) && departureKey(item) === redirect.journeyKey) || null;
+    return (body.journeys || []).find((item) => journeyAllowed(item, enabledModes(), maxTransfers()) && departureKey(item) === redirect.journeyKey) || null;
   } catch (_) {
     return null;
   }
@@ -281,15 +305,17 @@ async function redirectJourney(trip, redirect) {
 function invalidateSuggestions() {
   requestGeneration += 1;
   if (inflight) inflight.abort();
+  if (recommendationInflight) recommendationInflight.abort();
   if (pastInflight) pastInflight.abort();
+  recommendationInflight = null;
   state.loadingPast = false;
 }
 
 function enabledModes() { return preferencesOf(state.doc).enabledModes; }
 
-function capped() { return effectiveCap(state.doc); }
+function maxTransfers() { return effectiveCap(state.doc); }
 
-function transferLimit() { return capped() ? CAPPED_CHANGES : undefined; }
+function transferLimit() { return maxTransfers() ?? undefined; }
 
 /* What a changed filter does, whether the rider changed it or the backend
    did: keep the rows that still qualify, ask the API for the rest, and never
@@ -297,7 +323,7 @@ function transferLimit() { return capped() ? CAPPED_CHANGES : undefined; }
 function refetchEligible() {
   invalidateSuggestions();
   const previousSelection = state.selection;
-  const previousBody = filterBody(state.body, enabledModes(), capped());
+  const previousBody = filterBody(state.body, enabledModes(), maxTransfers());
   const previousStale = state.serverStale;
   const followed = focusSelection();
   if (followed) {
@@ -323,6 +349,9 @@ function refetchEligible() {
   state.seenLive = new Map();
   state.seenKey = null;
   state.journey = null;
+  state.recommendation = null;
+  state.recommendationCandidates = [];
+  state.recommendationPages = [];
   fetchLive();
 }
 
@@ -337,9 +366,9 @@ async function loadFlags() {
   if (flagsRequest !== request) return;
   flagsRequest = null;
   if (flags) {
-    const wasCapped = capped();
+    const wasCapped = maxTransfers();
     ctx.update(setFlags(state.doc, flags));
-    if (capped() !== wasCapped) {
+    if (maxTransfers() !== wasCapped) {
       if (state.view === 'settings') renderSettings(state.root, ctx, settingsSubview());
       refetchEligible();
     }
@@ -369,9 +398,11 @@ function route() {
 
   if (hash === '#/settings' || hash.startsWith('#/settings/')) {
     state.view = 'settings';
+    void refreshFollowed();
+    syncArrivalMonitoring();
     renderSettings(root, ctx, settingsSubview());
     startTimers(false);
-    refreshFollowed();
+    void ensureArrivalMonitoring();
     return;
   }
   if (hash === '#/setup' || hash === '#/trips/new') return openSetup(root);
@@ -387,6 +418,7 @@ function route() {
 
 function openSetup(root) {
   state.view = 'setup';
+  stopArrivalMonitoring();
   state.setupSaved = false;
   const prefill = state.prefill || {};
   state.prefill = null;
@@ -407,7 +439,7 @@ function currentKey() {
 }
 
 function focusSelection() {
-  const focus = visibleFocus(state.doc, now(), state.stations);
+  const focus = visibleFocus(state.doc, now(), state.stations, state.arrivalResumeWaitUntil);
   return focus ? { tripId: focus.tripId, direction: focus.direction } : null;
 }
 
@@ -485,26 +517,67 @@ function loadSelectedCache() {
   const ends = currentLeg();
   const cached = getCache(state.doc, currentKey())
     || getCache(state.doc, cacheKey(ends.from.id, ends.to.id));
-  state.body = cached ? filterBody(cached.body, enabledModes(), capped()) : null;
+  state.body = cached ? filterBody(cached.body, enabledModes(), maxTransfers()) : null;
   state.serverStale = cached?.serverStale === true;
   state.offline = false;
+  state.recommendationPages = cached?.recommendationPages || [];
+  const sources = cached ? [{
+    body: cached.body, serverStale: cached.serverStale === true,
+    maxTransfers: cached.maxTransfers ?? null
+  },
+    ...state.recommendationPages] : [];
+  setRecommendationCandidates(sources, true);
+}
+
+function sourceEnvelope(source, offline = false) {
+  const body = filterBody(source?.body, enabledModes(), maxTransfers());
+  const model = boardModel(body, now(), {
+    forceStale: offline,
+    degraded: source?.serverStale === true
+  });
+  const capMismatch = (source?.maxTransfers ?? null) !== maxTransfers();
+  const freshness = capMismatch
+    ? { stale: true, freshness: 'Offline', dot: 'stale' }
+    : homeFreshness(model, source?.serverStale === true);
+  return { body, offline, serverStale: source?.serverStale === true,
+    maxTransfers: source?.maxTransfers ?? null, ...freshness, provisional: capMismatch };
+}
+
+function setRecommendationCandidates(sources, offline = false) {
+  const byKey = new Map();
+  for (const source of sources) {
+    const envelope = sourceEnvelope(source, offline);
+    for (const journey of envelope.body.journeys || []) {
+      const key = journeyKey(journey);
+      const observedAt = sourceTime(envelope.body);
+      if ((byKey.get(key)?.observedAt ?? -Infinity) > observedAt) continue;
+      byKey.set(key, { journey, source: envelope, stale: envelope.stale, observedAt });
+    }
+  }
+  state.recommendationCandidates = [...byKey.values()].map(({ observedAt, ...value }) => value);
+  state.recommendation = selectRecommendation(state.recommendationCandidates, now(), {
+    modes: enabledModes(), maxTransfers: maxTransfers()
+  });
 }
 
 function showHome(root) {
   state.view = 'home';
+  state.detailSource = null;
   state.fix = null;
   state.previousOpen = state.doc.lastOpen || null;
   state.selection = chooseSelection();
   if (state.selection) loadSelectedCache();
   else state.body = null;
+  fetchLive();
+  syncArrivalMonitoring();
   renderHome();
   onAction(root, homeAction);
   startTimers(false);
   noteLastOpen();
-  fetchLive();
   backfillCoordinates();
   loadIndex();
   silentFix();
+  void ensureArrivalMonitoring();
 }
 
 /* The index arrives after the first paint, so a fix taken without it gets its
@@ -544,7 +617,8 @@ function indexReady(list) {
 function noteLastOpen() {
   if (suppressPreferenceEvents || state.view !== 'home' || focusSelection() || !state.selection) return;
   const journeys = (state.body && state.body.journeys) || [];
-  const journey = journeys.find((item) => journeyAllowed(item, enabledModes(), capped()) && !journeyCancelled(item));
+  const journey = state.recommendation?.journey
+    || selectRecommendation(journeys, now(), { modes: enabledModes(), maxTransfers: maxTransfers() });
   if (!journey) return;
   const spot = here(state.doc, state.stations, validFix());
   ctx.update(recordLastOpen(state.doc, {
@@ -564,7 +638,15 @@ async function silentFix() {
   if (generation !== geoGeneration || state.view !== 'home') return;
   state.geoPermission = permission;
   if (state.geoPermission !== 'granted') {
+    state.arrivalPermissionPending = false;
+    syncArrivalMonitoring();
     renderHome();
+    return;
+  }
+  state.arrivalPermissionPending = false;
+  const focus = focusOf(state.doc);
+  if (focus && now() >= (departureMs(focus.journey) ?? Infinity)) {
+    syncArrivalMonitoring();
     return;
   }
   const fix = await takeFix({ enableHighAccuracy: underWay(), maximumAge: 0 });
@@ -598,10 +680,15 @@ function takeFix(options = {}) {
 }
 
 async function takeContextFix(options = {}) {
+  stopArrivalMonitoring();
   const generation = ++geoGeneration;
   const fix = await takeFix(options);
-  if (generation !== geoGeneration || !fix) return null;
+  if (generation !== geoGeneration || !fix) {
+    void ensureArrivalMonitoring();
+    return null;
+  }
   state.fix = fix;
+  void ensureArrivalMonitoring();
   return fix;
 }
 
@@ -614,16 +701,43 @@ function fixOf(position) {
   return {
     lat: position.coords.latitude,
     lon: position.coords.longitude,
+    accuracy: position.coords.accuracy,
     speed: Number.isFinite(speed) ? speed : undefined,
-    at: position.timestamp || Date.now()
+    at: Number.isFinite(position.timestamp) ? position.timestamp : NaN
   };
+}
+
+function permissionChanged() {
+  state.geoPermission = geoPermissionStatus?.state || 'prompt';
+  state.arrivalPermissionPending = false;
+  geoGeneration += 1;
+  state.fix = null;
+  stopArrivalMonitoring();
+  syncArrivalMonitoring();
+  renderCurrent();
+}
+
+function watchPermission(status) {
+  if (!status || status === geoPermissionStatus) return;
+  if (geoPermissionStatus) {
+    if (typeof geoPermissionStatus.removeEventListener === 'function') {
+      geoPermissionStatus.removeEventListener('change', permissionChanged);
+    } else if (geoPermissionStatus.onchange === permissionChanged) {
+      geoPermissionStatus.onchange = null;
+    }
+  }
+  geoPermissionStatus = status;
+  if (typeof status.addEventListener === 'function') status.addEventListener('change', permissionChanged);
+  else status.onchange = permissionChanged;
 }
 
 async function geoPermissionState() {
   if (!navigator.geolocation) return 'unavailable';
   if (!navigator.permissions) return 'prompt';
   try {
-    return (await navigator.permissions.query({ name: 'geolocation' })).state;
+    const status = await navigator.permissions.query({ name: 'geolocation' });
+    watchPermission(status);
+    return status.state;
   } catch (_) {
     return 'prompt';
   }
@@ -654,9 +768,11 @@ function useFix() {
   const storedFocus = focusOf(state.doc);
   const entered = (storedFocus && !focusExpired(storedFocus, now()))
     || rideRecorded(state.doc, state.previousOpen) ? null
-    : journeyAllowed(state.previousOpen?.journey, enabledModes(), capped())
+    : journeyAllowed(state.previousOpen?.journey, enabledModes(), maxTransfers())
       ? inferTravel({ ...state.doc, lastOpen: state.previousOpen }, now(), fix) : null;
   if (entered) {
+    stopArrivalMonitoring();
+    state.arrivalDecision = null;
     ctx.update(setFocus(state.doc, entered, entered.journey, now(), 'inferred'));
     state.predicted = false;
     state.leap = null;
@@ -668,8 +784,7 @@ function useFix() {
     state.selection = answer;
     if (!answer) { state.body = null; renderHome(); return; }
   }
-  const completed = settleFocusRide(state.doc);
-  if (completed !== state.doc) ctx.update(completed);
+  settleArrival({ sample: fix });
   loadSelectedCache();
   renderHome();
   fetchLive();
@@ -677,12 +792,15 @@ function useFix() {
 
 function currentModel() {
   const ends = currentLeg();
+  const body = state.view === 'board' && state.body
+    ? { ...state.body, journeys: (state.body.journeys || []).slice(0, LIMIT) }
+    : state.body;
   // The train you just missed is in neither register until the last live copy
   // of it is offered back as a past page (design.md, defect 3).
   const pastBodies = state.view === 'board'
     ? [...state.pastBodies, { journeys: [...state.seenLive.values()] }]
     : state.pastBodies;
-  const model = boardModel(state.body || {}, now(), {
+  const model = boardModel(body || {}, now(), {
     forceStale: state.offline,
     degraded: state.serverStale,
     fallbackHeadsign: ends.to.name,
@@ -690,6 +808,7 @@ function currentModel() {
   });
   if (!enabledModes().length) model.status = 'services-off';
   else if (!state.body) model.status = state.offline ? 'offline' : 'loading';
+  else if (model.empty && maxTransfers() === 0 && !state.offline && !model.stale) model.status = 'direct-empty';
   else if (model.empty && enabledModes().length < SUPPORTED_MODES.length && !state.offline && !model.stale) model.status = 'services-empty';
   return model;
 }
@@ -700,13 +819,119 @@ function sourceTime(body) {
 }
 
 function identityOfFocus(focus) {
-  return focus ? `${focus.tripId}:${focus.direction}:${departureKey(focus.journey)}` : '';
+  return focus ? `${focus.tripId}:${focus.direction}:${journeyKey(focus.journey)}` : '';
+}
+
+function settleArrival({ sample = null, monitoring = false, matchingRefresh = false } = {}) {
+  const focus = focusOf(state.doc);
+  const trip = focus && findTrip(state.doc, focus.tripId);
+  if (!focus || !trip) {
+    state.arrivalDecision = null;
+    state.arrivalWindow = null;
+    return null;
+  }
+  const decision = reduceArrival({
+    identity: identityOfFocus(focus),
+    departureMs: departureMs(focus.journey),
+    arrivalMs: arrivalMs(focus.journey),
+    nowMs: now(),
+    destination: leg(trip, focus.direction).to.location || null,
+    guard: focus.arrivalGuard,
+    window: state.arrivalWindow,
+    sample,
+    monitoring,
+    permissionPending: state.arrivalPermissionPending
+      || preferencesOf(state.doc).useLocation && state.geoPermission === null
+      || state.focusRefreshPending === identityOfFocus(focus),
+    legacyCompleted: rideRecorded(state.doc, focus),
+    cancelled: journeyCancelled(focus.journey),
+    matchingRefresh,
+    resumeWaitUntilMs: state.arrivalResumeWaitUntil
+  });
+  state.arrivalWindow = decision.window;
+  state.arrivalDecision = decision;
+  const next = applyArrivalResult(state.doc, decision, now());
+  if (JSON.stringify(next) !== JSON.stringify(state.doc)) ctx.update(next);
+  if (decision.action === 'expire') state.previousOpen = null;
+  if (!focusOf(state.doc) || ['arrived', 'expiredUnconfirmed'].includes(decision.state)) {
+    stopArrivalMonitoring();
+  }
+  return decision;
+}
+
+function arrivalMonitorEligible() {
+  const focus = focusOf(state.doc);
+  const departure = focus && departureMs(focus.journey);
+  return Boolean(focus && !document.hidden && preferencesOf(state.doc).useLocation
+    && state.geoPermission === 'granted' && navigator.geolocation
+    && Number.isFinite(departure) && now() >= departure
+    && !(rideRecorded(state.doc, focus) && (!focus.arrivalGuard || focus.arrivalGuard.basis))
+    && !['arrived', 'expiredUnconfirmed'].includes(state.arrivalDecision?.state));
+}
+
+function stopArrivalMonitoring(clearWindow = true) {
+  arrivalGeneration += 1;
+  if (arrivalWatch !== null && navigator.geolocation) navigator.geolocation.clearWatch(arrivalWatch);
+  arrivalWatch = null;
+  if (clearWindow) state.arrivalWindow = null;
+}
+
+function syncArrivalMonitoring() {
+  if (!arrivalMonitorEligible()) {
+    if (arrivalWatch !== null) stopArrivalMonitoring();
+    settleArrival();
+    return;
+  }
+  if (arrivalWatch !== null) {
+    settleArrival();
+    return;
+  }
+  const generation = ++arrivalGeneration;
+  settleArrival({ monitoring: true });
+  if (generation !== arrivalGeneration || !arrivalMonitorEligible() || !focusOf(state.doc)) return;
+  try {
+    arrivalWatch = navigator.geolocation.watchPosition((position) => {
+      if (generation !== arrivalGeneration || document.hidden) return;
+      const sample = fixOf(position);
+      state.fix = sample;
+      settleArrival({ sample });
+      renderCurrent();
+    }, (error) => {
+      if (generation !== arrivalGeneration) return;
+      if (error?.code === 1) state.geoPermission = 'denied';
+      state.fix = null;
+      stopArrivalMonitoring();
+      settleArrival();
+      renderCurrent();
+    }, { enableHighAccuracy: true, timeout: ARRIVAL_RESUME_WAIT_MS, maximumAge: 0 });
+  } catch (_) {
+    arrivalWatch = null;
+    settleArrival();
+  }
+}
+
+async function ensureArrivalMonitoring() {
+  if (!focusOf(state.doc) || !preferencesOf(state.doc).useLocation || document.hidden) {
+    syncArrivalMonitoring();
+    return;
+  }
+  if (state.geoPermission === null) {
+    const generation = arrivalGeneration;
+    state.arrivalPermissionPending = true;
+    settleArrival();
+    const permission = await geoPermissionState();
+    if (generation !== arrivalGeneration || document.hidden) return;
+    state.geoPermission = permission;
+    state.arrivalPermissionPending = false;
+  }
+  syncArrivalMonitoring();
+  renderCurrent();
 }
 
 function focusSource() {
   const focus = focusOf(state.doc);
   const trip = focus && findTrip(state.doc, focus.tripId);
-  if (!focus || !trip || focusExpired(focus, now())) return null;
+  if (!focus || !trip || focusExpired(focus, now(), state.arrivalResumeWaitUntil)) return null;
   const ends = leg(trip, focus.direction);
   const sources = [];
   const add = (body, offline, serverStale, priority) => {
@@ -751,6 +976,13 @@ function renderHome() {
     lastHome = null;
     return;
   }
+  state.recommendationCandidates = state.recommendationCandidates.map(candidate => {
+    const source = sourceEnvelope(candidate.source, candidate.source.offline);
+    return { ...candidate, source, stale: source.stale };
+  });
+  state.recommendation = selectRecommendation(state.recommendationCandidates, now(), {
+    modes: enabledModes(), maxTransfers: maxTransfers()
+  });
   const candidateModel = currentModel();
   const focused = Boolean(focusSelection());
   const followed = focused ? focusSource() : null;
@@ -763,17 +995,23 @@ function renderHome() {
   if (kind) openForAnalytics();
   const home = Home.homeModel(state.doc, state.selection, state.body, now(), {
     stations: state.stations,
+    resumeWaitUntilMs: state.arrivalResumeWaitUntil,
     fix: validFix(),
     stale: focused ? focusModel.stale : candidateModel.stale,
     offline: focused ? !followed || followed.offline : state.offline,
     candidateSource: candidateFreshness,
+    recommendation: state.recommendation,
+    alternative: state.recommendation && earliestAlternative(
+      state.recommendationCandidates, state.recommendation, now(), {
+        modes: enabledModes(), maxTransfers: maxTransfers()
+      }),
     focusBody: followed?.body || null,
     focusSource: followedFreshness,
     askLocation,
     predicted: state.predicted,
     leap: state.leap,
     loadedAt: state.loadedAt,
-    arrived: arrivedNow(),
+    arrivalDecision: state.arrivalDecision,
     leave: leaveDistance(),
     stripVariant: activeVariant('strip-placement')
   });
@@ -808,7 +1046,7 @@ function renderHome() {
 }
 
 function homeAnswerKind() {
-  const focus = visibleFocus(state.doc, now(), state.stations);
+  const focus = visibleFocus(state.doc, now(), state.stations, state.arrivalResumeWaitUntil);
   if (focus) return focus.by === 'inferred' ? 'inferred' : 'focus';
   if (!state.predicted) return null;
   return state.leap || 'predicted';
@@ -832,22 +1070,12 @@ function restoreHomeAttribution() {
   state.headerKind = state.lastShownKind;
 }
 
-/* The rider stepping off the train ends the trip before the timetable does
-   (client-storage.md, Travel mode). */
-function arrivedNow(doc = state.doc) {
-  const focus = focusOf(doc);
-  const trip = focus && !focusExpired(focus, now()) && findTrip(doc, focus.tripId);
-  if (!trip) return false;
-  if (rideRecorded(doc, focus)) return true;
-  return arrived(focus, leg(trip, focus.direction).to, validFix(), now());
-}
-
 function leaveDistance() {
   const fix = validFix();
   if (!fix || !selectedTrip()) return '';
   const origin = currentLeg().from;
   const distanceKmFromOrigin = distanceKm(fix, origin.location);
-  const focus = visibleFocus(state.doc, now(), state.stations);
+  const focus = visibleFocus(state.doc, now(), state.stations, state.arrivalResumeWaitUntil);
   const journey = focus && focus.tripId === state.selection.tripId
     && focus.direction === state.selection.direction ? focus.journey
     : state.body && (state.body.journeys || []).find((item) => !item.cancelled);
@@ -864,6 +1092,7 @@ function leaveDistance() {
 
 function showBoard(root) {
   state.view = 'board';
+  state.detailSource = null;
   state.selection = explicitSelection();
   if (!state.selection) { ctx.go('#/'); return; }
   state.viewRecorded = false;
@@ -873,13 +1102,15 @@ function showBoard(root) {
   state.pastExhausted = false;
   state.initialBoardLanding = true;
   loadSelectedCache();
+  fetchLive();
+  syncArrivalMonitoring();
   renderBoard();
   onAction(root, boardAction);
   wireTimeline();
   startTimers(true);
-  fetchLive();
   fetchPast(true);
   loadIndex();
+  void ensureArrivalMonitoring();
 }
 
 function renderBoard({ addedAbove = false, fade = true } = {}) {
@@ -952,6 +1183,17 @@ function wireTimeline() {
 function homeAction(action, element) {
   if (action === 'unpin' && lastHome?.pinned) return unpinService();
   if (action === 'settings') return ctx.go('#/settings');
+  if (action === 'recommendation-detail') {
+    const journey = lastHome?.directions?.journey;
+    if (!journey) return;
+    state.selection = { ...lastHome.selected };
+    state.journey = journey;
+    const source = lastHome.displaySource;
+    if (source?.body) {
+      state.detailHandoff = { key: currentKey(), journeyKey: journeyKey(journey), ...source };
+    }
+    return ctx.go('#/journey');
+  }
   if (action === 'next-service') {
     const next = lastHome?.following;
     if (!next || next.key !== element.dataset.match) return;
@@ -981,7 +1223,9 @@ function homeAction(action, element) {
       analytics.track('back_' + state.headerKind);
     }
     state.headerKind = null;
-    state.doc = clearFocus(settleFocusRide(state.doc));
+    settleArrival();
+    state.doc = clearFocus(state.doc);
+    stopArrivalMonitoring();
     state.selection = {
       tripId: state.selection.tripId,
       direction: state.selection.direction === 'reverse' ? 'forward' : 'reverse'
@@ -1028,7 +1272,7 @@ function homeAction(action, element) {
 async function requestLocation() {
   state.locationDismissed = true;
   const generation = ++geoGeneration;
-  const fix = await takeFix({ maximumAge: 0 });
+  const fix = await takeContextFix({ maximumAge: 0 });
   if (generation !== geoGeneration || state.view !== 'home') return;
   if (fix) {
     analytics.track('granted_panel');
@@ -1054,50 +1298,61 @@ function boardAction(action, element) {
   const journey = journeys.find((item) => journeyKey(item) === element.dataset.match);
   if (journey) {
     state.journey = journey;
+    state.detailSource = null;
     ctx.go('#/journey');
   }
 }
 
 function showDetail(root) {
-  const focus = visibleFocus(state.doc, now(), state.stations);
+  const focus = visibleFocus(state.doc, now(), state.stations, state.arrivalResumeWaitUntil);
   if (!state.journey && focus) {
     state.journey = focus.journey;
     state.selection = { tripId: focus.tripId, direction: focus.direction };
   }
   if (!state.journey || !state.selection || !selectedTrip()
-      || !journeyAllowed(state.journey, enabledModes(), capped())
+      || !journeyAllowed(state.journey, enabledModes(), maxTransfers())
       || !suggestionAllowed(state.selection)) {
     location.hash = '#/';
     return;
   }
   state.view = 'detail';
   loadSelectedCache();
+  fetchLive();
+  syncArrivalMonitoring();
   const handoff = state.detailHandoff;
   state.detailHandoff = null;
-  if (handoff?.key === currentKey() && handoff.journeyKey === journeyKey(state.journey)) {
-    state.body = filterBody(handoff.body, enabledModes(), capped());
+  state.detailSource = null;
+  if (handoff?.body && handoff.journeyKey === journeyKey(state.journey)) {
+    state.body = filterBody(handoff.body, enabledModes(), maxTransfers());
     state.offline = handoff.offline;
     state.serverStale = handoff.serverStale;
+    state.detailSource = handoff;
   }
   renderDetail();
   onAction(root, detailAction);
   startTimers(false);
-  fetchLive();
+  void ensureArrivalMonitoring();
 }
 
 function detailModel() {
   if (!state.journey) return null;
   const ends = currentLeg();
+  const handoff = state.detailSource?.journeyKey === journeyKey(state.journey)
+    ? state.detailSource : null;
   const board = isFocused(state.doc, state.journey)
-    ? modelForSource(focusSource()) : currentModel();
-  const opts = { stale: board.stale, fromName: ends.from.name, toName: ends.to.name };
+    ? modelForSource(focusSource()) : handoff ? modelForSource(handoff) : currentModel();
+  const focused = isFocused(state.doc, state.journey);
+  const opts = {
+    stale: board.stale, fromName: ends.from.name, toName: ends.to.name,
+    arrivalDecision: focused ? state.arrivalDecision : null
+  };
   const model = journeyDetail(state.journey, now(), opts);
   return {
     ...model,
     row: detailRow(model, opts),
-    focused: isFocused(state.doc, state.journey),
+    focused,
     pinned: isFocused(state.doc, state.journey) && focusOf(state.doc)?.by !== 'inferred',
-    footer: board.footer
+    footer: handoff ? { ...board.footer, text: handoff.freshness || board.footer.text } : board.footer
   };
 }
 
@@ -1133,11 +1388,13 @@ function renderDetail() {
 
 function unpinService() {
   if (!focusOf(state.doc) || focusOf(state.doc).by === 'inferred') return;
-  const released = clearFocus(settleFocusRide(state.doc));
+  settleArrival();
+  const released = clearFocus(state.doc);
   delete released.lastOpen;
   ctx.update(released);
   if (focusInflight) focusInflight.abort();
   focusInflight = null;
+  stopArrivalMonitoring();
   state.focusBody = null;
   state.focusIdentity = null;
   state.focusOffline = false;
@@ -1162,6 +1419,8 @@ function detailAction(action) {
       analytics.track('hit_' + state.headerKind);
     }
     state.headerKind = null;
+    stopArrivalMonitoring();
+    state.arrivalDecision = null;
     ctx.update(setFocus(state.doc, state.selection, state.journey, now()));
     return ctx.go('#/');
   }
@@ -1169,21 +1428,27 @@ function detailAction(action) {
 
 async function refreshFollowed() {
   const focus = focusOf(state.doc);
-  if (focus && focusExpired(focus, now())) {
-    ctx.update(clearFocus(settleFocusRide(state.doc)));
-    state.focusBody = null;
-    state.focusIdentity = null;
-    if (state.view === 'home' || state.view === 'settings') reconcileSuggestionSelection();
+  const trip = focus && findTrip(state.doc, focus.tripId);
+  if (!trip || document.hidden) {
+    state.focusRefreshPending = null;
     return;
   }
-  const trip = focus && findTrip(state.doc, focus.tripId);
-  if (!trip || document.hidden) return;
   const identity = identityOfFocus(focus);
   const ends = leg(trip, focus.direction);
   if (focusInflight) focusInflight.abort();
   const controller = new AbortController();
   focusInflight = controller;
+  state.focusRefreshPending = identity;
   const departure = departureMs(focus.journey);
+  if (now() >= (arrivalMs(focus.journey) ?? Infinity)
+      && !Number.isFinite(state.arrivalResumeWaitUntil)) {
+    state.arrivalResumeWaitUntil = now() + ARRIVAL_RESUME_WAIT_MS;
+  }
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, ARRIVAL_RESUME_WAIT_MS);
   try {
     const { body, serverStale } = await getDepartures(ends.from.id, ends.to.id, {
       limit: LIMIT, modes: SUPPORTED_MODES, signal: controller.signal,
@@ -1192,7 +1457,10 @@ async function refreshFollowed() {
     const current = focusOf(state.doc);
     if (controller.signal.aborted || !current
       || identityOfFocus(current) !== identity) return;
-    ctx.update(settleRefreshedFocus(state.doc, focus, body, now(), validFix()));
+    const matched = matchJourney(body.journeys, current.journey);
+    if (matched) ctx.update(applyFocusSnapshot(state.doc, focus, body));
+    state.focusRefreshPending = null;
+    settleArrival({ matchingRefresh: Boolean(matched) });
     state.focusOffline = false;
     if (matchJourney(body.journeys, current.journey)) {
       state.focusBody = body;
@@ -1204,17 +1472,22 @@ async function refreshFollowed() {
     }
     renderCurrent();
   } catch (_) {
-    if (!controller.signal.aborted && focusInflight === controller) {
-      ctx.update(settleFocusRide(state.doc));
+    if (focusInflight === controller && (!controller.signal.aborted || timedOut)) {
+      state.focusRefreshPending = null;
+      settleArrival();
       state.focusOffline = true;
       renderCurrent();
     }
+  } finally {
+    clearTimeout(timeout);
+    if (focusInflight === controller) focusInflight = null;
   }
 }
 
 async function fetchLive({ independent = false } = {}) {
   if (independent) suppressPreferenceEvents = false;
   if (document.hidden) return;
+  if (recommendationInflight) recommendationInflight.abort();
   refreshFollowed();
   if ((!onLiveView() && state.view !== 'settings') || !state.selection) return;
   const modes = enabledModes();
@@ -1232,27 +1505,111 @@ async function fetchLive({ independent = false } = {}) {
   const generation = ++requestGeneration;
   try {
     const { body, serverStale } = await getDepartures(ends.from.id, ends.to.id, {
-      limit: LIMIT, modes, transferLimit: transferLimit(), signal: controller.signal
+      limit: ['home', 'settings'].includes(state.view) ? RECOMMENDATION_LIMIT : LIMIT,
+      modes, transferLimit: transferLimit(), signal: controller.signal
     });
     if (controller.signal.aborted || generation !== requestGeneration || !state.selection || key !== currentKey()) return;
-    const eligible = filterBody(body, modes, capped());
+    const eligible = filterBody(body, modes, maxTransfers());
     if (state.seenKey !== key) { state.seenLive = new Map(); state.seenKey = key; }
     for (const journey of eligible.journeys || []) state.seenLive.set(departureKey(journey), journey);
     state.body = eligible;
     state.serverStale = serverStale;
     state.offline = false;
-    ctx.update(putCache(state.doc, key, body, now(), { serverStale }));
+    if (state.view === 'detail' && state.journey && matchJourney(eligible.journeys, state.journey)) {
+      state.detailSource = {
+        key, journeyKey: journeyKey(state.journey),
+        ...sourceEnvelope({ body, serverStale, maxTransfers: maxTransfers() })
+      };
+    }
+    const base = { body, serverStale, maxTransfers: maxTransfers() };
+    setRecommendationCandidates([base, ...state.recommendationPages], false);
+    ctx.update(putCache(state.doc, key, body, now(), {
+      serverStale, maxTransfers: maxTransfers(), recommendationPages: state.recommendationPages
+    }));
     noteLastOpen();
     if (state.journey) state.journey = matchJourney(eligible.journeys, state.journey) || state.journey;
+    renderCurrent();
+    if (state.view === 'home' && !focusSelection()) {
+      void fetchRecommendationPages({ base, ends, key, generation, modes, firstCompletedAt: performance.now() });
+    }
+    return;
   } catch (error) {
     if (controller.signal.aborted || generation !== requestGeneration || error.name === 'AbortError') return;
     state.offline = true;
+    setRecommendationCandidates([
+      { body: state.body || {}, serverStale: state.serverStale },
+      ...state.recommendationPages
+    ], true);
   }
   renderCurrent();
 }
 
-function settleFocusRide(doc) {
-  return settleRide(doc, now(), validFix());
+async function fetchRecommendationPages({ base, ends, key, generation, modes, firstCompletedAt }) {
+  const requestKey = `${key}|${maxTransfers() === null ? 'any' : maxTransfers()}`;
+  const lastStarted = recommendationStartedAt.get(requestKey) || -Infinity;
+  if (now() - lastStarted < RECOMMENDATION_THROTTLE_MS) return;
+  recommendationStartedAt.set(requestKey, now());
+  const controller = new AbortController();
+  recommendationInflight = controller;
+  const remainingMs = Math.max(0,
+    RECOMMENDATION_DEADLINE_MS - (performance.now() - firstCompletedAt));
+  const deadline = setTimeout(() => controller.abort(), remainingMs);
+  const requestedCap = maxTransfers();
+  let previousAt = now();
+  let previousKeys = new Set((base.body.journeys || []).map(journeyKey));
+  const pages = [];
+  try {
+    for (let index = 0; index < RECOMMENDATION_PAGES; index += 1) {
+      if (performance.now() - firstCompletedAt >= RECOMMENDATION_DEADLINE_MS) break;
+      const cursor = nextRecommendationCursor(
+        index ? pages.at(-1).body : base.body, previousAt, now(), index ? state.recommendation
+          : selectRecommendation((base.body.journeys || []).map(journey => ({
+            journey, stale: sourceEnvelope(base).stale
+          })), now(), { modes, maxTransfers: requestedCap })
+      );
+      if (cursor === null) {
+        if (!pages.length) {
+          state.recommendationPages = [];
+          setRecommendationCandidates([base], false);
+          ctx.update(putCache(state.doc, key, base.body, now(), {
+            serverStale: base.serverStale, maxTransfers: requestedCap, recommendationPages: []
+          }));
+          noteLastOpen();
+          renderHome();
+        }
+        break;
+      }
+      const response = await getDepartures(ends.from.id, ends.to.id, {
+        limit: RECOMMENDATION_LIMIT, at: cursor, modes,
+        transferLimit: requestedCap ?? undefined, signal: controller.signal
+      });
+      if (performance.now() - firstCompletedAt >= RECOMMENDATION_DEADLINE_MS
+          || controller.signal.aborted || generation !== requestGeneration || state.view !== 'home'
+          || focusSelection() || key !== currentKey() || requestedCap !== maxTransfers()
+          || modes.join(',') !== enabledModes().join(',')) return;
+      const identities = new Set((response.body.journeys || []).map(journeyKey));
+      const gained = [...identities].some((identity) => !previousKeys.has(identity));
+      for (const identity of identities) previousKeys.add(identity);
+      pages.push({
+        at: cursor, body: response.body, serverStale: response.serverStale,
+        maxTransfers: requestedCap
+      });
+      previousAt = cursor;
+      state.recommendationPages = pages;
+      setRecommendationCandidates([base, ...pages], false);
+      ctx.update(putCache(state.doc, key, base.body, now(), {
+        serverStale: base.serverStale, maxTransfers: requestedCap, recommendationPages: pages
+      }));
+      noteLastOpen();
+      renderHome();
+      if (!identities.size || !gained) break;
+    }
+  } catch (error) {
+    if (error.name !== 'AbortError') renderHome();
+  } finally {
+    clearTimeout(deadline);
+    if (recommendationInflight === controller) recommendationInflight = null;
+  }
 }
 
 function rideRecorded(doc, selection) {
@@ -1293,7 +1650,7 @@ async function fetchPast(initial) {
     const before = new Set(state.pastBodies.flatMap((page) => page.journeys || []).map(departureKey));
     const gained = (body.journeys || []).some((journey) => !before.has(departureKey(journey)));
     if (!gained) state.pastExhausted = true;
-    else state.pastBodies.unshift(filterBody(body, enabledModes(), capped()));
+    else state.pastBodies.unshift(filterBody(body, enabledModes(), maxTransfers()));
     if (initial) state.initialBoardLanding = true;
     renderBoard({ addedAbove: !initial });
   } catch (error) {
@@ -1314,9 +1671,14 @@ function renderCurrent() {
   else if (state.view === 'detail') renderDetail();
 }
 
+function tickCurrent() {
+  syncArrivalMonitoring();
+  renderCurrent();
+}
+
 function startTimers(recordBoardView) {
   stopTimers();
-  timers.tick = setInterval(renderCurrent, TICK_MS);
+  timers.tick = setInterval(tickCurrent, TICK_MS);
   timers.refresh = setInterval(() => {
     if (!document.hidden) {
       fetchLive({ independent: true });
@@ -1361,7 +1723,12 @@ async function backfillCoordinates() {
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
+    invalidateSuggestions();
     stopTimers();
+    stopArrivalMonitoring();
+    if (focusInflight) focusInflight.abort();
+    focusInflight = null;
+    state.focusRefreshPending = null;
     flagsRequest?.abort();
     flagsRequest = null;
     return;
@@ -1373,8 +1740,14 @@ document.addEventListener('visibilitychange', () => {
     state.fix = null;
     state.previousOpen = state.doc.lastOpen || null;
   }
+  const focus = focusOf(state.doc);
+  if (focus?.arrivalGuard?.armed && !focus.arrivalGuard.basis
+      && now() >= (arrivalMs(focus.journey) ?? Infinity)) {
+    state.arrivalResumeWaitUntil = now() + ARRIVAL_RESUME_WAIT_MS;
+  }
   startTimers(state.view === 'board');
   fetchLive();
+  void ensureArrivalMonitoring();
   if (state.view !== 'home') return;
   silentFix();
 });
@@ -1391,7 +1764,9 @@ window.__trains = {
   older: () => fetchPast(false),
   rerender: renderCurrent,
   onLiveView,
-  tick: renderCurrent,
+  tick: tickCurrent,
+  settleArrival,
+  syncArrivalMonitoring,
   indexReady,
   route
 };

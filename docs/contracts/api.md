@@ -233,6 +233,45 @@ Semantics:
   An explicit all-off `modes=` response makes no TfNSW request, so its
   `generatedAt` is when the proxy formed that empty answer.
 
+### Client recommendation search
+
+Only the active Home pair performs supplementary search. Explicitly focused
+travel needs its normal exact-service refresh, not this lookahead. Boards,
+past pages and background trackers do not trigger supplementary searches.
+
+1. Request the normal first page with `limit=10` and the effective modes/cap.
+   Paint cached data immediately; publish this first answer as soon as it
+   arrives. Keep the board's existing presentation limit separately.
+2. At most two further `limit=10` pages are allowed per search, sequentially.
+   Set the next `at` to the ten-minute bucket immediately after the greatest
+   effective departure returned on the previous page. Use the raw valid page
+   times for the cursor, not just the filtered winning journey.
+3. Stop on an empty page, no new full-journey identities, a nonadvancing cursor,
+   an error, the page budget, or a cursor beyond the API's two-hour future
+   window. Also stop when the next cursor is strictly later than the current
+   best cost. Strictly later preserves all score tie-breakers.
+4. Supplementary work has a total 12-second deadline from the first page's
+   completion. Abort it when that deadline, navigation, a new selection,
+   pinning, preference/flag changes or a new request generation supersedes it.
+   Failure retains the best valid result already available.
+5. Repeat supplementary search no more often than every 60 seconds per
+   directed pair/modes/cap while Home is visible. Normal first-page refresh
+   cadence remains unchanged. A user change may start one search for its new
+   key. No all-saved-trips fan-out, background prefetch or retry loop.
+
+Deduplicate full journey identity; a newer matching observation replaces the
+older one. Choose among fresh eligible candidates first. A page is not made
+fresh by a newer unrelated page. Apply existing retained/offline selection
+when no fresh candidates exist, with the source's honest stale presentation.
+No silent replacement by an older candidate just because its stale ETA has a
+lower cost. A fresh successful empty search and a failed search remain distinct.
+
+The score is optimal over the eligible candidates actually found. Upstream
+can omit services within a full bucket and post-filter away all its returned
+routes; paging is not proof of exhaustive coverage. Do not claim a global
+optimum or that no direct service exists. No undocumented upstream parameter
+or quota increase is required by this design.
+
 ## GET /api/v1/stops?q={text}
 
 Station autocomplete for trip setup, answered from a station list baked into

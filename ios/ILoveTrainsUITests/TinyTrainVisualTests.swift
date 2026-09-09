@@ -46,6 +46,22 @@ final class TinyTrainVisualTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testReducedMotionShowsCompleteConsistInBothSchemes() {
+        let app = XCUIApplication()
+        for calibration in ["home", "home-light"] {
+            app.launchArguments = ["--calibration", calibration, "--tiny-train", "--tiny-train-reduced-motion"]
+            app.launchEnvironment["ILOVETRAINS_TEST_DOMAIN"] = UUID().uuidString
+            app.launch()
+            let trigger = app.buttons["tiny-train-trigger"]
+            XCTAssertTrue(trigger.waitForExistence(timeout: 5))
+            trigger.tap()
+            attach(app.screenshot(), name: "tiny-train-\(calibration)-reduced-complete")
+            XCTAssertTrue(trigger.waitForReady(timeout: 2))
+            app.terminate()
+        }
+    }
+
     private func attach(_ screenshot: XCUIScreenshot, name: String) {
         let attachment = XCTAttachment(screenshot: screenshot)
         attachment.name = name

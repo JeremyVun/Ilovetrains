@@ -61,8 +61,16 @@ and out with `/?tinyTrain=0`; persistence is defined in
 [client-storage.md](client-storage.md#local-preview-flags).
 
 On Home, activating the coloured trip line beneath the station names sends a
-tiny double-decker along it. Each pass has six carriages; further taps during
-a pass are ignored. The drawing has a yellow nose, two rows of windows and warm windows in dark appearance. It is silent and never starts
+tiny double-decker along it. Each pass has eight carriages; further taps during
+a pass are ignored. The first and last carriages have outward-facing yellow
+cabs; the rear cab mirrors the front. Six middle cars have square ends and
+no cab hardware. Every car, including each driving car, has two yellow paired
+passenger doorways around the two decks of saloon windows: 16 doorways in
+total. The consist is 327 units wide (eight 40-unit cars, seven 1-unit gaps),
+fits uniformly inside a narrow reduced-motion lane, and stays on its baseline.
+The accepted geometry is in `assets/comps/latest/commute-feedback/cab/`.
+The drawing has two rows of windows and
+warm windows in dark appearance. It is silent and never starts
 automatically. A pass lasts about 2.6 seconds. Reduced motion shows a stationary
 train for 650ms instead.
 
@@ -175,11 +183,13 @@ When the flag is off, the trip line remains unchanged and does no animation work
   journey is under way, with the receipt `Printed change was <n> min.` when the
   window has shrunk below what was printed.
 - Before departure, a 44px rail below the main answer and above the heavy rule
-  shows the next distinct service: countdown, departure time, arrival time and
+  shows the earliest catchable distinct service: countdown, departure time, arrival time and
   a detail chevron. Its label uses the first leg's mode: `Next train`,
   `Next metro`, `Next ferry`, or `Next service` if unknown. The arrival time
-  matters because a later departure need not arrive equally late.
-- The next-service candidate is the earliest later effective departure on the
+  matters because a later departure need not arrive equally late. If the
+  alternative departs before the recommendation, use `Earlier train` or
+  `Earlier ferry` instead.
+- The next-service candidate is the earliest catchable effective departure on the
   displayed pair and direction, with every leg enabled and none cancelled.
   Exclude alternate itineraries sharing the lead's first line and scheduled
   departure. Keep its countdown visible for stale and offline data, using the
@@ -552,6 +562,65 @@ When the flag is off, the trip line remains unchanged and does no animation work
   instruction below it. Progress is a time inference, never a claim of
   continuous location tracking.
 
+### Guarded arrival and native tracker presentation
+
+Use the accepted composition in `assets/comps/latest/commute-feedback/` and
+existing type hierarchy. Keep the last ETA and destination instruction visible; the provenance is `Last estimate`.
+
+| Arrival evidence | Header status | Main figure / instruction |
+| --- | --- | --- |
+| Checking arrival | `Checking arrival` | Dash; `Checking arrival at <destination>.` |
+| Fresh away plus sustained movement | `Arrival uncertain` | Whole minutes `Past estimate`; `Still on the way to <destination>.` |
+| Stopped away, ambiguous or missing position | `Arrival unconfirmed` | Dash; `Arrival time needs an update.` |
+
+Minutes past estimate uses nonnegative floor elapsed minutes; in its first
+minute use a dash rather than a misleading zero. Never print `0 min TO GO`,
+`Trip over`, “You've arrived,” or a return offer for an unconfirmed trip.
+Keep existing offline/stale source indication independently of arrival status.
+For never-guarded estimate completion, replace the existing personal claim
+“You've arrived” with `The scheduled trip has ended. The return trip is ready.`
+when schedule-only, or `The last arrival estimate has passed. The return trip is ready.`
+when an estimate exists. Location-confirmed completion keeps the existing
+arrival/return composition and wording.
+
+The shared arrival state must override all repeated UI `now >= A` tests.
+Journey detail's final step does not become done solely from ETA for the
+matching guarded focus; other timetable rows retain their normal time styling.
+Native tracker lifecycle must not end/suppress the session, or settle a ride,
+solely because its projection reaches the final endpoint. Publish the same
+unconfirmed semantics using its existing quiet instruction/context rows.
+In the background, no new GPS collection occurs: a guarded session remains
+unconfirmed until permitted foreground evidence, correction or expiry.
+iOS cannot promise a fresh transition while suspended; keep its published
+absolute last estimate and established stale fallback, and reconcile before
+publishing on resume. OS removal of a surface is not completion. Preserve
+existing dismissal suppression, identity generations and serialized ownership.
+
+### Completed-route treatment
+
+Keep route widths, transfer gaps, pin geometry and marker shape unchanged.
+Overlay 62% of the actual page ground on the travelled portion: the retained
+route contribution is 38%. Composite the same overlay above completed transfer
+chip fills AND numerals, keeping the chip opaque over the route underneath.
+Both chips stay full contrast during the change and fade together when the
+next leg starts according to existing timetable/live-estimate phase rules.
+Upcoming chips and the active marker keep their normal contrast. Apply only
+to progress-bearing active journey axes, not every historical board row.
+
+Time-based progress remains a time inference. Before ETA use the existing
+fraction, bounded below 100% while guarded and unconfirmed. At/past ETA, hold
+at 98% until confirmed; this is a visual pending-end position, not a measured
+location. Show the held marker only with fresh away/moving evidence; otherwise
+hide it while retaining the faded route. The comp's illustrative 93% overdue
+position is not the production algorithm. No reversal or acceleration animation
+is required when an updated ETA changes the fraction. Respect reduced motion.
+
+The selected completed-platform treatment intentionally reduces contrast;
+keep full platform text available in accessible journey instructions/detail.
+Do not apply it to a currently actionable platform. Before/during/after frames
+must use correct action countdowns and instructions; the visual clock deltas
+in comps must not accidentally redefine the product's next-action countdown.
+
 ## Visual language
 
 The interface reads as a printed timetable: one column measure, one type-scale
@@ -818,24 +887,24 @@ note, and it appears only while the backend publishes the `transferLimit` flag
 as on. With the flag off Settings renders exactly as it did before the row
 existed. The row is the Location row's composition without its icon column,
 because no glyph in the set means a change count: the title `Transfer limit`,
-the current value as the subtitle, and the other value as the action mark in
-the mark's letterspaced caps. It has no heading, no note, no glyph, no journey
-line and no colour, and it is one 56px button read as title, subtitle, then
-action, with the same row height in every state.
+the current value as the subtitle, and `Change` as its action mark. It has no
+heading, note, glyph or journey line. The single button is read as title,
+subtitle, Change; preserve existing platform row heights.
 
-| Choice | Subtitle | Mark | Tapping it |
-| --- | --- | --- | --- |
-| Up to two changes (default) | `Up to 2` | `NO LIMIT` | lifts the limit |
-| No limit | `No limit` | `UP TO 2` | caps changes at two |
+| Stored choice | Subtitle | Next choice |
+| --- | --- | --- |
+| `direct` | `Direct only` | `two` |
+| `two` (default) | `Up to 2` | `any` |
+| `any` | `No limit` | `direct` |
 
-Tapping swaps the value and takes the service change's path: eligible cached
-rows are kept, replacements are fetched through the departures API, and an
-excluded journey is never restored on failure. While capped, a journey with
-more than two changes is hidden wherever the service allow-list applies, and
-the followed journey's own all-mode refresh stays uncapped. Turning every
-service off changes the note above the row, never the row itself. A flag
-answer that changes the cap mid-session repaints Settings and refetches the
-board exactly as a tap does.
+Tapping cycles the value and takes the service-change path: eligible cached
+rows remain, replacements are fetched, and failures never restore excluded
+journeys. Every presentation surface uses the same numeric/null cap, including
+focus and alternatives. The stored followed journey's all-mode refresh stays
+uncapped. A successful empty direct search says `No direct services found` in
+the existing empty slot; failed or stale searches retain their source status.
+All-off changes the service note, never this row. A changed flag invalidates
+search generations and repaints just as a tap does.
 
 Appearance has radio semantics for System, Light and Dark. Manual choice wins
 before first paint and updates browser chrome; System follows device changes.

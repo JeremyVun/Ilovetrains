@@ -2,6 +2,9 @@ package com.ilovetrains.app
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import org.json.JSONObject
 import java.io.InputStream
 import java.net.HttpURLConnection
@@ -17,11 +20,19 @@ class TransitApi(baseUrl: String = BuildConfig.API_BASE) {
         transferLimit?.let { args["transferLimit"] = it.toString() }
         val query = args.entries.joinToString("&") { "${it.key}=${URLEncoder.encode(it.value, "UTF-8")}" }
         val connection = open("/api/v1/departures?$query")
-        try {
-            check(connection.responseCode == 200) { "Live departures are unavailable" }
-            val raw = readLimited(connection.inputStream, 2_000_000)
-            Wire.board(JSONObject(raw), api = true).copy(from = from, to = to, serverStale = connection.getHeaderField("X-Data-Stale") == "true")
-        } finally { connection.disconnect() }
+        suspendCancellableCoroutine { continuation ->
+            continuation.invokeOnCancellation { connection.disconnect() }
+            try {
+                check(connection.responseCode == 200) { "Live departures are unavailable" }
+                val raw = readLimited(connection.inputStream, 2_000_000)
+                val board = Wire.board(JSONObject(raw), api = true).copy(from = from, to = to,
+                    serverStale = connection.getHeaderField("X-Data-Stale") == "true",
+                    fetchConstraint = TransferConstraint(transferLimit))
+                continuation.resume(board)
+            } catch (error: Exception) {
+                continuation.resumeWithException(error)
+            } finally { connection.disconnect() }
+        }
     }
     /** The followed journey is answered whole: every mode, and never a cap that could hide it. */
     suspend fun focusedDepartures(from: Station, to: Station, at: Long?): BoardData = departures(from, to, AllModes, at)

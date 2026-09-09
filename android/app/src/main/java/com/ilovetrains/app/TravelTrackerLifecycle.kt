@@ -57,7 +57,8 @@ internal class TravelTrackerLifecycle(
         surfaceRequested = false
     }
 
-    fun reconcile(focus: FocusedJourney?, visibleFocus: FocusedJourney?, now: Long, recordedComplete: Boolean = false): TravelTrackerState? {
+    fun reconcile(focus: FocusedJourney?, visibleFocus: FocusedJourney?, now: Long, recordedComplete: Boolean = false,
+                  arrival: ArrivalResult? = null): TravelTrackerState? {
         val identity = focus?.trackerIdentity
         var changed = false
 
@@ -77,7 +78,7 @@ internal class TravelTrackerLifecycle(
         } else if (session.activeIdentity == null) {
             val resumableCompletion = session.suppressedIdentity == identity &&
                 session.suppression == TravelTrackerSuppression.Completed &&
-                TravelTrackerState.derive(focus, now, session.generation + 1) != null
+                TravelTrackerState.derive(focus, now, session.generation + 1, arrival) != null
             val newInference = !focus.pinned && session.suppressedIdentity != identity
             if (resumableCompletion || newInference) {
                 session = session.copy(activeIdentity = identity, generation = session.generation + 1)
@@ -103,7 +104,7 @@ internal class TravelTrackerLifecycle(
             return null
         }
 
-        val projection = TravelTrackerState.derive(focus, now, session.generation)
+        val projection = TravelTrackerState.derive(focus, now, session.generation, arrival)
         if (projection == null) {
             session = session.copy(
                 activeIdentity = null,

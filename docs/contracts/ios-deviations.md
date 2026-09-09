@@ -68,6 +68,23 @@ iOS implementation requested on 2026-09-07.
 - User state uses atomic app-private files excluded from iCloud backup. iOS
   and the web have separate local trip lists; no account or sync is introduced.
 
+## Foreground arrival evidence
+
+While a stored focus is under way, the existing foreground location owner can
+monitor it across Home, detail and Settings with already-granted permission.
+Provider updates target ten seconds; accepted evidence is at least five seconds
+apart. Setup lookups share the owner. Backgrounding, disabling location,
+permission loss, unpinning, deleting or replacing focus stops collection and
+clears the raw window; late callbacks cannot cross generations. No background
+GPS or location payload is introduced. Persist only the identity-bound guard,
+retention checkpoint and optional completion basis/time described in
+[client-storage.md](client-storage.md#final-arrival-decision).
+
+The app, history and existing tracker consume the same arrival result. A
+clock reaching the last estimate cannot complete an armed unresolved focus or
+suppress its tracker. Reconcile matching refreshed service times before arrival
+on resume. OS dismissal remains surface suppression, never ride completion.
+
 ## Persistent travel tracker
 
 Automatic inferred travel-mode entry starts a local Live Activity when the app

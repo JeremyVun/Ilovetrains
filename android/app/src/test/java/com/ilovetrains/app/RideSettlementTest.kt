@@ -11,6 +11,12 @@ class RideSettlementTest {
     private val central = Station("200060", "Central Station")
     private val parramatta = Station("215020", "Parramatta Station")
 
+    @Test fun cancellationWithdrawsRideEvenWhenArrivalTimeIsUnchanged() {
+        val focus = focus(now - 60_000)
+        val recorded = emptyList<Ride>().settled(focus, arrived = true)
+        assertTrue(recorded.settled(focus, arrived = false).isEmpty())
+    }
+
     private fun focus(arrival: Long): FocusedJourney {
         val journey = Journey(listOf(Leg("T1", "train", "Parramatta", central, parramatta,
             now - 25 * 60_000, now - 60_000, estimatedArrival = arrival)))
@@ -37,9 +43,14 @@ class RideSettlementTest {
     }
 
     @Test fun arrivingAtTheDestinationRecordsBeforeTheTimetableAgrees() {
-        val atDestination = emptyList<Ride>().settled(focus(now + 2 * 60_000), arrived = true)
+        val confirmed = focus(now + 2 * 60_000).copy(arrivalGuard =
+            ArrivalGuard(armed = true, basis = ArrivalBasis.Location, confirmedAt = now))
+        val atDestination = emptyList<Ride>().settled(confirmed, arrived = true)
         assertEquals(1, atDestination.size)
-        assertSame(atDestination, atDestination.settled(focus(now + 2 * 60_000), arrived = false))
+        val decision = reduceArrival(ArrivalInput("confirmed", confirmed.journey.effectiveDeparture,
+            confirmed.journey.effectiveArrival, now, guard = confirmed.arrivalGuard, legacyCompleted = true))
+        assertEquals(ArrivalState.Arrived, decision.state)
+        assertSame(atDestination, atDestination.settled(confirmed, arrived = decision.state == ArrivalState.Arrived))
     }
 
     @Test fun anUnfinishedJourneyRecordsNothing() {

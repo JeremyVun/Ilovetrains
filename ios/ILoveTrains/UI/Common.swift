@@ -214,11 +214,33 @@ func directionFigureFor(_ journey: Journey, now: Millis) -> Figure? {
     return nil
 }
 
+func arrivalFigure(_ arrival: ArrivalResult?, journey: Journey, now: Millis) -> Figure? {
+    guard let arrival, arrival.state == .checkingArrival || arrival.state == .arrivalUnconfirmed else { return nil }
+    if arrival.moving {
+        let elapsed = max(0, Int(floor((now - journey.effectiveArrival) / 60_000)))
+        return elapsed == 0
+            ? Figure(value: "—", provenance: "Past estimate")
+            : Figure(value: "\(elapsed)", unit: "min", provenance: "Past estimate")
+    }
+    return Figure(value: "—", provenance: "Last estimate")
+}
+
+func arrivalInstruction(_ arrival: ArrivalResult?, destination: String) -> String? {
+    guard let arrival else { return nil }
+    switch arrival.state {
+    case .checkingArrival: return "Checking arrival at \(destination)."
+    case .arrivalUnconfirmed where arrival.moving: return "Still on the way to \(destination)."
+    case .arrivalUnconfirmed: return "Arrival time needs an update."
+    default: return nil
+    }
+}
+
 struct JourneyAxis: View {
     let journey: Journey
     var large = false
     var showCap = true
     var progress: Double? = nil
+    var showProgressMarker = true
     var tinyTrain: Bool? = nil
     @State private var trainEnabled = false
     @Environment(\.trainColors) private var colors
@@ -243,6 +265,11 @@ struct JourneyAxis: View {
                             .layoutValue(key: AxisItemKey.self, value: .dwell(index))
                     }
                 }
+                if progress != nil {
+                    Rectangle().fill(colors.ground.opacity(0.62))
+                        .layoutValue(key: AxisItemKey.self, value: .travelled)
+                        .zIndex(1)
+                }
                 if let tinyTrain {
                     TinyTrainLane(flag: tinyTrain, onAvailabilityChange: { trainEnabled = $0 }).layoutValue(key: AxisItemKey.self, value: .tinyTrain)
                 }
@@ -262,8 +289,21 @@ struct JourneyAxis: View {
                         .foregroundStyle(colors.ink2).multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                         .layoutValue(key: AxisItemKey.self, value: .station(index))
+                    if completedTransfer(index) {
+                        if journey.legs.count <= 2 || index == 0,
+                           transferPlatformText(leg.toPlatform, mode: leg.mode) != nil {
+                            RoundedRectangle(cornerRadius: lineChipCornerRadius).fill(colors.ground.opacity(0.62))
+                                .layoutValue(key: AxisItemKey.self, value: .completedAlight(index))
+                                .zIndex(3)
+                        }
+                        if transferPlatformText(next.fromPlatform, mode: next.mode) != nil {
+                            RoundedRectangle(cornerRadius: lineChipCornerRadius).fill(colors.ground.opacity(0.62))
+                                .layoutValue(key: AxisItemKey.self, value: .completedBoard(index))
+                                .zIndex(3)
+                        }
+                    }
                 }
-                if progress != nil {
+                if progress != nil, showProgressMarker {
                     Image(systemName: "triangle.fill").font(.system(size: 13))
                         .foregroundStyle(colors.ink3).rotationEffect(.degrees(180))
                         .layoutValue(key: AxisItemKey.self, value: .progress)
@@ -272,6 +312,13 @@ struct JourneyAxis: View {
             .accessibilityElement(children: trainEnabled ? .contain : .ignore)
             .accessibilityLabel("Journey from \(first.from.shortName) to \(journey.legs.last?.to.shortName ?? first.to.shortName)")
         }
+    }
+
+    private func completedTransfer(_ index: Int) -> Bool {
+        guard let progress else { return false }
+        let duration = max(1, journey.effectiveArrival - journey.effectiveDeparture)
+        let inferred = journey.effectiveDeparture + progress * duration
+        return inferred >= journey.legs[index + 1].effectiveDeparture
     }
 
     private func pin(_ leg: Leg, platform: String) -> some View {

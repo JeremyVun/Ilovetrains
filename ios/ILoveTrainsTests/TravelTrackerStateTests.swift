@@ -221,6 +221,50 @@ final class TravelTrackerStateTests: XCTestCase {
         XCTAssertNil(TravelTrackerState.derive(focus: delayed, now: delayed.journey.effectiveArrival, generation: 1))
     }
 
+    func testGuardedArrivalKeepsTrackerActiveWithUnconfirmedCopy() throws {
+        let focus = twoLegFocus()
+        let checking = try XCTUnwrap(TravelTrackerState.derive(
+            focus: focus,
+            now: focus.journey.effectiveArrival,
+            generation: 1,
+            arrivalState: .checkingArrival
+        ))
+        let moving = try XCTUnwrap(TravelTrackerState.derive(
+            focus: focus,
+            now: focus.journey.effectiveArrival + minute,
+            generation: 2,
+            arrivalState: .arrivalUnconfirmed,
+            arrivalMoving: true
+        ))
+        let stopped = try XCTUnwrap(TravelTrackerState.derive(
+            focus: focus,
+            now: focus.journey.effectiveArrival + minute,
+            generation: 3,
+            arrivalState: .arrivalUnconfirmed
+        ))
+
+        XCTAssertEqual(checking.headline.text, "Checking arrival")
+        XCTAssertEqual(checking.instruction, "Checking arrival at Finish.")
+        XCTAssertEqual(moving.headline.text, "Arrival uncertain")
+        XCTAssertEqual(moving.instruction, "Still on the way to Finish.")
+        XCTAssertEqual(stopped.headline.text, "Arrival unconfirmed")
+        XCTAssertEqual(stopped.instruction, "Arrival time needs an update.")
+        XCTAssertEqual(stopped.etaText, "Last estimate 10:40")
+        XCTAssertEqual(stopped.connection, "Last estimate 10:40")
+        XCTAssertNil(stopped.event.countdownMinutes)
+    }
+
+    func testCancellationAfterEstimateDoesNotBecomeTrackerCompletion() throws {
+        var focus = twoLegFocus()
+        focus.journey.legs[0].cancelled = true
+        let state = try XCTUnwrap(TravelTrackerState.derive(
+            focus: focus, now: focus.journey.effectiveArrival + 60_000,
+            generation: 1, arrivalState: .travelling
+        ))
+        XCTAssertTrue(state.cancelled)
+        XCTAssertEqual(state.event.kind, .cancellation)
+    }
+
     private func twoLegFocus() -> FocusedJourney {
         makeFocus([
             Leg(line: "T1", mode: "train", headsign: "Change", from: Station(id: "a", name: "Start Station"),

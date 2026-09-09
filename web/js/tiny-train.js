@@ -1,5 +1,5 @@
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const CARRIAGES = 6;
+const CARRIAGES = 8;
 const RUN_MS = 2600;
 const REDUCED_MS = 650;
 
@@ -9,41 +9,50 @@ function svgElement(name, attrs = {}) {
   return node;
 }
 
+function doorway(x) {
+  return [
+    svgElement('rect', { class: 'tiny-train-passenger-door', x, y: '4', width: '5', height: '11', rx: '.25' }),
+    svgElement('path', { class: 'tiny-train-door-seam', d: `M${x + 2.5} 4V15` }),
+    svgElement('rect', { class: 'tiny-train-door-window', x: String(x + .5), y: '5', width: '1.5', height: '3' }),
+    svgElement('rect', { class: 'tiny-train-door-window', x: String(x + 3), y: '5', width: '1.5', height: '3' })
+  ];
+}
+
 function carriage(lead = false) {
   const svg = svgElement('svg', {
     class: `tiny-train-car${lead ? ' lead' : ''}`,
-    viewBox: '0 0 32 18',
-    width: '32',
+    viewBox: '0 0 40 18',
+    width: '40',
     height: '18',
     'aria-hidden': 'true'
   });
 
   const body = svgElement('path', {
     class: 'tiny-train-body',
-    d: lead ? 'M1 3H25L31 7V15H1Z' : 'M1 3H31V15H1Z'
+    d: lead ? 'M1 3H33L39 7V15H1Z' : 'M1 3H39V15H1Z'
   });
   svg.append(body);
 
   for (const y of [5, 9]) {
-    for (const x of [4, 9, 14, 19]) {
+    for (const x of [12.5, 16.5, 20.5, 24.5]) {
       svg.append(svgElement('rect', {
         class: `tiny-train-window ${y === 5 ? 'upper' : 'lower'}`,
-        x: String(x), y: String(y), width: '3', height: '2'
+        x: String(x), y: String(y), width: '2.5', height: '2'
       }));
     }
   }
 
+  svg.append(...doorway(6), ...doorway(28));
+
   if (lead) {
-    svg.append(svgElement('path', { class: 'tiny-train-nose', d: 'M24 3H26L31 7V15H24Z' }));
-    svg.append(svgElement('rect', { class: 'tiny-train-windscreen', x: '25', y: '5', width: '3', height: '4' }));
-    svg.append(svgElement('rect', { class: 'tiny-train-headlight', x: '29', y: '12', width: '1', height: '1' }));
-  } else {
-    svg.append(svgElement('rect', { class: 'tiny-train-door', x: '25', y: '5', width: '3', height: '8' }));
+    svg.append(svgElement('path', { class: 'tiny-train-nose', d: 'M33 3H34L39 7V15H33Z' }));
+    svg.append(svgElement('rect', { class: 'tiny-train-windscreen', x: '34', y: '5', width: '3', height: '4' }));
+    svg.append(svgElement('rect', { class: 'tiny-train-headlight', x: '37', y: '12', width: '1', height: '1' }));
   }
 
   svg.append(
-    svgElement('circle', { class: 'tiny-train-wheel', cx: '7', cy: '16', r: '1.5' }),
-    svgElement('circle', { class: 'tiny-train-wheel', cx: '25', cy: '16', r: '1.5' })
+    svgElement('circle', { class: 'tiny-train-wheel', cx: '8', cy: '16', r: '1.5' }),
+    svgElement('circle', { class: 'tiny-train-wheel', cx: '32', cy: '16', r: '1.5' })
   );
   return svg;
 }
@@ -55,6 +64,7 @@ export function attachTinyTrain(host) {
   const trigger = document.createElement('button');
   trigger.type = 'button';
   trigger.className = 'tiny-train-trigger';
+  trigger.dataset.act = 'tiny-train';
   trigger.setAttribute('aria-label', 'Run a tiny train');
   const stage = document.createElement('span');
   stage.className = 'tiny-train-stage';
@@ -97,6 +107,13 @@ export function attachTinyTrain(host) {
     trigger.setAttribute('aria-label', 'Run a tiny train');
   }
 
+  function showReduced() {
+    host.classList.add('tiny-train-reduced');
+    const fit = Math.min(1, Math.max(0, stageWidth - 8) / trainWidth);
+    consist.style.transform = `translateX(-50%) scale(${fit})`;
+    consist.style.left = '50%';
+  }
+
   function frame(now) {
     if (!consist || destroyed || !document.contains(host) || document.hidden) {
       clearRun();
@@ -123,9 +140,7 @@ export function attachTinyTrain(host) {
     trainWidth = consist.getBoundingClientRect().width;
 
     if (reduced.matches) {
-      host.classList.add('tiny-train-reduced');
-      consist.style.transform = 'translateX(-50%)';
-      consist.style.left = '50%';
+      showReduced();
       timer = setTimeout(clearRun, REDUCED_MS);
       return;
     }
@@ -154,9 +169,7 @@ export function attachTinyTrain(host) {
     if (!event.matches || !consist) return;
     if (raf) cancelAnimationFrame(raf);
     raf = 0;
-    host.classList.add('tiny-train-reduced');
-    consist.style.transform = 'translateX(-50%)';
-    consist.style.left = '50%';
+    showReduced();
     if (timer) clearTimeout(timer);
     timer = setTimeout(clearRun, REDUCED_MS);
   }

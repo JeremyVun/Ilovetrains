@@ -109,6 +109,127 @@ final class OfflineRouterTests: XCTestCase {
         XCTAssertEqual(raised.first?.legs.compactMap { $0.identity?.tripId }, ["one", "two", "three", "four"])
     }
 
+    func testWeightedRecommendationKeepsSameSeedFallbackUntilLongWaitFiltering() throws {
+        let x = Station(id: "X", name: "X")
+        let c1 = Station(id: "C1", name: "C1")
+        let c2 = Station(id: "C2", name: "C2")
+        let c3 = Station(id: "C3", name: "C3")
+        let c4 = Station(id: "C4", name: "C4")
+        let minute = 60_000.0
+        let values = [
+            connection("seed", from: alpha, to: x, departure: 0, arrival: minute, fromSequence: 1, toSequence: 2),
+            connection("seed", from: x, to: bravo, departure: minute, arrival: 85 * minute, fromSequence: 2, toSequence: 3),
+            connection("long-wait", from: x, to: bravo, departure: 70 * minute, arrival: 75 * minute),
+            connection("later-1", from: alpha, to: c1, departure: 2 * minute, arrival: 3 * minute),
+            connection("later-2", from: c1, to: c2, departure: 8 * minute, arrival: 9 * minute),
+            connection("later-3", from: c2, to: c3, departure: 14 * minute, arrival: 15 * minute),
+            connection("later-4", from: c3, to: c4, departure: 20 * minute, arrival: 21 * minute),
+            connection("later-5", from: c4, to: bravo, departure: 26 * minute, arrival: 69 * minute)
+        ].sorted { $0.departure < $1.departure }
+
+        let recommendation = try XCTUnwrap(OfflineRouter().recommendation(
+            from: alpha,
+            to: bravo,
+            at: 0,
+            connections: values,
+            maxTransfers: 4
+        ))
+
+        XCTAssertEqual(recommendation.legs.compactMap { $0.identity?.tripId }, ["seed"])
+        XCTAssertEqual(recommendation.effectiveArrival, 85 * minute)
+    }
+
+    func testDominancePreservesLabelsWithDifferentVisitedStations() {
+        let papa = Station(id: "P", name: "P")
+        let xray = Station(id: "X", name: "X")
+        let yankee = Station(id: "Y", name: "Y")
+        let minute = 60_000.0
+        let values = [
+            connection("seed", from: alpha, to: papa, departure: 0, arrival: minute),
+            connection("loop", from: papa, to: yankee, departure: 6 * minute, arrival: 7 * minute, fromSequence: 1, toSequence: 2),
+            connection("loop", from: yankee, to: xray, departure: 7 * minute, arrival: 8 * minute, fromSequence: 2, toSequence: 3),
+            connection("direct", from: papa, to: xray, departure: 6 * minute, arrival: 9 * minute),
+            connection("out", from: xray, to: yankee, departure: 14 * minute, arrival: 15 * minute, fromSequence: 1, toSequence: 2),
+            connection("out", from: yankee, to: bravo, departure: 15 * minute, arrival: 16 * minute, fromSequence: 2, toSequence: 3)
+        ].sorted { $0.departure < $1.departure }
+
+        let journeys = OfflineRouter().route(from: alpha, to: bravo, at: 0, connections: values, limit: 4)
+
+        XCTAssertEqual(journeys.first?.legs.compactMap { $0.identity?.tripId }, ["seed", "direct", "out"])
+    }
+
+    func testInvalidOriginConnectionsDoNotConsumeRecommendationSeedBudget() {
+        var values = (0..<72).map { index in
+            connection(
+                "invalid-\(index)",
+                from: alpha,
+                to: bravo,
+                departure: Millis(index),
+                arrival: Millis(index - 1)
+            )
+        }
+        values.append(connection("valid", from: alpha, to: bravo, departure: 100, arrival: 200))
+
+        XCTAssertEqual(
+            OfflineRouter().recommendation(from: alpha, to: bravo, at: 0, connections: values)?
+                .legs.first?.identity?.tripId,
+            "valid"
+        )
+    }
+
+    func testRouterCooperativelyCancelsLongScans() {
+        let values = (0..<1_000).map { index in
+            connection("trip-\(index)", from: alpha, to: bravo, departure: Millis(index), arrival: Millis(index + 100))
+        }
+        var checks = 0
+        let result = OfflineRouter().recommendation(
+            from: alpha,
+            to: bravo,
+            at: 0,
+            connections: values,
+            isCancelled: { checks += 1; return checks > 1 }
+        )
+
+        XCTAssertNil(result)
+        XCTAssertLessThan(checks, 10)
+    }
+
+    func testStationDominanceKeepsDifferentLastTripsForReboarding() throws {
+        let p = Station(id: "P", name: "P")
+        let x = Station(id: "X", name: "X")
+        let minute = 60_000.0
+        let values = [
+            connection("seed", from: alpha, to: p, departure: 0, arrival: minute),
+            connection("loop", from: p, to: x, departure: 6 * minute, arrival: 7 * minute),
+            connection("other", from: p, to: x, departure: 6 * minute, arrival: 8 * minute),
+            connection("loop", from: x, to: bravo, departure: 14 * minute, arrival: 15 * minute, fromSequence: 9, toSequence: 10)
+        ]
+        let result = try XCTUnwrap(OfflineRouter().recommendation(from: alpha, to: bravo, at: 0, connections: values))
+        XCTAssertEqual(result.legs.compactMap { $0.identity?.tripId }, ["seed", "other", "loop"])
+    }
+
+    func testWeightedSearchContinuesBeyondFirstTerminalArrivalAndBoardPrefix() throws {
+        let minute = 60_000.0
+        let values = [
+            connection("seed", from: alpha, to: central, departure: 0, arrival: minute, fromSequence: 1, toSequence: 2),
+            connection("transfer", from: central, to: bravo, departure: 6 * minute, arrival: 20 * minute),
+            connection("seed", from: central, to: bravo, departure: 21 * minute, arrival: 24 * minute, fromSequence: 2, toSequence: 3),
+            connection("later", from: alpha, to: bravo, departure: 22 * minute, arrival: 23 * minute)
+        ].sorted { $0.departure < $1.departure }
+        let result = try XCTUnwrap(OfflineRouter().recommendation(from: alpha, to: bravo, at: 0, connections: values))
+        XCTAssertEqual(result.legs.first?.identity?.tripId, "later")
+        XCTAssertEqual(OfflineRouter().route(from: alpha, to: bravo, at: 0, connections: values, limit: 1).first?.legs.count, 2)
+        XCTAssertEqual(OfflineRouter().recommendation(from: alpha, to: bravo, at: 0, connections: Array(values.dropLast()))?.legs.count, 1)
+    }
+
+    func testRecommendationChecksExactlySeventyTwoFutureSeeds() {
+        let values = (0..<73).map { index in
+            connection("trip-\(index)", from: alpha, to: bravo, departure: Millis(index + 1), arrival: Millis(1_000 - index))
+        }
+        XCTAssertEqual(OfflineRouter().recommendation(from: alpha, to: bravo, at: 0, connections: values)?.legs.first?.identity?.tripId, "trip-71")
+        XCTAssertEqual(OfflineRouter().recommendation(from: alpha, to: bravo, at: 2, connections: values)?.legs.first?.identity?.tripId, "trip-72")
+    }
+
     func testGTFSUsesSydneyCivilTimeAcrossDSTAndAfterMidnight() {
         XCTAssertEqual(
             OfflinePlanner.gtfsEpochMillis(serviceDate: "20261004", seconds: 3 * 3_600 + 30 * 60),

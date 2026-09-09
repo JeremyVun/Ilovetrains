@@ -56,6 +56,7 @@ test('the transfer limit reads as up to two changes unless it says otherwise', (
   assert.equal(preferencesOf(emptyDoc()).transferLimit, 'two');
   assert.equal(preferencesOf({ preferences: { transferLimit: 'any' } }).transferLimit, 'any');
   assert.equal(preferencesOf({ preferences: { transferLimit: 'two' } }).transferLimit, 'two');
+  assert.equal(preferencesOf({ preferences: { transferLimit: 'direct' } }).transferLimit, 'direct');
   assert.equal(preferencesOf({ preferences: { transferLimit: 'none' } }).transferLimit, 'two');
   assert.equal(preferencesOf({ preferences: { transferLimit: 4 } }).transferLimit, 'two');
 
@@ -72,14 +73,15 @@ test('flags are booleans this backend answered, and the cap needs the flag and t
   assert.deepEqual(flagsOf({ flags: { transferLimit: 'true', other: true } }), { other: true });
 
   const on = setFlags(emptyDoc(), { transferLimit: true });
-  assert.equal(effectiveCap(on), true);
-  assert.equal(effectiveCap(setPreferences(on, { transferLimit: 'any' })), false);
-  assert.equal(effectiveCap(emptyDoc()), false);
-  assert.equal(effectiveCap(setFlags(emptyDoc(), { transferLimit: 'yes' })), false);
+  assert.equal(effectiveCap(on), 2);
+  assert.equal(effectiveCap(setPreferences(on, { transferLimit: 'direct' })), 0);
+  assert.equal(effectiveCap(setPreferences(on, { transferLimit: 'any' })), null);
+  assert.equal(effectiveCap(emptyDoc()), null);
+  assert.equal(effectiveCap(setFlags(emptyDoc(), { transferLimit: 'yes' })), null);
 
   const round = parseDoc(serializeDoc(setPreferences(on, { transferLimit: 'any' })));
   assert.deepEqual(round.flags, { transferLimit: true });
-  assert.equal(effectiveCap(round), false);
+  assert.equal(effectiveCap(round), null);
   assert.equal(parseDoc(JSON.stringify({ flags: [1] })).flags, undefined);
 });
 
@@ -89,16 +91,16 @@ test('the cap hides a journey with more than two changes wherever modes are appl
   const threeChanges = { legs: 4, legDetail: [leg, leg, leg, leg] };
   const body = { generatedAt: 'now', journeys: [twoChanges, threeChanges] };
 
-  assert.equal(journeyAllowed(twoChanges, SUPPORTED_MODES, true), true);
-  assert.equal(journeyAllowed(threeChanges, SUPPORTED_MODES, true), false);
-  assert.equal(journeyAllowed(threeChanges, SUPPORTED_MODES, false), true);
+  assert.equal(journeyAllowed(twoChanges, SUPPORTED_MODES, 2), true);
+  assert.equal(journeyAllowed(threeChanges, SUPPORTED_MODES, 2), false);
+  assert.equal(journeyAllowed(threeChanges, SUPPORTED_MODES, null), true);
   assert.equal(journeyAllowed(threeChanges, SUPPORTED_MODES), true);
   // A body cached before `legs` shipped is still counted by its legs.
-  assert.equal(journeyAllowed({ legDetail: [leg, leg, leg, leg] }, SUPPORTED_MODES, true), false);
+  assert.equal(journeyAllowed({ legDetail: [leg, leg, leg, leg] }, SUPPORTED_MODES, 2), false);
 
-  assert.deepEqual(filterBody(body, SUPPORTED_MODES, true).journeys, [twoChanges]);
-  assert.deepEqual(filterBody(body, SUPPORTED_MODES, false).journeys, [twoChanges, threeChanges]);
-  assert.deepEqual(filterBody(body, ['ferry'], false).journeys, []);
+  assert.deepEqual(filterBody(body, SUPPORTED_MODES, 2).journeys, [twoChanges]);
+  assert.deepEqual(filterBody(body, SUPPORTED_MODES, null).journeys, [twoChanges, threeChanges]);
+  assert.deepEqual(filterBody(body, ['ferry'], null).journeys, []);
 });
 
 test('journeys require every service leg and filtering leaves the raw response unchanged', () => {

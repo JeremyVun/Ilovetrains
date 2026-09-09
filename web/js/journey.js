@@ -68,11 +68,10 @@ export function departureKey(journey) {
 }
 
 export function arrivalMs(journey) {
-  const fromJourney = journey ? effective(journey.arrival) : null;
-  if (fromJourney !== null) return fromJourney;
   const legs = legsOf(journey);
   const last = legs[legs.length - 1];
-  return last ? effective(last.arrival) : null;
+  const fromLeg = last ? effective(last.arrival) : null;
+  return fromLeg !== null ? fromLeg : journey ? effective(journey.arrival) : null;
 }
 
 export function departureMs(journey) {

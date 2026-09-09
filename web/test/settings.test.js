@@ -179,17 +179,20 @@ test('the transfer limit is absent from Settings until the backend turns it on',
   assert.doesNotMatch(services(SUPPORTED_MODES), /st-transfer-row/);
 });
 
-test('the transfer limit row shows the value and offers the other one', () => {
+test('the transfer limit row shows each value with one Change action', () => {
+  const direct = services(SUPPORTED_MODES, 'direct');
   const capped = services(SUPPORTED_MODES, 'two');
   const uncapped = services(SUPPORTED_MODES, 'any');
 
   assert.match(capped, /Trips use chosen services only\.<\/p><button class="st-person-row st-transfer-row"/);
   assert.match(capped, /<span class="st-name">Transfer limit<\/span><span class="st-value">Up to 2<\/span>/);
-  assert.match(capped, /<span class="st-state">No limit<\/span><\/button><\/section>/);
-  assert.match(capped, /aria-label="Transfer limit, Up to 2 transfers, Change to no limit"/);
+  assert.match(capped, /<span class="st-state">Change<\/span><\/button><\/section>/);
+  assert.match(capped, /aria-label="Transfer limit, Up to 2, Change"/);
   assert.match(uncapped, /<span class="st-value">No limit<\/span>/);
-  assert.match(uncapped, /<span class="st-state">Up to 2<\/span>/);
-  assert.match(uncapped, /aria-label="Transfer limit, No limit on transfers, Change to up to 2 transfers"/);
+  assert.match(uncapped, /<span class="st-state">Change<\/span>/);
+  assert.match(uncapped, /aria-label="Transfer limit, No limit, Change"/);
+  assert.match(direct, /<span class="st-value">Direct only<\/span>/);
+  assert.match(direct, /aria-label="Transfer limit, Direct only, Change"/);
   assert.equal(transferRow('junk'), transferRow('two'));
 
   // Every service off hides the journey line, and keeps the words (round 2).
@@ -205,7 +208,8 @@ test('the transfer limit row swaps the value through setPreferences', () => {
   const branch = /if \(action === 'transfer-limit'\) \{([\s\S]*?)\n    \}/.exec(source);
 
   assert.ok(branch, 'the settings handler still answers the row');
-  assert.match(branch[1], /ctx\.setPreferences\(\{ transferLimit: current === 'two' \? 'any' : 'two' \}\)/);
+  assert.match(branch[1], /current === 'direct' \? 'two' : current === 'two' \? 'any' : 'direct'/);
+  assert.match(branch[1], /ctx\.setPreferences\(\{ transferLimit: next \}\)/);
   assert.match(branch[1], /paintMain\(root, ctx, permission\)/);
   assert.match(source, /flagsOf\(ctx\.doc\)\.transferLimit \? prefs\.transferLimit : null/);
 });

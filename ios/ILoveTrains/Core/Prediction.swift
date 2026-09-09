@@ -44,7 +44,6 @@ func compatible(_ trip: SavedTrip, modes: Set<String>) -> Bool {
 
 func visibleFocus(data: UserData, now: Millis) -> FocusedJourney? {
     guard let focus = data.focus,
-          now <= focus.journey.effectiveArrival + 1_800_000,
           let trip = data.trips.first(where: { $0.id == focus.tripId }),
           compatible(trip, modes: data.modes),
           focus.journey.legs.allSatisfy({ data.modes.contains($0.mode) }) else { return nil }

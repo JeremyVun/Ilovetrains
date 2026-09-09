@@ -25,9 +25,16 @@ fun boardForOpenedJourney(
     homeBoard: BoardData?,
     board: BoardData?,
     journey: Journey,
-): BoardData? = focus?.alternatives?.takeIf { alternatives ->
-    journey.key != focus.journey.key && alternatives.journeys.any { it.key == journey.key }
-} ?: homeBoard ?: board
+): BoardData? = focus?.takeIf { it.journey.key == journey.key }?.board
+    ?: focus?.alternatives?.sourceForJourney(journey)
+    ?: homeBoard?.sourceForJourney(journey)
+    ?: board?.sourceForJourney(journey)
+    ?: homeBoard ?: board
+
+fun BoardData.sourceForJourney(journey: Journey): BoardData? =
+    recommendation?.takeIf { it.journey.key == journey.key }?.source
+        ?: (listOf(this) + recommendationPages.map { it.body })
+            .filter { source -> source.journeys.any { it.key == journey.key } }.maxByOrNull { it.generatedAt }
 
 fun focusAfterRefresh(focus: FocusedJourney, update: FocusedRefresh?, alternatives: BoardData?): FocusedJourney {
     if (update == null || update.journey.key != focus.journey.key || update.journey.legs.size != focus.journey.legs.size) {
@@ -63,9 +70,12 @@ fun isTightChange(journey: Journey, changeIndex: Int): Boolean =
     !journey.cancelled && changeIndex in 0 until journey.legs.lastIndex &&
         minutesBetween(journey.legs[changeIndex].effectiveArrival, journey.legs[changeIndex + 1].effectiveDeparture) < 5
 
-fun focusStatus(focus: FocusedJourney, now: Long, complete: Boolean): FocusStatus {
+fun focusStatus(focus: FocusedJourney, now: Long, complete: Boolean, arrival: ArrivalResult? = null): FocusStatus {
     val journey = focus.journey
-    if (complete || now >= journey.effectiveArrival) return FocusStatus("Trip over", false)
+    if (complete || arrival?.state == ArrivalState.Arrived) return FocusStatus("Trip over", false)
+    if (arrival?.state == ArrivalState.CheckingArrival) return FocusStatus("Checking arrival", false)
+    if (arrival?.state == ArrivalState.ArrivalUnconfirmed) return FocusStatus(
+        if (arrival.moving) "Arrival uncertain" else "Arrival unconfirmed", arrival.moving)
     if (journey.cancelled) return FocusStatus("Cancelled", true)
     val active = journey.legs.firstOrNull { now < it.effectiveArrival } ?: journey.legs.lastOrNull()
     val delay = active?.estimatedDeparture?.let { minutesBetween(active.departure, it) } ?: 0
@@ -76,8 +86,8 @@ fun focusStatus(focus: FocusedJourney, now: Long, complete: Boolean): FocusStatu
     return FocusStatus("Running", false)
 }
 
-fun savedTripFocusStatus(focus: FocusedJourney, now: Long, complete: Boolean): String {
-    val status = focusStatus(focus, now, complete).text
+fun savedTripFocusStatus(focus: FocusedJourney, now: Long, complete: Boolean, arrival: ArrivalResult? = null): String {
+    val status = focusStatus(focus, now, complete, arrival).text
     return if (focus.pinned && status != "Pinned") "$status · Pinned" else status
 }
 
@@ -105,10 +115,10 @@ fun shownLeadEvidence(
 ): ShownLeadEvidence? {
     if (suppressed) return null
     val lead = nextHomeJourney(board, now)?.takeUnless { it.retained } ?: return null
-    val observed = observedSources.any { source ->
-        source.isLive(now) && source.journeys.any { it.key == lead.key && !it.retained }
-    }
-    return if (observed) ShownLeadEvidence(board, lead) else null
+    val observed = observedSources.filter { source ->
+        source.isLive(now) && source.journeys.any { it == lead && !it.retained }
+    }.maxByOrNull { it.generatedAt } ?: return null
+    return ShownLeadEvidence(observed, lead)
 }
 
 fun shouldCastHomeVote(screen: Screen, hasTrips: Boolean, station: Station?, alreadyVoted: Boolean): Boolean =

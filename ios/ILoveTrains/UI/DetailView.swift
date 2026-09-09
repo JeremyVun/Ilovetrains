@@ -31,8 +31,17 @@ struct DetailView: View {
                         LazyVStack(spacing: 0) {
                             BoardRow(journey: journey, board: model.state.board, now: model.state.now, detail: true,
                                      figureOverride: !journey.cancelled
-                                        ? directionFigureFor(journey, now: model.state.now) : nil)
-                            JourneySteps(journey: journey, now: model.state.now)
+                                        ? arrivalFigure(focused ? model.state.arrival : nil, journey: journey, now: model.state.now)
+                                            ?? directionFigureFor(journey, now: model.state.now) : nil)
+                            if let instruction = arrivalInstruction(
+                                focused ? model.state.arrival : nil,
+                                destination: last.to.shortName
+                            ) {
+                                Text(instruction).font(.system(size: 15, weight: .regular)).foregroundStyle(colors.ink)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, pagePadding).padding(.vertical, 10)
+                            }
+                            JourneySteps(journey: journey, now: model.state.now, arrival: focused ? model.state.arrival : nil)
                             Spacer().frame(height: 12)
                         }
                     }
@@ -45,7 +54,10 @@ struct DetailView: View {
                         Text(clockTime(journey.effectiveArrival)).font(.system(size: 19, weight: .light)).foregroundStyle(last.cancelled ? colors.ink3 : colors.ink).strikethrough(last.cancelled).tabular()
                         Text(last.to.shortName).font(.system(size: 14, weight: .light)).foregroundStyle(colors.ink2).lineLimit(1)
                         Spacer()
-                        TrainLabel(text: last.cancelled ? "Journey cancelled" : platformText(last.toPlatform, mode: last.mode, full: true) ?? "Arrive",
+                        TrainLabel(text: last.cancelled ? "Journey cancelled"
+                                   : (focused && (model.state.arrival?.state == .checkingArrival || model.state.arrival?.state == .arrivalUnconfirmed))
+                                    ? "Last estimate"
+                                    : platformText(last.toPlatform, mode: last.mode, full: true) ?? "Arrive",
                                    color: last.cancelled ? colors.warning : colors.ink3, lines: 2)
                     }.frame(minHeight: 52)
                 }
@@ -81,6 +93,7 @@ struct DetailView: View {
 private struct JourneySteps: View {
     let journey: Journey
     let now: Millis
+    let arrival: ArrivalResult?
     var body: some View {
         if let first = journey.legs.first {
             DetailStep(time: clockTime(first.effectiveDeparture), station: first.from.shortName, platform: first.fromPlatform,
@@ -91,7 +104,8 @@ private struct JourneySteps: View {
             }
             if let last = journey.legs.last {
                 DetailStep(time: clockTime(last.effectiveArrival), station: last.to.shortName, platform: last.toPlatform,
-                           leg: last, action: last.cancelled ? "Arrive · journey cancelled" : "Arrive", done: false)
+                           leg: last, action: last.cancelled ? "Arrive · journey cancelled" : "Arrive",
+                           done: arrival.map { $0.state == .arrived } ?? (now >= last.effectiveArrival))
             }
         }
     }

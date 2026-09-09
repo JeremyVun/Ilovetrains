@@ -123,8 +123,8 @@ private fun SettingsMain(state: AppState, actions: UiActions, feedback: () -> Un
             else "Trips use chosen services only.", Modifier.padding(top = 8.dp),
             color = if (state.enabledModes.isEmpty()) c.warning else c.ink3, maxLines = 3)
         state.transferLimit?.let { limit ->
-            SettingsPersonalRow(null, "Transfer limit", limit.label, limit.other.label,
-                { actions.setTransferLimit(limit.other) }, primaryState = true)
+            SettingsPersonalRow(null, "Transfer limit", limit.label, "Change",
+                { actions.setTransferLimit(limit.next) }, primaryState = true)
         }
 
         Spacer(Modifier.height(22.dp)); SettingsSection("Appearance")
@@ -137,8 +137,6 @@ private fun SettingsMain(state: AppState, actions: UiActions, feedback: () -> Un
 
         Spacer(Modifier.height(22.dp)); Rule()
         SecondaryRow("Send feedback", "›", feedback)
-        SecondaryRow("Offline timetable", state.timetableStatus, actions::updateTimetable,
-            enabled = !state.timetableUpdating)
         SecondaryRow("Version ${state.version}", "", null)
         Spacer(Modifier.height(18.dp))
     }

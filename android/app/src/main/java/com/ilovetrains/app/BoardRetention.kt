@@ -2,7 +2,17 @@ package com.ilovetrains.app
 
 private const val PAST_RETENTION = 24 * 60 * 60_000L
 
-internal fun BoardData.lastKnown() = copy(offline = true, journeys = journeys.map { it.copy(retained = true) })
+internal fun BoardData.lastKnown(): BoardData {
+    fun retainedSource(source: BoardData) = source.copy(offline = true,
+        journeys = source.journeys.map { it.copy(retained = true) }, recommendationPages = emptyList(), recommendation = null)
+    return copy(
+        offline = true,
+        journeys = journeys.map { it.copy(retained = true) },
+        recommendationPages = recommendationPages.map { page -> page.copy(body = retainedSource(page.body)) },
+        recommendation = recommendation?.let { result -> RecommendationResult(
+            result.journey.copy(retained = true), retainedSource(result.source)) },
+    )
+}
 
 internal fun FocusedJourney.lastKnown() = copy(journey = journey.copy(retained = true), board = board.lastKnown())
 
@@ -17,12 +27,13 @@ internal fun FocusedJourney.demotedForLostOverlay(): FocusedJourney? =
 /** An offline open keeps the answer the rider last saw, without inferring a ride. */
 fun retainedHomeJourney(board: BoardData?, now: Long): Journey? {
     if (board == null || !board.offline) return null
-    return board.journeys.find { it.key == board.homeJourneyKey && now <= it.effectiveArrival + 30 * 60_000L }
+    return (board.journeys + listOfNotNull(board.recommendation?.journey))
+        .find { it.key == board.homeJourneyKey && now <= it.effectiveArrival + 30 * 60_000L }
 }
 
 fun nextHomeJourney(board: BoardData, now: Long): Journey? = retainedHomeJourney(board, now)
-    ?: board.journeys.firstOrNull { !it.cancelled && it.effectiveDeparture >= now }
-    ?: board.journeys.firstOrNull { it.effectiveDeparture >= now }
+    ?: board.recommendation?.journey?.takeIf { !it.cancelled && it.effectiveDeparture >= now }
+    ?: selectRecommendation(board.recommendationCandidates(now), now)?.journey
 
 /** Online answers own future services. A failed request cannot erase a saved service. */
 internal fun mergeBoardResults(
@@ -46,6 +57,29 @@ internal fun mergeBoardResults(
     local?.takeIf { it.isLive(now) }?.journeys?.filter { recent(it) && it.realtime && (online == null || it.effectiveDeparture < now) }
         ?.forEach { rows[it.key] = it }
     online?.journeys?.forEach { rows[it.key] = it }
-    val merged = base.copy(journeys = rows.values.sortedBy { it.effectiveDeparture }, homeJourneyKey = prior?.homeJourneyKey)
+    val retainedAnswer = prior?.copy(offline = base.offline)?.let { retainedHomeJourney(it, now) }
+    val selectedRecommendation = when {
+        online != null -> online.recommendation ?: selectRecommendation(online.recommendationCandidates(now), now)?.let {
+            RecommendationResult(it.journey, it.source)
+        }
+        retainedAnswer != null -> RecommendationResult(
+            rows[retainedAnswer.key] ?: retainedAnswer.copy(retained = true),
+            (prior.recommendation?.source?.takeIf { prior.recommendation.journey.key == retainedAnswer.key } ?: prior).lastKnown())
+        local != null -> local.recommendation ?: selectRecommendation(local.recommendationCandidates(now), now)?.let {
+            RecommendationResult(it.journey, it.source)
+        }
+        else -> prior?.recommendation
+    }
+    val recommendation = selectedRecommendation?.let { selected ->
+        val priorSource = prior?.recommendation?.takeIf { it.journey.key == selected.journey.key }?.source ?: prior
+        val known = prior?.recommendation?.journey?.takeIf { it.key == selected.journey.key }
+            ?: prior?.journeys?.find { it.key == selected.journey.key }
+        if (online == null && known != null && (known.realtime || known.cancelled) &&
+            !(selected.source.isLive(now) && selected.journey.realtime) && priorSource != null) {
+            RecommendationResult(known.copy(retained = true), priorSource.lastKnown())
+        } else selected
+    }
+    val merged = base.copy(journeys = rows.values.sortedBy { it.effectiveDeparture }, homeJourneyKey = prior?.homeJourneyKey,
+        recommendation = recommendation)
     return merged.copy(homeJourneyKey = nextHomeJourney(merged, now)?.key)
 }

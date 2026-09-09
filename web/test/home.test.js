@@ -42,6 +42,17 @@ test('next service mode and stale figure describe the second service itself', ()
   }
 });
 
+test('an earlier Metro alternative uses the approved train label', () => {
+  const [earlier, recommended] = transferJourneys();
+  earlier.legDetail[0].line.mode = 'metro';
+  const model = homeModel(homeDoc(), HOME_SELECTION, transferBody({ journeys: [recommended] }), at('09:21'), {
+    recommendation: { journey: recommended, source: { body: transferBody(), stale: false } },
+    alternative: { journey: earlier, source: { body: transferBody(), stale: false } }
+  });
+
+  assert.equal(model.following.label, 'Earlier train');
+});
+
 test('a pinned header takes its next service and freshness from its own pair', () => {
   const journeys = transferJourneys();
   const doc = homeDoc(journeys[0]);
@@ -327,6 +338,58 @@ test('a focus-source replacement still obeys the enabled service modes', () => {
   assert.equal(model.directions.depTime, '09:24');
 });
 
+function directVersion(journey) {
+  const result = structuredClone(journey);
+  const last = result.legDetail.at(-1);
+  result.legDetail = [{ ...result.legDetail[0], to: last.to, arrival: last.arrival }];
+  result.legs = 1;
+  return result;
+}
+
+test('a cancelled direct focus cannot offer transfers from its uncapped refresh', () => {
+  const journeys = transferJourneys();
+  const cancelled = cancelLeg(directVersion(journeys[0]), 0);
+  const doc = homeDoc(cancelled);
+  doc.flags = { transferLimit: true };
+  doc.preferences = { transferLimit: 'direct' };
+  const model = homeModel(doc, HOME_SELECTION, transferBody({ journeys: [] }), at('09:21'), {
+    focusBody: transferBody({ journeys: [cancelled, ...journeys.slice(1)] })
+  });
+  assert.equal(model.directions.journey, cancelled);
+  assert.equal(model.following, null);
+});
+
+test('cancellation replacement minimizes weighted cost and keeps its own source', () => {
+  const journeys = transferJourneys();
+  cancelLeg(journeys[0], 0);
+  const direct = directVersion(journeys[2]);
+  direct.arrival = { scheduled: '2026-09-01T10:14:00+10:00' };
+  direct.legDetail[0].arrival = direct.arrival;
+  const model = homeModel(homeDoc(journeys[0]), HOME_SELECTION, transferBody({ journeys: journeys.slice(0, 2) }), at('09:21'), {
+    focusBody: transferBody({ journeys: [journeys[0], direct] }),
+    candidateSource: { stale: true, freshness: 'Offline', dot: 'stale' },
+    focusSource: { stale: false, freshness: 'Live', dot: 'live' }
+  });
+  assert.equal(model.directions.journey, direct);
+  assert.equal(model.freshness, 'Live');
+});
+
+test('predeparture cancellation can recommend an earlier catchable service', () => {
+  const journeys = transferJourneys();
+  cancelLeg(journeys[1], 0);
+  const model = homeModel(homeDoc(journeys[1]), HOME_SELECTION, transferBody({ journeys }), at('09:21'));
+  assert.equal(model.directions.journey, journeys[0]);
+  assert.equal(model.status.text, 'Cancelled');
+});
+
+test('an exhausted unfocused recommendation cannot fall back to a departed journey', () => {
+  const journeys = transferJourneys();
+  const model = homeModel(homeDoc(), HOME_SELECTION, transferBody({ journeys: [journeys[0]] }), at('09:33'), {
+    recommendation: null
+  });
+  assert.equal(model.directions.journey, null);
+});
+
 test('a stale candidate replacement does not inherit fresh focus provenance', () => {
   const journeys = transferJourneys();
   cancelLeg(journeys[0], 0);
@@ -399,16 +462,15 @@ test('home labels an unnumbered ferry origin Wharf without inventing a number', 
   assert.match(html, /class="hm-stn"[^>]*>Pyrmont Bay Wharf<\/span>/);
 });
 
-test('a saved-trip row opens that trip’s departures and the header is read-only', () => {
+test('a saved-trip row opens departures and the recommendation opens its exact detail', () => {
   const { html } = screen(transferJourneys(), '09:21');
 
   assert.ok(html.includes('data-act="open-trip" data-id="t1" data-direction="forward"'));
   assert.ok(html.includes('aria-label="Open Rhodes to Bondi Junction departures"'));
   assert.ok(html.includes('Departures<span class="arrow">›</span>'));
   assert.ok(!html.includes('select-trip'), 'the old home-only selection is gone');
-  assert.ok(!html.includes('data-act="board"'), 'and the header is not a control');
-  assert.match(html, /<section class="hm-hd[^>]*>/);
-  assert.ok(!/<section class="hm-hd[^>]*data-act=/.test(html));
+  assert.match(html, /<section class="hm-hd[^>]*data-act="recommendation-detail"/);
+  assert.match(html, /aria-label="Open Rhodes to Bondi Junction journey"/);
   assert.ok(html.includes('<div class="l">My trips</div>'));
 });
 
@@ -427,8 +489,15 @@ function receiptDoc(history, trips = [HOME_TRIP, SECOND_TRIP]) {
   return { ...emptyDoc(), trips, history };
 }
 
+function receiptBody(nowMs) {
+  const delta = nowMs - at('09:21');
+  return JSON.parse(JSON.stringify(transferBody()), (key, value) =>
+    ['scheduled', 'estimated', 'generatedAt'].includes(key) && typeof value === 'string'
+      ? new Date(Date.parse(value) + delta).toISOString() : value);
+}
+
 const receiptOf = (doc, nowMs, opts = {}) =>
-  homeModel(doc, HOME_SELECTION, transferBody(), nowMs, { predicted: true, ...opts })
+  homeModel(doc, HOME_SELECTION, receiptBody(nowMs), nowMs, { predicted: true, ...opts })
     .directions.receipt;
 
 const SATURDAY_0921 = Date.parse('2026-09-05T09:21:00+10:00');
@@ -505,7 +574,7 @@ test('the reverse receipt prints the ride’s Sydney time from any device zone',
     }]
   };
   const receipt = () => homeModel(doc, { tripId: 't1', direction: 'reverse' },
-    transferBody(), at('17:40'), {}).directions.receipt;
+    receiptBody(at('17:40')), at('17:40'), {}).directions.receipt;
 
   for (const zone of ['Australia/Sydney', 'Australia/Perth', 'UTC']) {
     process.env.TZ = zone;
@@ -593,15 +662,16 @@ test('a saved-trip row tap selects and routes, and leaves focus alone', () => {
 
 /* The record inferred entry reads is written where writes happen, never from a
    render or a tick, and only for an unfocused header (client-storage.md). */
-test('the controller records the previous open at two write points only', () => {
+test('the controller records the chosen journey after cache, base and lookahead writes', () => {
   const main = readFileSync(join(import.meta.dirname, '..', 'js', 'main.js'), 'utf8');
   const body = /function noteLastOpen\(\) \{([\s\S]*?)\n\}/.exec(main);
 
   assert.ok(body, 'the controller still has noteLastOpen');
   assert.match(body[1], /state\.view !== 'home' \|\| focusSelection\(\)/);
-  assert.match(body[1], /!journeyCancelled\(item\)/, 'the lead journey is the first running one');
+  assert.match(body[1], /selectRecommendation\(journeys/, 'fallback uses the same eligibility and cost rule');
   assert.match(body[1], /spot && spot\.tier === 1 \? spot\.station : null/);
-  assert.equal(main.match(/^\s*noteLastOpen\(\);$/gm).length, 2, 'the cache paint and the refresh');
+  assert.equal(main.match(/^\s*noteLastOpen\(\);$/gm).length, 4,
+    'cache paint, first page, improved lookahead and retired supplementary pages');
   assert.ok(!/renderHome\(\)[\s\S]{0,40}noteLastOpen/.test(
     /function renderHome[\s\S]*?\n\}/.exec(main)[0]), 'never from a render');
 });
@@ -647,7 +717,7 @@ const rhodesVotes = (count) => Array.from({ length: count }, (_, index) => ({
 
 function leapModel(votes, opts) {
   const doc = { ...emptyDoc(), trips: [HOME_TRIP], homeVotes: rhodesVotes(votes) };
-  return homeModel(doc, { tripId: 't1', direction: 'reverse' }, transferBody(), at('17:40'), {
+  return homeModel(doc, { tripId: 't1', direction: 'reverse' }, receiptBody(at('17:40')), at('17:40'), {
     predicted: true, fix: { lat: BONDI.location.lat, lon: BONDI.location.lon }, ...opts
   });
 }
@@ -819,7 +889,7 @@ test('a backend flag answer refetches once, and only when it changes the cap', (
   assert.ok(body, 'the controller still reads the flags endpoint');
   assert.match(body[1], /flags = await getFlags\(\{ signal: request\.signal \}\);/);
   assert.match(body[1], /ctx\.update\(setFlags\(state\.doc, flags\)\)/);
-  assert.match(body[1], /if \(capped\(\) !== wasCapped\)/);
+  assert.match(body[1], /if \(maxTransfers\(\) !== wasCapped\)/);
   assert.equal(body[1].match(/refetchEligible\(\)/g).length, 1);
   assert.match(body[1], /if \(state\.view === 'settings'\) renderSettings/);
   assert.equal(main.match(/^\s*refetchEligible\(\);$/gm).length, 2,
@@ -845,11 +915,10 @@ test('every departures request carries the cap except the focus refresh', () => 
   const main = readFileSync(join(import.meta.dirname, '..', 'js', 'main.js'), 'utf8');
   const calls = main.match(/getDepartures\([\s\S]*?\n?\s*\}\);/g);
 
-  assert.equal(calls.length, 4);
-  assert.equal(calls.filter((call) => call.includes('transferLimit: transferLimit()')).length, 3);
+  assert.equal(calls.length, 5);
+  assert.equal(calls.filter((call) => call.includes('transferLimit:')).length, 4);
   const refresh = /async function refreshFollowed\(\) \{([\s\S]*?)\n\}/.exec(main)[1];
   assert.match(refresh, /modes: SUPPORTED_MODES/);
   assert.doesNotMatch(refresh, /transferLimit/);
-  assert.match(main, /function transferLimit\(\) \{ return capped\(\) \? CAPPED_CHANGES : undefined; \}/);
-  assert.match(main, /const CAPPED_CHANGES = 2;/);
+  assert.match(main, /function transferLimit\(\) \{ return maxTransfers\(\) \?\? undefined; \}/);
 });

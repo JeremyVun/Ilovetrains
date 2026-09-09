@@ -1,0 +1,45 @@
+{
+  "round": "commute-feedback-accepted",
+  "title": "Commute feedback \u00b7 accepted C1",
+  "frames": {
+    "phone": {
+      "w": 390,
+      "h": 844,
+      "note": "the standard frame"
+    },
+    "short": {
+      "w": 412,
+      "h": 732,
+      "note": "the owner's phone with browser chrome"
+    }
+  },
+  "concepts": [
+    "c1-fade"
+  ],
+  "scenarios": [
+    "direct",
+    "overdue-moving"
+  ],
+  "settle": 260,
+  "dsf": 2,
+  "probes": {
+    "tapMin": 44
+  },
+  "jobs": [
+    {
+      "concept": "c1-fade",
+      "frames": [
+        "phone",
+        "short"
+      ],
+      "scenarios": [
+        "direct",
+        "overdue-moving"
+      ],
+      "schemes": [
+        "dark",
+        "light"
+      ]
+    }
+  ]
+}

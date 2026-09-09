@@ -202,6 +202,8 @@ actor TravelTrackerController {
         visibleFocus: FocusedJourney?,
         now: Millis,
         recordedComplete: Bool,
+        arrivalState: ArrivalState? = nil,
+        arrivalMoving: Bool = false,
         debugStaticCountdown: String? = nil
     ) async -> TravelTrackerState? {
         await prepare(focus: focus)
@@ -233,7 +235,13 @@ actor TravelTrackerController {
             let completedCanResume = session.suppressedIdentity == identity
                 && session.suppression == .completed
                 && !recordedComplete
-                && TravelTrackerState.derive(focus: focus, now: now, generation: 0) != nil
+                && TravelTrackerState.derive(
+                    focus: focus,
+                    now: now,
+                    generation: 0,
+                    arrivalState: arrivalState,
+                    arrivalMoving: arrivalMoving
+                ) != nil
             let newInference = !focus.pinned
                 && !(session.suppressedIdentity == identity && session.suppression == .dismissed)
             if completedCanResume || newInference {
@@ -261,7 +269,13 @@ actor TravelTrackerController {
             await suppress(.completed, identity: identity)
             return nil
         }
-        guard let state = TravelTrackerState.derive(focus: focus, now: now, generation: active.generation) else {
+        guard let state = TravelTrackerState.derive(
+            focus: focus,
+            now: now,
+            generation: active.generation,
+            arrivalState: arrivalState,
+            arrivalMoving: arrivalMoving
+        ) else {
             await suppress(.completed, identity: identity)
             return nil
         }
@@ -603,9 +617,8 @@ enum TravelTrackerActivityContentMapper {
         #if DEBUG
         content.debugStaticCountdown = debugStaticCountdown
         if debugStaticCountdown != nil {
-            content.staleDate = state.freshness == .live
-                ? Date().addingTimeInterval(3_600)
-                : Date().addingTimeInterval(-1)
+            // Static captures keep the host visible; the wall-clock lane tests OS staleness.
+            content.staleDate = Date().addingTimeInterval(3_600)
         }
         #endif
         return content

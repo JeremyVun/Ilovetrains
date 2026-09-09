@@ -91,11 +91,12 @@ data class TravelTrackerState(
     val freshUntil: Long?,
 ) {
     companion object {
-        fun derive(focus: FocusedJourney, now: Long, generation: Long): TravelTrackerState? {
+        fun derive(focus: FocusedJourney, now: Long, generation: Long, arrival: ArrivalResult? = null): TravelTrackerState? {
             val legs = focus.journey.legs
             if (legs.isEmpty()) return null
             val projectionEnd = legs.maxOf { it.effectiveArrival }
-            if (now >= projectionEnd) return null
+            if (now >= projectionEnd && arrival == null) return null
+            if (arrival?.state in setOf(ArrivalState.Arrived, ArrivalState.ExpiredUnconfirmed)) return null
 
             val identity = TravelTrackerIdentity(focus.tripId, focus.reverse, focus.journey.key)
             val revision = TravelTrackerRevision(identity, generation)
@@ -115,7 +116,25 @@ data class TravelTrackerState(
             val connection: String?
             val tight: Boolean
 
-            if (cancelledLeg != null) {
+            if (now >= projectionEnd && arrival != null) {
+                event = TravelTrackerEvent(TravelTrackerEventKind.Arrival, destination, last.effectiveArrival, null)
+                when {
+                    arrival.state == ArrivalState.CheckingArrival -> {
+                        headline = TravelTrackerHeadline("Checking arrival")
+                        instruction = "Checking arrival at $destination."
+                    }
+                    arrival.moving -> {
+                        headline = TravelTrackerHeadline("Arrival uncertain")
+                        instruction = "Still on the way to $destination."
+                    }
+                    else -> {
+                        headline = TravelTrackerHeadline("Arrival unconfirmed")
+                        instruction = "Arrival time needs an update."
+                    }
+                }
+                connection = null
+                tight = false
+            } else if (cancelledLeg != null) {
                 val name = cancelledLeg.line.ifBlank { trackerVehicle(cancelledLeg.mode) }
                 event = TravelTrackerEvent(TravelTrackerEventKind.Cancellation, name, cancelledLeg.effectiveDeparture, null)
                 headline = TravelTrackerHeadline("$name cancelled")
@@ -145,15 +164,16 @@ data class TravelTrackerState(
                 missedConnection = missed,
                 destination = destination,
                 eta = last.effectiveArrival,
-                etaText = (if (missed == null) "about " else "Planned ") + trackerClock(last.effectiveArrival),
+                etaText = if (now >= projectionEnd && arrival != null) "Last estimate ${trackerClock(last.effectiveArrival)}"
+                    else (if (missed == null) "about " else "Planned ") + trackerClock(last.effectiveArrival),
                 segments = trackerSegments(legs, projectionEnd),
-                progress = trackerProgress(legs, now, projectionEnd),
+                progress = if (now >= projectionEnd && arrival != null) .98 else trackerProgress(legs, now, projectionEnd),
                 freshness = source.first,
                 provenance = trackerProvenance(focus, source.first),
                 retained = focus.journey.retained,
                 cancelled = cancelledLeg != null,
                 arrivalCancelled = last.cancelled,
-                nextBoundary = position.boundary,
+                nextBoundary = if (now >= projectionEnd && arrival != null) now + 30_000 else position.boundary,
                 freshUntil = source.second,
             )
         }

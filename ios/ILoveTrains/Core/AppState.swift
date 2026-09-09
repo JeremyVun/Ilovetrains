@@ -9,7 +9,7 @@ func clockTime(_ time: Double) -> String {
 func epochNow() -> Double { (Date().timeIntervalSince1970 * 1000).rounded() }
 enum Screen: String, Codable, Sendable { case home, board, detail, setup, settings }
 enum Appearance: String, Codable, CaseIterable, Sendable { case system, dark, light }
-enum TransferLimit: String, Codable, CaseIterable, Sendable { case two, any }
+enum TransferLimit: String, Codable, CaseIterable, Sendable { case direct, two, any }
 let transferLimitFlagKey = "transferLimit"
 let tinyTrainFlagKey = "tiny_train"
 
@@ -23,6 +23,7 @@ struct AppState {
     var reverse = false
     var board: BoardData?
     var homeBoard: BoardData?
+    var recommendation: JourneyRecommendation?
     var detail: Journey?
     var focus: FocusedJourney?
     var now = epochNow()
@@ -41,6 +42,7 @@ struct AppState {
     var homeIsManual = false
     var automaticHome: Station?
     var focusComplete = false
+    var arrival: ArrivalResult?
     var stations: [Station] = []
     var recentFrom: [Station] = []
     var recentTo: [Station] = []

@@ -9,9 +9,9 @@ val AllModes = setOf("train", "metro", "ferry")
 const val TransferLimitFlag = "transferLimit"
 const val TinyTrainFlag = "tiny_train"
 
-enum class TransferLimit(val wire: String, val label: String) {
-    Two("two", "Up to 2"), Any("any", "No limit");
-    val other get() = if (this == Two) Any else Two
+enum class TransferLimit(val wire: String, val label: String, val maxTransfers: Int?) {
+    Direct("direct", "Direct only", 0), Two("two", "Up to 2", 2), Any("any", "No limit", null);
+    val next get() = when (this) { Direct -> Two; Two -> Any; Any -> Direct }
 }
 fun transferLimitOf(value: String?): TransferLimit = TransferLimit.entries.find { it.wire == value } ?: TransferLimit.Two
 
@@ -45,15 +45,24 @@ data class Journey(val legs: List<Leg>, val retained: Boolean = false) {
     val realtime get() = legs.any { it.estimatedDeparture != null || it.estimatedArrival != null }
     val mode get() = legs.first().mode
 }
+data class TransferConstraint(val maxTransfers: Int?)
 data class BoardData(val from: Station, val to: Station, val journeys: List<Journey>, val generatedAt: Long,
     val source: String = "schedule", val offline: Boolean = false, val serverStale: Boolean = false,
-    val coverage: String = "", val error: String? = null, val homeJourneyKey: String? = null) {
+    val coverage: String = "", val error: String? = null, val homeJourneyKey: String? = null,
+    val fetchConstraint: TransferConstraint? = null,
+    val recommendationPages: List<RecommendationPage> = emptyList(),
+    val recommendation: RecommendationResult? = null) {
     fun isLive(now: Long) = source == "live" && !offline && !serverStale && now - generatedAt in 0..90_000
 }
-val UserData.capped get() = flags[TransferLimitFlag] == true && transferLimit == TransferLimit.Two
-val UserData.offlineMaxTransfers get() = if (flags[TransferLimitFlag] == true && transferLimit == TransferLimit.Any) 4 else 2
-fun Journey.withinTransferCap(capped: Boolean) = !capped || legs.size <= 3
-fun BoardData.withinTransferCap(capped: Boolean) = if (capped) copy(journeys = journeys.filter { it.withinTransferCap(true) }) else this
+data class RecommendationPage(val at: Long, val body: BoardData, val serverStale: Boolean, val constraint: TransferConstraint)
+data class RecommendationResult(val journey: Journey, val source: BoardData)
+val UserData.maxTransfers get() = if (flags[TransferLimitFlag] == true) transferLimit.maxTransfers else null
+val UserData.offlineMaxTransfers get() = if (flags[TransferLimitFlag] == true) transferLimit.maxTransfers ?: 4 else 2
+fun Journey.withinTransferCap(maxTransfers: Int?) = maxTransfers == null || legs.size - 1 <= maxTransfers
+fun BoardData.withinTransferCap(maxTransfers: Int?) = copy(
+    journeys = journeys.filter { it.withinTransferCap(maxTransfers) },
+    recommendation = recommendation?.takeIf { it.journey.withinTransferCap(maxTransfers) },
+)
 enum class Screen { Home, Board, Detail, Setup, Settings }
 enum class Appearance { System, Dark, Light }
 data class FocusedJourney(
@@ -63,6 +72,7 @@ data class FocusedJourney(
     val board: BoardData,
     val pinned: Boolean = true,
     val alternatives: BoardData? = null,
+    val arrivalGuard: ArrivalGuard? = null,
 )
 data class ViewEvent(val tripId: String, val reverse: Boolean, val at: Long)
 data class Ride(val tripId: String, val reverse: Boolean, val departure: Long, val arrival: Long,
@@ -80,6 +90,7 @@ data class AppState(
     val useLocation: Boolean = true, val locationGranted: Boolean = false, val locationDenied: Boolean = false,
     val distanceMetres: Int? = null, val receipt: String? = null, val home: Station? = null, val homeIsManual: Boolean = false,
     val automaticHome: Station? = null, val focusComplete: Boolean = false,
+    val arrival: ArrivalResult? = null,
     val stations: List<Station> = emptyList(), val recentFrom: List<Station> = emptyList(), val recentTo: List<Station> = emptyList(),
     val setupFrom: Station? = null, val setupTo: Station? = null, val selectingHome: Boolean = false,
     val setupLocationStatus: SetupLocationStatus = SetupLocationStatus.Idle,

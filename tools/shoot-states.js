@@ -1906,6 +1906,9 @@ function pageScript(state) {
     t.state.pastBodies = [];
     t.state.seenLive = new Map();
     t.state.body = ${JSON.stringify(body)};
+    t.state.recommendation = null;
+    t.state.recommendationCandidates = [];
+    t.state.recommendationPages = [];
     t.state.offline = ${state.offline ? 'true' : 'false'};
     t.state.serverStale = false;
     t.rerender();

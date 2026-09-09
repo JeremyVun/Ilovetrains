@@ -35,6 +35,21 @@ fun DetailScreen(state: AppState, actions: UiActions) {
     val last = journey.legs.last()
     val focused = state.focus?.journey?.key == journey.key
     val pinned = focused && state.focus?.pinned == true
+    val complete = focused && (state.focusComplete || state.arrival?.state == ArrivalState.Arrived)
+    val activeProgress = focused && state.now >= journey.effectiveDeparture && !complete
+    val duration = (journey.effectiveArrival - journey.effectiveDeparture).coerceAtLeast(1)
+    val overdue = activeProgress && state.now >= journey.effectiveArrival
+    val progress = if (!activeProgress) null else if (overdue) .98f else
+        ((((state.now - journey.effectiveDeparture) / 60_000) * 60_000).toFloat() / duration).coerceIn(0f, .999f)
+    val detailFigure = when {
+        journey.cancelled -> null
+        overdue -> {
+            val past = ((state.now - journey.effectiveArrival) / 60_000).toInt()
+            Figure(if (state.arrival?.moving == true && past > 0) past.toString() else "—",
+                if (state.arrival?.moving == true && past > 0) "min" else "", "Last estimate", past = true)
+        }
+        else -> directionFigureFor(journey, state.now)
+    }
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxWidth().padding(horizontal = PagePadding)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -61,8 +76,10 @@ fun DetailScreen(state: AppState, actions: UiActions) {
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             BoardRow(journey, board, state.now, detail = true,
-                figureOverride = if (!journey.cancelled) directionFigureFor(journey, state.now) else null)
-            JourneySteps(journey, state.now)
+                figureOverride = detailFigure,
+                axisTravelledAt = progress?.let { journey.effectiveDeparture + (duration * it).toLong() },
+                axisProgress = progress?.takeIf { !overdue || state.arrival?.moving == true })
+            JourneySteps(journey, state.now, complete)
             Spacer(Modifier.height(12.dp))
         }
         Column(Modifier.padding(horizontal = PagePadding)) {
@@ -87,7 +104,7 @@ fun DetailScreen(state: AppState, actions: UiActions) {
 }
 
 @Composable
-private fun JourneySteps(journey: Journey, now: Long) {
+private fun JourneySteps(journey: Journey, now: Long, finalDone: Boolean) {
     val c = LocalTrainColors.current
     val first = journey.legs.first()
     DetailStep(clockTime(first.effectiveDeparture), first.from.shortName, first.fromPlatform, first,
@@ -133,7 +150,7 @@ private fun JourneySteps(journey: Journey, now: Long) {
     }
     val last = journey.legs.last()
     DetailStep(clockTime(last.effectiveArrival), last.to.shortName, last.toPlatform, last,
-        if (last.cancelled) "Arrive · journey cancelled" else "Arrive", done = false)
+        if (last.cancelled) "Arrive · journey cancelled" else "Arrive", done = finalDone)
 }
 
 @Composable

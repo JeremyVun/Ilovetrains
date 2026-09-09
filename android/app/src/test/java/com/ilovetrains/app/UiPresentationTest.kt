@@ -67,19 +67,31 @@ class UiPresentationTest {
         assertEquals("2H", nextServiceFigure(journey.copy(retained = true), board, now))
     }
 
-    @Test fun shownLeadEvidenceStoresTheMergedLeadOnlyForAnObservedHomeAnswer() {
+    @Test fun shownLeadEvidenceKeepsTheExactObservationAndItsSource() {
         val now = 6_000_000L
         val scheduled = Journey(listOf(Leg("T1", "train", "Beta", a, b, now + 60_000, now + 300_000)))
         val mergedLead = Journey(listOf(scheduled.legs.single().copy(estimatedDeparture = now + 120_000)))
         val final = BoardData(a, b, listOf(mergedLead), now, source = "live")
         val observed = BoardData(a, b, listOf(scheduled), now, source = "live")
 
-        val evidence = shownLeadEvidence(final, listOf(observed), now, suppressed = false)
-        assertSame(final, evidence?.board)
+        assertNull(shownLeadEvidence(final, listOf(observed), now, suppressed = false))
+        val matching = observed.copy(journeys = listOf(mergedLead), generatedAt = now - 1000)
+        val evidence = shownLeadEvidence(final, listOf(matching), now, suppressed = false)
+        assertSame(matching, evidence?.board)
         assertSame(mergedLead, evidence?.journey)
         assertNull(shownLeadEvidence(final, listOf(observed.copy(offline = true)), now, suppressed = false))
         assertNull(shownLeadEvidence(final.copy(journeys = listOf(mergedLead.copy(retained = true))), listOf(observed), now, suppressed = false))
         assertNull(shownLeadEvidence(final, listOf(observed), now, suppressed = true))
+
+        val outside = Journey(listOf(scheduled.legs.single().copy(line = "T2", departure = now + 180_000,
+            arrival = now + 240_000)))
+        val outsideSource = final.copy(journeys = listOf(outside), generatedAt = now)
+        val withRecommendation = final.copy(recommendation = RecommendationResult(outside, outsideSource))
+        assertSame(outside, shownLeadEvidence(withRecommendation, listOf(outsideSource), now, false)?.journey)
+        val earlier = scheduled.copy(legs = scheduled.legs.map { it.copy(line = "T3") })
+        val earlierSource = final.copy(journeys = listOf(earlier), generatedAt = now - 30_000)
+        val pages = withRecommendation.copy(recommendationPages = listOf(RecommendationPage(now, earlierSource, false, TransferConstraint(null))))
+        assertSame(earlierSource, boardForOpenedJourney(null, pages, null, earlier))
     }
 
     @Test fun homeVotesAreLimitedToTheHomeScreen() {
@@ -120,6 +132,9 @@ class UiPresentationTest {
         assertSame(d, redirectOrigin(focus.copy(reverse = true), listOf(saved)))
         assertSame(focusedBoard, boardForOpenedJourney(focus, focusedBoard, null, printed))
         assertSame(alternatives, boardForOpenedJourney(focus, focusedBoard, null, alternative))
+        val recommendationSource = focusedBoard.copy(journeys = listOf(alternative), generatedAt = 300)
+        val recommendingBoard = focusedBoard.copy(recommendation = RecommendationResult(alternative, recommendationSource))
+        assertSame(recommendationSource, boardForOpenedJourney(null, recommendingBoard, null, alternative))
     }
 
     @Test fun failedFocusedRefreshKeepsLastKnownAgeAndAttachesIndependentAlternatives() {

@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -111,14 +112,15 @@ fun ActionRail(text: String, onClick: () -> Unit, enabled: Boolean = true, minHe
 
 @Composable
 fun LineChip(line: String, mode: String, text: String = line, modifier: Modifier = Modifier,
-             height: Dp = 22.dp, horizontalPadding: Dp = 7.dp) {
+             height: Dp = 22.dp, horizontalPadding: Dp = 7.dp, dimmed: Boolean = false) {
     val c = LocalTrainColors.current
     // The chip is sized in text units: enlarged text grows it instead of being clipped by it.
     Box(modifier.height(height * LocalDensity.current.fontScale).clip(RoundedCornerShape(LineChipCornerRadius))
-        .background(lineColor(line, mode, c, fill = true)).padding(horizontal = horizontalPadding).testTag("chip-$text"),
+        .background(lineColor(line, mode, c, fill = true)).testTag("chip-$text"),
         contentAlignment = Alignment.Center) {
-        Text(text.uppercase(), color = chipInk(line, mode, c), fontSize = 14.sp,
+        Text(text.uppercase(), modifier = Modifier.padding(horizontal = horizontalPadding), color = chipInk(line, mode, c), fontSize = 14.sp,
             fontWeight = FontWeight.Bold, letterSpacing = 0.sp, maxLines = 1, softWrap = false)
+        if (dimmed) Box(Modifier.matchParentSize().background(c.ground.copy(alpha = .62f)))
     }
 }
 
@@ -331,7 +333,8 @@ internal fun journeyAxisFrames(
 
 @Composable
 fun JourneyAxis(journey: Journey, modifier: Modifier = Modifier, large: Boolean = false,
-                showCap: Boolean = true, progress: Float? = null, tinyTrain: Boolean = false) {
+                showCap: Boolean = true, progress: Float? = null, tinyTrain: Boolean = false,
+                travelledAt: Long? = null) {
     if (journey.legs.isEmpty()) return
     val c = LocalTrainColors.current
     val fontScale = LocalDensity.current.fontScale
@@ -347,11 +350,21 @@ fun JourneyAxis(journey: Journey, modifier: Modifier = Modifier, large: Boolean 
         journey.legs.forEachIndexed { index, leg ->
             Box(Modifier.layoutId(AxisElement.Ride(index)).background(lineColor(leg.line, leg.mode, c, fill = true),
                 RoundedCornerShape(topEnd = if (index == journey.legs.lastIndex) 3.dp else 0.dp,
-                    bottomEnd = if (index == journey.legs.lastIndex) 3.dp else 0.dp)))
+                    bottomEnd = if (index == journey.legs.lastIndex) 3.dp else 0.dp)).drawWithContent {
+                drawContent()
+                val fraction = travelledAt?.let { ((it - leg.effectiveDeparture).toFloat() /
+                    (leg.effectiveArrival - leg.effectiveDeparture).coerceAtLeast(1)).coerceIn(0f, 1f) } ?: 0f
+                if (fraction > 0) drawRect(c.ground.copy(alpha = .62f), size = androidx.compose.ui.geometry.Size(size.width * fraction, size.height))
+            })
             if (index < journey.legs.lastIndex) {
                 val next = journey.legs[index + 1]
                 Box(Modifier.layoutId(AxisElement.Dwell(index)).background(
-                    if (isTightChange(journey, index)) c.warning else c.rule))
+                    if (isTightChange(journey, index)) c.warning else c.rule).drawWithContent {
+                    drawContent()
+                    val fraction = travelledAt?.let { ((it - leg.effectiveArrival).toFloat() /
+                        (next.effectiveDeparture - leg.effectiveArrival).coerceAtLeast(1)).coerceIn(0f, 1f) } ?: 0f
+                    if (fraction > 0) drawRect(c.ground.copy(alpha = .62f), size = androidx.compose.ui.geometry.Size(size.width * fraction, size.height))
+                })
             }
         }
         if (tinyTrain) TinyTrainLane(Modifier.layoutId(AxisElement.TinyTrain))
@@ -361,13 +374,15 @@ fun JourneyAxis(journey: Journey, modifier: Modifier = Modifier, large: Boolean 
                 platformText(leg.toPlatform, leg.mode)?.let {
                     LineChip(leg.line, leg.mode, it,
                         Modifier.layoutId(AxisElement.Alight(index)).testTag("axis-alight-$index"),
-                        height = if (large) 24.dp else 22.dp, horizontalPadding = 5.dp)
+                        height = if (large) 24.dp else 22.dp, horizontalPadding = 5.dp,
+                        dimmed = travelledAt?.let { at -> at >= next.effectiveDeparture } == true)
                 }
             }
             platformText(next.fromPlatform, next.mode)?.let {
                 LineChip(next.line, next.mode, it,
                     Modifier.layoutId(AxisElement.Board(index)).testTag("axis-board-$index"),
-                    height = if (large) 24.dp else 22.dp, horizontalPadding = 5.dp)
+                    height = if (large) 24.dp else 22.dp, horizontalPadding = 5.dp,
+                    dimmed = travelledAt?.let { at -> at >= next.effectiveDeparture } == true)
             }
             Text((if (leg.to.id == next.from.id) leg.to.shortName else "${leg.to.shortName} → ${next.from.shortName}").uppercase(Locale.ENGLISH),
                 Modifier.layoutId(AxisElement.StationLabel(index)), color = c.ink2, fontSize = 10.sp,

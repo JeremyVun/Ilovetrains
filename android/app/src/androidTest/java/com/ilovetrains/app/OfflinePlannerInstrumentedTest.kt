@@ -18,6 +18,15 @@ import java.util.UUID
 
 @RunWith(AndroidJUnit4::class)
 class OfflinePlannerInstrumentedTest {
+    @Test fun recommendationStartsNowWhileBoardRetainsEarlierDepartures() = runBlocking {
+        val recommendationAt = at + 900_000
+        val result = planner.planWithRecommendation(station("200060", "Central Station", "train"),
+            station("215020", "Parramatta Station", "train"), at, setOf("train"),
+            recommendationAt = recommendationAt)
+        assertTrue(result.board.journeys.any { it.effectiveDeparture < recommendationAt })
+        assertTrue(requireNotNull(result.recommendation).journey.effectiveDeparture >= recommendationAt)
+    }
+
     @Test
     fun bundledPackageRoutesTrainMetroMixedAndFerryJourneys() = runBlocking {
         val train = planner.plan(station("200060", "Central Station", "train", "metro"), station("215020", "Parramatta Station", "train"), at, setOf("train"))

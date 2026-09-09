@@ -3,6 +3,199 @@ import XCTest
 
 @MainActor
 final class ControllerTests: XCTestCase {
+    func testColdLoadWaitsForPermissionThenArmsBeforeOfflineSettlement() async throws {
+        let (data, _) = departedFocus()
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let store = DeviceStore(directory: directory)
+        try await store.save(data)
+        let location = ControlledLocation()
+        let model = TrainViewModel(store: store, location: location)
+        model.networkDisabled = true
+        model.resume()
+        defer { model.pause() }
+        for _ in 0..<300 {
+            if model.state.ready, location.permission != nil { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertTrue(model.state.ready)
+        XCTAssertNotEqual(model.state.arrival?.state, .arrived)
+        let pending = await store.load()
+        XCTAssertTrue(pending.rides.isEmpty)
+        location.resolve(true)
+        try await settled(store) { $0.focus?.arrivalGuard?.armed == true }
+        XCTAssertTrue(location.isMonitoring)
+        XCTAssertFalse(model.state.focusComplete)
+        let armed = await store.load()
+        XCTAssertTrue(armed.rides.isEmpty)
+    }
+
+    func testGrantedPermissionBeforeStoreLoadArmsBeforeFirstSettlement() async throws {
+        let (data, _) = departedFocus()
+        let store = DeviceStore(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        try await store.save(data)
+        let location = ControlledLocation()
+        location.granted = true
+        location.immediatePermission = true
+        let model = TrainViewModel(store: store, location: location)
+        model.networkDisabled = true
+        model.resume()
+        defer { model.pause() }
+        try await settled(store) { $0.focus?.arrivalGuard?.armed == true }
+        let restored = await store.load()
+        XCTAssertTrue(restored.rides.isEmpty)
+        XCTAssertFalse(model.state.focusComplete)
+    }
+
+    func testMatchingRefreshPreservesGuardArmedDuringRequest() async throws {
+        let fixture = departedFocus()
+        let location = ControlledLocation()
+        location.granted = true
+        location.immediatePermission = true
+        let (store, model) = try await networkedModel(
+            data: fixture.data, arrival: fixture.stale + 600_000,
+            delay: .milliseconds(200), location: location
+        )
+        model.resume()
+        defer { model.pause(); StubbedDepartures.delay = .zero }
+        try await settled(store) { $0.focus?.arrivalGuard?.armed == true }
+        try await refreshed(model, arrival: fixture.stale + 600_000)
+        let restored = await store.load()
+        XCTAssertEqual(restored.focus?.arrivalGuard?.armed, true)
+        XCTAssertTrue(restored.rides.isEmpty)
+    }
+
+    func testOverdueGuardResumeKeepsFocusUntilFreshEvidenceAndStopsOnPause() async throws {
+        var (data, _) = departedFocus()
+        let now = epochNow()
+        data.focus?.journey.legs[0].arrival = now - 8_000_000
+        data.focus?.journey.legs[0].departure = now - 9_000_000
+        data.trips[0].to.lat = -33.8173
+        data.trips[0].to.lon = 151.0053
+        data.focus?.arrivalGuard = ArrivalGuard(armed: true, retainedAt: now - 8_000_000)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let store = DeviceStore(directory: directory)
+        try await store.save(data)
+        let location = ControlledLocation()
+        let model = TrainViewModel(store: store, location: location)
+        model.networkDisabled = true
+        model.resume()
+        defer { model.pause() }
+        for _ in 0..<300 {
+            if model.state.ready, location.permission != nil { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertNotNil(model.state.focus)
+        location.resolve(true)
+        for _ in 0..<100 {
+            if location.isMonitoring { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        location.onFix?(Fix(lat: -33.9, lon: 151.1, at: epochNow(), speed: 10, accuracyMetres: 10))
+        try await settled(store) { ($0.focus?.arrivalGuard?.retainedAt ?? 0) >= now }
+        XCTAssertNotNil(model.state.focus)
+        XCTAssertFalse(model.state.focusComplete)
+        model.pause()
+        XCTAssertFalse(location.isMonitoring)
+    }
+
+    func testCancellationWithdrawsRideEvenWhenArrivalDidNotChange() {
+        let (data, _) = departedFocus(rides: true)
+        XCTAssertTrue(settledRides(data.rides, focus: data.focus!, arrived: false).isEmpty)
+    }
+
+    func testDepartureDeadlineCancelsAnUnresponsiveTransport() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [UnresponsiveDepartures.self]
+        var api = TransitAPI()
+        api.baseURL = "http://deadline.invalid"
+        api.session = URLSession(configuration: configuration)
+        let now = ContinuousClock.now
+        do {
+            _ = try await api.departurePage(from: Station(id: "a", name: "A"), to: Station(id: "b", name: "B"), modes: allModes, timeout: 0.02)
+            XCTFail("The unresponsive request unexpectedly completed")
+        } catch {
+            XCTAssertLessThan(now.duration(to: .now), .seconds(1))
+        }
+    }
+
+    func testThreePageRecommendationKeepsSourceWhenOpeningAndPinning() async throws {
+        let now = (epochNow() / 600_000).rounded(.down) * 600_000
+        var fixture = departedFocus().data
+        fixture.useLocation = false
+        let offsets = [(600_000.0, 2_700_000.0), (1_200_000.0, 2_400_000.0), (1_800_000.0, 2_100_000.0)]
+        PagingDepartures.pages = try offsets.map { departure, arrival in
+            var value = fixture
+            value.focus!.journey.legs[0].departure = now + departure
+            value.focus!.journey.legs[0].arrival = now + arrival
+            return try departuresBody(value, arrival: now + arrival)
+        }
+        PagingDepartures.calls = 0
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [PagingDepartures.self]
+        var api = TransitAPI()
+        api.baseURL = "http://paging.invalid"
+        api.session = URLSession(configuration: configuration)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let store = DeviceStore(directory: directory)
+        fixture.focus = nil
+        try await store.save(fixture)
+        let model = TrainViewModel(store: store, api: api)
+        model.resume()
+        defer { model.pause() }
+        for _ in 0..<500 {
+            if model.state.recommendation?.journey.departure == now + 1_800_000, !model.state.refreshing { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let chosen = try XCTUnwrap(model.state.recommendation)
+        XCTAssertEqual(chosen.journey.departure, now + 1_800_000)
+        XCTAssertEqual(PagingDepartures.calls, 3)
+        XCTAssertFalse(model.state.board?.journeys.contains { $0.key == chosen.journey.key } ?? true)
+        XCTAssertTrue(chosen.board.journeys.contains { $0.key == chosen.journey.key })
+        model.openJourney(chosen.journey)
+        XCTAssertEqual(model.state.detail?.key, chosen.journey.key)
+        XCTAssertEqual(model.state.board, chosen.board)
+        model.pinJourney(chosen.journey)
+        try await settled(store) { $0.focus?.journey.key == chosen.journey.key }
+        XCTAssertEqual(model.state.focus?.journey.key, chosen.journey.key)
+    }
+
+    func testSavedTripColoursPublishWithCacheBeforeNetworkAndAfterReadding() async throws {
+        let now = epochNow()
+        let from = Station(id: "colour-origin", name: "Origin")
+        let via = Station(id: "colour-change", name: "Change")
+        let to = Station(id: "colour-destination", name: "Destination")
+        let journey = Journey(legs: [
+            leg("T8", from: from, to: via, departure: now + 600_000, arrival: now + 900_000),
+            leg("M1", from: via, to: to, departure: now + 960_000, arrival: now + 1_800_000)
+        ])
+        let board = BoardData(from: from, to: to, journeys: [journey], generatedAt: now, source: "schedule", offline: true)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let store = DeviceStore(directory: directory)
+        try await store.save(UserData(useLocation: false))
+        try await store.cache(board, modes: allModes)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubbedDepartures.self]
+        StubbedDepartures.delay = .seconds(20)
+        var api = TransitAPI(); api.baseURL = "http://departures.invalid"; api.session = URLSession(configuration: configuration)
+        let model = TrainViewModel(store: store, api: api)
+        defer { model.pause(); StubbedDepartures.delay = .zero }
+        for _ in 0..<300 where !model.state.ready { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertTrue(model.state.ready)
+        model.resume()
+        var previousId: String?
+        for _ in 0..<2 {
+            model.saveTrip(from: from, to: to)
+            let id = try XCTUnwrap(model.state.selectedTripId)
+            XCTAssertNotEqual(id, previousId)
+            try await settledBoard(model) { $0.contains { $0.key == journey.key } }
+            XCTAssertTrue(model.state.refreshing, "Network response must still be pending")
+            XCTAssertEqual(model.state.trips.first { $0.id == id }?.lines, ["T8", "M1"])
+            try await settled(store) { $0.trips.first { $0.id == id }?.lines == ["T8", "M1"] }
+            model.deleteTrip(id: id)
+            previousId = id
+        }
+    }
+
     func testSettingsLocationPresentationCoversEachPermissionAction() {
         assertLocationPresentation(useLocation: false, granted: false, denied: false,
                                    subtitle: "Location is not used", mark: "TURN ON",
@@ -19,15 +212,20 @@ final class ControllerTests: XCTestCase {
     }
 
     func testSettingsTransferLimitPresentationOffersTheOtherValue() {
+        let direct = SettingsTransferLimitPresentation(limit: .direct)
+        XCTAssertEqual(direct.subtitle, "Direct only")
+        XCTAssertEqual(direct.mark, "Change")
+        XCTAssertEqual(direct.next, .two)
+
         let capped = SettingsTransferLimitPresentation(limit: .two)
         XCTAssertEqual(capped.subtitle, "Up to 2")
-        XCTAssertEqual(capped.mark, "NO LIMIT")
+        XCTAssertEqual(capped.mark, "Change")
         XCTAssertEqual(capped.next, .any)
 
         let uncapped = SettingsTransferLimitPresentation(limit: .any)
         XCTAssertEqual(uncapped.subtitle, "No limit")
-        XCTAssertEqual(uncapped.mark, "UP TO 2")
-        XCTAssertEqual(uncapped.next, .two)
+        XCTAssertEqual(uncapped.mark, "Change")
+        XCTAssertEqual(uncapped.next, .direct)
     }
 
     func testCappedBoardHidesCachedThreeChangeRowsUntilTheLimitIsLifted() async throws {
@@ -150,7 +348,7 @@ final class ControllerTests: XCTestCase {
         let (store, model) = try await model(data: UserData(trips: [trip], focus: focus))
         model.resume()
 
-        model.receiveLocation(Fix(lat: savedTo.lat, lon: savedTo.lon, at: epochNow()))
+        confirmArrival(model, at: savedTo)
 
         XCTAssertTrue(model.state.focusComplete)
         try await settled(store) { $0.rides.count == 1 }
@@ -407,7 +605,7 @@ final class ControllerTests: XCTestCase {
         XCTAssertFalse(model.state.focusComplete)
 
         StubbedDepartures.body = try departuresBody(data, arrival: arrival + 120_000)
-        model.receiveLocation(Fix(lat: b.lat, lon: b.lon, at: epochNow()))
+        confirmArrival(model, at: b)
         XCTAssertTrue(model.state.focusComplete, "the fix at the destination records the ride")
 
         try await refreshed(model, arrival: arrival + 120_000)
@@ -421,11 +619,14 @@ final class ControllerTests: XCTestCase {
     func testExpiryStillClearsTheFocusAndACancelledJourneyRecordsNoRide() async throws {
         var expired = departedFocus()
         let late = expired.stale - 1_800_000 - 120_000
+        expired.data.focus!.journey.legs[0].departure = late - 600_000
+        expired.data.focus!.board.journeys[0].legs[0].departure = late - 600_000
+        expired.data.useLocation = false
         expired.data.focus!.journey.legs[0].estimatedArrival = late
         expired.data.focus!.board.journeys[0].legs[0].estimatedArrival = late
         let (store, model) = try await networkedModel(data: expired.data, arrival: late)
         model.resume()
-        try await settled(store) { $0.focus == nil && $0.rides.map(\.arrival) == [late] }
+        try await settled(store) { $0.focus == nil && $0.rides.isEmpty }
         model.pause()
 
         let cancelled = departedFocus()
@@ -613,7 +814,7 @@ final class ControllerTests: XCTestCase {
         ])
     }
 
-    private func networkedModel(data: UserData, arrival: Millis, cancelled: Bool = false, delay: Duration = .zero) async throws -> (DeviceStore, TrainViewModel) {
+    private func networkedModel(data: UserData, arrival: Millis, cancelled: Bool = false, delay: Duration = .zero, location: (any LocationProviding)? = nil) async throws -> (DeviceStore, TrainViewModel) {
         StubbedDepartures.body = try departuresBody(data, arrival: arrival, cancelled: cancelled)
         StubbedDepartures.delay = delay
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -622,7 +823,7 @@ final class ControllerTests: XCTestCase {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [StubbedDepartures.self]
         var api = TransitAPI(); api.baseURL = "http://departures.invalid"; api.session = URLSession(configuration: configuration)
-        let model = TrainViewModel(store: store, api: api)
+        let model = TrainViewModel(store: store, api: api, location: location)
         for _ in 0..<300 {
             if model.state.ready { return (store, model) }
             try await Task.sleep(for: .milliseconds(10))
@@ -641,6 +842,19 @@ final class ControllerTests: XCTestCase {
 
     private func leg(_ line: String, from: Station, to: Station, departure: Millis, arrival: Millis) -> Leg {
         Leg(line: line, mode: "train", headsign: to.name, from: from, to: to, departure: departure, arrival: arrival)
+    }
+
+    private func confirmArrival(_ model: TrainViewModel, at station: Station) {
+        let now = epochNow()
+        for offset in [-30_000.0, -15_000.0, 0] {
+            model.receiveLocation(Fix(
+                lat: station.lat,
+                lon: station.lon,
+                at: now + offset,
+                speed: 0,
+                accuracyMetres: 20
+            ))
+        }
     }
 
     private func settled(_ store: DeviceStore, _ check: @escaping (UserData) -> Bool) async throws {
@@ -791,5 +1005,57 @@ final class StubbedDepartures: URLProtocol {
             DispatchQueue.global().asyncAfter(deadline: .now() + Double(StubbedDepartures.delay.components.seconds) + Double(StubbedDepartures.delay.components.attoseconds) / 1e18, execute: deliver)
         }
     }
+    override func stopLoading() {}
+}
+
+@MainActor
+private final class ControlledLocation: LocationProviding {
+    var onPermission: ((Bool, Bool) -> Void)?
+    var onFix: ((Fix) -> Void)?
+    var onFailure: ((SetupLocationStatus) -> Void)?
+    var isMonitoring = false
+    var permission: CheckedContinuation<Bool, Never>?
+    var granted = false
+    var immediatePermission: Bool?
+    func refreshPermission() { onPermission?(granted, false) }
+    func openSettings() {}
+    func request(prompt: Bool) {}
+    func monitoringPermitted() async -> Bool {
+        if let immediatePermission { return immediatePermission }
+        return await withCheckedContinuation { permission = $0 }
+    }
+    func resolve(_ value: Bool) {
+        granted = value
+        onPermission?(value, !value)
+        permission?.resume(returning: value)
+        permission = nil
+    }
+    func startMonitoring() -> Bool { isMonitoring = granted; return granted }
+    func stop() { isMonitoring = false }
+}
+
+private final class PagingDepartures: URLProtocol {
+    static var pages: [Data] = []
+    static var calls = 0
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        guard request.url?.path.contains("departures") == true else {
+            client?.urlProtocol(self, didFailWithError: URLError(.resourceUnavailable)); return
+        }
+        let page = Self.pages[min(Self.calls, Self.pages.count - 1)]
+        Self.calls += 1
+        let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: [:])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: page)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
+private final class UnresponsiveDepartures: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {}
     override func stopLoading() {}
 }

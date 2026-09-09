@@ -9,18 +9,28 @@ class StorageTest {
         val a = Station("a", "A"); val b = Station("b", "B")
         val j = Journey(listOf(Leg("T9", "train", "B", a, b, 10_000, 20_000, 11_000, 22_000, "1", "2",
             identity = TripIdentity("sydneytrains", "exact", "20260906", "a1", "b2"))))
-        val board = BoardData(a, b, listOf(j), 9000, source = "live", serverStale = true)
+        val pageBody = BoardData(a, b, listOf(j), 8_000, source = "live", serverStale = true,
+            fetchConstraint = TransferConstraint(null))
+        val board = BoardData(a, b, listOf(j), 9000, source = "live", serverStale = true,
+            fetchConstraint = TransferConstraint(0), recommendationPages = listOf(
+                RecommendationPage(7_000, pageBody, true, TransferConstraint(null))),
+            recommendation = RecommendationResult(j, pageBody))
         val alternatives = board.copy(generatedAt = 30_000, serverStale = false,
             journeys = listOf(j.copy(legs = j.legs.map { it.copy(departure = 40_000, arrival = 60_000,
                 estimatedDeparture = 41_000, estimatedArrival = 62_000, cancelled = true) })))
         val data = UserData(trips = listOf(SavedTrip("t", a, b)),
-            focus = FocusedJourney("t", false, j, board, alternatives = alternatives), modes = emptySet())
+            focus = FocusedJourney("t", false, j, board, alternatives = alternatives,
+                arrivalGuard = ArrivalGuard(true, 12_000, ArrivalBasis.Location, 13_000)), modes = emptySet())
         val restored = Wire.user(JSONObject(Wire.user(data).toString()))
         assertEquals(data, restored)
         assertEquals("exact", restored.focus?.journey?.legs?.first()?.identity?.tripId)
         assertEquals(alternatives, restored.focus?.alternatives)
         assertTrue(restored.focus!!.board.serverStale)
         assertFalse(restored.focus.alternatives!!.serverStale)
+        assertEquals(TransferConstraint(0), restored.focus.board.fetchConstraint)
+        assertEquals(TransferConstraint(null), restored.focus.board.recommendationPages.single().constraint)
+        assertEquals(13_000L, restored.focus.arrivalGuard?.confirmedAt)
+        assertEquals(pageBody, restored.focus.board.recommendation?.source)
         assertTrue(restored.modes.isEmpty())
     }
     @Test fun malformedLegCannotTurnTransferIntoDifferentJourney() {
@@ -52,12 +62,12 @@ class StorageTest {
             Wire.user(JSONObject("""{"flags":{"transferLimit":false,"other":"yes","count":2}}""")).flags)
     }
 
-    @Test fun cappedNeedsBothTheFlagAndThePreferenceAndBoundsOfflineRouting() {
+    @Test fun transferConstraintNeedsBothTheFlagAndThePreferenceAndBoundsOfflineRouting() {
         val on = mapOf("transferLimit" to true)
-        assertTrue(UserData(flags = on).capped)
-        assertFalse(UserData(flags = on, transferLimit = TransferLimit.Any).capped)
-        assertFalse(UserData().capped)
-        assertFalse(UserData(transferLimit = TransferLimit.Any).capped)
+        assertEquals(2, UserData(flags = on).maxTransfers)
+        assertEquals(0, UserData(flags = on, transferLimit = TransferLimit.Direct).maxTransfers)
+        assertNull(UserData(flags = on, transferLimit = TransferLimit.Any).maxTransfers)
+        assertNull(UserData().maxTransfers)
         assertEquals(2, UserData(flags = on).offlineMaxTransfers)
         assertEquals(4, UserData(flags = on, transferLimit = TransferLimit.Any).offlineMaxTransfers)
         assertEquals(2, UserData(transferLimit = TransferLimit.Any).offlineMaxTransfers)

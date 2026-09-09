@@ -1,0 +1,27 @@
+{
+  "title": "Commute feedback \u00b7 illustrative targets",
+  "lede": [
+    "Direct and overdue-moving remain illustrative targets. Transfer boundaries and missing-location states use the verified built-client captures in the parent directory."
+  ],
+  "sections": [
+    {
+      "h2": "Direct and uncertain arrival",
+      "note": "Journey values come from captured fixtures; overdue movement and marker placement are synthetic.",
+      "exemplars": false,
+      "figures": [
+        {
+          "shot": "c1-fade-390x844-direct",
+          "note": "Direct \u00b7 dark"
+        },
+        {
+          "shot": "c1-fade-390x844-overdue-moving",
+          "note": "Recent movement after last estimate"
+        },
+        {
+          "shot": "c1-fade-412x732-overdue-moving-light",
+          "note": "Short phone \u00b7 light"
+        }
+      ]
+    }
+  ]
+}

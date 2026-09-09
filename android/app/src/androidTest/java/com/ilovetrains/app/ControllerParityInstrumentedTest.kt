@@ -182,16 +182,173 @@ class ControllerParityInstrumentedTest {
         assertEquals(lastAnswer, persisted.lastAnswer)
     }
 
+    @Test
+    fun restoredFocusWaitsForPermissionBeforeFirstSettlement() = runBlocking {
+        val now = System.currentTimeMillis()
+        val journey = journey(primaryTrip.from, primaryTrip.to, now - 600_000, now - 60_000, "T1")
+        val board = BoardData(primaryTrip.from, primaryTrip.to, listOf(journey), now - 5_000, source = "live")
+        val model = model(UserData(
+            trips = listOf(primaryTrip),
+            focus = FocusedJourney(primaryTrip.id, false, journey, board, pinned = false),
+            useLocation = true,
+        ))
+
+        assertFalse("initial paint settled before permission was resolved", model.state.value.focusComplete)
+        assertFalse(model.state.value.arrival?.state == ArrivalState.Arrived)
+        assertTrue(storedAfterWrites().rides.isEmpty())
+    }
+
+    @Test
+    fun permissionGrantedBeforeLoadArmsRestoredFocusBeforeSettlement() = runBlocking {
+        val now = System.currentTimeMillis()
+        val journey = journey(primaryTrip.from, primaryTrip.to, now - 600_000, now - 60_000, "T1")
+        val board = BoardData(primaryTrip.from, primaryTrip.to, listOf(journey), now - 5_000, source = "live")
+        val model = unreadyModel(UserData(
+            trips = listOf(primaryTrip),
+            focus = FocusedJourney(primaryTrip.id, false, journey, board, pinned = false),
+            useLocation = true,
+        ))
+        model.attachActivity(Any(), {}, {}, {}, { beforeStart -> beforeStart(); true }, {})
+        model.activityResumed()
+        model.permission(granted = true, denied = false)
+        withTimeout(10_000) { model.state.first { it.ready } }
+
+        assertTrue(model.state.value.focus?.arrivalGuard?.armed == true)
+        assertFalse(model.state.value.focusComplete)
+        assertFalse(model.state.value.arrival?.state == ArrivalState.Arrived)
+        assertTrue(storedAfterWrites().rides.isEmpty())
+    }
+
+    @Test
+    fun providerLossBackgroundDisableAndUnpinRejectLateCallbacks() = runBlocking {
+        val now = System.currentTimeMillis()
+        val journey = journey(primaryTrip.from, primaryTrip.to, now - 600_000, now + 500, "T1")
+        val board = BoardData(primaryTrip.from, primaryTrip.to, listOf(journey), now, source = "live")
+        val model = model(UserData(
+            trips = listOf(primaryTrip),
+            focus = FocusedJourney(primaryTrip.id, false, journey, board, pinned = false),
+            useLocation = true,
+        ))
+        var stopCalls = 0
+        model.attachActivity(Any(), {}, {}, { stopCalls++ }, { beforeStart -> beforeStart(); true }, {})
+        model.activityResumed()
+        model.permission(granted = true, denied = false)
+        assertTrue(model.state.value.focus?.arrivalGuard?.armed == true)
+
+        delay(750)
+        model.arrivalLocation(Fix(primaryTrip.from.lat, primaryTrip.from.lon, System.currentTimeMillis(), 12.0, 20.0))
+        assertEquals(ArrivalState.ArrivalUnconfirmed, model.state.value.arrival?.state)
+        assertFalse(model.state.value.focusComplete)
+
+        model.activityStopped()
+        val stoppedWindow = model.state.value.arrival?.window?.samples.orEmpty()
+        model.arrivalLocation(Fix(primaryTrip.to.lat, primaryTrip.to.lon, System.currentTimeMillis(), 0.0, 10.0))
+        assertEquals(stoppedWindow, model.state.value.arrival?.window?.samples.orEmpty())
+
+        model.activityResumed()
+        model.permission(granted = true, denied = false)
+        model.arrivalMonitoringFailed(SetupLocationStatus.ServicesDisabled)
+        val failedWindow = model.state.value.arrival?.window?.samples.orEmpty()
+        model.arrivalLocation(Fix(primaryTrip.to.lat, primaryTrip.to.lon, System.currentTimeMillis(), 0.0, 10.0))
+        assertEquals(failedWindow, model.state.value.arrival?.window?.samples.orEmpty())
+
+        model.setUseLocation(false)
+        model.arrivalLocation(Fix(primaryTrip.to.lat, primaryTrip.to.lon, System.currentTimeMillis(), 0.0, 10.0))
+        assertTrue(model.state.value.focus?.arrivalGuard?.armed == true)
+        model.unpinJourney()
+        model.arrivalLocation(Fix(primaryTrip.to.lat, primaryTrip.to.lon, System.currentTimeMillis(), 0.0, 10.0))
+        assertNull(model.state.value.focus)
+        assertFalse(model.state.value.focusComplete)
+        assertTrue(storedAfterWrites().rides.isEmpty())
+        assertTrue("provider stop callback was not invoked", stopCalls >= 3)
+    }
+
+    @Test fun expiredGuardWaitsForResumeEvidenceBeforeVisibilityAndSettlement() = runBlocking {
+        val now = System.currentTimeMillis()
+        val journey = journey(primaryTrip.from, primaryTrip.to, now - 14_400_000, now - 10_800_000, "T1")
+        val board = BoardData(primaryTrip.from, primaryTrip.to, listOf(journey), now - 10_800_000, source = "live")
+        val model = model(UserData(trips = listOf(primaryTrip), useLocation = true,
+            focus = FocusedJourney(primaryTrip.id, false, journey, board,
+                arrivalGuard = ArrivalGuard(armed = true, retainedAt = now - 10_800_000))))
+        assertNotNull("expired focus disappeared before the resume lookup", model.state.value.focus)
+        model.attachActivity(Any(), {}, {}, {}, { beforeStart -> beforeStart(); true }, {})
+        model.activityResumed()
+        model.permission(true, false)
+        model.arrivalLocation(Fix(primaryTrip.from.lat, primaryTrip.from.lon, System.currentTimeMillis(), 10.0, 20.0))
+        model.arrivalLookupComplete()
+        assertNotNull("fresh evidence failed to retain the guarded focus", model.state.value.focus)
+        assertFalse(model.state.value.focusComplete)
+        assertTrue(storedAfterWrites().rides.isEmpty())
+    }
+
+    @Test fun completedEstimateIsNotRearmedByColdLoadMonitoring() = runBlocking {
+        val now = System.currentTimeMillis()
+        val journey = journey(primaryTrip.from, primaryTrip.to, now - 600_000, now - 60_000, "T1")
+        val board = BoardData(primaryTrip.from, primaryTrip.to, listOf(journey), now, source = "live")
+        val model = unreadyModel(UserData(trips = listOf(primaryTrip), useLocation = true,
+            focus = FocusedJourney(primaryTrip.id, false, journey, board,
+                arrivalGuard = ArrivalGuard(basis = ArrivalBasis.Estimate)),
+            rides = listOf(Ride(primaryTrip.id, false, journey.departure, journey.effectiveArrival))))
+        var starts = 0
+        model.attachActivity(Any(), {}, {}, {}, { beforeStart -> starts++; beforeStart(); true }, {})
+        model.activityResumed()
+        model.permission(true, false)
+        withTimeout(10_000) { model.state.first { it.ready } }
+        assertEquals(0, starts)
+        assertTrue(model.state.value.focusComplete)
+        assertEquals(ArrivalState.Arrived, model.state.value.arrival?.state)
+    }
+
+    @Test
+    fun recommendationDetailPinAndReloadKeepDirectSourceProvenance() = runBlocking {
+        val now = System.currentTimeMillis()
+        val earlier = journey(primaryTrip.from, primaryTrip.to, now + 300_000, now + 1_800_000, "T1")
+        val direct = journey(primaryTrip.from, primaryTrip.to, now + 600_000, now + 1_500_000, "T3")
+        val recommendationSource = BoardData(primaryTrip.from, primaryTrip.to, listOf(direct), now - 12_000,
+            source = "live", fetchConstraint = TransferConstraint(0))
+        val board = BoardData(primaryTrip.from, primaryTrip.to, listOf(earlier), now - 2_000,
+            source = "live", fetchConstraint = TransferConstraint(0),
+            recommendation = RecommendationResult(direct, recommendationSource))
+        val model = model(UserData(
+            trips = listOf(primaryTrip),
+            focus = FocusedJourney(primaryTrip.id, false, earlier, board, pinned = false),
+            flags = mapOf(TransferLimitFlag to true),
+            transferLimit = TransferLimit.Direct,
+            useLocation = false,
+        ))
+
+        model.openJourney(direct)
+        assertEquals(Screen.Detail, model.state.value.screen)
+        assertEquals(recommendationSource.generatedAt, model.state.value.board?.generatedAt)
+        assertEquals(0, model.state.value.board?.fetchConstraint?.maxTransfers)
+        model.pinJourney(direct)
+        assertTrue(model.state.value.focus?.pinned == true)
+        assertEquals(recommendationSource.generatedAt, model.state.value.focus?.board?.generatedAt)
+
+        val persisted = storedAfterWrites()
+        assertEquals(TransferLimit.Direct, persisted.transferLimit)
+        assertEquals(recommendationSource.generatedAt, persisted.focus?.board?.generatedAt)
+        releaseModel()
+        val reloaded = model(persisted)
+        assertEquals(TransferLimit.Direct, reloaded.state.value.transferLimit)
+        assertEquals(direct.key, reloaded.state.value.focus?.journey?.key)
+        assertEquals(recommendationSource.generatedAt, reloaded.state.value.focus?.board?.generatedAt)
+    }
+
     private suspend fun model(data: UserData): TrainViewModel {
+        val model = unreadyModel(data)
+        withTimeout(10_000) { model.state.first { it.ready } }
+        return model
+    }
+
+    private suspend fun unreadyModel(data: UserData): TrainViewModel {
         application = IsolatedApplication(File(root, "scenario-${UUID.randomUUID()}"))
             .also { it.attachTo(InstrumentationRegistry.getInstrumentation().targetContext) }
         DeviceStore(application).save(data)
         val nextOwner = TestOwner()
         owner = nextOwner
         val factory = ViewModelProvider.AndroidViewModelFactory(application)
-        val model = ViewModelProvider(nextOwner, factory)[TrainViewModel::class.java]
-        withTimeout(10_000) { model.state.first { it.ready } }
-        return model
+        return ViewModelProvider(nextOwner, factory)[TrainViewModel::class.java]
     }
 
     private suspend fun storedAfterWrites(): UserData {

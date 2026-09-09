@@ -100,11 +100,19 @@ struct TravelTrackerState: Equatable, Sendable {
     var nextBoundary: Millis
     var freshUntil: Millis?
 
-    static func derive(focus: FocusedJourney, now: Millis, generation: Int) -> TravelTrackerState? {
+    static func derive(
+        focus: FocusedJourney,
+        now: Millis,
+        generation: Int,
+        arrivalState: ArrivalState? = nil,
+        arrivalMoving: Bool = false
+    ) -> TravelTrackerState? {
         let legs = focus.journey.legs
         guard !legs.isEmpty else { return nil }
         let projectionEnd = legs.map(\.effectiveArrival).max()!
-        guard now < projectionEnd else { return nil }
+        let unresolved = arrivalState == .checkingArrival || arrivalState == .arrivalUnconfirmed
+        let cancellationPending = arrivalState == .travelling && focus.journey.cancelled
+        guard now < projectionEnd || unresolved || cancellationPending else { return nil }
 
         let identity = TravelTrackerIdentity(tripId: focus.tripId, reverse: focus.reverse, serviceKey: focus.journey.key)
         let revision = TravelTrackerRevision(identity: identity, generation: generation)
@@ -130,6 +138,25 @@ struct TravelTrackerState: Equatable, Sendable {
             instruction = "\(trackerClock(cancelledLeg.effectiveDeparture)) from \(cancelledLeg.from.shortName) cancelled."
             connection = nil
             tight = false
+        } else if unresolved && now >= projectionEnd {
+            event = TravelTrackerEvent(
+                kind: .arrival,
+                name: destination,
+                deadline: projectionEnd,
+                countdownMinutes: nil
+            )
+            if arrivalState == .checkingArrival {
+                headline = TravelTrackerHeadline(lead: "Checking arrival")
+                instruction = "Checking arrival at \(destination)."
+            } else if arrivalMoving {
+                headline = TravelTrackerHeadline(lead: "Arrival uncertain")
+                instruction = "Still on the way to \(destination)."
+            } else {
+                headline = TravelTrackerHeadline(lead: "Arrival unconfirmed")
+                instruction = "Arrival time needs an update."
+            }
+            connection = "Last estimate \(trackerClock(last.effectiveArrival))"
+            tight = false
         } else {
             let built = trackerCopy(legs, position: position, now: now, missed: missed)
             event = built.event
@@ -153,9 +180,11 @@ struct TravelTrackerState: Equatable, Sendable {
             missedConnection: missed,
             destination: destination,
             eta: last.effectiveArrival,
-            etaText: (missed == nil ? "about " : "Planned ") + trackerClock(last.effectiveArrival),
+            etaText: unresolved && now >= projectionEnd
+                ? "Last estimate \(trackerClock(last.effectiveArrival))"
+                : (missed == nil ? "about " : "Planned ") + trackerClock(last.effectiveArrival),
             segments: trackerSegments(legs, projectionEnd: projectionEnd),
-            progress: trackerProgress(legs, now: now, projectionEnd: projectionEnd),
+            progress: unresolved ? min(0.98, trackerProgress(legs, now: now, projectionEnd: projectionEnd)) : trackerProgress(legs, now: now, projectionEnd: projectionEnd),
             freshness: source.0,
             provenance: trackerProvenance(focus, freshness: source.0),
             retained: focus.journey.retained == true,

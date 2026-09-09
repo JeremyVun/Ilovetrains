@@ -1,8 +1,7 @@
 export const SUPPORTED_MODES = ['train', 'metro', 'ferry'];
 
 const APPEARANCES = new Set(['system', 'light', 'dark']);
-const TRANSFER_LIMITS = new Set(['two', 'any']);
-const CAPPED_LEGS = 3;
+const TRANSFER_LIMITS = new Set(['direct', 'two', 'any']);
 const MODE_SET = new Set(SUPPORTED_MODES);
 const TRAIN_LINES = new Set(['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'BMT', 'CCN', 'SCO', 'SHL', 'HUN']);
 const FERRY_LINES = new Set(['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'MFF']);
@@ -86,10 +85,11 @@ export function setFlags(doc, flags) {
   return { ...doc, flags: normalizeFlags(flags) };
 }
 
-/** The cap is the flag and the preference together: either one off means the
-    uncapped board this client has always drawn. */
+/** Numeric zero is a real cap; null is the uncapped wire value. */
 export function effectiveCap(doc) {
-  return flagsOf(doc).transferLimit === true && preferencesOf(doc).transferLimit === 'two';
+  if (flagsOf(doc).transferLimit !== true) return null;
+  const choice = preferencesOf(doc).transferLimit;
+  return choice === 'direct' ? 0 : choice === 'two' ? 2 : null;
 }
 
 function modeOf(line) {
@@ -113,9 +113,9 @@ function serviceModes(journey) {
   return legs.map((leg) => modeOf(leg && leg.line)).filter((mode) => mode !== 'walk');
 }
 
-export function journeyAllowed(journey, modes, capped = false) {
+export function journeyAllowed(journey, modes, maxTransfers = null) {
   if (!journey) return false;
-  if (capped && legCount(journey) > CAPPED_LEGS) return false;
+  if (Number.isInteger(maxTransfers) && maxTransfers >= 0 && legCount(journey) - 1 > maxTransfers) return false;
   const enabled = new Set(normalizeModes(modes));
   if (!enabled.size) return false;
   const allServed = enabled.size === SUPPORTED_MODES.length;
@@ -123,10 +123,10 @@ export function journeyAllowed(journey, modes, capped = false) {
   return services.length > 0 && services.every((mode) => mode ? enabled.has(mode) : allServed);
 }
 
-export function filterBody(body, modes, capped = false) {
+export function filterBody(body, modes, maxTransfers = null) {
   const source = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
   const journeys = Array.isArray(source.journeys) ? source.journeys : [];
-  return { ...source, journeys: journeys.filter((journey) => journeyAllowed(journey, modes, capped)) };
+  return { ...source, journeys: journeys.filter((journey) => journeyAllowed(journey, modes, maxTransfers)) };
 }
 
 /* Endpoint compatibility is known from the station index, not from one old

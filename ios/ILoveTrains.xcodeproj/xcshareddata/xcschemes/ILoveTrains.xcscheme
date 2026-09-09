@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "7B23C58D984C5E39D698BDF4335FF195"
+               BlueprintIdentifier = "38D81F26F5D08F89EFA6DD5A56DA1E97"
                BuildableName = "ILoveTrains.app"
                BlueprintName = "ILoveTrains"
                ReferencedContainer = "container:ILoveTrains.xcodeproj">
@@ -30,7 +30,7 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "7B23C58D984C5E39D698BDF4335FF195"
+            BlueprintIdentifier = "38D81F26F5D08F89EFA6DD5A56DA1E97"
             BuildableName = "ILoveTrains.app"
             BlueprintName = "ILoveTrains"
             ReferencedContainer = "container:ILoveTrains.xcodeproj">
@@ -41,7 +41,7 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "64D8ECF3DFDDF56BEBE7240CF18A4AFF"
+               BlueprintIdentifier = "8CD9BBE8278B15CCDC7832273FD75D22"
                BuildableName = "ILoveTrainsTests.xctest"
                BlueprintName = "ILoveTrainsTests"
                ReferencedContainer = "container:ILoveTrains.xcodeproj">
@@ -73,7 +73,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "7B23C58D984C5E39D698BDF4335FF195"
+            BlueprintIdentifier = "38D81F26F5D08F89EFA6DD5A56DA1E97"
             BuildableName = "ILoveTrains.app"
             BlueprintName = "ILoveTrains"
             ReferencedContainer = "container:ILoveTrains.xcodeproj">
@@ -90,7 +90,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "7B23C58D984C5E39D698BDF4335FF195"
+            BlueprintIdentifier = "38D81F26F5D08F89EFA6DD5A56DA1E97"
             BuildableName = "ILoveTrains.app"
             BlueprintName = "ILoveTrains"
             ReferencedContainer = "container:ILoveTrains.xcodeproj">

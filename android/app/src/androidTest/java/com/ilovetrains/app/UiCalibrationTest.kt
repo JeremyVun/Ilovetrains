@@ -317,6 +317,31 @@ class UiCalibrationTest {
             compose.onNodeWithText("The platform marker overlaps the line").performClick()
             capture("settings-feedback-draft-focused")
         }
+        for (appearance in listOf(Appearance.Dark, Appearance.Light)) {
+            val suffix = if (appearance == Appearance.Light) "-light" else ""
+            frame("c1-transfer-before$suffix") {
+                compose.runOnIdle { state.value = fixture.c1TransferBefore.copy(appearance = appearance) }
+                capture("c1-transfer-before$suffix")
+            }
+            frame("c1-transfer-during$suffix") {
+                compose.runOnIdle { state.value = fixture.c1TransferDuring.copy(appearance = appearance) }
+                capture("c1-transfer-during$suffix")
+            }
+            frame("c1-transfer-after$suffix") {
+                compose.runOnIdle { state.value = fixture.c1TransferAfter.copy(appearance = appearance) }
+                capture("c1-transfer-after$suffix")
+            }
+            frame("c1-cab$suffix") {
+                compose.runOnIdle { state.value = fixture.c1TransferAfter.copy(appearance = appearance, tinyTrain = true) }
+                compose.waitForIdle()
+                compose.mainClock.autoAdvance = false
+                compose.onNodeWithContentDescription("Run a tiny train").performClick()
+                compose.mainClock.advanceTimeBy(1_300)
+                capture("c1-cab$suffix")
+                compose.mainClock.advanceTimeBy(3_000)
+                compose.mainClock.autoAdvance = true
+            }
+        }
         val requested = InstrumentationRegistry.getArguments().getString("calibrationScreens")
             ?.split(',')?.map { it.trim() }?.toSet()
         require(requested == null || requested.isNotEmpty() && requested.all { it in frames }) {
@@ -376,6 +401,51 @@ class UiCalibrationTest {
         compose.onNodeWithTag(row).performTouchInput { swipeLeft(centerRight.x, centerRight.x - width * 0.75f, durationMillis = 2_000) }
         compose.waitUntil(5_000) { actions.deleted.size == 2 }
         compose.onNodeWithTag(row).assertDoesNotExist()
+    }
+
+    @Test fun settingsOmitsOfflineTimetableAndTransferLimitShowsOnlyCurrentValue() {
+        val fixture = Fixtures()
+        val state = mutableStateOf(fixture.settingsState.copy(transferLimit = TransferLimit.Two))
+        val selected = mutableListOf<TransferLimit>()
+        val actions = object : UiActions by NoActions {
+            override fun setTransferLimit(value: TransferLimit) {
+                selected += value
+                state.value = state.value.copy(transferLimit = value)
+            }
+        }
+        compose.setContent { TrainApp(state.value, actions) }
+
+        compose.onAllNodesWithText("Offline timetable").assertCountEquals(0)
+        compose.onNodeWithContentDescription("Transfer limit, Up to 2, Change")
+            .assertIsDisplayed().assertHasClickAction().performClick()
+        compose.onNodeWithContentDescription("Transfer limit, No limit, Change")
+            .assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(listOf(TransferLimit.Any, TransferLimit.Direct), selected) }
+        compose.onAllNodesWithText("Direct only").assertCountEquals(1)
+        compose.onAllNodesWithText("No limit").assertCountEquals(0)
+    }
+
+    @Test fun headerOpensWeightedWinnerAndReselectsAfterItDeparts() {
+        val initial = Fixtures().home
+        val board = requireNotNull(initial.board)
+        val leg = board.journeys.first().legs.first()
+        fun journey(line: String, departure: Long, arrival: Long) = Journey(listOf(leg.copy(
+            line = line, departure = departure, arrival = arrival, estimatedDeparture = null, estimatedArrival = null)))
+        val row = journey("T1", initial.now + 60_000, initial.now + 900_000)
+        val winner = journey("T9", initial.now + 120_000, initial.now + 300_000)
+        val later = journey("T2", initial.now + 240_000, initial.now + 600_000)
+        val source = board.copy(journeys = listOf(winner))
+        val candidates = board.copy(journeys = listOf(row, later), recommendation = RecommendationResult(winner, source))
+        val state = mutableStateOf(initial.copy(board = candidates, homeBoard = candidates))
+        val opened = mutableListOf<Journey>()
+        val actions = object : UiActions by NoActions {
+            override fun openJourney(journey: Journey) { opened += journey }
+        }
+        compose.setContent { TrainApp(state.value, actions) }
+        compose.onNodeWithTag("home-journey").performClick()
+        compose.runOnIdle { assertEquals(winner, opened.last()); state.value = state.value.copy(now = initial.now + 180_000) }
+        compose.onNodeWithTag("home-journey").performClick()
+        compose.runOnIdle { assertEquals(later, opened.last()) }
     }
 
     @Test fun lineChipsGrowWithEnlargedTextInsteadOfClippingIt() {
@@ -748,6 +818,14 @@ private class Fixtures {
     val activeInferredState = activePinnedState.copy(
         focus = activePinnedState.focus?.copy(pinned = false))
     val completedState = activePinnedState.copy(focusComplete = true)
+    private fun activeAt(now: Long): AppState {
+        val board = activeBoard.copy(generatedAt = now)
+        return activePinnedState.copy(now = now, board = board, homeBoard = board,
+            focus = activePinnedState.focus?.copy(board = board))
+    }
+    val c1TransferBefore = activeAt(activeJourney.legs.first().effectiveArrival - 2 * 60_000)
+    val c1TransferDuring = activeAt(activeJourney.legs.first().effectiveArrival + 2 * 60_000)
+    val c1TransferAfter = activeAt(activeJourney.legs.last().effectiveDeparture + 3 * 60_000)
 
     val beachTrip = SavedTrip("rhodes-bondi", transferBoard.from, transferBoard.to, lines = listOf("T9", "T4"))
     val twoTripsState = home.copy(trips = listOf(centralTrip, beachTrip), totalTrips = 2)

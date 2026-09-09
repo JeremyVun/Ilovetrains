@@ -41,11 +41,11 @@ export function focusOf(doc) {
 
 /* Stored focus and displayed focus have separate lifetimes. Filtering hides
    an incompatible journey without discarding the rider's saved snapshot. */
-export function visibleFocus(doc, nowMs, stations) {
+export function visibleFocus(doc, nowMs, stations, resumeWaitUntilMs = null) {
   const focus = focusOf(doc);
   const modes = preferencesOf(doc).enabledModes;
   const trip = focus && findTrip(doc, focus.tripId);
-  return focus && !focusExpired(focus, nowMs)
+  return focus && !focusExpired(focus, nowMs, resumeWaitUntilMs)
     && tripAllowed(trip, modes, stations) && journeyAllowed(focus.journey, modes, effectiveCap(doc))
     ? focus : null;
 }
@@ -128,11 +128,42 @@ export function isFocused(doc, journey) {
 /** Past the arrival plus the grace window. A snapshot whose arrival we never
     learned falls back to when it was focused, so nothing can pin directions
     to the screen forever. */
-export function focusExpired(focus, nowMs) {
+export function focusExpired(focus, nowMs, resumeWaitUntilMs = null) {
   if (!focus) return false;
+  if (Number.isFinite(resumeWaitUntilMs) && nowMs < resumeWaitUntilMs) return false;
   const arrival = arrivalMs(focus.journey);
   const base = arrival === null ? Date.parse(focus.focusedAt) : arrival;
+  const guard = focus.arrivalGuard;
+  if (guard?.armed && !guard.basis && arrival !== null) {
+    const retained = Date.parse(guard.retainedAt || '');
+    const checkpoint = Number.isFinite(retained) ? Math.min(retained, nowMs) : Math.min(arrival, nowMs);
+    return nowMs > Math.max(arrival + FOCUS_CLEAR_MS, checkpoint + 2 * 60 * 60_000);
+  }
   return Number.isFinite(base) && nowMs > base + FOCUS_CLEAR_MS;
+}
+
+export function applyArrivalResult(doc, result, nowMs) {
+  const focus = focusOf(doc);
+  const trip = focus && findTrip(doc, focus.tripId);
+  if (!focus || !trip || !result) return doc;
+  const selection = { tripId: focus.tripId, direction: focus.direction };
+  const ends = leg(trip, focus.direction);
+  let next = { ...doc, focus: { ...focus } };
+  if (result.guard) next.focus.arrivalGuard = result.guard;
+  else delete next.focus.arrivalGuard;
+  if (result.action === 'record') {
+    next = recordRide(next, selection, next.focus.journey, ends.from, ends.to);
+  } else if (result.action === 'correct') {
+    next = correctRide(next, selection, next.focus.journey, nowMs, result.state === 'arrived');
+    if (result.state === 'arrived') next = recordRide(next, selection, next.focus.journey, ends.from, ends.to);
+  } else if (result.action === 'withdraw') {
+    next = correctRide(next, selection, next.focus.journey, nowMs, false);
+  } else if (result.action === 'expire') {
+    if (next.lastOpen?.tripId === focus.tripId && next.lastOpen.direction === focus.direction
+        && journeyKey(next.lastOpen.journey) === journeyKey(focus.journey)) next.lastOpen = null;
+    delete next.focus;
+  }
+  return next;
 }
 
 export function matchJourney(journeys, snapshot) {
@@ -198,6 +229,10 @@ function departureDelayMinutes(item) {
    arrival outrank it (ui.md, smart home). */
 export function focusStatus(journey, opts = {}) {
   const state = (text, kind, late, leg, delay) => ({ text, kind, late, leg, delay });
+  if (opts.arrivalState === 'checkingArrival') return state('Checking arrival', 'ordinary', false, -1, 0);
+  if (opts.arrivalState === 'arrivalUnconfirmed') {
+    return state(opts.moving ? 'Arrival uncertain' : 'Arrival unconfirmed', 'uncertain', false, -1, 0);
+  }
   if (opts.over) return state('Trip over', 'complete', false, -1, 0);
   if (journeyCancelled(journey)) return state('Cancelled', 'exception', false, -1, 0);
   const leg = Number.isInteger(opts.activeLeg) && opts.activeLeg >= 0 ? opts.activeLeg : 0;
@@ -225,7 +260,9 @@ export function directionsModel(value, nowMs, opts = {}) {
     ? 1 : Math.max(1, Math.floor(arrMs / 60000) - Math.floor(depMs / 60000));
   const elapsed = depMs === null ? 0
     : Math.floor(nowMs / 60000) - Math.floor(depMs / 60000);
-  const at = depMs === null ? 0 : Math.max(0, Math.min(1, elapsed / total));
+  const rawAt = depMs === null ? 0 : Math.max(0, Math.min(1, elapsed / total));
+  const at = opts.arrivalDecision && opts.arrivalDecision.state !== 'arrived'
+    ? Math.min(.98, rawAt) : rawAt;
   const cancelledIndex = legs.findIndex((leg) => leg.cancelled === true);
   const cancelled = cancelledIndex >= 0 ? legs[cancelledIndex]
     : (journey && journey.cancelled ? first : null);
@@ -233,6 +270,8 @@ export function directionsModel(value, nowMs, opts = {}) {
   // Read through journeyDetail so the header, the board row and detail can
   // never disagree about a change window.
   const changes = journeyDetail(journey, nowMs, opts).changes;
+  const completedTransfers = changes.map((change, index) =>
+    change.departureMs !== null && nowMs >= change.departureMs ? index : -1).filter((index) => index >= 0);
   // Computed before the phase branches: a change still ahead is at risk while
   // the rider is waiting for the train too, not only once aboard.
   const risk = changes.find((change) => change.tight
@@ -280,14 +319,42 @@ export function directionsModel(value, nowMs, opts = {}) {
   }
   /* A fix at the destination ends the journey before its timetable does, so this
      branch is tested before the countdown ones (client-storage.md, Travel mode). */
-  if (nowMs >= arrMs || opts.arrived) {
+  if (opts.arrivalDecision?.state === 'arrived' || opts.arrived
+      || opts.arrivalDecision === undefined && nowMs >= arrMs) {
     model.phase = 'done';
-    model.progress = { at: 1, phase: 'done' };
+    model.progress = { at: 1, phase: 'done', completedTransfers };
     model.figure = countdownFigure(Math.max(0, -minutesUntil(arrMs, nowMs)));
     model.provenance = 'AGO';
-    model.instruction = `You arrived at ${model.to}.`;
+    model.instruction = opts.arrivalDecision?.basis === 'estimate'
+      ? last.arrival?.estimated
+        ? 'The last arrival estimate has passed. The return trip is ready.'
+        : 'The scheduled trip has ended. The return trip is ready.'
+      : `You arrived at ${model.to}.`;
     model.showBoardingPlatform = false;
     model.act = true;
+    return model;
+  }
+  if (nowMs >= arrMs && ['checkingArrival', 'arrivalUnconfirmed'].includes(opts.arrivalDecision?.state)) {
+    const decision = opts.arrivalDecision;
+    model.phase = 'ride';
+    model.progress = { at: .98, phase: 'ride', showMarker: decision.moving, completedTransfers };
+    model.lastEstimate = true;
+    model.showBoardingPlatform = false;
+    model.act = true;
+    if (decision.state === 'checkingArrival') {
+      model.figure = '—';
+      model.provenance = '';
+      model.instruction = `Checking arrival at ${model.to}.`;
+    } else if (decision.moving) {
+      const elapsed = Math.floor((nowMs - arrMs) / 60000);
+      model.figure = elapsed > 0 ? String(elapsed) : '—';
+      model.provenance = elapsed > 0 ? 'PAST ESTIMATE' : '';
+      model.instruction = `Still on the way to ${model.to}.`;
+    } else {
+      model.figure = '—';
+      model.provenance = 'LAST ESTIMATE';
+      model.instruction = 'Arrival time needs an update.';
+    }
     return model;
   }
   if (nowMs < depMs) {
@@ -334,7 +401,7 @@ export function directionsModel(value, nowMs, opts = {}) {
     }
   }
   model.phase = phase;
-  model.progress = { at, phase };
+  model.progress = { at, phase, activeLeg: model.activeLeg, completedTransfers };
   if (risk) {
     model.warn = true;
     model.instruction = `Tight change · ${risk.minutes} min`

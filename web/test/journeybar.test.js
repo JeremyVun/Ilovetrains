@@ -24,14 +24,17 @@ test('the journey bar is one exact percentage time axis', () => {
   assert.match(html, />3<\/span>.*>5<\/span>/);
 });
 
-test('progress paints before transfer numerals so it cannot obscure them', () => {
+test('progress dims the route and completed transfer chips as whole devices', () => {
   const spec = journeyBarSpec(transferJourneys()[0]);
   const html = journeyBarHtml(spec, {
     caps: true,
-    progress: { at: 0.76, phase: 'ride2' }
+    progress: { at: 0.76, phase: 'ride2', completedTransfers: [0] }
   });
-  assert.ok(html.indexOf('sy-mk') < html.indexOf('sy-p a'));
-  assert.ok(html.indexOf('sy-dim') < html.indexOf('sy-p a'));
+  assert.match(html, /class="sy-p a completed"/);
+  assert.match(html, /class="sy-p b completed"/);
+  assert.match(html, /class="sy-progress-dim"/);
+  assert.match(css, /\.sy-bar \.sy-p\.completed::after/);
+  assert.match(css, /background: var\(--bg\); opacity: \.62/);
 });
 
 test('a real return journey keeps its own platform numbers in ride order', () => {

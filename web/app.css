@@ -359,7 +359,7 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
 .sy-bar .sy-g0 { background: var(--rule); }
 .sy-bar .sy-g0.warn { background: var(--warn); }
 .sy-bar .sy-p {
-  top: 50%; transform: translateY(-50%); bottom: auto; height: 22px; z-index: 2;
+  top: 50%; transform: translateY(-50%); bottom: auto; height: 22px; z-index: 4;
   display: flex; align-items: center; justify-content: center; padding: 0 5px; min-width: 19px;
   font-size: 14px; font-weight: 700; border-radius: 3px;
 }
@@ -368,7 +368,7 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
 /* A station belongs to both transfer platforms. Its own band keeps long or
    multiple changes clear of the headsign without distorting the time axis. */
 .sy-bar > .sy-pstn {
-  top: 26px; bottom: auto; width: max-content; transform: translateX(-50%);
+  top: 26px; bottom: auto; z-index: 4; width: max-content; transform: translateX(-50%);
   font-size: 10px; font-weight: 600; line-height: 1.2; letter-spacing: .06em;
   text-align: center; text-transform: uppercase; color: var(--ink-2);
 }
@@ -379,8 +379,15 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
    where to get off and what to board. */
 .sy-row.two .sy-bar .sy-p.a[data-transfer-index="1"] { display: none; }
 .sy-row.two .sy-sign { min-width: 56px; }
-.sy-bar .sy-dim { left: 0; background: var(--bg); opacity: .62; }
-.sy-bar .sy-mk { top: -2px; bottom: -2px; width: 8px; margin-left: -4px; background: var(--bg); }
+.sy-bar .sy-progress-dim {
+  left: 0; z-index: 1; background: var(--bg); opacity: .62;
+  pointer-events: none;
+}
+.sy-bar .sy-p.completed::after {
+  content: ''; position: absolute; inset: 0; z-index: 5; border-radius: inherit;
+  background: var(--bg); opacity: .62; pointer-events: none;
+}
+.sy-bar .sy-mk { top: -2px; bottom: -2px; z-index: 3; width: 8px; margin-left: -4px; background: var(--bg); }
 .sy-bar .sy-mk::after {
   content: ''; position: absolute; left: 3px; top: 2px; bottom: 2px; width: 2px;
   background: var(--mkc, var(--ink-3));
@@ -449,6 +456,7 @@ button.pin-status { height: 44px; margin: -15px 0; }
 .pin-icon { width: 12px; height: 12px; fill: currentColor; flex: none; }
 .pin-separator { margin: 0 .4em; color: var(--ink-3); }
 .answer-kind.status-late, .answer-kind.status-exception { color: var(--warn); }
+.answer-kind.status-uncertain { color: var(--ink-2); }
 .status-copy { white-space: nowrap; }
 .status-late-word { margin-left: .42em; }
 .hm-fresh { display: flex; align-items: center; gap: 8px; flex: none; }
@@ -486,6 +494,10 @@ button.pin-status { height: 44px; margin: -15px 0; }
 .hm-t { margin-top: 3px; line-height: 1.1; white-space: nowrap; }
 .hm-e.from .hm-t { font-size: var(--dept); font-weight: 400; letter-spacing: -.01em; color: var(--ink); }
 .hm-e.to .hm-t { margin-top: 7px; font-size: var(--arrt); font-weight: 300; color: var(--ink-2); }
+.hm-estimate {
+  display: block; margin-top: 4px; font-size: 9px; font-weight: 600;
+  letter-spacing: .12em; line-height: 1; text-transform: uppercase; color: var(--ink-3);
+}
 .hm-hd .sy-j { grid-column: 1 / -1; grid-row: 2; margin-top: var(--hdgap); height: var(--jh); }
 .hm-hd .sy-j.has-changes + .hm-sign { margin-top: 6px; }
 .hm-hd .sy-cap { height: var(--caph); font-size: var(--capf); padding: 0 var(--cappad); letter-spacing: .02em; }
@@ -608,6 +620,7 @@ button.pin-status { height: 44px; margin: -15px 0; }
 .tripr.shown:not(.focused) .hm-sub b { color: var(--ink-2); }
 .tripr.focused .hm-sub b.status-late,
 .tripr.focused .hm-sub b.status-exception { color: var(--warn); }
+.tripr.focused .hm-sub b.status-uncertain { color: var(--ink-2); }
 .hm-end {
   flex: none; padding: 14px 0 6px; white-space: nowrap; font-size: 10px;
   font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3);
@@ -895,7 +908,7 @@ html[data-theme="light"] .dchip { color:var(--bg) !important; }
 .tiny-train-car {
   display: block;
   flex: none;
-  width: 32px;
+  width: 40px;
   height: 18px;
   shape-rendering: crispEdges;
 }
@@ -904,7 +917,9 @@ html[data-theme="light"] .dchip { color:var(--bg) !important; }
 .tiny-train-window.upper,
 .tiny-train-windscreen { fill: #4A3328; }
 .tiny-train-window.lower { fill: #2A1D18; }
-.tiny-train-door { fill: #939896; }
+.tiny-train-passenger-door { fill: #F9B928; }
+.tiny-train-door-window { fill: #4A3328; }
+.tiny-train-door-seam { fill: none; stroke: #4A3328; stroke-width: .5; }
 .tiny-train-nose { fill: #F9B928; }
 .tiny-train-headlight { fill: #FFF1AE; }
 .tiny-train-wheel { fill: #201C1A; }
@@ -914,7 +929,9 @@ html[data-theme="light"] .dchip { color:var(--bg) !important; }
   .tiny-train-window.upper,
   .tiny-train-windscreen { fill: #4A3125; }
   .tiny-train-window.lower { fill: #291B16; }
-  .tiny-train-door { fill: #747B79; }
+  .tiny-train-passenger-door { fill: #E4A20C; }
+  .tiny-train-door-window { fill: #3B2A22; }
+  .tiny-train-door-seam { stroke: #3B2A22; }
   .tiny-train-nose { fill: #E4A20C; }
   .tiny-train-headlight { fill: #FFF3B3; }
 }
@@ -923,14 +940,18 @@ html[data-theme="light"] .tiny-train-body { fill: #9DA3A1; }
 html[data-theme="light"] .tiny-train-window.upper,
 html[data-theme="light"] .tiny-train-windscreen { fill: #3B2A22; }
 html[data-theme="light"] .tiny-train-window.lower { fill: #241713; }
-html[data-theme="light"] .tiny-train-door { fill: #747B79; }
+html[data-theme="light"] .tiny-train-passenger-door { fill: #E4A20C; }
+html[data-theme="light"] .tiny-train-door-window { fill: #3B2A22; }
+html[data-theme="light"] .tiny-train-door-seam { stroke: #3B2A22; }
 html[data-theme="light"] .tiny-train-nose { fill: #E4A20C; }
 html[data-theme="light"] .tiny-train-headlight { fill: #FFF3B3; }
 html[data-theme="dark"] .tiny-train-body { fill: #B6BAB8; }
 html[data-theme="dark"] .tiny-train-window.upper,
 html[data-theme="dark"] .tiny-train-windscreen { fill: #4A3328; }
 html[data-theme="dark"] .tiny-train-window.lower { fill: #2A1D18; }
-html[data-theme="dark"] .tiny-train-door { fill: #939896; }
+html[data-theme="dark"] .tiny-train-passenger-door { fill: #F9B928; }
+html[data-theme="dark"] .tiny-train-door-window { fill: #4A3328; }
+html[data-theme="dark"] .tiny-train-door-seam { stroke: #4A3328; }
 html[data-theme="dark"] .tiny-train-nose { fill: #F9B928; }
 html[data-theme="dark"] .tiny-train-headlight { fill: #FFF1AE; }
 

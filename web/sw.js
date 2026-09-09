@@ -23,7 +23,7 @@
  * Bump VERSION on every deploy that changes any file in SHELL.
  */
 
-const VERSION = 'v54';
+const VERSION = 'v58';
 const SHELL_CACHE = 'shell-' + VERSION;
 const DATA_CACHE = 'data-' + VERSION;
 
@@ -37,6 +37,7 @@ const SHELL = [
   '/manifest.webmanifest',
   '/stations.json',
   '/js/analytics.js',
+  '/js/arrival.js',
   '/js/api.js',
   '/js/appearance.js',
   '/js/settings.js',
@@ -53,6 +54,7 @@ const SHELL = [
   '/js/lines.js',
   '/js/main.js',
   '/js/predict.js',
+  '/js/recommendation.js',
   '/js/rowmodel.js',
   '/js/search.js',
   '/js/setup.js',

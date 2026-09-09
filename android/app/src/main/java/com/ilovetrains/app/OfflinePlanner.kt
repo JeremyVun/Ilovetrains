@@ -3,6 +3,8 @@ package com.ilovetrains.app
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -29,6 +31,8 @@ data class FocusedRefresh(
 ) {
     val canJudgeClock: Boolean get() = matchedLegIndices.isNotEmpty()
 }
+
+data class PlannedBoard(val board: BoardData, val recommendation: RecommendationResult?)
 
 class OfflinePlanner(
     context: Context,
@@ -87,19 +91,31 @@ class OfflinePlanner(
         }
     }
 
-    suspend fun plan(from: Station, to: Station, at: Long, modes: Set<String>, limit: Int = 12, maxTransfers: Int = 2): BoardData = withContext(Dispatchers.IO) {
+    suspend fun plan(from: Station, to: Station, at: Long, modes: Set<String>, limit: Int = 12, maxTransfers: Int = 2): BoardData =
+        planEnvelope(from, to, at, modes, limit, maxTransfers, includeRecommendation = false).board
+
+    suspend fun planWithRecommendation(from: Station, to: Station, at: Long, modes: Set<String>, limit: Int = 12,
+                                      maxTransfers: Int = 2, recommendationAt: Long = at): PlannedBoard =
+        planEnvelope(from, to, at, modes, limit, maxTransfers, includeRecommendation = true, recommendationAt)
+
+    private suspend fun planEnvelope(from: Station, to: Station, at: Long, modes: Set<String>, limit: Int,
+                                     maxTransfers: Int, includeRecommendation: Boolean, recommendationAt: Long = at): PlannedBoard = withContext(Dispatchers.IO) {
         mutex.withLock {
             ensureOpen()
             val active = checkNotNull(activePackage)
             val date = Instant.ofEpochMilli(at).atZone(Sydney).toLocalDate()
             if (date.format(COMPACT_DATE) !in active.serviceDateFrom..active.serviceDateTo) {
-                return@withLock BoardData(from, to, emptyList(), active.generatedAt, source = "schedule", offline = true, coverage = coverageDescription, error = "The offline timetable does not cover this date")
+                return@withLock PlannedBoard(BoardData(from, to, emptyList(), active.generatedAt, source = "schedule", offline = true,
+                    coverage = coverageDescription, error = "The offline timetable does not cover this date",
+                    fetchConstraint = TransferConstraint(maxTransfers)), null)
             }
             if (modes.isEmpty()) {
-                return@withLock BoardData(from, to, emptyList(), active.generatedAt, source = "schedule", offline = true, coverage = coverageDescription)
+                return@withLock PlannedBoard(BoardData(from, to, emptyList(), active.generatedAt, source = "schedule", offline = true,
+                    coverage = coverageDescription, fetchConstraint = TransferConstraint(maxTransfers)), null)
             }
             if (from.modes.intersect(modes).isEmpty() || to.modes.intersect(modes).isEmpty()) {
-                return@withLock BoardData(from, to, emptyList(), active.generatedAt, source = "schedule", offline = true, coverage = coverageDescription)
+                return@withLock PlannedBoard(BoardData(from, to, emptyList(), active.generatedAt, source = "schedule", offline = true,
+                    coverage = coverageDescription, fetchConstraint = TransferConstraint(maxTransfers)), null)
             }
             val db = checkNotNull(database)
             val assignments = mutableMapOf<String, StopAssignment?>()
@@ -109,9 +125,18 @@ class OfflinePlanner(
                     assignments.getOrPut("$source\u0000$stopId") { assignmentFor(db, source, stopId) }
                 }.sortedWith(compareBy<ScheduledConnection> { it.effectiveDeparture }.thenBy { it.tripKey }.thenBy { it.fromSequence }) else scheduled
             }
-            var routed = router.route(from, to, at, connections(INITIAL_HORIZON_HOURS), limit, maxTransfers)
-            if (routed.isEmpty() || routed.any(::hasLongWait)) {
-                routed = router.route(from, to, at, connections(MAX_HORIZON_HOURS), limit, maxTransfers)
+            val job = currentCoroutineContext()[Job]
+            var loaded = connections(INITIAL_HORIZON_HOURS)
+            var routed = router.route(from, to, at, loaded, limit, maxTransfers) { job?.isActive == false }
+            var recommended = if (includeRecommendation) router.recommend(from, to, recommendationAt, loaded, maxTransfers) {
+                job?.isActive == false
+            } else null
+            if (routed.isEmpty() || routed.any(::hasLongWait) || includeRecommendation && (recommended == null || hasLongWait(recommended))) {
+                loaded = connections(MAX_HORIZON_HOURS)
+                routed = router.route(from, to, at, loaded, limit, maxTransfers) { job?.isActive == false }
+                if (includeRecommendation) recommended = router.recommend(from, to, recommendationAt, loaded, maxTransfers) {
+                    job?.isActive == false
+                }
             }
             var observedAt: Long? = null
             var matched = false
@@ -121,7 +146,7 @@ class OfflinePlanner(
                 result.observedAt?.let { observedAt = minOf(observedAt ?: Long.MAX_VALUE, it) }
                 result.value
             }
-            BoardData(
+            val board = BoardData(
                 from = from,
                 to = to,
                 journeys = finalJourneys,
@@ -129,7 +154,21 @@ class OfflinePlanner(
                 source = if (matched) "live" else "schedule",
                 offline = !matched,
                 coverage = coverageDescription,
+                fetchConstraint = TransferConstraint(maxTransfers),
             )
+            val recommendation = recommended?.let { journey ->
+                val observation = realtime.observation(journey)
+                val value = observation.value
+                val source = board.copy(
+                    journeys = listOf(value),
+                    generatedAt = observation.observedAt ?: active.generatedAt,
+                    source = if (observation.matched) "live" else "schedule",
+                    offline = !observation.matched,
+                    homeJourneyKey = value.key,
+                )
+                RecommendationResult(value, source)
+            }
+            PlannedBoard(board.copy(recommendation = recommendation), recommendation)
         }
     }
 

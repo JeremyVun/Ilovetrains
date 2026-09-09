@@ -394,3 +394,29 @@ test('cached source-stale provenance survives storage and clears only on a fresh
   const recovered = putCache(degraded, key, body, Date.now());
   assert.equal(recovered.cache[key].serverStale, undefined);
 });
+
+test('focus arrival metadata and bounded recommendation pages round-trip without raw evidence', () => {
+  const doc = docWithTrips();
+  doc.focus = {
+    tripId: 't1', direction: 'forward', focusedAt: '2026-09-09T09:00:00Z', journey: JOURNEY,
+    arrivalGuard: { armed: true, retainedAt: '2026-09-09T09:05:00Z' }
+  };
+  const key = cacheKey(CENTRAL.id, PARRA.id);
+  const pages = [0, 1, 2].map((index) => ({
+    at: 1_780_000_000_000 + index * 600_000,
+    body: { generatedAt: `2026-09-09T09:0${index}:00Z`, journeys: [] },
+    serverStale: index === 1,
+    maxTransfers: 0
+  }));
+  const stored = putCache(doc, key, { journeys: [] }, Date.now(), {
+    maxTransfers: 0, recommendationPages: pages
+  });
+  const round = parseDoc(serializeDoc(stored));
+
+  assert.deepEqual(round.focus.arrivalGuard, {
+    armed: true, retainedAt: '2026-09-09T09:05:00.000Z'
+  });
+  assert.equal(round.cache[key].maxTransfers, 0);
+  assert.deepEqual(round.cache[key].recommendationPages, pages.slice(0, 2));
+  assert.equal(JSON.stringify(round).includes('samples'), false);
+});

@@ -25,6 +25,7 @@ class MainActivity : ComponentActivity() {
     private var locationGeneration = 0L
     private var listener: LocationListener? = null
     private var locating = false
+    private var monitoringArrival = false
     private var askingPermission = false
     private var foreground = false
     private val handler = Handler(Looper.getMainLooper())
@@ -38,6 +39,7 @@ class MainActivity : ComponentActivity() {
     private val locationRequest: () -> Unit = { requestLocationFromSystem() }
     private val silentLocation: () -> Unit = { if (hasLocation()) takeLocation() }
     private val locationDisabled: () -> Unit = { stopLocation() }
+    private val arrivalMonitoring: (() -> Unit) -> Boolean = { beforeStart -> startArrivalMonitoring(beforeStart) }
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
         askingPermission = false
         val granted = permissions.values.any { it } || hasLocation()
@@ -52,7 +54,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        model.attachActivity(this, locationRequest, silentLocation, locationDisabled, notificationPermissionRequest)
+        model.attachActivity(this, locationRequest, silentLocation, locationDisabled, arrivalMonitoring, notificationPermissionRequest)
         handleTrackerIntent(intent)
         setContent {
             val state = model.state.collectAsStateWithLifecycle().value
@@ -110,6 +112,7 @@ class MainActivity : ComponentActivity() {
     private fun hasLocation() = checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED || checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     private fun stopLocation() {
         locating = false
+        monitoringArrival = false
         locationGeneration++
         listener?.let { locationManager.removeUpdates(it) }; listener = null
         handler.removeCallbacksAndMessages(null)
@@ -154,6 +157,47 @@ class MainActivity : ComponentActivity() {
         }
         if (!subscribed) { finish(); return }
         handler.postDelayed({ finish() }, 15_000)
+    }
+
+    private fun startArrivalMonitoring(beforeStart: () -> Unit): Boolean {
+        if (!foreground || askingPermission || !hasLocation() || !model.state.value.useLocation) return false
+        stopLocation()
+        val generation = locationGeneration
+        val manager = locationManager
+        val providers = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER).filter { manager.isProviderEnabled(it) }
+        if (providers.isEmpty()) return false
+        beforeStart()
+        if (generation != locationGeneration || model.state.value.focus == null || !model.state.value.useLocation) return false
+        locating = true
+        monitoringArrival = true
+        val continuous = object : LocationListener {
+            override fun onLocationChanged(location: Location) {
+                if (generation != locationGeneration) return
+                model.arrivalLocation(Fix(location.latitude, location.longitude, location.time,
+                    location.speed.toDouble().takeIf { location.hasSpeed() }, location.accuracy.toDouble().takeIf { location.hasAccuracy() }))
+            }
+            @Deprecated("Legacy Android callback") override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+            override fun onProviderEnabled(provider: String) {}
+            override fun onProviderDisabled(provider: String) {
+                if (generation == locationGeneration && !manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) &&
+                    !manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                    stopLocation()
+                    model.arrivalMonitoringFailed(SetupLocationStatus.ServicesDisabled)
+                }
+            }
+        }
+        listener = continuous
+        var subscribed = false
+        for (provider in providers) {
+            try { manager.requestLocationUpdates(provider, 10_000L, 0f, continuous, Looper.getMainLooper()); subscribed = true }
+            catch (_: SecurityException) { }
+            catch (_: IllegalArgumentException) { }
+        }
+        if (!subscribed) { stopLocation(); return false }
+        handler.postDelayed({
+            if (generation == locationGeneration && monitoringArrival) model.arrivalLookupComplete()
+        }, 15_000)
+        return true
     }
 
 }

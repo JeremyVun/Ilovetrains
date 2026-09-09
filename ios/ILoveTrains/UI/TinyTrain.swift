@@ -1,14 +1,41 @@
 import SwiftUI
 
+let tinyTrainCarCount = 8
+let tinyTrainCarWidth: CGFloat = 40
+let tinyTrainGap: CGFloat = 1
+let tinyTrainLength = tinyTrainCarWidth * CGFloat(tinyTrainCarCount) + tinyTrainGap * CGFloat(tinyTrainCarCount - 1)
+
+func tinyTrainCarBody(cab: Bool) -> Path {
+    var shape = Path()
+    shape.move(to: CGPoint(x: 0, y: 3))
+    shape.addLine(to: CGPoint(x: cab ? 33 : 40, y: 3))
+    if cab { shape.addLine(to: CGPoint(x: 40, y: 7)) }
+    shape.addLine(to: CGPoint(x: 40, y: 15))
+    shape.addLine(to: CGPoint(x: 0, y: 15))
+    shape.closeSubpath()
+    return shape
+}
+
+func tinyTrainCarOffset(_ index: Int, scale: CGFloat) -> CGFloat {
+    CGFloat(index) * (tinyTrainCarWidth + tinyTrainGap) * scale
+}
+
 struct TinyTrainLane: View {
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.trainColors) private var colors
     @State private var started: Date?
     @State private var runID = 0
     var flag = false
     var flagOverride: Bool? = nil
     var onAvailabilityChange: (Bool) -> Void = { _ in }
+
+    private var reduceMotion: Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--tiny-train-reduced-motion") { return true }
+        #endif
+        return systemReduceMotion
+    }
 
     private var previewFlag: Bool? {
         #if DEBUG
@@ -35,12 +62,20 @@ struct TinyTrainLane: View {
                     TimelineView(.animation(paused: reduceMotion)) { timeline in
                         Canvas { context, size in
                             let progress = min(1, max(0, timeline.date.timeIntervalSince(started) / 2.6))
-                            let left = reduceMotion ? (size.width - 197) / 2 : -201 + progress * (size.width + 205)
+                            let scale = reduceMotion ? min(1, size.width / tinyTrainLength) : 1
+                            let left = reduceMotion
+                                ? (size.width - tinyTrainLength * scale) / 2
+                                : -tinyTrainLength - 4 + progress * (size.width + tinyTrainLength + 8)
                             context.clip(to: Path(CGRect(x: 0, y: 0, width: size.width, height: 18)))
-                            for car in 0..<6 {
+                            for car in 0..<tinyTrainCarCount {
                                 var carContext = context
-                                carContext.translateBy(x: left + CGFloat(car * 33), y: 0)
-                                drawCar(&carContext, lead: car == 5)
+                                carContext.translateBy(x: left + tinyTrainCarOffset(car, scale: scale), y: 0)
+                                carContext.scaleBy(x: scale, y: scale)
+                                if car == 0 {
+                                    carContext.translateBy(x: tinyTrainCarWidth, y: 0)
+                                    carContext.scaleBy(x: -1, y: 1)
+                                }
+                                drawCar(&carContext, cab: car == 0 || car == tinyTrainCarCount - 1)
                             }
                         }
                     }.allowsHitTesting(false).accessibilityHidden(true)
@@ -62,7 +97,7 @@ struct TinyTrainLane: View {
         .onDisappear { started = nil; onAvailabilityChange(false) }
     }
 
-    private func drawCar(_ context: inout GraphicsContext, lead: Bool) {
+    private func drawCar(_ context: inout GraphicsContext, cab: Bool) {
         func rect(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> Path {
             Path(CGRect(x: x, y: y, width: w, height: h))
         }
@@ -71,23 +106,24 @@ struct TinyTrainLane: View {
         }
         let body = color(colors.dark ? 0xB6BAB8 : 0x9DA3A1)
         let window = color(colors.dark ? 0x4A3328 : 0x3B2A22)
-        var shape = Path()
-        shape.move(to: CGPoint(x: 1, y: 3)); shape.addLine(to: CGPoint(x: lead ? 25 : 31, y: 3))
-        if lead { shape.addLine(to: CGPoint(x: 31, y: 7)) }
-        shape.addLines([CGPoint(x: 31, y: 15), CGPoint(x: 1, y: 15)]); shape.closeSubpath()
-        context.fill(shape, with: .color(body))
-        for y in [5, 9] { for x in [4, 9, 14, 19] {
-            context.fill(rect(CGFloat(x), CGFloat(y), 3, 2), with: .color(y == 5 ? window : color(colors.dark ? 0x2A1D18 : 0x241713)))
+        context.fill(tinyTrainCarBody(cab: cab), with: .color(body))
+        let door = color(colors.dark ? 0xF9B928 : 0xE4A20C)
+        for x in [5, 28] {
+            context.fill(rect(CGFloat(x), 5, 6, 9), with: .color(door))
+            context.fill(rect(CGFloat(x + 3), 5, 1, 9), with: .color(body.opacity(0.75)))
+        }
+        for y in [5, 10] { for x in [13, 18, 23] {
+            context.fill(rect(CGFloat(x), CGFloat(y), 3, 2), with: .color(window))
         } }
-        if lead {
+        if cab {
             var nose = Path()
-            nose.addLines([CGPoint(x: 24, y: 3), CGPoint(x: 26, y: 3), CGPoint(x: 31, y: 7),
-                           CGPoint(x: 31, y: 15), CGPoint(x: 24, y: 15)]); nose.closeSubpath()
-            context.fill(nose, with: .color(color(colors.dark ? 0xF9B928 : 0xE4A20C)))
-            context.fill(rect(25, 5, 3, 4), with: .color(window))
-            context.fill(rect(29, 12, 1, 1), with: .color(color(colors.dark ? 0xFFF1AE : 0xFFF3B3)))
-        } else { context.fill(rect(25, 5, 3, 8), with: .color(color(colors.dark ? 0x939896 : 0x747B79))) }
-        for x in [7, 25] {
+            nose.addLines([CGPoint(x: 33, y: 3), CGPoint(x: 35, y: 3), CGPoint(x: 40, y: 7),
+                           CGPoint(x: 40, y: 15), CGPoint(x: 33, y: 15)]); nose.closeSubpath()
+            context.fill(nose, with: .color(door))
+            context.fill(rect(34, 5, 3, 4), with: .color(window))
+            context.fill(rect(38, 12, 1, 1), with: .color(color(colors.dark ? 0xFFF1AE : 0xFFF3B3)))
+        }
+        for x in [7, 33] {
             context.fill(Path(ellipseIn: CGRect(x: Double(x) - 1.5, y: 14.5, width: 3, height: 3)), with: .color(color(0x201C1A)))
         }
     }

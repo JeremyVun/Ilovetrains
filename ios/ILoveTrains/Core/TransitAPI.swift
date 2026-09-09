@@ -4,20 +4,46 @@ struct TransitAPI: Sendable {
     var baseURL = "https://ilovetrains.jeremyvun.com"
     var session: URLSession = .shared
 
+    struct DeparturePage: Sendable {
+        var board: BoardData
+        var body: Data
+    }
+
     func departures(from: Station, to: Station, modes: Set<String>, at: Double? = nil, transferLimit: Int? = nil) async throws -> BoardData {
+        try await departurePage(from: from, to: to, modes: modes, at: at, transferLimit: transferLimit).board
+    }
+
+    func departurePage(
+        from: Station,
+        to: Station,
+        modes: Set<String>,
+        at: Double? = nil,
+        transferLimit: Int? = nil,
+        timeout: TimeInterval = 12
+    ) async throws -> DeparturePage {
         var url = URLComponents(string: baseURL + "/api/v1/departures")!
         url.queryItems = [URLQueryItem(name: "from", value: from.id), URLQueryItem(name: "to", value: to.id),
             URLQueryItem(name: "limit", value: "10"), URLQueryItem(name: "modes", value: modes.sorted().joined(separator: ","))]
         if let at { url.queryItems?.append(URLQueryItem(name: "at", value: ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: at / 1000)))) }
         if let transferLimit { url.queryItems?.append(URLQueryItem(name: "transferLimit", value: String(transferLimit))) }
-        var request = URLRequest(url: url.url!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12)
+        var request = URLRequest(url: url.url!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: timeout)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        let (bytes, response) = try await session.data(for: request)
+        let outgoing = request
+        let (bytes, response) = try await withThrowingTaskGroup(of: (Data, URLResponse).self) { group in
+            group.addTask { [session] in try await session.data(for: outgoing) }
+            group.addTask {
+                try await Task.sleep(for: .seconds(timeout))
+                throw URLError(.timedOut)
+            }
+            defer { group.cancelAll() }
+            return try await group.next()!
+        }
         guard let http = response as? HTTPURLResponse, http.statusCode == 200, bytes.count <= 2_000_000 else { throw TransitError.unavailable }
         var board = try TransitWire.board(bytes)
         board.from = from; board.to = to
         board.serverStale = http.value(forHTTPHeaderField: "X-Data-Stale")?.lowercased() == "true"
-        return board
+        board.requestMaxTransfers = transferLimit
+        return DeparturePage(board: board, body: bytes)
     }
 
     func flags() async throws -> [String: Bool] {

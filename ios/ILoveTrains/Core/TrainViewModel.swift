@@ -1,6 +1,12 @@
 import Foundation
 import Combine
 
+private enum BoardFetch: Sendable {
+    case local(OfflinePlanResult?)
+    case online(TransitAPI.DeparturePage?)
+    case supplement(TransitAPI.DeparturePage)
+}
+
 @MainActor
 final class TrainViewModel: ObservableObject {
     @Published var state = AppState()
@@ -16,11 +22,15 @@ final class TrainViewModel: ObservableObject {
     private var generation = 0
     private var sharedGeneration = 0
     private var boardTask: Task<Void, Never>?
+    private var supplementTask: Task<TransitAPI.DeparturePage, Never>?
     private var focusTask: Task<Void, Never>?
+    private var focusRefreshGeneration = 0
+    private var focusRefreshPending = false
     private var historyTask: Task<Void, Never>?
     private var earlierTask: Task<Void, Never>?
     private var realtimeTask: Task<Void, Never>?
     private var trackerTask: Task<Void, Never>?
+    private var arrivalTask: Task<Void, Never>?
     private var loop: Task<Void, Never>?
     private var writeTask: Task<Void, Never>?
     private var bootstrap: Task<Void, Error>?
@@ -28,6 +38,7 @@ final class TrainViewModel: ObservableObject {
     private var settingsBack: Screen = .home
     private var lastTimetableCheck = 0.0
     private var lastRealtimeAttempt = 0.0
+    private var recommendationPagingAt: [String: Millis] = [:]
     private var active = false
     private var setupOriginEdited = false
     private var setupLocationRequested = false
@@ -38,8 +49,12 @@ final class TrainViewModel: ObservableObject {
     private var pendingDeletion: PendingDeletion?
     private var undoTask: Task<Void, Never>?
     private var pendingTrackerURL: URL?
+    private var arrivalWindow: ArrivalWindow?
+    private var arrivalPermissionPending = false
+    private var arrivalResumeWaitUntil: Millis?
+    private var arrivalGeneration = 0
     private let undoWindow: Duration
-    let location = LocationService()
+    let location: any LocationProviding
     #if DEBUG
     var seeded = false
     var networkDisabled = false
@@ -51,8 +66,10 @@ final class TrainViewModel: ObservableObject {
         api: TransitAPI = TransitAPI(),
         planner: OfflinePlanner = OfflinePlanner(),
         tracker: TravelTrackerController? = nil,
+        location: (any LocationProviding)? = nil,
         undoWindow: Duration = defaultUndoWindow
     ) {
+        self.location = location ?? LocationService()
         self.api = api; self.planner = planner; self.undoWindow = undoWindow
         var trackerDirectory: URL?
         #if DEBUG
@@ -65,15 +82,23 @@ final class TrainViewModel: ObservableObject {
         self.store = store
         #endif
         self.tracker = tracker ?? TravelTrackerController.live(directory: trackerDirectory)
-        location.onPermission = { [weak self] granted, denied in self?.state.locationGranted = granted; self?.state.locationDenied = denied }
-        location.onFix = { [weak self] in self?.receiveLocation($0) }
-        location.onFailure = { [weak self] in self?.locationFailed($0) }
+        self.location.onPermission = { [weak self] granted, denied in
+            guard let self else { return }
+            self.state.locationGranted = granted
+            self.state.locationDenied = denied
+            if !granted, self.location.isMonitoring { self.clearArrivalMonitoring() }
+        }
+        self.location.onFix = { [weak self] in self?.receiveLocation($0) }
+        self.location.onFailure = { [weak self] in self?.locationFailed($0) }
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--offline") { networkDisabled = true }
         if configureTrackerCase() { seeded = true; return }
         if configureCalibration() { seeded = true; return }
         #endif
-        bootstrap = Task { try await planner.initialize() }
+        bootstrap = Task {
+            try await planner.initialize()
+            state.timetableStatus = await planner.coverageDescription
+        }
         Task { await start() }
     }
 
@@ -82,16 +107,21 @@ final class TrainViewModel: ObservableObject {
         #if DEBUG
         if configureTrackerDebugAfterLoad() { try? await store.save(data) }
         #endif
+        if active, data.useLocation, data.focus != nil { arrivalPermissionPending = true; arrivalResumeWaitUntil = state.now + 15_000 }
         state.stations = (try? await store.stations()) ?? []
-        if !canNetwork { settleFocus() }
+        if active {
+            focusRefreshPending = canNetwork && data.focus != nil
+            beginArrivalMonitoring()
+        }
         choosePrediction(); syncPersonal()
         if let pair = ends(), let cached = await cachedBoard(from: pair.0, to: pair.1) {
+            updateRecommendation(cached, local: nil, modes: data.modes, maxTransfers: data.requestTransferLimit)
             publish(retainedOfflineBoard(cached), request: generation)
         }
         state.ready = true; state.screen = data.trips.isEmpty ? .setup : .home
         if let url = pendingTrackerURL { pendingTrackerURL = nil; openTracker(url) }
         refresh(); refreshFlags()
-        do { try await bootstrap?.value; state.timetableStatus = await planner.coverageDescription }
+        do { try await bootstrap?.value }
         catch { state.timetableStatus = "Offline timetable unavailable. Download it in Settings." }
         if active { refreshSharedData(refreshBoard: false); silentLocation() }
     }
@@ -113,7 +143,7 @@ final class TrainViewModel: ObservableObject {
     }
     private func cachedBoard(from: Station, to: Station) async -> BoardData? {
         guard let cached = await store.cached(from: from, to: to, modes: data.modes) else { return nil }
-        return data.withinTransferLimit(cached)
+        return cached
     }
     private func syncPersonal() {
         let focus = currentFocus()
@@ -125,7 +155,9 @@ final class TrainViewModel: ObservableObject {
             return sa == sb ? a.createdAt < b.createdAt : sa > sb
         }
         state.totalTrips = data.trips.count; state.focus = focus
-        state.focusComplete = focus.map { f in data.rides.contains { $0.tripId == f.tripId && $0.reverse == f.reverse && $0.departure == f.journey.departure } } ?? false
+        state.focusComplete = state.arrival?.state == .arrived
+            || focus.map { f in data.rides.contains { $0.tripId == f.tripId && $0.reverse == f.reverse && $0.departure == f.journey.departure } } ?? false
+        if data.focus == nil { state.arrival = nil }
         state.appearance = data.appearance; state.enabledModes = data.modes; state.useLocation = data.useLocation
         state.transferLimit = data.transferLimit; state.flags = data.flags
         state.automaticHome = automaticHome(data: data); state.home = data.home ?? state.automaticHome; state.homeIsManual = data.home != nil
@@ -139,7 +171,16 @@ final class TrainViewModel: ObservableObject {
         let arguments = ProcessInfo.processInfo.arguments
         if seeded && !arguments.contains("--tracker-case") && !arguments.contains("--tracker-debug") { return }
         #endif
+        if !active, storedFocus != nil, state.arrival == nil {
+            #if DEBUG
+            if !seeded { return }
+            #else
+            return
+            #endif
+        }
         let now = state.now
+        let arrivalState = state.arrival?.state
+        let arrivalMoving = state.arrival?.moving ?? false
         let complete = storedFocus.map { focus in
             data.rides.contains { $0.tripId == focus.tripId && $0.reverse == focus.reverse && $0.departure == focus.journey.departure }
         } ?? false
@@ -167,6 +208,8 @@ final class TrainViewModel: ObservableObject {
                 visibleFocus: visibleFocus,
                 now: now,
                 recordedComplete: complete,
+                arrivalState: arrivalState,
+                arrivalMoving: arrivalMoving,
                 debugStaticCountdown: debugCountdown
             )
             #if DEBUG
@@ -185,7 +228,7 @@ final class TrainViewModel: ObservableObject {
         let changed = state.selectedTripId != selected?.tripId || state.reverse != (selected?.reverse ?? false)
         state.selectedTripId = selected?.tripId; state.reverse = selected?.reverse ?? false; state.receipt = selected?.receipt
         state.selectionPredicted = focus == nil && selected != nil
-        if changed { state.board = nil }
+        if changed { state.board = nil; state.recommendation = nil }
     }
     private func ends(id: String? = nil, reverse: Bool? = nil) -> (Station, Station)? {
         guard let trip = data.trips.first(where: { $0.id == (id ?? state.selectedTripId) }) else { return nil }
@@ -200,14 +243,19 @@ final class TrainViewModel: ObservableObject {
         guard loop == nil else { return }
         state.justAddedTripId = nil
         state.now = epochNow(); location.refreshPermission()
-        if state.ready { choosePrediction(); syncPersonal(); refresh(); refreshSharedData(refreshBoard: false); refreshFlags(); silentLocation() }
+        if state.ready {
+            focusRefreshPending = canNetwork && data.focus != nil
+            beginArrivalMonitoring()
+            choosePrediction(); syncPersonal(); refresh(); refreshSharedData(refreshBoard: false); refreshFlags(); silentLocation()
+        }
         loop = Task { [weak self] in
             var ticks = 0
             while !Task.isCancelled {
                 do { try await Task.sleep(for: .seconds(1)) } catch { return }
                 guard let self else { return }
                 self.state.now = epochNow(); ticks += 1
-                self.settleFocus(judgeClock: self.data.focus?.board.isLive(self.state.now) == true)
+                if self.data.focus != nil, self.arrivalWindow == nil { self.beginArrivalMonitoring() }
+                self.settleFocus()
                 if ticks % 30 == 0, self.state.ready {
                     self.refreshFlags()
                     if !self.refreshSharedData(), self.realtimeTask == nil { self.refresh() }
@@ -217,14 +265,20 @@ final class TrainViewModel: ObservableObject {
     }
     func pause() {
         active = false; loop?.cancel(); loop = nil
-        boardTask?.cancel(); focusTask?.cancel(); historyTask?.cancel(); earlierTask?.cancel(); earlierTask = nil
+        boardTask?.cancel(); supplementTask?.cancel(); supplementTask = nil; focusTask?.cancel(); historyTask?.cancel(); earlierTask?.cancel(); earlierTask = nil
         realtimeTask?.cancel(); realtimeTask = nil
+        clearArrivalMonitoring()
         generation += 1; sharedGeneration += 1; state.refreshing = false; state.distanceMetres = nil
         state.earlierLoading = false
         state.nearestStation = nil; fix = nil; location.stop()
     }
     private func silentLocation() {
-        guard data.useLocation, active, state.screen == .home || state.screen == .setup else { return }
+        guard data.useLocation, active else { return }
+        if data.focus != nil {
+            beginArrivalMonitoring()
+            return
+        }
+        guard state.screen == .home || state.screen == .setup else { return }
         // A user-requested lookup may have reached Settings before iOS could ask permission.
         let resumePermission = setupLocationRequested && !state.locationGranted && !state.locationDenied
         if setupLocationRequested && (state.locationGranted || resumePermission) { state.setupLocationStatus = .locating }
@@ -243,10 +297,13 @@ final class TrainViewModel: ObservableObject {
         #endif
         guard state.ready, active else { return }
         earlierTask?.cancel(); earlierTask = nil; state.earlierLoading = false
-        boardTask?.cancel(); generation += 1
+        boardTask?.cancel(); supplementTask?.cancel(); supplementTask = nil; generation += 1
         let request = generation; let modes = data.modes; let now = state.now
         let transferLimit = data.requestTransferLimit; let bound = data.offlineTransferBound
-        guard let pair = ends(), !modes.isEmpty else { state.board = nil; state.refreshing = false; syncPersonal(); refreshFocus(); return }
+        guard let pair = ends(), !modes.isEmpty else {
+            state.board = nil; state.recommendation = nil; state.refreshing = false
+            syncPersonal(); refreshFocus(); return
+        }
         let id = state.selectedTripId; let reverse = state.reverse
         let recordLastAnswer = !suppressNextLastAnswer
         suppressNextLastAnswer = false
@@ -258,41 +315,234 @@ final class TrainViewModel: ObservableObject {
                 board.from.id == pair.0.id && board.to.id == pair.1.id ? board : nil
             } ?? cached
             if state.board == nil, let cached { publish(retainedOfflineBoard(cached), request: request) }
-            var local: BoardData?; var online: BoardData?
-            await withTaskGroup(of: (Bool, BoardData?).self) { group in
+            var localPlan: OfflinePlanResult?
+            var onlinePage: TransitAPI.DeparturePage?
+            await withTaskGroup(of: BoardFetch.self) { group in
                 let planner = self.planner, api = self.api, bootstrap = self.bootstrap, network = self.canNetwork
-                group.addTask { do { try await bootstrap?.value; return (false, try await planner.plan(from: pair.0, to: pair.1, at: now - 900_000, modes: modes, limit: 24, maxTransfers: bound)) } catch { return (false, nil) } }
-                if network { group.addTask { (true, try? await api.departures(from: pair.0, to: pair.1, modes: modes, transferLimit: transferLimit)) } }
-                for await (isOnline, result) in group {
+                group.addTask {
+                    do {
+                        try await bootstrap?.value
+                        return .local(try await planner.planResult(
+                            from: pair.0, to: pair.1, at: now - 900_000,
+                            modes: modes, limit: 24, maxTransfers: bound, recommendationAt: now
+                        ))
+                    } catch { return .local(nil) }
+                }
+                if network {
+                    group.addTask {
+                        .online(try? await api.departurePage(
+                            from: pair.0, to: pair.1, modes: modes, transferLimit: transferLimit
+                        ))
+                    }
+                }
+                for await fetch in group {
                     guard request == generation, !Task.isCancelled else { group.cancelAll(); return }
-                    if isOnline { online = result } else { local = result }
-                    if result != nil,
-                       let merged = mergeBoardResults(previous: previous, local: local, online: online, now: now) {
+                    switch fetch {
+                    case let .local(value):
+                        if var value {
+                            value.board.requestMaxTransfers = transferLimit
+                            value.recommendation?.board.requestMaxTransfers = transferLimit
+                            localPlan = value
+                        }
+                    case let .online(value):
+                        onlinePage = value
+                        let completedAt = epochNow()
+                        if let value, state.screen == .home, data.focus == nil,
+                           shouldPageRecommendations(from: pair.0, to: pair.1, modes: modes, maxTransfers: transferLimit, now: completedAt) {
+                            let task = Task {
+                                var page = value
+                                page.board = await self.supplementRecommendations(
+                                    value.board, pair: pair, modes: modes, maxTransfers: transferLimit,
+                                    local: nil, request: request, completedAt: completedAt
+                                )
+                                return page
+                            }
+                            supplementTask = task
+                            group.addTask { .supplement(await task.value) }
+                        }
+                    case let .supplement(value):
+                        onlinePage = value
+                    }
+                    if let merged = mergeBoardResults(
+                        previous: previous,
+                        local: localPlan?.board,
+                        online: onlinePage?.board,
+                        now: now
+                    ) {
+                        updateRecommendation(
+                            merged,
+                            local: onlinePage == nil ? localPlan?.recommendation : nil,
+                            modes: modes,
+                            maxTransfers: transferLimit
+                        )
                         publish(merged, request: request)
                     }
                 }
             }
             guard request == generation, !Task.isCancelled else { return }
-            let result = mergeBoardResults(previous: previous, local: local, online: online, now: now)
+            let online = onlinePage?.board
+            let local = localPlan?.board
+            var result = mergeBoardResults(previous: previous, local: local, online: online, now: now)
                 ?? BoardData(from: pair.0, to: pair.1, journeys: [], generatedAt: 0, offline: true, error: "No timetable available for this trip")
+            let chosen = updateRecommendation(
+                result,
+                local: online == nil ? localPlan?.recommendation : nil,
+                modes: modes,
+                maxTransfers: transferLimit
+            )
+            result.recommendation = chosen.map {
+                recommendationPage(for: $0, in: result, firstBody: onlinePage?.body ?? Data())
+            }
             publish(result, request: request); state.refreshing = false
-            try? await store.cache(state.board ?? result, modes: modes)
+            try? await store.cache(result, modes: modes)
             guard request == generation, !Task.isCancelled else { return }
             resolveRedirect(result)
-            let liveEvidence = [online, local].compactMap { $0 }.first { $0.isLive(now) }
-            if let lead = result.journeys.first(where: { journeyAllowed($0, modes: modes) && !$0.cancelled && $0.effectiveDeparture >= now }), let id {
-                if let index = data.trips.firstIndex(where: { $0.id == id }) { data.trips[index].lines = orderedLineCodes(lead) }
-                let freshlyObserved = liveEvidence?.journeys.contains { $0.key == lead.key && $0.retained != true } == true
+            if let recommendation = state.recommendation, let id {
+                let lead = recommendation.journey
+                let freshlyObserved = recommendationIsFresh(recommendation, now: now, maxTransfers: transferLimit)
                 if recordLastAnswer, data.focus == nil, state.screen == .home, lead.retained != true, freshlyObserved {
                     let here = stationHere(data: data, stations: state.stations, fix: fix, now: now)
                     let stationId = here.flatMap { station in fix.map { distanceMetres($0, station) <= 200 ? station.id : nil } ?? nil }
-                    data.lastAnswer = LastAnswer(tripId: id, reverse: reverse, at: now, stationId: stationId, board: result, journey: lead)
+                    data.lastAnswer = LastAnswer(
+                        tripId: id,
+                        reverse: reverse,
+                        at: now,
+                        stationId: stationId,
+                        board: recommendation.board,
+                        journey: lead
+                    )
                 }
                 persist(); syncPersonal()
             }
         }
         refreshFocus()
     }
+
+    @discardableResult
+    private func updateRecommendation(
+        _ board: BoardData,
+        local: JourneyRecommendation?,
+        modes: Set<String>,
+        maxTransfers: Int?
+    ) -> JourneyRecommendation? {
+        var candidates = recommendationCandidates(board)
+        if let local { candidates.append(local) }
+        let fresh = selectRecommendation(
+            candidates.filter { recommendationIsFresh($0, now: state.now, maxTransfers: maxTransfers) },
+            now: state.now,
+            modes: modes,
+            maxTransfers: maxTransfers
+        )
+        let retained = board.recommendation.flatMap { page in
+            page.journeys.first.map {
+                JourneyRecommendation(journey: $0, board: page.board(from: board.from, to: board.to))
+            }
+        }.flatMap { value in
+            value.journey.retained == true
+                ? selectRecommendation([value], now: state.now, modes: modes, maxTransfers: maxTransfers)
+                : nil
+        }
+        let selected = fresh ?? retained ?? selectRecommendation(
+            candidates, now: state.now, modes: modes, maxTransfers: maxTransfers
+        )
+        state.recommendation = selected
+        return selected
+    }
+
+    private func recommendationPage(
+        for recommendation: JourneyRecommendation,
+        in board: BoardData,
+        firstBody: Data
+    ) -> RecommendationPage {
+        let matchingPage = board.recommendationPages?.first {
+            $0.generatedAt == recommendation.board.generatedAt
+                && $0.journeys.contains { $0.key == recommendation.journey.key }
+        }
+        let body = matchingPage?.rawBody
+            ?? (recommendation.board.generatedAt == board.generatedAt ? firstBody : Data())
+        return RecommendationPage(
+            at: matchingPage?.at ?? state.now,
+            rawBody: body,
+            board: recommendation.board,
+            maxTransfers: recommendation.board.requestMaxTransfers
+        )
+    }
+
+    private func recommendationPagingKey(
+        from: Station,
+        to: Station,
+        modes: Set<String>,
+        maxTransfers: Int?
+    ) -> String {
+        "\(from.id)|\(to.id)|\(modes.sorted().joined(separator: ","))|\(maxTransfers.map(String.init) ?? "null")"
+    }
+
+    private func shouldPageRecommendations(
+        from: Station,
+        to: Station,
+        modes: Set<String>,
+        maxTransfers: Int?,
+        now: Millis
+    ) -> Bool {
+        let key = recommendationPagingKey(from: from, to: to, modes: modes, maxTransfers: maxTransfers)
+        guard now - (recommendationPagingAt[key] ?? -.infinity) >= 60_000 else { return false }
+        recommendationPagingAt[key] = now
+        return true
+    }
+
+    private func supplementRecommendations(
+        _ first: BoardData,
+        pair: (Station, Station),
+        modes: Set<String>,
+        maxTransfers: Int?,
+        local: JourneyRecommendation?,
+        request: Int,
+        completedAt: Millis
+    ) async -> BoardData {
+        var result = first
+        result.recommendationPages = []
+        var current = first
+        var previousAt = state.now
+        var identities = Set(first.journeys.map(\.key))
+        let deadline = completedAt + 12_000
+        for _ in 0..<2 {
+            var candidates = recommendationCandidates(result)
+            if let local { candidates.append(local) }
+            let best = selectRecommendation(candidates, now: state.now, modes: modes, maxTransfers: maxTransfers)?.journey
+            guard let cursor = nextRecommendationCursor(
+                page: current,
+                previousAt: previousAt,
+                now: state.now,
+                best: best
+            ) else { break }
+            let remaining = deadline - epochNow()
+            guard remaining > 0, request == generation, !Task.isCancelled,
+                  state.screen == .home, data.focus == nil else { break }
+            guard let page = try? await api.departurePage(
+                from: pair.0,
+                to: pair.1,
+                modes: modes,
+                at: cursor,
+                transferLimit: maxTransfers,
+                timeout: max(0.1, remaining / 1_000)
+            ) else { break }
+            guard request == generation, !Task.isCancelled, state.screen == .home, data.focus == nil,
+                  epochNow() <= deadline, !page.board.journeys.isEmpty else { break }
+            let newIdentities = page.board.journeys.map(\.key).filter { identities.insert($0).inserted }
+            guard !newIdentities.isEmpty else { break }
+            result.recommendationPages?.append(RecommendationPage(
+                at: cursor,
+                rawBody: page.body,
+                board: page.board,
+                maxTransfers: maxTransfers
+            ))
+            current = page.board
+            previousAt = cursor
+            updateRecommendation(result, local: local, modes: modes, maxTransfers: maxTransfers)
+        }
+        return result
+    }
+
     private func merge(_ older: [Journey], _ newer: [Journey]) -> [Journey] {
         var values = Dictionary(older.map { ($0.key, $0) }, uniquingKeysWith: { _, last in last })
         newer.forEach { values[$0.key] = $0 }
@@ -300,12 +550,22 @@ final class TrainViewModel: ObservableObject {
     }
     private func publish(_ board: BoardData?, request: Int) {
         guard request == generation else { return }
-        var remembered = board
-        if let board { remembered?.homeJourneyKey = nextHomeJourney(board, now: state.now)?.key }
+        // Publish route colours with the first cached/local board, without waiting for the network.
+        if let board, let lead = state.recommendation?.journey ?? nextHomeJourney(board, now: state.now),
+           let index = data.trips.firstIndex(where: { $0.id == state.selectedTripId }) {
+            let lines = orderedLineCodes(lead)
+            if data.trips[index].lines != lines {
+                data.trips[index].lines = lines
+                persist()
+            }
+        }
+        var remembered = board.map { data.withinTransferLimit($0) }
+        if let board { remembered?.homeJourneyKey = state.recommendation?.journey.key ?? nextHomeJourney(board, now: state.now)?.key }
         state.board = remembered
         if let detail = state.detail {
-            if let new = remembered?.journeys.first(where: { $0.key == detail.key }) {
-                state.detail = new
+            if let source = remembered.flatMap({ recommendationCandidates($0).first { $0.journey.key == detail.key } }) {
+                state.detail = source.journey
+                if state.screen == .detail { state.board = source.board }
             } else {
                 var retained = detail
                 retained.retained = true
@@ -334,13 +594,18 @@ final class TrainViewModel: ObservableObject {
             guard !Task.isCancelled, active, sharedRequest == sharedGeneration else { return }
             if let focus = data.focus, focus.journey.legs.allSatisfy({ $0.identity != nil }) {
                 let update = await planner.refreshFocused(focus.journey)
+                guard !Task.isCancelled, sharedRequest == sharedGeneration, active else { return }
+                if sameFocus(focus), let subject = data.focus {
+                    data.focus = focusAfterRefresh(subject, update: update, alternatives: nil)
+                    settleFocus(matchingRefresh: update.live); persist(); syncPersonal()
+                }
                 let alternatives = try? await planner.plan(from: focus.board.from, to: focus.board.to, at: state.now - 900_000, modes: allModes, limit: 24, maxTransfers: data.offlineTransferBound)
                 guard !Task.isCancelled, sharedRequest == sharedGeneration, active else { return }
                 if sameFocus(focus) {
                     if let subject = data.focus {
                         data.focus = focusAfterRefresh(subject, update: update, alternatives: alternatives)
                     }
-                    settleFocus(judgeClock: update.canJudgeClock); persist(); syncPersonal()
+                    settleFocus(matchingRefresh: update.live); persist(); syncPersonal()
                 }
             }
             guard fetched, state.now - lastTimetableCheck >= 21_600_000 else { return }
@@ -358,39 +623,133 @@ final class TrainViewModel: ObservableObject {
         // A phone that cannot ask has no refresh to wait for.
         guard canNetwork else { settleFocus(); return }
         focusTask?.cancel()
+        focusRefreshGeneration += 1
+        let refreshRequest = focusRefreshGeneration
+        focusRefreshPending = true
         focusTask = Task {
+            defer {
+                if refreshRequest == focusRefreshGeneration { focusRefreshPending = false }
+            }
             guard let pair = ends(id: focus.tripId, reverse: focus.reverse) else { return }
             let at = focus.journey.departure < state.now ? max(state.now - 86_400_000, focus.journey.departure) : nil
             let result = try? await api.departures(from: pair.0, to: pair.1, modes: allModes, at: at)
             guard !Task.isCancelled, sameFocus(focus) else { return }
+            guard var current = data.focus else { return }
+            var matched = false
             if let result, let match = result.journeys.first(where: { $0.key == focus.journey.key }) {
-                var updated = focus; updated.board = result; updated.alternatives = nil; updated.journey = match; data.focus = updated
-            } else if let demoted = focus.demotedForUnmatchedBoard() { data.focus = demoted }
-            settleFocus(); persist(); syncPersonal()
+                matched = true
+                current.board = result; current.alternatives = nil; current.journey = match; data.focus = current
+            } else if let demoted = current.demotedForUnmatchedBoard() { data.focus = demoted }
+            settleFocus(matchingRefresh: matched); persist(); syncPersonal()
         }
     }
-    private func settleFocus(judgeClock: Bool = true) {
+    private func settleFocus(
+        sample: ArrivalSample? = nil,
+        monitoring: Bool? = nil,
+        matchingRefresh: Bool = false
+    ) {
         guard var focus = data.focus else { return }
         var changed = false
         if !focus.board.isLive(state.now), focus.journey.retained != true, focus.journey.realtime || focus.journey.cancelled {
             focus = focus.lastKnown(); data.focus = focus; changed = true
         }
-        if !focus.journey.cancelled {
-            settleRide(focus, arrived: (judgeClock && state.now >= focus.journey.effectiveArrival) || arrivedByFix(focus))
+        let legacyCompleted = data.rides.contains {
+            $0.tripId == focus.tripId && $0.reverse == focus.reverse && $0.departure == focus.journey.departure
         }
-        if state.now > focus.journey.effectiveArrival + 1_800_000 { data.focus = nil; changed = true }
+        let result = reduceArrival(ArrivalInput(
+            identity: arrivalIdentity(focus),
+            departureMs: focus.journey.effectiveDeparture,
+            arrivalMs: focus.journey.effectiveArrival,
+            nowMs: state.now,
+            destination: ends(id: focus.tripId, reverse: focus.reverse)?.1,
+            guard: focus.arrivalGuard,
+            window: arrivalWindow,
+            sample: sample,
+            monitoring: monitoring ?? location.isMonitoring,
+            permissionPending: arrivalPermissionPending
+                || (focusRefreshPending && !matchingRefresh && focus.arrivalGuard?.armed != true),
+            legacyCompleted: legacyCompleted,
+            cancelled: focus.journey.cancelled,
+            matchingRefresh: matchingRefresh,
+            resumeWaitUntilMs: arrivalResumeWaitUntil
+        ))
+        arrivalWindow = result.window
+        state.arrival = result
+        if focus.arrivalGuard != result.guard {
+            focus.arrivalGuard = result.guard
+            data.focus = focus
+            changed = true
+        }
+        let rides = switch result.action {
+        case .record, .correct: settledRides(data.rides, focus: focus, arrived: true, ends: ends(id: focus.tripId, reverse: focus.reverse))
+        case .withdraw: settledRides(data.rides, focus: focus, arrived: false, ends: ends(id: focus.tripId, reverse: focus.reverse))
+        case .none, .expire: data.rides
+        }
+        if rides != data.rides { data.rides = rides; changed = true }
+        if result.action == .expire {
+            data.focus = nil
+            if data.lastAnswer?.tripId == focus.tripId, data.lastAnswer?.reverse == focus.reverse {
+                data.lastAnswer = nil
+            }
+            clearArrivalMonitoring()
+            changed = true
+        }
+        if result.state == .arrived { clearArrivalMonitoring() }
         if changed { persist() }
         syncPersonal()
     }
-    private func arrivedByFix(_ focus: FocusedJourney) -> Bool {
-        // A refreshed journey carries no coordinates, so the destination comes from the saved trip.
-        guard let fix, let to = ends(id: focus.tripId, reverse: focus.reverse)?.1 else { return false }
-        return state.now >= focus.journey.effectiveArrival - 300_000 && distanceMetres(fix, to) <= 200
+
+    private func arrivalIdentity(_ focus: FocusedJourney) -> String {
+        "\(focus.tripId)|\(focus.reverse)|\(focus.journey.key)"
     }
-    private func settleRide(_ focus: FocusedJourney, arrived: Bool) {
-        let rides = settledRides(data.rides, focus: focus, arrived: arrived, ends: ends(id: focus.tripId, reverse: focus.reverse))
-        guard rides != data.rides else { return }
-        data.rides = rides; persist()
+
+    private func beginArrivalMonitoring() {
+        guard active, data.useLocation, let focus = data.focus else {
+            settleFocus()
+            return
+        }
+        guard state.now >= focus.journey.effectiveDeparture,
+              focus.arrivalGuard?.basis != .location,
+              !data.rides.contains(where: {
+                  $0.tripId == focus.tripId && $0.reverse == focus.reverse && $0.departure == focus.journey.departure
+              }) else { settleFocus(); return }
+        let identity = arrivalIdentity(focus)
+        if (arrivalTask != nil || location.isMonitoring), arrivalWindow?.identity == identity { return }
+        clearArrivalMonitoring()
+        arrivalGeneration += 1
+        let request = arrivalGeneration
+        arrivalWindow = ArrivalWindow(identity: identity, samples: [])
+        arrivalResumeWaitUntil = state.now + 15_000
+        arrivalPermissionPending = true
+        settleFocus()
+        arrivalTask = Task { [weak self] in
+            guard let self else { return }
+            let permitted = await self.location.monitoringPermitted()
+            guard request == self.arrivalGeneration,
+                  self.active,
+                  self.data.useLocation,
+                  self.data.focus.map({ self.arrivalIdentity($0) }) == identity else { return }
+            self.arrivalPermissionPending = false
+            if permitted {
+                self.settleFocus(monitoring: true)
+                guard request == self.arrivalGeneration,
+                      self.data.focus.map({ self.arrivalIdentity($0) }) == identity else { return }
+                if !self.location.startMonitoring() { self.settleFocus(monitoring: false) }
+            } else {
+                self.arrivalResumeWaitUntil = nil
+                self.settleFocus(monitoring: false)
+            }
+            if request == self.arrivalGeneration { self.arrivalTask = nil }
+        }
+    }
+
+    private func clearArrivalMonitoring() {
+        arrivalGeneration += 1
+        arrivalTask?.cancel(); arrivalTask = nil
+        arrivalWindow = nil
+        arrivalPermissionPending = false
+        arrivalResumeWaitUntil = nil
+        location.stop()
     }
     func receiveLocation(_ value: Fix) {
         #if DEBUG
@@ -399,7 +758,7 @@ final class TrainViewModel: ObservableObject {
         let current = epochNow()
         #endif
         state.now = current
-        guard data.useLocation, active, state.screen == .home || state.screen == .setup else { return }
+        guard data.useLocation, active else { return }
         guard (0...300_000).contains(current - value.at) else { locationFailed(.unavailable); return }
         fix = value
         let here = stationHere(data: data, stations: state.stations, fix: value, now: current)
@@ -420,8 +779,20 @@ final class TrainViewModel: ObservableObject {
             let day = format.string(from: Date(timeIntervalSince1970: current / 1000))
             if !data.votes.contains(where: { $0.day == day }) { data.votes.append(HomeVote(day: day, station: here)); data.votes = Array(data.votes.suffix(7)); persist() }
         }
-        if let inferred = inferredFocus(data: data, fix: value, now: current) { data.focus = inferred; persist() }
-        if let focus = data.focus, arrivedByFix(focus) { settleRide(focus, arrived: true) }
+        if data.focus != nil {
+            settleFocus(sample: ArrivalSample(
+                lat: value.lat,
+                lon: value.lon,
+                at: value.at,
+                accuracy: value.accuracyMetres ?? 0,
+                speed: value.speed
+            ))
+        }
+        if let inferred = inferredFocus(data: data, fix: value, now: current) {
+            data.focus = inferred
+            persist()
+            beginArrivalMonitoring()
+        }
         if !explicit, data.focus == nil, let here, let home = data.home ?? automaticHome(data: data), here.id != home.id,
            !data.trips.contains(where: { compatible($0, modes: data.modes) && ($0.from.id == here.id || $0.to.id == here.id) }), !home.modes.isDisjoint(with: data.modes) {
             let trip = SavedTrip(id: UUID().uuidString, from: here, to: home, createdAt: current)
@@ -452,7 +823,7 @@ final class TrainViewModel: ObservableObject {
         guard let trip = data.trips.first(where: { $0.id == id }), compatible(trip, modes: data.modes) else { return }
         explicit = true
         let direction = id == state.selectedTripId && !reverse ? state.reverse : reverse
-        if id != state.selectedTripId || state.reverse != direction { state.board = nil }
+        if id != state.selectedTripId || state.reverse != direction { state.board = nil; state.recommendation = nil }
         state.selectedTripId = id; state.reverse = direction; state.screen = .board; state.detail = nil; state.receipt = nil
         state.selectionPredicted = false
         syncPersonal(); historyRecorded = false; scheduleHistory(); refresh()
@@ -469,13 +840,20 @@ final class TrainViewModel: ObservableObject {
         historyRecorded = true; persist()
     }
     func openJourney(_ journey: Journey) {
+        guard data.withinTransferLimit(journey), journeyAllowed(journey, modes: data.modes) else { return }
         if state.screen == .home {
-            state.board = state.homeBoard ?? state.board
+            let source = state.homeBoard.flatMap { board in
+                recommendationCandidates(board).first { $0.journey.key == journey.key }?.board
+            }
+            state.board = state.recommendation?.journey.key == journey.key
+                ? state.recommendation?.board
+                : source ?? state.homeBoard ?? state.board
             if let focus = currentFocus() {
                 if journey.key != focus.journey.key, let alternatives = focus.alternatives, alternatives.journeys.contains(where: { $0.key == journey.key }) { state.board = alternatives }
                 state.selectedTripId = focus.tripId; state.reverse = focus.reverse
             }
         }
+        supplementTask?.cancel(); supplementTask = nil
         recordHistory(); state.screen = .detail; state.detail = journey
     }
     func openTracker(_ url: URL) {
@@ -498,26 +876,30 @@ final class TrainViewModel: ObservableObject {
         }
     }
     func pinJourney(_ journey: Journey) {
-        guard !journey.cancelled, let id = state.selectedTripId, var board = state.board, let pair = ends(), board.from.id == pair.0.id, board.to.id == pair.1.id else { return }
+        guard !journey.cancelled, data.withinTransferLimit(journey), journeyAllowed(journey, modes: data.modes), let id = state.selectedTripId, var board = state.board, let pair = ends(), board.from.id == pair.0.id, board.to.id == pair.1.id else { return }
         board.journeys = merge(board.journeys, [journey])
         var focus = FocusedJourney(tripId: id, reverse: state.reverse, journey: journey, board: board)
         if !board.isLive(state.now), journey.realtime || journey.cancelled { focus = focus.lastKnown() }
+        clearArrivalMonitoring(); state.arrival = nil
         data.focus = focus; data.lastAnswer = nil; persist()
-        state.screen = .home; state.detail = nil; historyRecorded = false; syncPersonal(); refresh()
+        state.screen = .home; state.detail = nil; historyRecorded = false; syncPersonal(); beginArrivalMonitoring(); refresh()
     }
     func unpinJourney() {
         guard let focus = data.focus, focus.pinned else { return }
+        clearArrivalMonitoring()
         data.focus = nil; data.lastAnswer = nil; persist(); state.selectedTripId = focus.tripId; state.reverse = focus.reverse
         explicit = true; state.screen = .home; state.detail = nil; syncPersonal(); refresh()
     }
     func showReturn() {
         guard let focus = data.focus else { return }
+        clearArrivalMonitoring()
         data.focus = nil; data.lastAnswer = nil; persist(); explicit = true; historyRecorded = false
         state.selectedTripId = focus.tripId; state.reverse = !focus.reverse; state.screen = .home; state.board = nil; state.homeBoard = nil
         state.receipt = "You rode out at \(clockTime(focus.journey.effectiveDeparture)). Here’s the way back."
         syncPersonal(); refresh()
     }
     func newTrip() {
+        supplementTask?.cancel(); supplementTask = nil
         cancelSetupLocation(); setupLocationResolved = false
         redirect = currentFocus().flatMap { $0.pinned ? nil : $0 }
         redirectTargetId = nil
@@ -561,8 +943,9 @@ final class TrainViewModel: ObservableObject {
         guard let old = redirect, let id = state.selectedTripId, id == redirectTargetId else { return }
         redirect = nil; redirectTargetId = nil
         if let match = redirectMatch(for: old.journey, in: board.journeys) {
+            clearArrivalMonitoring(); state.arrival = nil
             data.focus = FocusedJourney(tripId: id, reverse: state.reverse, journey: match, board: board, pinned: false)
-            state.screen = .home; persist(); syncPersonal()
+            state.screen = .home; persist(); syncPersonal(); beginArrivalMonitoring()
         }
     }
     private func removeTrip(_ id: String) {
@@ -578,6 +961,7 @@ final class TrainViewModel: ObservableObject {
     }
     func deleteTrip(id: String) {
         guard let (remaining, pending) = data.beginningDeletion(of: id) else { return }
+        if data.focus?.tripId == id { clearArrivalMonitoring() }
         undoTask?.cancel(); expireDeletion()
         data = remaining; pendingDeletion = pending; persist()
         if state.selectedTripId == id { explicit = false; state.board = nil }
@@ -607,7 +991,7 @@ final class TrainViewModel: ObservableObject {
     private func show(_ message: String?, autoDismiss: Bool = false) {
         state.message = message; state.messageAutoDismiss = message != nil && autoDismiss; state.undoAvailable = false
     }
-    func openSettings() { settingsBack = state.screen; state.screen = .settings; state.feedbackSucceeded = false }
+    func openSettings() { supplementTask?.cancel(); supplementTask = nil; settingsBack = state.screen; state.screen = .settings; state.feedbackSucceeded = false }
     func setAppearance(_ value: Appearance) { data.appearance = value; persist(); syncPersonal() }
     func setMode(mode: String, enabled: Bool) {
         guard allModes.contains(mode) else { return }
@@ -621,7 +1005,10 @@ final class TrainViewModel: ObservableObject {
     }
     private func applyPreferenceChange() {
         suppressNextLastAnswer = true
-        persist(); state.board = nil; state.homeBoard = nil; choosePrediction(); syncPersonal(); refresh()
+        clearArrivalMonitoring()
+        persist(); state.board = nil; state.homeBoard = nil; state.recommendation = nil
+        beginArrivalMonitoring()
+        choosePrediction(); syncPersonal(); refresh()
     }
     private func refreshFlags() {
         guard canNetwork else { return }
@@ -629,14 +1016,22 @@ final class TrainViewModel: ObservableObject {
             let flags = try? await api.flags()
             state.tinyTrain = flags?[tinyTrainFlagKey] == true
             guard let flags, flags != data.flags else { return }
-            let wasCapped = data.capped
+            let previousRequestLimit = data.requestTransferLimit
+            let previousOfflineBound = data.offlineTransferBound
             data.flags = flags
-            if data.capped == wasCapped { persist(); syncPersonal() } else { applyPreferenceChange() }
+            if data.requestTransferLimit == previousRequestLimit && data.offlineTransferBound == previousOfflineBound {
+                persist(); syncPersonal()
+            } else {
+                applyPreferenceChange()
+            }
         }
     }
     func setUseLocation(_ enabled: Bool) {
         data.useLocation = enabled
-        if !enabled { cancelSetupLocation(); fix = nil; state.distanceMetres = nil; state.nearestStation = nil; location.stop() }
+        if !enabled {
+            cancelSetupLocation(); clearArrivalMonitoring()
+            fix = nil; state.distanceMetres = nil; state.nearestStation = nil
+        }
         persist(); syncPersonal()
         if enabled { requestLocation() } else { choosePrediction(); refresh() }
     }
@@ -658,6 +1053,7 @@ final class TrainViewModel: ObservableObject {
         #if DEBUG
         if seeded { return }
         #endif
+        if data.focus != nil { beginArrivalMonitoring(); return }
         location.request(prompt: true)
     }
     func locationFailed(_ status: SetupLocationStatus) {
@@ -735,7 +1131,7 @@ func settledRides(_ rides: [Ride], focus: FocusedJourney, arrived: Bool, ends: (
         return Array((rides + [Ride(tripId: focus.tripId, reverse: focus.reverse, departure: focus.journey.departure, arrival: arrival,
                                     from: ends?.0 ?? focus.journey.legs.first?.from, to: ends?.1 ?? focus.journey.legs.last?.to)]).suffix(100))
     }
-    guard arrival != rides[index].arrival else { return rides }
+    guard !arrived || arrival != rides[index].arrival else { return rides }
     var settled = rides
     if arrived { settled[index].arrival = arrival } else { settled.remove(at: index) }
     return settled
@@ -757,6 +1153,10 @@ private extension TrainViewModel {
     func publishTrackerDebugStatus(_ controllerStatus: String) {
         state.trackerDriverStatus = controllerStatus
             + "|focus=\(data.focus?.tripId ?? "none")"
+            + "|arrival=\(state.arrival?.state.rawValue ?? "none")"
+            + "|guard=\(data.focus?.arrivalGuard?.armed == true)"
+            + "|rides=\(data.rides.count)"
+            + "|monitoring=\(location.isMonitoring)"
             + "|screen=\(state.screen.rawValue)"
             + "|selected=\(state.selectedTripId ?? "none")"
             + "|pinned=\(data.focus?.pinned.description ?? "none")"
@@ -769,6 +1169,18 @@ private extension TrainViewModel {
         switch command {
         case "wall-start":
             data = debugTrackerData(id: "wall-clock", now: now, boundarySeconds: 60)
+        case "guarded-overdue":
+            data = debugTrackerData(id: "guarded-overdue", now: now)
+            var journey = data.focus!.journey
+            journey.legs = [journey.legs.last!]
+            journey.legs[0].from = data.trips[0].from
+            journey.legs[0].departure = now - 3_600_000
+            journey.legs[0].estimatedDeparture = nil
+            journey.legs[0].arrival = now - 300_000
+            journey.legs[0].estimatedArrival = nil
+            data.focus!.journey = journey
+            data.focus!.board.journeys = [journey]
+            data.focus!.arrivalGuard = ArrivalGuard(armed: true, retainedAt: now - 600_000)
         case "dismiss-start":
             data = debugTrackerData(id: "dismiss-original", now: now)
         case "permission-start":
@@ -883,6 +1295,7 @@ private extension TrainViewModel {
         state.screen = .home
         state.ready = true
         trackerDebugCountdown = TravelTrackerState.derive(focus: data.focus!, now: now, generation: 1)?.headline.emphasis ?? ""
+        seeded = true
         syncPersonal()
         return true
     }
@@ -905,7 +1318,7 @@ private extension TrainViewModel {
         let name = arguments[index + 1]
         guard let url = Bundle.main.url(forResource: "calibration", withExtension: "json"),
               let bytes = try? Data(contentsOf: url), let catalogue = try? JSONSerialization.jsonObject(with: bytes) as? [String: Any] else { return false }
-        let key = name.contains("ferry") ? "ferry" : name.contains("two-change") ? "threeLeg" : name.contains("detail") || name.contains("active") || name.contains("inferred") || name.contains("pinned") ? "transfer" : "central"
+        let key = name.contains("ferry") ? "ferry" : name.contains("two-change") ? "threeLeg" : name.contains("commute") || name.contains("detail") || name.contains("active") || name.contains("inferred") || name.contains("pinned") ? "transfer" : "central"
         guard let entry = catalogue[key] as? [String: Any], let body = entry["body"] as? [String: Any],
               let bodyData = try? JSONSerialization.data(withJSONObject: body), var board = try? TransitWire.board(bodyData), let now = entry["now"] as? Double else { return false }
         state.now = now
@@ -951,8 +1364,9 @@ private extension TrainViewModel {
         let trip = SavedTrip(id: "calibration-trip", from: board.from, to: board.to, createdAt: now,
                             lines: board.journeys.first.map(orderedLineCodes) ?? [])
         data.trips = [trip]; data.appearance = name.contains("light") ? .light : .dark
-        if name.contains("transfer-limit") { data.flags = [transferLimitFlagKey: true] }
+        if name.contains("transfer-limit") || name.contains("direct-only") { data.flags = [transferLimitFlagKey: true] }
         if name.contains("no-limit") { data.transferLimit = .any }
+        if name.contains("direct-only") { data.transferLimit = .direct }
         if name.contains("unknown-line") { data.trips[0].lines = [] }
         data.lastTripId = trip.id
         if ["settings-off", "settings-off-light"].contains(name) { data.useLocation = false }
@@ -968,12 +1382,29 @@ private extension TrainViewModel {
             }
         }
         state.selectedTripId = trip.id; state.board = board; state.homeBoard = board
+        if name.contains("recommendation-outside-prefix"), let journey = board.journeys.first {
+            state.recommendation = JourneyRecommendation(journey: journey, board: board)
+            state.board?.journeys = Array(board.journeys.dropFirst())
+            state.homeBoard = state.board
+        }
         if name.contains("just-added") {
             state.justAddedTripId = trip.id
             state.selectionPredicted = true
         }
         if name.contains("pinned") || name.contains("active") || name.contains("inferred"), let journey = board.journeys.first {
             data.focus = FocusedJourney(tripId: trip.id, reverse: false, journey: journey, board: board, pinned: !name.contains("inferred"))
+        }
+        if name.contains("commute"), let journey = board.journeys.first {
+            if name.contains("before") { state.now = journey.legs[0].effectiveArrival - 60_000 }
+            else if name.contains("during") { state.now = journey.legs[0].effectiveArrival + 60_000 }
+            else if name.contains("after") { state.now = journey.legs[1].effectiveDeparture + 60_000 }
+            else { state.now = journey.effectiveArrival + 300_000 }
+            let metadata = ArrivalGuard(armed: true, retainedAt: state.now)
+            data.focus = FocusedJourney(tripId: trip.id, reverse: false, journey: journey, board: board, arrivalGuard: metadata)
+            state.arrival = reduceArrival(ArrivalInput(
+                identity: arrivalIdentity(data.focus!), departureMs: journey.effectiveDeparture,
+                arrivalMs: journey.effectiveArrival, nowMs: state.now, guard: metadata
+            ))
         }
         if let stationsURL = Bundle.main.url(forResource: "stations", withExtension: "json"), let raw = try? Data(contentsOf: stationsURL), let stations = try? JSONSerialization.jsonObject(with: raw) as? [[String: Any]] {
             state.stations = stations.compactMap { try? TransitWire.station($0) }

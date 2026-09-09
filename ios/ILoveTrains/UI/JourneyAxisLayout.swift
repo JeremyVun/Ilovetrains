@@ -1,7 +1,8 @@
 import SwiftUI
 
 enum AxisItem: Equatable {
-    case cap, ride(Int), dwell(Int), alight(Int), board(Int), station(Int), progress, tinyTrain
+    case cap, ride(Int), dwell(Int), alight(Int), board(Int), station(Int), travelled
+    case completedAlight(Int), completedBoard(Int), progress, tinyTrain
 }
 
 struct AxisItemKey: LayoutValueKey {
@@ -48,6 +49,15 @@ struct JourneyAxisGeometry {
                 pins.append(i)
             case .station:
                 labels.append(i)
+            case .travelled:
+                boxes[i] = CGRect(
+                    x: capWidth,
+                    y: (chipHeight - barHeight) / 2,
+                    width: axisWidth * min(1, max(0, progress ?? 0)),
+                    height: barHeight
+                )
+            case .completedAlight(_), .completedBoard(_):
+                break
             case .tinyTrain:
                 boxes[i] = CGRect(x: capWidth, y: (chipHeight - barHeight) / 2 - 18, width: axisWidth, height: 44)
             case .progress:
@@ -78,6 +88,16 @@ struct JourneyAxisGeometry {
             for index in indices.reversed() {
                 boxes[index].origin.x = min(boxes[index].minX, edge - boxes[index].width)
                 edge = boxes[index].minX - 3
+            }
+        }
+        for (index, item) in items.enumerated() {
+            switch item {
+            case let .completedAlight(leg):
+                if let source = items.firstIndex(of: .alight(leg)) { boxes[index] = boxes[source] }
+            case let .completedBoard(leg):
+                if let source = items.firstIndex(of: .board(leg)) { boxes[index] = boxes[source] }
+            default:
+                break
             }
         }
         for (index, item) in items.enumerated() {

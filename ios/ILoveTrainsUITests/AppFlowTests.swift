@@ -5,6 +5,22 @@ final class AppFlowTests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     @MainActor
+    func testHomeRecommendationOutsideBoardRowsOpensAndPins() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--calibration", "home-recommendation-outside-prefix"]
+        app.launchEnvironment["ILOVETRAINS_TEST_DOMAIN"] = UUID().uuidString
+        app.launch()
+        let recommendation = app.buttons["open-recommended-journey"]
+        XCTAssertTrue(recommendation.waitForExistence(timeout: 10))
+        recommendation.tap()
+        let pin = app.buttons["pin-this-train"]
+        XCTAssertTrue(pin.waitForExistence(timeout: 5))
+        pin.tap()
+        XCTAssertTrue(app.buttons["unpin-home"].waitForExistence(timeout: 5))
+        app.terminate()
+    }
+
+    @MainActor
     func testLocationPermissionGrantFillsOriginAndFocusesDestination() {
         XCUIDevice.shared.location = XCUILocation(location: CLLocation(coordinate: CLLocationCoordinate2D(latitude: -33.8736, longitude: 151.2069), altitude: 0, horizontalAccuracy: 25, verticalAccuracy: 25, timestamp: Date()))
         defer { XCUIDevice.shared.location = nil }

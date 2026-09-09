@@ -1,0 +1,945 @@
+/* web/app.css, copied verbatim by tools/comps/new-round.js.
+ * git blob 6c1840db8a5c2f1b2bef3bf1c53486fcb9d1d29e — regenerate rather than hand-editing, so a comp
+ * can never drift from the product's own language. */
+
+/* Implements the visual language in docs/contracts/ui.md: a printed timetable
+   page with one column measure, one scale ladder,
+   letterspaced small-caps labels, one heavy rule under the masthead,
+   hairlines below it, and line colour attached to each service. System stack only —
+   no webfont may sit between a cold open and the answer. */
+
+:root {
+  --bg:       #0A0B0D;
+  --ink:      #F4F5F7;                 /* 17.6:1 on --bg */
+  --ink-2:    rgba(244,245,247,0.66);  /* ~8:1   secondary reads */
+  --ink-3:    rgba(244,245,247,0.46);  /* ~4.3:1 labels only */
+  --rule:     rgba(244,245,247,0.10);  /* 1.24:1 hairline */
+  --rule-2:   rgba(244,245,247,0.20);  /* 1.73:1 */
+  --warn:     #FF7A5C;                 /* delay / cancellation. 7.4:1 */
+  --live:     #4ADE80;
+
+  /* TfNSW service colours, as badge accents. The board paints var(--line-XX);
+     web/js/lines.js maps rail codes and the ferry mode to a variable, and
+     web/test/theme.test.js fails if the two lists ever disagree. */
+  --line-T1: #F99D1C; --line-T2: #0098CD; --line-T3: #F37021; --line-T4: #005AA3;
+  --line-T5: #C4258F; --line-T7: #6F818E; --line-T8: #00954C; --line-T9: #D11F2F;
+  --line-M1: #168388;
+  --line-BMT: #F99D1C; --line-CCN: #D11F2F; --line-SCO: #0098CD;
+  --line-SHL: #00954C; --line-HUN: #833134;
+  --line-FERRY: #5AB031;
+
+  /* The second colour role: what a FILLED device is painted, as against the
+     same line used as bare text. Only the light scheme splits them. */
+  --line-fill-T1: var(--line-T1); --line-fill-T2: var(--line-T2);
+  --line-fill-T3: var(--line-T3); --line-fill-T4: var(--line-T4);
+  --line-fill-T5: var(--line-T5); --line-fill-T7: var(--line-T7);
+  --line-fill-T8: var(--line-T8); --line-fill-T9: var(--line-T9);
+  --line-fill-M1: var(--line-M1);
+  --line-fill-BMT: var(--line-BMT); --line-fill-CCN: var(--line-CCN);
+  --line-fill-SCO: var(--line-SCO); --line-fill-SHL: var(--line-SHL);
+  --line-fill-HUN: var(--line-HUN);
+  --line-fill-FERRY: var(--line-FERRY);
+
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* ---- light scheme ------------------------------------------------------- */
+
+/* Not an inversion — a second printing of the same page. The dark palette's
+   CONTRAST STRUCTURE is what carries over, and dark ink on paper does not
+   reach it at the same alphas as light ink on black: ink-2 needs 0.75 here
+   where it needs 0.66 there, ink-3 needs 0.60 against 0.46. Every value below
+   was measured (WCAG relative luminance), not eyeballed; the contrast roles
+   are fixed by docs/contracts/ui.md.
+
+   The ground is warm paper (#FAF9F5), not #FFF: a language made entirely of
+   hairlines and 250-weight numerals glares off pure white, and the exemplar's
+   claim is a printed timetable page, which is never white either. */
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:     #FAF9F5;                 /* warm paper */
+    --ink:    #14120E;                 /* 17.76:1 on --bg */
+    --ink-2:  rgba(20,18,14,0.75);     /* #4E4C48, 8.13:1 */
+    --ink-3:  rgba(20,18,14,0.60);     /* #706E6A, 4.83:1 — labels clear 4.5 */
+    --rule:   rgba(20,18,14,0.11);     /* 1.25:1 — the dark hairline's weight */
+    --rule-2: rgba(20,18,14,0.25);     /* 1.74:1 */
+    --warn:   #BF3418;                 /* 5.36:1. Same hue as #FF7A5C (10° vs
+                                          11°), which is 2.3:1 here and unusable */
+    --live:   #0F7A4A;                 /* 5.11:1 */
+
+    /* Darkened per palette key, hue and saturation held, lightness dropped only
+       until the badge clears 4.5:1 as text. Four lines were already dark enough to
+       print unchanged. Ratios are guarded by web/test/theme.test.js. */
+    --line-T1: #A46204; /* 4.61 */  --line-T2: #0079A3; /* 4.68 */
+    --line-T3: #BD4D0A; /* 4.71 */  --line-T4: #005AA3; /* 6.66, unchanged */
+    --line-T5: #C4258F; /* 4.97, unchanged */
+    --line-T7: #62727E; /* 4.72 */  --line-T8: #008041; /* 4.79 */
+    --line-T9: #D11F2F; /* 5.05, unchanged */
+    --line-M1: #157B7F; /* 4.78 */
+    --line-BMT: #A46204; --line-CCN: #D11F2F; --line-SCO: #0079A3;
+    --line-SHL: #008041; --line-HUN: #833134; /* 8.12, unchanged */
+    --line-FERRY: #428024; /* 4.59 */
+    --line-fill-FERRY: var(--line-FERRY);
+
+    /* Paper on this yellow is 2.02:1, the exception ui.md's visual language
+       accepts: the darkened token above makes T1 look brown and lose its identity. */
+    --line-fill-T1: #F99D1C; --line-fill-BMT: #F99D1C;
+  }
+
+  /* Antialiasing is the one rule that must NOT carry over. `antialiased`
+     stops light-on-dark type fattening; applied to dark-on-light it thins it,
+     and this page is set in 250- and 300-weight. The default smoothing is
+     what makes the light board weigh the same as the dark one. */
+  html, body { -webkit-font-smoothing: auto; }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  /* The DYNAMIC viewport, not the large one. Android and iOS collapse their
+     browser chrome as you scroll, and a frame sized to the tall viewport hangs
+     its last inches below the visible area — a fold that cannot be scrolled to
+     because the frame is the thing that does not scroll (the rows do). `dvh`
+     tracks the area actually on screen; the `100%` above is the fallback for a
+     browser that does not know it, and in an installed PWA the two agree. */
+  height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "ss01" 1;
+}
+
+body { display: flex; flex-direction: column; overflow: hidden; }
+
+/* A single nowrap string (a long line name + headsign) otherwise inflates the
+   flex line's cross size and shoves right-aligned content past the viewport
+   clip — which looks like missing content rather than overflow. */
+body > *, #app > * { width: 100%; min-width: 0; max-width: 100%; }
+
+#app { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+
+/* The board has no labelled scroll affordance by contract, and a desktop
+   scrollbar was the only one on the screen (owner ruling, 2026-09-05). */
+.sy-tl, .hm-ix, .detail-scroll { scrollbar-width: none; }
+.sy-tl::-webkit-scrollbar, .hm-ix::-webkit-scrollbar, .detail-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+input, button { font: inherit; color: inherit; background: none; border: 0; }
+button { cursor: pointer; }
+
+/* One label idiom for the whole system: letterspaced small caps. Nothing is
+   ever sentence-case and small at the same time. */
+.lbl {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+
+/* Freshness: a hairline, never a spinner. */
+.pulse { width: 5px; height: 5px; border-radius: 50%; background: var(--ink-3); flex: none; }
+.pulse.live { background: var(--live); }
+.pulse.stale { background: var(--warn); }
+
+/* ---- journey detail (calibration: assets/comps/latest/detail-*) --------- */
+
+/* The chosen result is promoted intact at the top of detail — the board's own
+   row, rendered by board.js — and the journey under it is steps on the same
+   figure and body ladder, so the two screens read as one system. */
+
+.detail-kicker { margin: 8px 0; }
+.detail-title {
+  margin: 0; font-size: 29px; font-weight: 300; letter-spacing: -.025em; line-height: 1.06;
+}
+.detail-title em { font-style: normal; color: var(--ink-3); font-weight: 200; padding: 0 2px; }
+/* ui.md binds 18px of air between the summary and the heavy rule. */
+.detail-summary {
+  margin: 11px 0 18px; font-size: 14px; font-weight: 300; line-height: 1.5; color: var(--ink-2);
+}
+.detail-summary.warn { color: var(--warn); }
+
+.detail-scroll {
+  flex: 1; min-height: 0; overflow-y: auto;
+  -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+  --sy-fig: 69px;
+}
+.detail-scroll .sy-row { min-height: 100px; }
+.sy-row.distinct-stop, .sy-row.ferry-change { padding-top: 4px; padding-bottom: 5px; }
+.sy-row .sy-p[data-clamped="1"] {
+  border-radius: 3px;
+}
+
+.detail-steps { padding: 0 var(--sy-pad); }
+.dstep {
+  min-height: 72px; display: grid; grid-template-columns: var(--sy-fig) 1fr;
+  column-gap: var(--sy-gap); align-items: center; border-bottom: 1px solid var(--rule);
+}
+.dtime { text-align: right; font-size: 17px; font-weight: 300; color: var(--ink-2); }
+.dwhat { min-width: 0; }
+.dwhat strong { display: block; font-size: 17px; font-weight: 400; color: var(--ink); }
+.dwhat > span {
+  display: flex; align-items: center; gap: 7px; margin-top: 5px;
+  font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+.dwhat span.dside { display: inline; margin-top: 0; white-space: nowrap; }
+.dwhat > .dchange-act {
+  display: grid; grid-template-columns: max-content max-content minmax(0, 1fr);
+  align-items: start;
+}
+.dchange-act .dact-unit { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.dchange-act .dact-unit.board { min-width: 0; align-items: start; white-space: normal; }
+.dchange-act .dact-copy { min-width: 0; line-height: 1.35; }
+.dchange-act .dact-copy > span { display: block; }
+.dchange-act .dact-copy .dchange-note { color: inherit; }
+.dchange-act .darrow { padding-top: 4px; }
+.dchip {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 21px; height: 21px; padding: 0 5px; border-radius: 3px;
+  font-size: 14px; font-weight: 700; letter-spacing: 0;
+}
+.dchip.full-location {
+  justify-content: flex-start; height: 22px; padding: 0 7px; white-space: nowrap;
+  font-size: 14px; text-transform: uppercase;
+}
+.dwhat > .dplace-act {
+  flex-direction: column; align-items: flex-start; gap: 4px;
+}
+/* The change is bracketed by the masthead's own heavy rule, with its station
+   set at the title's step. */
+.dstep.change {
+  min-height: 82px; padding: 10px 0;
+  border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink);
+}
+.dstep.change .dwhat strong { font-size: 22px; font-weight: 300; line-height: 1.15; }
+.dstep.change.tight .dtime, .dstep.change.tight .dwhat span { color: var(--warn); }
+.dstep.cancelled { opacity: .58; }
+.dstep.cancelled .dtime, .dstep.cancelled .dwhat strong { text-decoration: line-through; }
+/* A step behind the rider is quiet, not struck: it happened. */
+.dstep.done .dwhat strong { color: var(--ink-2); }
+
+/* The journey ends somewhere, and that platform is stated nowhere else. The
+   closing rule answers the masthead's. */
+.detail-tail { flex: none; padding: 0 var(--sy-pad); }
+.detail-tail .rule { height: 2px; background: var(--ink); opacity: .82; }
+.detail-tail .line {
+  display: flex; align-items: baseline; gap: 10px; min-height: 43px; padding: 11px 0 0;
+}
+.detail-tail .t { font-size: 19px; font-weight: 300; }
+.detail-tail .n {
+  font-size: 14px; font-weight: 300; color: var(--ink-2); min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.detail-tail .p { margin-left: auto; flex: none; padding-left: 10px; }
+.detail-tail .p.warn { color: var(--warn); }
+/* An arrival that is not going to happen is struck, in the board's own idiom. */
+.detail-tail.cx .t { color: var(--ink-3); text-decoration: line-through; text-decoration-thickness: 1.5px; }
+
+.detail-fresh {
+  flex: 0 1 auto; min-width: 0; display: flex; align-items: center; justify-content: flex-end;
+  gap: 8px; min-height: 44px; margin-left: auto; text-align: right; line-height: 1.3;
+  font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+.detail-top { flex-wrap: wrap; column-gap: 12px; }
+.detail-top .sy-home { min-width: 0; max-width: 100%; }
+.detail-fresh span:last-child { min-width: 0; }
+.detail-fresh.offline { color: var(--warn); }
+.detail-rail button { width: 100%; }
+
+
+/* ---- setup ------------------------------------------------------------- */
+
+.hint { padding: 16px 0; font-size: 10px; font-weight: 600; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--ink-3); }
+.hint.warn { color: var(--warn); }
+
+/* ---- Departure board (calibration: assets/comps/latest/board-*) ------- */
+
+.sy-mast { flex: none; padding: 12px 22px 0; }
+.sy-top { display: flex; align-items: center; justify-content: space-between; }
+.sy-home {
+  display: flex; align-items: center; gap: 9px; min-height: 44px; padding: 0 14px 0 0;
+  font-size: 11px; font-weight: 600; letter-spacing: .15em; text-transform: uppercase;
+  color: var(--ink-2);
+}
+.sy-home .g { font-size: 16px; font-weight: 300; letter-spacing: 0; color: var(--ink-3); }
+.sy-fresh { display: flex; align-items: center; gap: 8px; flex: none; }
+.sy-h1 {
+  display: grid; grid-template-columns: minmax(0, 1fr) 26px minmax(0, 1fr);
+  gap: 9px; align-items: center; min-height: 62px; margin: 2px 0 9px;
+  font-size: 25px; font-weight: 300; letter-spacing: -.025em; line-height: 1.03;
+}
+.sy-h1 b { min-width: 0; font-weight: 300; overflow-wrap: anywhere; }
+.sy-h1 b:last-child { text-align: right; }
+.sy-h1 .conn { height: 1px; background: var(--rule-2); position: relative; }
+.sy-h1 .conn::after {
+  content: ''; position: absolute; right: 0; top: -3px;
+  border-left: 6px solid var(--rule-2); border-top: 3.5px solid transparent; border-bottom: 3.5px solid transparent;
+}
+.sy-hr { height: 2px; background: var(--ink); opacity: .82; }
+
+/* Journey detail promotes the same row, so the measure lives on the document
+   rather than on the board's scroller. */
+body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
+
+.sy-tl {
+  flex: 1; min-height: 0; position: relative;
+  display: flex; flex-direction: column; overflow-y: auto;
+  -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+  --sy-anchor: 32px;
+}
+.sy-fwd { flex: none; height: 100%; min-height: 100%; display: flex; flex-direction: column; }
+.sy-fwd.void { height: auto; min-height: 0; }
+.sy-now { flex: none; height: var(--sy-anchor); padding: 0 var(--sy-pad); }
+.sy-now .r { height: 2px; background: var(--ink); opacity: .85; }
+.sy-now.top .r { display: none; }
+.sy-now.top .l { padding-top: 9px; }
+.sy-now .l {
+  padding: 7px 0 9px; font-size: 11px; font-weight: 600; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--ink);
+}
+/* A fixed row, not a share of the frame: stretched rows made three services
+   look like a full page, and a short frame squeezed the sixth instead of
+   scrolling to it. */
+.sy-row {
+  flex: none; position: relative; min-height: 96px;
+  display: grid; grid-template-columns: var(--sy-fig) minmax(0, 1fr);
+  column-gap: var(--sy-gap); align-items: center;
+  padding: 9px var(--sy-pad) 10px; outline-offset: -2px;
+}
+/* A departed service fades where it stood; the timeline closes upward only
+   once it has gone (ui.md, departure board). */
+.sy-row.departing { opacity: 0; transition: opacity 240ms linear; }
+
+/* Edge to edge, as a ledger rule: an inset border makes each service look
+   like it leaks into the next. */
+.sy-row::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px;
+  height: 1px; background: var(--rule);
+}
+.sy-fig { grid-column: 1; align-self: center; min-width: 0; text-align: right; }
+.sy-fig .sy-n {
+  display: block; white-space: nowrap;
+  font-size: 40.5px; font-weight: 250; letter-spacing: -.045em; line-height: .84; color: var(--ink);
+}
+.sy-fig .sy-u {
+  font-size: 12px; line-height: 1; font-weight: 500; letter-spacing: .01em; padding-left: 2px; color: inherit;
+}
+.sy-row.wide .sy-fig .sy-n { font-size: 27.9px; }
+.sy-fig .sy-st {
+  display: block; margin-top: 6px; min-height: 12px; white-space: nowrap;
+  font-size: 9px; font-weight: 600; letter-spacing: .13em; text-transform: uppercase; color: var(--ink-3);
+}
+.sy-fig .sy-st.warn { color: var(--warn); }
+.sy-b { grid-column: 2; min-width: 0; }
+.sy-t { display: flex; align-items: baseline; min-width: 0; line-height: 1; }
+.sy-dp { font-size: 18px; font-weight: 300; letter-spacing: -.005em; color: var(--ink); }
+.sy-was {
+  margin-left: 7px; flex: none; font-size: 13px; font-weight: 300; color: var(--ink-3);
+  text-decoration: line-through; text-decoration-thickness: 1.5px;
+}
+.sy-ar { margin-left: auto; padding-left: 8px; font-size: 16px; font-weight: 300; color: var(--ink-2); }
+.sy-ar.cx { display: flex; align-items: baseline; gap: 7px; color: var(--ink-3); }
+.sy-ar.cx del { text-decoration-thickness: 1.5px; }
+.sy-arx {
+  font-size: 9px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--warn);
+}
+.sy-j { display: flex; align-items: center; height: 22px; margin-top: 6px; min-width: 0; }
+.sy-j.has-changes { margin-bottom: var(--transfer-space, 22px); }
+.sy-j.has-changes + .sy-sign { margin-top: 6px; }
+.sy-cap {
+  flex: none; height: 22px; display: flex; align-items: center; padding: 0 7px;
+  border-radius: 3px; white-space: nowrap; background: var(--stem); color: var(--chipink);
+  font-size: 14px; font-weight: 700; text-transform: uppercase;
+}
+.sy-bar { flex: 1; min-width: 0; position: relative; height: 7px; }
+.sy-bar > span { position: absolute; top: 0; bottom: 0; display: block; }
+.sy-bar .sy-rp { position: absolute; inset: 0; display: block; }
+.sy-bar .sy-spec { display: none; }
+.sy-bar .sy-g0 { background: var(--rule); }
+.sy-bar .sy-g0.warn { background: var(--warn); }
+.sy-bar .sy-p {
+  top: 50%; transform: translateY(-50%); bottom: auto; height: 22px; z-index: 2;
+  display: flex; align-items: center; justify-content: center; padding: 0 5px; min-width: 19px;
+  font-size: 14px; font-weight: 700; border-radius: 3px;
+}
+.sy-bar .sy-p.a { background: var(--stem); color: var(--chipink); }
+.sy-bar .sy-p.b { background: var(--stem2); color: var(--chipink2); }
+/* A station belongs to both transfer platforms. Its own band keeps long or
+   multiple changes clear of the headsign without distorting the time axis. */
+.sy-bar > .sy-pstn {
+  top: 26px; bottom: auto; width: max-content; transform: translateX(-50%);
+  font-size: 10px; font-weight: 600; line-height: 1.2; letter-spacing: .06em;
+  text-align: center; text-transform: uppercase; color: var(--ink-2);
+}
+.sy-pstn.travelling::before {
+  content: ''; position: absolute; left: 50%; top: -8px; width: 1px; height: 6px; background: var(--ink-3);
+}
+/* The second alighting numeral is the only fact the row can lose and still say
+   where to get off and what to board. */
+.sy-row.two .sy-bar .sy-p.a[data-transfer-index="1"] { display: none; }
+.sy-row.two .sy-sign { min-width: 56px; }
+.sy-bar .sy-dim { left: 0; background: var(--bg); opacity: .62; }
+.sy-bar .sy-mk { top: -2px; bottom: -2px; width: 8px; margin-left: -4px; background: var(--bg); }
+.sy-bar .sy-mk::after {
+  content: ''; position: absolute; left: 3px; top: 2px; bottom: 2px; width: 2px;
+  background: var(--mkc, var(--ink-3));
+}
+.sy-bar .sy-mk i {
+  display: block; position: absolute; left: 50%; bottom: 100%; margin: 0 0 var(--mkgap, 3px) -6.5px;
+  width: 13px; height: 9px; background: var(--mkc, var(--ink-3));
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+.sy-bar .sy-mk.pre { --mkc: var(--ink-3); }
+.sy-bar .sy-mk.ride { --mkc: var(--stem); }
+.sy-bar .sy-mk.dwell, .sy-bar .sy-mk.ride2 { --mkc: var(--stem2); }
+.sy-bar .sy-mk.done { --mkc: var(--ink-3); }
+/* Shrink-wrapped, so a full name is never cut while the row still has width
+   and an ellipsis marks a real collision with the edge. */
+.sy-sign {
+  width: max-content; max-width: 100%; margin-top: 5px; height: 20px; line-height: 20px;
+  min-width: 0; font-size: 13px; font-weight: 300; color: var(--ink-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sy-sign.note {
+  font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--warn);
+}
+.sy-row.sched .sy-n { color: var(--ink-2); font-weight: 200; }
+.sy-row.late:not(.past) .sy-n, .sy-row.late .sy-dp { color: var(--warn); }
+.sy-row.cx .sy-n, .sy-row.past .sy-n { color: var(--ink-3); }
+.sy-row.cx .sy-dp { color: var(--ink-3); text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.sy-row.cx .sy-sign { color: var(--ink-3); }
+.sy-row.cx .sy-j { opacity: .3; }
+.sy-row.past .sy-b { color: var(--ink-3); }
+.sy-row.past.late .sy-dp { color: var(--warn); }
+.sy-end { flex: none; padding: 15px var(--sy-pad) 18px; }
+.sy-end b {
+  display: block; white-space: nowrap; font-size: 10px; font-weight: 600;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3);
+}
+.sy-end span { display: block; margin-top: 8px; font-size: 14px; font-weight: 300; color: var(--ink-3); }
+
+/* ---- Smart home and directions (calibration: assets/comps/latest/home-*) */
+
+.home-screen { display: flex; flex: 1; min-height: 0; flex-direction: column; }
+.hm-c {
+  --figtrack: 104px; --fign: 64px; --fign-wide: 50px; --stn: 16px;
+  --dept: 25px; --arrt: 20px; --jh: 42px; --caph: 24px; --capf: 15px;
+  --cappad: 10px; --barh: 14px; --mkgap: 3px; --signf: 15px;
+  --hdpad-t: 14px; --hdpad-b: 12px; --hdgap: 12px;
+}
+/* The band is the notch clearance: nothing else in the stylesheet reads the
+   top inset, and the app installs standalone. */
+.hm-top {
+  flex: none; display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: max(15px, env(safe-area-inset-top, 0px)) 22px 0; min-height: 22px;
+}
+/* Clips rather than ellipsises: only a station name grows this line, and
+   fitStationNames shortens one by rule instead. */
+.answer-kind {
+  display: flex; align-items: center; min-width: 0;
+  font-size: 11px; font-weight: 600; letter-spacing: .15em;
+  text-transform: uppercase; color: var(--ink-2);
+}
+.answer-line { line-height: 14px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+.pin-status { position: relative; padding: 0; text-transform: inherit; letter-spacing: inherit; line-height: 14px; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.answer-line:has(button) { display: flex; align-items: center; overflow: visible; }
+button.pin-status { height: 44px; margin: -15px 0; }
+.pin-icon { width: 12px; height: 12px; fill: currentColor; flex: none; }
+.pin-separator { margin: 0 .4em; color: var(--ink-3); }
+.answer-kind.status-late, .answer-kind.status-exception { color: var(--warn); }
+.status-copy { white-space: nowrap; }
+.status-late-word { margin-left: .42em; }
+.hm-fresh { display: flex; align-items: center; gap: 8px; flex: none; }
+.hm-hd {
+  flex: none;
+  display: grid; grid-template-columns: var(--figtrack) 1fr; column-gap: 14px;
+  width: 100%; text-align: left; padding: var(--hdpad-t) 22px var(--hdpad-b);
+}
+.hm-fig { grid-column: 1; grid-row: 1; text-align: left; }
+.hm-n {
+  display: block; white-space: nowrap; font-size: var(--fign); font-weight: 250;
+  letter-spacing: -.045em; line-height: .84; color: var(--ink);
+}
+.hm-hd.wide .hm-n { font-size: var(--fign-wide); }
+.hm-u { font-size: .24em; font-weight: 400; letter-spacing: .01em; padding-left: .06em; color: var(--ink-2); }
+.hm-st {
+  display: block; margin-top: 7px; min-height: 13px; white-space: nowrap;
+  font-size: 10px; font-weight: 600; letter-spacing: .13em; text-transform: uppercase; color: var(--ink-3);
+}
+.hm-st:empty { display: none; }
+.hm-st.warn { color: var(--warn); }
+.hm-hd.late .hm-n, .hm-hd.late .hm-e.from .hm-t { color: var(--warn); }
+/* Lateness colours the figure for the next action too. */
+.hm-hd.active-late .hm-n { color: var(--warn); }
+.hm-ends { grid-column: 2; grid-row: 1; display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+.hm-e { display: flex; flex-direction: column; min-width: 0; }
+.hm-e.to { margin-left: auto; text-align: right; }
+.hm-stn {
+  font-size: var(--stn); font-weight: 300; letter-spacing: -.015em; line-height: 1.15;
+  color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: clip;
+}
+.hm-e.from .hm-stn { color: var(--ink); }
+/* The smaller arrival clock's extra gap puts the two clocks on one baseline
+   while the names keep one top edge. */
+.hm-t { margin-top: 3px; line-height: 1.1; white-space: nowrap; }
+.hm-e.from .hm-t { font-size: var(--dept); font-weight: 400; letter-spacing: -.01em; color: var(--ink); }
+.hm-e.to .hm-t { margin-top: 7px; font-size: var(--arrt); font-weight: 300; color: var(--ink-2); }
+.hm-hd .sy-j { grid-column: 1 / -1; grid-row: 2; margin-top: var(--hdgap); height: var(--jh); }
+.hm-hd .sy-j.has-changes + .hm-sign { margin-top: 6px; }
+.hm-hd .sy-cap { height: var(--caph); font-size: var(--capf); padding: 0 var(--cappad); letter-spacing: .02em; }
+.hm-hd .sy-cap[data-ferry-location] { font-size: 14px; }
+.hm-hd .sy-bar { height: var(--barh); }
+.hm-hd .sy-bar .sy-p { height: var(--caph); font-size: var(--capf); padding: 0 7px; min-width: 24px; letter-spacing: .02em; }
+.hm-sign {
+  grid-column: 1 / -1; grid-row: 3; margin-top: 8px; min-width: 0;
+  font-size: var(--signf); font-weight: 300; line-height: 1.3; color: var(--ink-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hm-hd .hm-sign.hm-act { color: var(--ink); font-weight: 400; }
+.hm-hd .hm-sign.note {
+  font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+  line-height: 1.75; color: var(--warn);
+}
+.hm-rec {
+  display: block; grid-column: 1 / -1; grid-row: 4; margin-top: var(--hdgap);
+  font-size: 15px; font-weight: 300; line-height: 1.4; color: var(--ink-2);
+}
+.hm-rec-strip {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  height: 32px; min-width: 0;
+}
+.hm-rec-strip .q {
+  min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hm-rec-strip button {
+  flex: none; min-height: 44px; white-space: nowrap; font-size: 12px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--ink);
+}
+.hm-offer { flex: none; padding: 0 22px; }
+.hm-offer .r { height: 1px; background: var(--rule-2); margin: 12px 0; }
+.hm-offer .k, .hm-ask .k {
+  font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3);
+}
+.hm-offer p { margin-top: 7px; font-size: 15px; font-weight: 300; line-height: 1.4; color: var(--ink); }
+.hm-acts { display: flex; gap: 26px; }
+.hm-acts button {
+  min-height: 50px; white-space: nowrap; font-size: 12px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--ink);
+}
+.hm-acts button.q { color: var(--ink-3); }
+.hm-rule { flex: none; height: 2px; background: var(--ink); opacity: .85; }
+.hm-next {
+  flex: none; width: calc(100% - 44px); margin: 0 22px; min-height: 44px;
+  display: grid; grid-template-columns: 96px 48px 1fr 12px; align-items: center; gap: 7px;
+  border-top: 1px solid var(--rule); color: var(--ink-2); text-align: left;
+}
+.hm-next-label { font-size: 9px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+.hm-next-count { font-size: 17px; font-weight: 300; color: var(--ink); white-space: nowrap; }
+.hm-next-unit { font-size: 12px; font-weight: 500; padding-left: 2px; }
+.hm-next-times { display: flex; align-items: center; gap: 7px; justify-self: end; white-space: nowrap; font-size: 15px; font-weight: 300; }
+.hm-next-times > span, .hm-next-go { color: var(--ink-3); }
+.hm-next-go { font-size: 17px; }
+/* The second offer grammar: one line below the heavy rule, question left,
+   action right, so the header above it stays read-only (ui.md, Core flow). */
+.hm-strip {
+  flex: none; display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; padding: 0 22px; min-height: 48px; border-bottom: 1px solid var(--rule);
+}
+.hm-strip .q {
+  font-size: 15px; font-weight: 300; color: var(--ink-2); min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hm-strip button {
+  flex: none; min-height: 48px; white-space: nowrap; font-size: 12px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--ink);
+}
+.hm-new { font-size: 12px; font-weight: 400; font-style: italic; letter-spacing: 0; text-transform: none; }
+.hm-ix {
+  flex: 1 1 auto; min-height: 0; padding: 0 22px; display: flex; flex-direction: column;
+  overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+}
+.hm-anchor .l {
+  padding: 22px 0 10px; font-size: 11px; font-weight: 600; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--ink);
+}
+.tripr {
+  display: flex; flex-direction: column; justify-content: center; width: 100%;
+  text-align: left; flex: none; position: relative; height: 72px;
+  border-bottom: 1px solid var(--rule);
+}
+.hm-in { display: flex; align-items: stretch; gap: 13px; width: 100%; min-width: 0; position: relative; }
+.route-cue {
+  position: absolute; right: 0; bottom: 0; padding-left: 8px; white-space: nowrap;
+  font-size: 10px; font-weight: 600; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-2);
+}
+.route-cue .arrow {
+  padding-left: 5px; font-size: 15px; font-weight: 300; letter-spacing: 0; color: var(--ink-2);
+}
+.tripr:active .route-cue, .tripr:active .hm-nm { color: var(--ink-2); }
+.hm-in > .hm-bd { flex: 1; min-width: 0; }
+.hm-spine { flex: none; width: 15px; align-self: stretch; display: flex; gap: 3px; }
+.hm-spine i { display: block; width: 3px; border-radius: 1px; }
+.hm-bdg {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 5px;
+  border-radius: 3px; margin-right: 6px; vertical-align: 1px;
+  font-size: 14px; font-weight: 700; letter-spacing: .02em;
+}
+.tripr .hm-nm {
+  display: block; font-size: 19px; font-weight: 300; letter-spacing: -.015em; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tripr .hm-route { white-space: nowrap; }
+.tripr.wrapped { height: 92px; }
+.tripr .hm-nm[data-wrap="true"] {
+  white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.15;
+}
+.tripr .hm-nm em { font-style: normal; color: var(--ink-3); font-weight: 200; padding: 0 4px; }
+/* The 106px is reserved for the tap cue; the ellipsis inside what is left
+   falls on metadata, never on a station name. */
+.tripr .hm-sub {
+  display: block; margin-top: 7px; padding-right: 106px; font-size: 10px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tripr.focused .hm-sub b { color: var(--ink); }
+.tripr.shown:not(.focused) .hm-sub b { color: var(--ink-2); }
+.tripr.focused .hm-sub b.status-late,
+.tripr.focused .hm-sub b.status-exception { color: var(--warn); }
+.hm-end {
+  flex: none; padding: 14px 0 6px; white-space: nowrap; font-size: 10px;
+  font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3);
+}
+.hm-bar {
+  flex: none; display: flex; align-items: stretch; border-top: 2px solid var(--ink);
+  padding: 0 22px max(8px, env(safe-area-inset-bottom, 0px));
+}
+.hm-bar button {
+  display: flex; align-items: center; gap: 9px; min-height: 56px; white-space: nowrap;
+  font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink);
+}
+.hm-bar button[disabled] { color: var(--ink-3); cursor: default; }
+.hm-bar .g { font-size: 17px; font-weight: 300; letter-spacing: 0; color: var(--ink-2); }
+.hm-ask { flex: none; padding: 15px 22px 0; border-top: 2px solid var(--ink); }
+.hm-ask p { margin-top: 9px; font-size: 15px; font-weight: 300; line-height: 1.45; color: var(--ink); }
+.hm-ask .hm-acts { padding-bottom: max(4px, env(safe-area-inset-bottom, 0px)); }
+
+.hm-back {
+  display: flex; align-items: center; gap: 9px; min-height: 44px; padding: 0 14px 0 0;
+  font-size: 11px; font-weight: 600; letter-spacing: .15em; text-transform: uppercase; color: var(--ink-2);
+}
+.hm-back .g { font-size: 16px; font-weight: 300; letter-spacing: 0; color: var(--ink-3); }
+.hm-mast { flex: none; padding: 2px 22px 0; }
+.hm-mast h1 {
+  margin: 6px 0 12px; font-size: 29px; font-weight: 300;
+  letter-spacing: -.025em; line-height: 1.06; color: var(--ink);
+}
+.hm-mast .r { height: 2px; background: var(--ink); opacity: .82; }
+.hm-sheet {
+  flex: 1 1 auto; min-height: 0; padding: 0 22px; display: flex; flex-direction: column;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+}
+.hm-field {
+  flex: none; display: block; width: 100%; text-align: left;
+  padding: 15px 0 0; border-bottom: 1px solid var(--rule);
+}
+.hm-field .lbl { display: block; }
+.hm-field .v {
+  display: block; width: 100%; padding: 6px 0 14px; font-size: 20px;
+  font-weight: 400; letter-spacing: -.01em; color: var(--ink); outline: 0;
+}
+.hm-field .v::placeholder { color: var(--ink-3); font-weight: 300; opacity: 1; }
+.hm-grp {
+  flex: none; padding: 18px 0 4px; font-size: 10px; font-weight: 600;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3);
+}
+.hm-res button {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; text-align: left; min-height: 52px; padding: 12px 0 13px;
+  border-bottom: 1px solid var(--rule);
+}
+.hm-res .n { font-size: 18px; font-weight: 300; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hm-res .w {
+  flex: none; font-size: 10px; font-weight: 600; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-3); white-space: nowrap;
+}
+.hm-bar.save button { flex: 1; justify-content: flex-start; font-size: 13px; letter-spacing: .12em; min-height: 64px; }
+
+@media (prefers-color-scheme: light) {
+  .sy-cap, .sy-bar .sy-p, .hm-bdg, .dchip { color: var(--bg) !important; }
+}
+/* The narrow phone (360px) gets a narrower page margin, not smaller type: the
+   type ladder and the label idiom are the design, the margin is the sheet it
+   is printed on. 22px of margin at 390px is 18px at 360px in the same
+   proportion, and those 8px are what let the cancelled-lead note print whole
+   at the full idiom (205px of copy in a 210px column, measured). */
+@media (max-width: 375px) {
+  body { --sy-pad: 18px; }
+  .sy-h1 {
+    grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1fr);
+    gap: 7px; font-size: 24px;
+  }
+  .sy-mast, .hm-top, .hm-hd, .hm-offer, .hm-strip, .hm-ix, .hm-bar, .hm-ask, .hm-mast, .hm-sheet {
+    padding-left: 18px; padding-right: 18px;
+  }
+  .sy-cap { padding-left: 6px; padding-right: 6px; }
+  .sy-bar .sy-p { padding-left: 4px; padding-right: 4px; min-width: 17px; }
+  .hm-c { --figtrack: 92px; --fign: 56px; --fign-wide: 44px; --stn: 15px; }
+}
+
+@media (min-width: 900px) {
+  /* A wider screen must show MORE of the board, not less: all six services
+     stay above the fold, and the empty margin reads as a printed page rather
+     than as content that ran out.
+
+     Scoped through #app because the overflow guard above (`#app > *`) carries
+     an ID and so out-specifies a bare class: `max-width: 100%` was quietly
+     beating `max-width: 940px`, and every desktop shot ran the full 1280px
+     measure. Verified 2026-09-01 by measuring the scroller, not by reading
+     the CSS. */
+  #app > .sy-mast, #app > .sy-tl, #app > .hm-c,
+  #app > .detail-scroll, #app > .detail-tail, #app > .detail-rail {
+    max-width: 940px; margin: 0 auto;
+  }
+  #app > .detail-rail { padding-left: 64px; padding-right: 64px; }
+  .sy-mast { padding-left: 64px; padding-right: 64px; }
+  .sy-tl { width: 100%; }
+  body { --sy-pad: 64px; --sy-fig: 120px; --sy-gap: 24px; }
+  .sy-fig .sy-n { font-size: 46.8px; }
+  .sy-row.wide .sy-fig .sy-n { font-size: 36px; }
+  .hm-c { width: 100%; }
+  .hm-c .hm-top, .hm-c .hm-hd, .hm-c .hm-offer, .hm-c .hm-strip, .hm-c .hm-ix,
+  .hm-c .hm-bar, .hm-c .hm-ask, .hm-c .hm-mast, .hm-c .hm-sheet {
+    padding-left: 64px; padding-right: 64px;
+  }
+}
+
+/* A resolved theme is set before this stylesheet loads. */
+html[data-theme="dark"] {
+  --bg:#0A0B0D; --ink:#F4F5F7; --ink-2:rgba(244,245,247,0.66); --ink-3:rgba(244,245,247,0.46);
+  --rule:rgba(244,245,247,0.10); --rule-2:rgba(244,245,247,0.20); --warn:#FF7A5C; --live:#4ADE80;
+  --line-T1:#F99D1C; --line-T2:#0098CD; --line-T3:#F37021; --line-T4:#005AA3;
+  --line-T5:#C4258F; --line-T7:#6F818E; --line-T8:#00954C; --line-T9:#D11F2F; --line-M1:#168388;
+  --line-BMT:#F99D1C; --line-CCN:#D11F2F; --line-SCO:#0098CD; --line-SHL:#00954C; --line-HUN:#833134; --line-FERRY:#5AB031;
+  --line-fill-T1:var(--line-T1); --line-fill-T2:var(--line-T2); --line-fill-T3:var(--line-T3); --line-fill-T4:var(--line-T4);
+  --line-fill-T5:var(--line-T5); --line-fill-T7:var(--line-T7); --line-fill-T8:var(--line-T8); --line-fill-T9:var(--line-T9);
+  --line-fill-M1:var(--line-M1); --line-fill-BMT:var(--line-BMT); --line-fill-CCN:var(--line-CCN); --line-fill-SCO:var(--line-SCO);
+  --line-fill-SHL:var(--line-SHL); --line-fill-HUN:var(--line-HUN); --line-fill-FERRY:var(--line-FERRY);
+  -webkit-font-smoothing:antialiased;
+}
+html[data-theme="light"] {
+  --bg:#FAF9F5; --ink:#14120E; --ink-2:rgba(20,18,14,0.75); --ink-3:rgba(20,18,14,0.60);
+  --rule:rgba(20,18,14,0.11); --rule-2:rgba(20,18,14,0.25); --warn:#BF3418; --live:#0F7A4A;
+  --line-T1:#A46204; --line-T2:#0079A3; --line-T3:#BD4D0A; --line-T4:#005AA3; --line-T5:#C4258F;
+  --line-T7:#62727E; --line-T8:#008041; --line-T9:#D11F2F; --line-M1:#157B7F;
+  --line-BMT:#A46204; --line-CCN:#D11F2F; --line-SCO:#0079A3; --line-SHL:#008041; --line-HUN:#833134; --line-FERRY:#428024;
+  --line-fill-T1:#F99D1C; --line-fill-T2:var(--line-T2); --line-fill-T3:var(--line-T3); --line-fill-T4:var(--line-T4);
+  --line-fill-T5:var(--line-T5); --line-fill-T7:var(--line-T7); --line-fill-T8:var(--line-T8); --line-fill-T9:var(--line-T9);
+  --line-fill-M1:var(--line-M1); --line-fill-BMT:#F99D1C; --line-fill-CCN:var(--line-CCN); --line-fill-SCO:var(--line-SCO);
+  --line-fill-SHL:var(--line-SHL); --line-fill-HUN:var(--line-HUN); --line-fill-FERRY:var(--line-FERRY);
+  -webkit-font-smoothing:auto;
+}
+html[data-theme="dark"] body { -webkit-font-smoothing:antialiased; }
+html[data-theme="light"] body { -webkit-font-smoothing:auto; }
+html[data-theme="light"] .sy-cap,
+html[data-theme="light"] .sy-bar .sy-p,
+html[data-theme="light"] .hm-bdg,
+html[data-theme="light"] .dchip { color:var(--bg) !important; }
+
+.st-screen { display:flex; flex:1; min-height:0; flex-direction:column; }
+.st-top { flex:none; min-height:48px; padding:max(8px,env(safe-area-inset-top,0px)) 22px 0; display:flex; align-items:flex-start; }
+.st-back { min-height:44px; display:flex; align-items:center; gap:9px; padding-right:14px; color:var(--ink-2); font-size:11px; font-weight:600; letter-spacing:.15em; text-transform:uppercase; }
+.st-back svg { width:16px; height:16px; color:var(--ink-3); }
+.st-mast { flex:none; padding:0 22px; }
+.st-mast h1 { margin:4px 0 12px; font-size:29px; font-weight:300; letter-spacing:-.025em; line-height:1.06; }
+.st-rule { height:2px; background:var(--ink); opacity:.82; }
+.st-scroll { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:none; padding:0 22px 18px; }
+.st-scroll::-webkit-scrollbar { display:none; }
+.st-group + .st-group { margin-top:22px; }
+.st-section { min-height:30px; display:flex; align-items:flex-end; padding-bottom:7px; font-size:10px; font-weight:600; letter-spacing:.18em; text-transform:uppercase; color:var(--ink-3); }
+.st-person { border-top:1px solid var(--rule); }
+.st-person-row { min-height:56px; width:100%; display:grid; grid-template-columns:24px minmax(0,1fr) auto; gap:12px; align-items:center; border-bottom:1px solid var(--rule); text-align:left; }
+.st-person-row > svg { width:21px; height:21px; color:var(--ink-2); }
+.st-copy { min-width:0; }
+.st-name { display:block; font-size:17px; font-weight:400; line-height:1.2; color:var(--ink); }
+.st-value { display:block; margin-top:4px; font-size:12px; font-weight:300; line-height:1.32; color:var(--ink-2); overflow-wrap:anywhere; }
+.st-value.warn,.st-note.warn,.st-error { color:var(--warn); }
+.st-person-state,.st-state { display:flex; align-items:center; gap:4px; padding-left:4px; color:var(--ink-2); font-size:10px; font-weight:600; letter-spacing:.13em; text-transform:uppercase; }
+.st-person-state svg,.st-state svg { width:14px; height:14px; color:var(--ink-3); }
+.st-location-row .st-state { color:var(--ink); white-space:nowrap; }
+.st-transfer-row { grid-template-columns:minmax(0,1fr) auto; }
+.st-transfer-row .st-state { color:var(--ink); white-space:nowrap; }
+.st-choice-set { border-top:1px solid var(--rule); border-bottom:1px solid var(--rule); }
+.st-service-set { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); }
+.st-mode { position:relative; min-width:0; min-height:86px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; border-right:1px solid var(--rule); color:var(--ink-2); text-align:center; }
+.st-mode:last-child,.st-theme:last-child { border-right:0; }
+.st-mode-icon { width:25px; height:25px; color:var(--ink-2); }
+.st-mode-label,.st-theme-label { display:block; color:var(--ink); font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; }
+.st-mode .st-state { justify-content:center; padding:0; font-size:9px; letter-spacing:.12em; }
+.st-mode[aria-pressed="true"] .st-mode-icon,.st-mode[aria-pressed="true"] .st-state { color:var(--ink); }
+.st-mode[aria-pressed="true"]::after,.st-theme[aria-checked="true"]::after { content:''; position:absolute; height:2px; background:var(--ink); bottom:-1px; left:10px; right:10px; }
+.st-mode[disabled] { cursor:default; }
+.st-mode[disabled] .st-mode-icon,.st-mode[disabled] .st-mode-label { color:var(--ink-3); }
+.st-mode[disabled]::before { content:''; position:absolute; top:25px; left:50%; margin-left:-16px; width:31px; height:1px; background:var(--ink-3); transform:rotate(-34deg); }
+.st-service-note,.st-service-empty { min-height:28px; display:flex; align-items:flex-end; padding-top:7px; color:var(--ink-3); font-size:10px; font-weight:600; letter-spacing:.12em; line-height:1.35; text-transform:uppercase; }
+.st-service-note.warn,.st-service-empty { color:var(--warn); }
+.st-theme-set { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); }
+.st-theme { position:relative; min-width:0; min-height:86px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px; padding:7px 4px; border-right:1px solid var(--rule); text-align:center; color:var(--ink-2); }
+.st-preview { display:flex; width:39px; height:25px; border:1px solid var(--rule-2); overflow:hidden; }
+.st-preview i { position:relative; display:block; flex:1; }
+.st-preview i::after { content:''; position:absolute; left:5px; right:5px; top:7px; height:2px; background:currentColor; box-shadow:0 5px currentColor; }
+.st-preview .paper { background:#FAF9F5; color:#14120E; }
+.st-preview .night { background:#0A0B0D; color:#F4F5F7; }
+.st-theme-copy { min-height:25px; display:flex; flex-direction:column; align-items:center; }
+.st-theme-sub { display:block; margin-top:3px; color:var(--ink-3); font-size:9px; font-weight:600; letter-spacing:.1em; line-height:1.25; text-transform:uppercase; }
+.st-theme[aria-checked="true"] .st-theme-label,.st-theme[aria-checked="true"] .st-theme-sub { color:var(--ink); }
+.st-theme-mark { position:absolute; top:8px; right:8px; width:14px; height:14px; color:var(--ink); }
+.st-secondary { margin-top:22px; border-top:1px solid var(--rule); }
+.st-secondary-row { width:100%; min-height:46px; display:flex; align-items:center; justify-content:space-between; gap:14px; border-bottom:1px solid var(--rule); text-align:left; color:var(--ink-2); }
+.st-secondary-row .st-name { font-size:14px; font-weight:300; color:var(--ink-2); }
+.st-secondary-row svg { width:14px; height:14px; color:var(--ink-3); }
+.st-secondary-row.passive { cursor:default; }
+
+.st-field { display:block; padding:16px 0 0; border-bottom:1px solid var(--rule); }
+.st-field .lbl { display:block; font-size:10px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-3); }
+.st-field input,.st-field textarea { width:100%; color:var(--ink); background:transparent; border:0; outline:0; resize:none; font:inherit; }
+.st-field input { min-height:52px; padding:5px 0 12px; font-size:20px; font-weight:400; }
+.st-field textarea { min-height:150px; padding:9px 0 14px; font-size:18px; font-weight:300; line-height:1.45; }
+.st-field input::placeholder,.st-field textarea::placeholder { color:var(--ink-3); opacity:1; }
+.st-result,.st-radio { min-height:64px; width:100%; display:flex; align-items:center; justify-content:space-between; gap:14px; border-bottom:1px solid var(--rule); text-align:left; }
+.st-result .st-name { font-size:18px; font-weight:300; white-space:normal; }
+.st-result-mode { flex:none; font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3); }
+.st-hint,.st-loading,.st-note,.st-error,.st-success { padding:14px 0; font-size:14px; font-weight:300; line-height:1.45; color:var(--ink-2); }
+.st-success { color:var(--live); }
+.st-current-home,.st-feedback-category { position:relative; min-height:64px; width:100%; display:flex; align-items:center; justify-content:space-between; gap:14px; border-bottom:1px solid var(--rule); text-align:left; }
+.st-current-home.passive { padding:12px 0; }
+.st-action { display:flex; align-items:center; gap:4px; flex:none; max-width:46%; color:var(--ink-2); text-align:right; font-size:10px; font-weight:600; letter-spacing:.13em; text-transform:uppercase; }
+.st-action svg { width:14px; height:14px; color:var(--ink-3); }
+.st-radio-mark { width:18px; height:18px; border:1px solid var(--ink-3); border-radius:50%; position:relative; }
+.st-radio[aria-checked="true"] .st-radio-mark::after { content:''; position:absolute; inset:4px; border-radius:50%; background:var(--ink); }
+.st-rail { flex:none; display:flex; align-items:stretch; border-top:2px solid var(--ink); padding:0 22px max(8px,env(safe-area-inset-bottom,0px)); }
+.st-rail button { min-height:56px; flex:1; text-align:left; font-size:12px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; }
+.st-rail button[disabled] { color:var(--ink-3); }
+.st-screen :focus-visible { outline:2px solid var(--ink); outline-offset:-2px; }
+.st-screen .st-field textarea:focus-visible { outline:none; }
+.st-field:has(textarea:focus) { border-bottom-color:var(--ink); box-shadow:inset 0 -1px 0 var(--ink); }
+.st-field:has(textarea:focus) .lbl { color:var(--ink); }
+
+.hm-bar.split button { width:50%; }
+.hm-bar.split button:last-child { justify-content:flex-end; text-align:right; }
+.hm-bar .settings-icon { width:19px; height:19px; color:var(--ink-2); }
+.hm-empty-settings { min-height:44px; margin-left:8px; color:var(--ink); font-size:11px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; }
+
+@media (max-width:375px) {
+  .st-top,.st-mast,.st-scroll,.st-rail { padding-left:18px; padding-right:18px; }
+}
+
+@media (min-width:900px) {
+  #app > .st-screen { max-width:940px; margin:0 auto; }
+  .st-top,.st-mast,.st-scroll,.st-rail { padding-left:64px; padding-right:64px; }
+}
+
+.hm-filtered-empty { padding: 28px 0; color: var(--ink-2); }
+.hm-filtered-empty p { margin: 0 0 16px; font-size: 20px; line-height: 1.4; }
+.hm-filtered-empty .hm-empty-settings { margin-left: 0; }
+/* The Home trip line is the track; the toy never changes its geometry. */
+.tiny-train-lane { position: relative; }
+
+.tiny-train-trigger {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 44px;
+  transform: translateY(-50%);
+  touch-action: manipulation;
+}
+
+.tiny-train-trigger:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+
+.tiny-train-lane > .tiny-train-stage {
+  position: absolute;
+  z-index: 1;
+  top: -18px;
+  bottom: auto;
+  right: 0;
+  left: 0;
+  height: 18px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Platform labels and the real journey marker remain above the drawing. */
+.tiny-train-lane > .sy-mk { z-index: 2; }
+
+.tiny-train-consist {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 1px;
+  width: max-content;
+  height: 18px;
+  transform: translateX(-100%);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.tiny-train-car {
+  display: block;
+  flex: none;
+  width: 32px;
+  height: 18px;
+  shape-rendering: crispEdges;
+}
+
+.tiny-train-body { fill: #B6BAB8; }
+.tiny-train-window.upper,
+.tiny-train-windscreen { fill: #4A3328; }
+.tiny-train-window.lower { fill: #2A1D18; }
+.tiny-train-door { fill: #939896; }
+.tiny-train-nose { fill: #F9B928; }
+.tiny-train-headlight { fill: #FFF1AE; }
+.tiny-train-wheel { fill: #201C1A; }
+
+@media (prefers-color-scheme: light) {
+  .tiny-train-body { fill: #9DA3A1; }
+  .tiny-train-window.upper,
+  .tiny-train-windscreen { fill: #4A3125; }
+  .tiny-train-window.lower { fill: #291B16; }
+  .tiny-train-door { fill: #747B79; }
+  .tiny-train-nose { fill: #E4A20C; }
+  .tiny-train-headlight { fill: #FFF3B3; }
+}
+
+html[data-theme="light"] .tiny-train-body { fill: #9DA3A1; }
+html[data-theme="light"] .tiny-train-window.upper,
+html[data-theme="light"] .tiny-train-windscreen { fill: #3B2A22; }
+html[data-theme="light"] .tiny-train-window.lower { fill: #241713; }
+html[data-theme="light"] .tiny-train-door { fill: #747B79; }
+html[data-theme="light"] .tiny-train-nose { fill: #E4A20C; }
+html[data-theme="light"] .tiny-train-headlight { fill: #FFF3B3; }
+html[data-theme="dark"] .tiny-train-body { fill: #B6BAB8; }
+html[data-theme="dark"] .tiny-train-window.upper,
+html[data-theme="dark"] .tiny-train-windscreen { fill: #4A3328; }
+html[data-theme="dark"] .tiny-train-window.lower { fill: #2A1D18; }
+html[data-theme="dark"] .tiny-train-door { fill: #939896; }
+html[data-theme="dark"] .tiny-train-nose { fill: #F9B928; }
+html[data-theme="dark"] .tiny-train-headlight { fill: #FFF1AE; }
+
+.tiny-train-reduced .tiny-train-consist { transform: translateX(-50%); will-change: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tiny-train-consist { will-change: auto; }
+}

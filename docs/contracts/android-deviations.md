@@ -12,6 +12,23 @@ This file records deliberate differences between the native Android app and the 
 - Native v1 leaves anonymous analytics counters off. This avoids mixing native renderer adoption and prediction behavior into the existing web-only experiment; functional feedback submission still works.
 - Android stores user state in app-private atomic files and excludes it from cloud backup and device transfer. The native trip list is not capped at the web client’s ten-trip LRU, and each trip has the explicit native deletion menu described above.
 
+## Foreground arrival evidence
+
+While a stored focus is under way, the existing foreground location owner can
+monitor it across Home, detail and Settings with already-granted permission.
+Provider updates target ten seconds; accepted evidence is at least five seconds
+apart. Setup lookups share the owner. Backgrounding, disabling location,
+permission loss, unpinning, deleting or replacing focus stops collection and
+clears the raw window; late callbacks cannot cross generations. No background
+GPS or location payload is introduced. Persist only the identity-bound guard,
+retention checkpoint and optional completion basis/time described in
+[client-storage.md](client-storage.md#final-arrival-decision).
+
+The app, history and existing tracker consume the same arrival result. A
+clock reaching the last estimate cannot complete an armed unresolved focus or
+suppress its tracker. Reconcile matching refreshed service times before arrival
+on resume. OS dismissal remains surface suppression, never ride completion.
+
 ## Persistent travel tracker
 
 Automatic inferred travel-mode entry requests notification permission once,
@@ -61,7 +78,7 @@ completion rules are in [client-storage.md](client-storage.md#native-tracker-ses
 
 ## Feedback fixes — 2026-09-07
 
-- Settings gives Use location, Home and Transfer limit 72dp minimum rows with 10dp vertical padding, where the web composition is 56px. Transfer limit uses that row without its icon column, so its title sits at the page margin. Service choices show only `On` or `Off`, without checkmarks, circles or underlines. Appearance keeps the selected checkmark, removes the underline and reserves the System subtitle's space in every option so previews and labels align.
+- Settings gives Use location, Home and Transfer limit 72dp minimum rows with 10dp vertical padding, where the web composition is 56px. Transfer limit uses that row without its icon column, so its title sits at the page margin. Its subtitle shows only the current value (`Direct only`, `Up to 2` or `No limit`), and the action reads `Change`; tapping switches the current value. The alternative value is never shown alongside the current one. Service choices show only `On` or `Off`, without checkmarks, circles or underlines. Appearance keeps the selected checkmark, removes the underline and reserves the System subtitle's space in every option so previews and labels align.
 - Home and board figures keep `Now` on one line, including enlarged Android text. They must fit their allocated column without clipping or invading the adjacent station/time columns.
 - Line and platform chips are sized in text units: enlarged text grows the chip, and the small journey axis with it, rather than clipping the glyphs (owner bug report, 2026-09-07). The bottom message bar's deletion text may wrap to two lines at enlarged text so its verb survives.
 - Journey lines have 3dp rounded corners at the destination end in Home, Board and Detail. Internal ride/transfer joins remain square so the time axis stays continuous (owner ruling, 2026-09-07).

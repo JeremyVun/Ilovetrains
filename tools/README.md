@@ -33,6 +33,29 @@
   and the trip index are specified in
   [native-data.md](../docs/contracts/native-data.md).
   Run compiler tests with `python3 -m unittest discover -s tools/test -p 'test_compile_timetable.py'`.
+- `check-commute-feedback.js --url http://localhost:<port> --out <tmp-dir>` —
+  drive the built web controller using pre-load clock, API, permission and
+  provider adapters. Covers recommendation paging, Direct only, guarded arrival,
+  lifecycle cancellation and C1 transfer captures at both phone sizes/schemes.
+  Serve `web/` on a private loopback server first. Provider evidence passes
+  through callbacks; the checker never assigns a final arrival state. Synthetic
+  networking sends no real API, feedback or analytics request.
+- `check-shell-upgrade.js --previous-ref <commit>` — install that committed web
+  shell in a private Chromium profile, replace it with the working tree shell,
+  then reload offline with Direct only and incompatible cached journeys. It
+  proves old-cache retirement, new-module precaching and preserved saved trips.
+  It serves its own loopback server with synthetic API responses and needs no
+  credentials. Pass an actual earlier shell commit; identical versions fail.
+  For an uncommitted starting shell, add `--previous-patch <saved-starting-diff>`;
+  only its `web/` changes are applied to the temporary old shell.
+- `fixtures/conformance/commute-feedback.json` — hand-authored integer-millisecond
+  recommendation, preference and arrival sequences shared by all three clients.
+  `epochMs` plus named deltas produces clocks; samples are
+  `[delta, lat, lon, accuracy, speed?]`. Feed samples sequentially at their own
+  timestamps, then reduce at the case clock. Missing speed stays unknown.
+  Expected costs/states are authored independently of the implementation;
+  device-only cases name their verification owner. Never regenerate expected
+  values from the code under test.
 - `export-android-conformance.mjs` — regenerate committed prediction and row
   expectations from the web implementation: `node tools/export-android-conformance.mjs`.
   Node and Android JVM tests consume the same JSON under `fixtures/conformance/`.

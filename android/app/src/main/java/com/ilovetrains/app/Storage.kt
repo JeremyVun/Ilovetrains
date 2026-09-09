@@ -66,22 +66,71 @@ object Wire {
         require(legs.all { it.arrival >= it.departure })
         return Journey(legs, o.optBoolean("retained"))
     }
-    fun board(b: BoardData) = JSONObject().put("from", station(b.from)).put("to", station(b.to))
-        .put("journeys", b.journeys.jsonEach(::journey)).put("generatedAt", b.generatedAt).put("source", b.source)
-        .put("offline", b.offline).put("serverStale", b.serverStale).put("coverage", b.coverage).put("error", b.error).put("homeJourneyKey", b.homeJourneyKey)
-    fun board(o: JSONObject, api: Boolean = false) = BoardData(station(o.getJSONObject("from")), station(o.getJSONObject("to")),
-        o.optJSONArray("journeys").readEach(::journey), epoch(o, "generatedAt") ?: 0,
-        if (api) "live" else o.optString("source", "schedule"), o.optBoolean("offline"), o.optBoolean("serverStale"), o.optString("coverage"), o.stringOrNull("error"),
-        if (api) null else o.stringOrNull("homeJourneyKey"))
+    fun board(b: BoardData): JSONObject = board(b, includePages = true)
+    private fun board(b: BoardData, includePages: Boolean): JSONObject {
+        val result = JSONObject().put("from", station(b.from)).put("to", station(b.to))
+            .put("journeys", b.journeys.jsonEach(::journey)).put("generatedAt", b.generatedAt).put("source", b.source)
+            .put("offline", b.offline).put("serverStale", b.serverStale).put("coverage", b.coverage).put("error", b.error).put("homeJourneyKey", b.homeJourneyKey)
+        result.apply {
+            b.fetchConstraint?.let { put("maxTransfers", it.maxTransfers ?: JSONObject.NULL) }
+            if (includePages && b.recommendationPages.isNotEmpty()) put("recommendationPages", b.recommendationPages.jsonEach { page ->
+                JSONObject().put("at", page.at).put("body", board(page.body, includePages = false))
+                    .put("serverStale", page.serverStale).put("maxTransfers", page.constraint.maxTransfers ?: JSONObject.NULL)
+            })
+            if (includePages) b.recommendation?.let { recommendation ->
+                put("recommendation", JSONObject().put("journey", journey(recommendation.journey))
+                    .put("source", board(recommendation.source, includePages = false)))
+            }
+        }
+        return result
+    }
+    fun board(o: JSONObject, api: Boolean = false): BoardData = board(o, api, readPages = true)
+    private fun board(o: JSONObject, api: Boolean, readPages: Boolean): BoardData {
+        val constraint = if (o.has("maxTransfers") && (o.isNull("maxTransfers") || o.opt("maxTransfers") is Number)) {
+            TransferConstraint(if (o.isNull("maxTransfers")) null else o.optInt("maxTransfers").takeIf { it >= 0 })
+        } else null
+        val pages = if (!readPages) emptyList() else o.optJSONArray("recommendationPages").readEach { page ->
+            require(page.has("maxTransfers") && (page.isNull("maxTransfers") || page.opt("maxTransfers") is Number))
+            val maximum = if (page.isNull("maxTransfers")) null else page.getInt("maxTransfers").also { require(it >= 0) }
+            RecommendationPage(requireNotNull(epoch(page, "at")), board(page.getJSONObject("body"), api = false, readPages = false),
+                page.optBoolean("serverStale"), TransferConstraint(maximum))
+        }.take(2)
+        val recommendation = if (!readPages) null else o.optJSONObject("recommendation")?.let { value ->
+            runCatching { RecommendationResult(journey(value.getJSONObject("journey")),
+                board(value.getJSONObject("source"), api = false, readPages = false)) }.getOrNull()
+        }
+        return BoardData(station(o.getJSONObject("from")), station(o.getJSONObject("to")),
+            o.optJSONArray("journeys").readEach(::journey), epoch(o, "generatedAt") ?: 0,
+            if (api) "live" else o.optString("source", "schedule"), o.optBoolean("offline"), o.optBoolean("serverStale"), o.optString("coverage"), o.stringOrNull("error"),
+            if (api) null else o.stringOrNull("homeJourneyKey"), constraint, pages, recommendation)
+    }
     private fun trip(t: SavedTrip) = JSONObject().put("id", t.id).put("from", station(t.from)).put("to", station(t.to))
         .put("createdAt", t.createdAt).put("lastViewed", t.lastViewed).put("lines", JSONArray(t.lines))
     private fun trip(o: JSONObject) = SavedTrip(o.getString("id"), station(o.getJSONObject("from")), station(o.getJSONObject("to")), o.optLong("createdAt"), o.optLong("lastViewed"),
         o.optJSONArray("lines")?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: emptyList())
+    private fun guard(value: ArrivalGuard) = JSONObject().apply {
+        value.armed?.let { put("armed", it) }
+        value.retainedAt?.let { put("retainedAt", it) }
+        value.basis?.let { put("basis", it.name.lowercase()) }
+        value.confirmedAt?.let { put("confirmedAt", it) }
+    }
+    private fun guard(value: JSONObject): ArrivalGuard? {
+        val basis = when (value.stringOrNull("basis")) {
+            "location" -> ArrivalBasis.Location.takeIf { epoch(value, "confirmedAt") != null }
+            "estimate" -> ArrivalBasis.Estimate
+            else -> null
+        }
+        return ArrivalGuard(value.opt("armed") as? Boolean, epoch(value, "retainedAt"), basis,
+            epoch(value, "confirmedAt").takeIf { basis == ArrivalBasis.Location }).takeIf {
+            it.armed != null || it.retainedAt != null || it.basis != null || it.confirmedAt != null
+        }
+    }
     private fun focus(f: FocusedJourney) = JSONObject().put("tripId", f.tripId).put("reverse", f.reverse)
         .put("journey", journey(f.journey)).put("board", board(f.board)).put("pinned", f.pinned)
-        .put("alternatives", f.alternatives?.let(::board))
+        .put("alternatives", f.alternatives?.let(::board)).put("arrivalGuard", f.arrivalGuard?.let(::guard))
     private fun focus(o: JSONObject) = FocusedJourney(o.getString("tripId"), o.optBoolean("reverse"), journey(o.getJSONObject("journey")), board(o.getJSONObject("board")), o.optBoolean("pinned", true),
-        o.optJSONObject("alternatives")?.let { runCatching { board(it) }.getOrNull() })
+        o.optJSONObject("alternatives")?.let { runCatching { board(it) }.getOrNull() },
+        o.optJSONObject("arrivalGuard")?.let(::guard))
     fun user(d: UserData) = JSONObject().put("schemaVersion", 1).put("trips", d.trips.jsonEach(::trip))
         .put("history", d.history.jsonEach { JSONObject().put("tripId", it.tripId).put("reverse", it.reverse).put("at", it.at) })
         .put("rides", d.rides.jsonEach { ride -> JSONObject().put("tripId", ride.tripId).put("reverse", ride.reverse)

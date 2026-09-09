@@ -37,8 +37,8 @@ export function onAction(root, handler) {
   });
   root.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Enter' && ev.key !== ' ') return;
-    const el = ev.target.closest('[data-act][role="button"]');
-    if (!el || !root.contains(el)) return;
+    const el = ev.target.closest('[data-act]');
+    if (!el || !root.contains(el) || el.getAttribute('role') !== 'button') return;
     ev.preventDefault();
     handler(el.dataset.act, el, ev);
   });

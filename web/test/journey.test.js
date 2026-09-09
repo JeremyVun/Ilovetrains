@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  journeyDetail, journeyKey, departureKey, legsOf, modeWords, platformChip, platformNumber,
+  arrivalMs, journeyDetail, journeyKey, departureKey, legsOf, modeWords, platformChip, platformNumber,
   transferPlatformChip, TIGHT_CHANGE_MIN
 } from '../js/journey.js';
 import {
@@ -231,6 +231,14 @@ test('a journey with no legDetail renders as the single leg it describes', () =>
   assert.equal(legs[0].line.name, 'T1');
   const m = journeyDetail(journey, NOW, { fromName: 'Central Station', toName: 'Parramatta Station' });
   assert.deepEqual(m.steps.map((s) => s.time), ['22:48', '23:17']);
+});
+
+test('effective arrival follows the final service leg before the summary', () => {
+  const journey = structuredClone(transferJourneys()[0]);
+  const finalArrival = Date.parse(journey.legDetail.at(-1).arrival.estimated);
+  journey.arrival.estimated = new Date(finalArrival - 12 * 60_000).toISOString();
+
+  assert.equal(arrivalMs(journey), finalArrival);
 });
 
 /* The steps behind the rider are quiet rather than gone — the ladder is how

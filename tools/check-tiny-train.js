@@ -61,7 +61,7 @@ async function check() {
           const box = button.getBoundingClientRect();
           if (box.width < 44 || box.height < 44) throw Error('train target smaller than 44px');
           for (const other of document.querySelectorAll('button, [role="button"]')) {
-            if (other === button || button.contains(other)) continue;
+            if (other === button || button.contains(other) || other.contains(button)) continue;
             const r = other.getBoundingClientRect();
             if (Math.min(box.right, r.right) > Math.max(box.left, r.left)
               && Math.min(box.bottom, r.bottom) > Math.max(box.top, r.top)) {
@@ -89,20 +89,43 @@ async function check() {
           if (Math.abs(stageBox.bottom - line.getBoundingClientRect().top) > 0.5) throw Error('train is not riding the trip line');
           return { width: box.width, height: box.height };
         })()`);
-        assert.equal(await evaluate(page, 'document.querySelectorAll(".tiny-train-car").length'), 6);
+        assert.equal(await evaluate(page, 'document.querySelectorAll(".tiny-train-car").length'), 8);
+        await evaluate(page, `(() => {
+          const cars = [...document.querySelectorAll('.tiny-train-car')];
+          if (cars.filter(car => car.classList.contains('lead')).length !== 2) throw Error('expected two cabs');
+          if (!cars[0].classList.contains('lead') || !cars.at(-1).classList.contains('lead')) throw Error('cabs must be terminal');
+          if (getComputedStyle(cars[0]).transform !== 'matrix(-1, 0, 0, 1, 0, 0)') throw Error('rear cab must face outward');
+          for (const [index, car] of cars.entries()) {
+            const doors = [...car.querySelectorAll('.tiny-train-passenger-door')];
+            if (doors.length !== 2 || car.querySelectorAll('.tiny-train-door-window').length !== 4) throw Error('car ' + index + ' needs paired passenger doors');
+            if (index > 0 && index < 7) {
+              if (car.querySelector('.tiny-train-nose, .tiny-train-windscreen, .tiny-train-headlight')) throw Error('middle car has cab hardware');
+              if (car.querySelector('.tiny-train-body').getAttribute('d') !== 'M1 3H39V15H1Z') throw Error('middle car ends must be square');
+            }
+            for (const window of car.querySelectorAll('.tiny-train-window')) {
+              const w = window.getBBox();
+              for (const door of doors) {
+                const d = door.getBBox();
+                if (Math.min(w.x + w.width, d.x + d.width) > Math.max(w.x, d.x)
+                  && Math.min(w.y + w.height, d.y + d.height) > Math.max(w.y, d.y)) throw Error('saloon window overlaps doorway');
+              }
+            }
+          }
+          if (document.querySelectorAll('.tiny-train-windscreen').length !== 2) throw Error('expected two windscreens');
+        })()`);
         await sleep(450);
         fs.writeFileSync(path.join(out, `${stem}-passing.png`), await screenshot(page));
         await evaluate(page, `(() => {
           document.querySelector('.tiny-train-trigger').click();
-          if (document.querySelectorAll('.tiny-train-car').length !== 6) throw Error('repeat tap changed carriage count');
+          if (document.querySelectorAll('.tiny-train-car').length !== 8) throw Error('repeat tap changed carriage count');
           const t = window.__trains;
           t.now = () => ${NOW + 60000};
           t.rerender();
           if (document.querySelector('.tiny-train-stage') !== window.trainStageBefore) throw Error('live repaint replaced train');
           if (document.querySelector('.hm-hd .sy-bar') === window.trainLineBefore) throw Error('live repaint retained stale journey markup');
-          if (document.querySelectorAll('.tiny-train-car').length !== 6) throw Error('live repaint lost carriages');
+          if (document.querySelectorAll('.tiny-train-car').length !== 8) throw Error('live repaint lost carriages');
           for (let i = 0; i < 80; i++) document.querySelector('.tiny-train-trigger').click();
-          if (document.querySelectorAll('.tiny-train-car').length !== 6) throw Error('repeat taps changed carriage count');
+          if (document.querySelectorAll('.tiny-train-car').length !== 8) throw Error('repeat taps changed carriage count');
         })()`);
         await sleep(150);
         fs.writeFileSync(path.join(out, `${stem}-long.png`), await screenshot(page));
@@ -128,7 +151,7 @@ async function check() {
           const trigger = document.querySelector('.tiny-train-trigger');
           if (scroller.scrollTop <= 0) throw Error('touch did not scroll trips');
           if (trigger.hidden) throw Error('trip-line control disappeared while only saved trips scrolled');
-          if (document.querySelectorAll('.tiny-train-car').length !== 6) throw Error('trip-list scroll interrupted header train');
+          if (document.querySelectorAll('.tiny-train-car').length !== 8) throw Error('trip-list scroll interrupted header train');
           if (trigger.getBoundingClientRect().bottom > scroller.getBoundingClientRect().top) throw Error('trip-line control overlaps saved trips');
           scroller.querySelector(':scope > div:last-child').remove();
           scroller.scrollTop = 0;
@@ -146,16 +169,26 @@ async function check() {
         await evaluate(page, 'document.querySelector(".tiny-train-trigger").focus()');
         await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
         await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
-        assert.equal(await evaluate(page, 'document.querySelectorAll(".tiny-train-car").length'), 6, 'Enter starts a train');
+        assert.equal(await evaluate(page, 'document.querySelectorAll(".tiny-train-car").length'), 8, 'Enter starts a train');
         await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 });
         await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 });
-        assert.equal(await evaluate(page, 'document.querySelectorAll(".tiny-train-car").length'), 6, 'Space ignores an active train');
+        assert.equal(await evaluate(page, 'document.querySelectorAll(".tiny-train-car").length'), 8, 'Space ignores an active train');
         await page.send('Emulation.setEmulatedMedia', { features: [
           { name: 'prefers-color-scheme', value: scheme },
           { name: 'prefers-reduced-motion', value: 'reduce' }
         ] });
         await evaluate(page, 'document.querySelector(".tiny-train-trigger").click()');
         await sleep(80);
+        await evaluate(page, `(() => {
+          const lane = document.querySelector('.tiny-train-stage').getBoundingClientRect();
+          const train = document.querySelector('.tiny-train-consist').getBoundingClientRect();
+          if (train.left < lane.left - .5 || train.right > lane.right + .5) throw Error('reduced train clipped by lane');
+          const cars = [...document.querySelectorAll('.tiny-train-car')];
+          for (const car of cars) {
+            const r = car.getBoundingClientRect();
+            if (r.left < lane.left - .5 || r.right > lane.right + .5) throw Error('reduced car clipped');
+          }
+        })()`);
         const position = await evaluate(page, 'getComputedStyle(document.querySelector(".tiny-train-consist")).transform');
         await sleep(350);
         assert.equal(await evaluate(page, 'getComputedStyle(document.querySelector(".tiny-train-consist")).transform'), position, 'reduced motion stays still');

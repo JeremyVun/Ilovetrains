@@ -131,9 +131,9 @@ midnight.
 The connection scan retains up to 72 origin services, keeps Pareto states by
 transfer count and incoming mode within each origin, and allows at most the
 transfer bound its caller passes; the router's own default is two. The planner
-derives that bound from the rider's transfer limit: two while the cap applies,
-two whenever the `transferLimit` flag is off, and four when the flag is on and
-the rider has chosen no limit. Four is what "no limit" can mean offline,
+derives that bound from the rider's transfer limit: zero for Direct only, two
+for Up to 2, and four for No limit while the flag is on; flag off uses two.
+Four is what "no limit" can mean offline,
 because the router's label state grows with the bound and no observed Sydney
 journey needs a third change. It starts with six hours of service and extends
 to 30 hours if it finds no viable journey or a long transfer still needs a
@@ -154,6 +154,47 @@ ferry, and seven plus three minutes between rail and ferry at Circular Quay.
 This is deliberately conservative but does not establish that every platform
 pair is reachable in that time. Cross-hub walks such as Wynyard–Barangaroo are
 not constructed offline. The online Trip Planner fallback covers those routes.
+
+### Weighted recommendation pass
+
+Keep the chronological board route and its existing limits. A separate
+recommendation result retains its own source in the planner/controller envelope
+so it is not lost by the board's prefix limit. Reuse loaded connections and
+realtime overlays; do not reload the timetable for each objective.
+Home recommends from the current time even when the chronological board starts
+15 minutes earlier to retain recently departed services.
+
+The recommendation pass examines the first 72 distinct eligible origin
+services in effective-departure order, without the board pass's sparse hourly
+sampling. Preserve the existing six/30-hour availability fallback. Within a
+seed, retain labels by transfer count and the existing feasibility state;
+select destination labels by the shared weighted tuple. Do not collapse
+states with different transfer counts to the earliest arrival. Continue past
+an earlier terminal arrival while another route can improve weighted cost.
+Retain the incoming trip and stop sequence for station feasibility. A label
+dominates another only when its visited stations and conditional long waits
+are subsets of the other's, with no worse arrival and deterministic ties.
+Do not retain waiting labels that have already used every permitted transfer.
+
+Before scanning, a trip/station graph computes a lower bound on changes still
+needed to reach the destination. It deliberately ignores clocks, direction and
+transfer restrictions, so pruning paths beyond the remaining change allowance
+cannot discard a feasible route. Both passes check cancellation during graph
+construction and connection scanning. iOS routes an immutable snapshot outside
+the planner actor, then validates the generation before publishing it.
+
+A connection/next seed can only be pruned by time once its departure exceeds
+the best cost, not the best arrival. Keep existing pickup/dropoff, transfer
+floors, mode changes, loop exclusion and conditional long-wait rules. Resolve
+long-wait exclusion before choosing the final result: the scan must also
+reach the maximum unresolved long-wait endpoint among candidate paths, or
+exhaust its resource bound. Enough board rows is not a recommendation stopping
+condition. If 72 seeds or timetable coverage truncate the pass, return the
+best eligible result found, not an empty answer or an exhaustive-search claim.
+
+Use existing native source precedence: a successful online answer owns future
+services; local recommendation is used when online is unavailable. Retained
+observations must not lose known delays to an unobserved schedule result.
 
 ## Realtime snapshots
 

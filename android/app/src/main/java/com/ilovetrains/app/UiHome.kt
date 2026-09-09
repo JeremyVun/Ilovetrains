@@ -47,19 +47,25 @@ fun HomeScreen(state: AppState, actions: UiActions) {
     val board = state.homeBoard ?: state.board
     val focusJourney = state.focus?.journey
     val alternatives = state.focus?.alternatives ?: board
+    val maxTransfers = state.transferLimit?.maxTransfers
     val retainedJourney = retainedHomeJourney(board, state.now)
     val firstFuture = retainedJourney ?: board?.journeys?.firstOrNull {
         journeyAllowed(it, state.enabledModes) && it.effectiveDeparture >= state.now
     }
-    val firstRunning = retainedJourney?.takeUnless { it.cancelled }
-        ?: board?.journeys?.firstOrNull { journeyAllowed(it, state.enabledModes) && !it.cancelled && it.effectiveDeparture >= state.now }
-    val focusReplacement = focusJourney?.takeIf { it.cancelled && state.now < it.effectiveDeparture }?.let { cancelled ->
-        alternatives?.journeys?.firstOrNull {
-            journeyAllowed(it, state.enabledModes) && !it.cancelled && it.effectiveDeparture > cancelled.effectiveDeparture
-        }
+    val recommendation = board?.let {
+        selectRecommendation(it.recommendationCandidates(state.now, TransferConstraint(maxTransfers)), state.now, state.enabledModes, maxTransfers)
+            ?.let { candidate -> RecommendationResult(candidate.journey, candidate.source) }
     }
-    val journey = focusReplacement ?: focusJourney ?: firstRunning ?: firstFuture
-    val displayBoard = if (focusReplacement != null) alternatives else state.focus?.board ?: board
+    val firstRunning = retainedJourney?.takeUnless { it.cancelled } ?: recommendation?.journey
+    val replacement = focusJourney?.takeIf { it.cancelled && state.now < it.effectiveDeparture }?.let {
+        alternatives?.let { candidateBoard -> selectRecommendation(
+            candidateBoard.recommendationCandidates(state.now, TransferConstraint(maxTransfers)),
+            state.now, state.enabledModes, maxTransfers) }
+    }
+    val focusReplacement = replacement?.journey
+    val journey = focusReplacement ?: focusJourney ?: firstRunning
+    val displayBoard = if (focusReplacement != null) replacement.source else state.focus?.board
+        ?: recommendation?.takeIf { it.journey.key == journey?.key }?.source ?: board
     val cancelledLeadTime = when {
         focusReplacement != null -> focusJourney?.effectiveDeparture
         focusJourney == null && firstFuture?.cancelled == true && firstRunning != null -> firstFuture.effectiveDeparture
@@ -120,18 +126,25 @@ private fun SmartLoadingHeader(state: AppState, board: BoardData?, actions: UiAc
 private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardData?, journey: Journey,
                         cancelledLeadTime: Long?, actions: UiActions) {
     val c = LocalTrainColors.current
+    val maxTransfers = state.transferLimit?.maxTransfers
     val fig = figureFor(journey, board, state.now)
     val first = journey.legs.first()
     val focus = state.focus
     val focused = focus != null && cancelledLeadTime == null
     val explicitlyPinned = focused && focus?.pinned == true
     val departed = focused && state.now >= journey.effectiveDeparture
-    val completed = state.focusComplete || state.now >= journey.effectiveArrival
-    val directionFigure = if (departed && !completed) {
+    val completed = state.focusComplete || state.arrival?.state == ArrivalState.Arrived
+    val overdue = focused && state.now >= journey.effectiveArrival && !completed
+    val directionFigure = if (overdue) {
+        val past = ((state.now - journey.effectiveArrival) / 60_000).toInt()
+        Figure(if (state.arrival?.moving == true && past > 0) past.toString() else "—",
+            if (state.arrival?.moving == true && past > 0) "min" else "",
+            if (state.arrival?.moving == true && past > 0) "Past estimate" else "Last estimate", past = true)
+    } else if (departed && !completed) {
         directionFigureFor(journey, state.now) ?: fig
     } else fig
     val late = minutesBetween(journey.departure, journey.effectiveDeparture) > 0
-    val focusState = focus?.let { focusStatus(it, state.now, state.focusComplete) }
+    val focusState = focus?.let { focusStatus(it, state.now, state.focusComplete, state.arrival) }
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().heightIn(min = if (explicitlyPinned) 44.dp else 22.dp).padding(horizontal = PagePadding), verticalAlignment = Alignment.CenterVertically) {
             val status = when {
@@ -159,7 +172,8 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
             Spacer(Modifier.weight(1f))
             Freshness(board, state.now)
         }
-        Row(Modifier.fillMaxWidth().padding(horizontal = PagePadding, vertical = 10.dp), verticalAlignment = Alignment.Top) {
+        Row(Modifier.fillMaxWidth().clickable(role = Role.Button) { actions.openJourney(journey) }
+            .testTag("home-journey").padding(horizontal = PagePadding, vertical = 10.dp), verticalAlignment = Alignment.Top) {
             Column(Modifier.width(104.dp)) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(directionFigure.value, color = if (late) c.warning else c.ink,
@@ -190,17 +204,32 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
                         textAlign = TextAlign.End, maxLines = 2, overflow = TextOverflow.Clip)
                     Text(clockTime(journey.effectiveArrival), color = c.ink2, fontSize = 20.sp,
                         fontWeight = FontWeight.Light, modifier = Modifier.padding(top = 7.dp))
+                    if (overdue) Label("Last estimate", Modifier.padding(top = 4.dp), color = c.ink3, size = 10)
                 }
             }
         }
+        val overdueUnconfirmed = overdue
+        val progress = if (departed && !completed) {
+            val duration = (journey.effectiveArrival - journey.effectiveDeparture).coerceAtLeast(1)
+            if (overdueUnconfirmed) .98f else {
+                val elapsed = ((state.now - journey.effectiveDeparture) / 60_000) * 60_000
+                (elapsed.toFloat() / duration).coerceIn(0f, .999f)
+            }
+        } else null
         JourneyAxis(journey, Modifier.fillMaxWidth().padding(horizontal = PagePadding), large = true, tinyTrain = true,
-            showCap = !departed, progress = if (departed && !completed) {
-                ((state.now - journey.effectiveDeparture).toFloat() /
-                    (journey.effectiveArrival - journey.effectiveDeparture).coerceAtLeast(1)).coerceIn(0f, 1f)
-            } else null)
+            showCap = !departed, progress = progress?.takeIf { !overdueUnconfirmed || state.arrival?.moving == true },
+            travelledAt = progress?.let { journey.effectiveDeparture +
+                ((journey.effectiveArrival - journey.effectiveDeparture) * it).toLong() })
         val instruction = when {
             cancelledLeadTime != null -> "${clockTime(cancelledLeadTime)} cancelled · next ${first.modeName()}"
+            completed && state.arrival?.basis == ArrivalBasis.Estimate -> if (journey.legs.any { it.estimatedArrival != null })
+                "The last arrival estimate has passed. The return trip is ready."
+                else "The scheduled trip has ended. The return trip is ready."
             completed -> "The journey has finished"
+            overdueUnconfirmed && state.arrival?.moving == true -> "Still on the way to ${journey.legs.last().to.shortName}."
+            overdueUnconfirmed && state.arrival?.state == ArrivalState.CheckingArrival ->
+                "Checking arrival at ${journey.legs.last().to.shortName}."
+            overdueUnconfirmed -> "Arrival time needs an update."
             departed -> focusedInstruction(journey, state.now)
             else -> first.headsign.ifBlank { first.to.shortName }
         }
@@ -226,16 +255,17 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
         }
         if (!departed) {
             val following = alternatives ?: board
-            following.journeys.firstOrNull { candidate -> journeyAllowed(candidate, state.enabledModes) &&
-                !candidate.cancelled && candidate.effectiveDeparture > journey.effectiveDeparture &&
-                !(candidate.departure == journey.departure && candidate.legs.firstOrNull()?.line == journey.legs.firstOrNull()?.line) }?.let { next ->
+            earliestAlternative(following.recommendationCandidates(state.now, TransferConstraint(maxTransfers)), journey, state.now,
+                state.enabledModes, maxTransfers)?.let { alternative ->
+                val next = alternative.journey
                 Rule(Modifier.padding(horizontal = PagePadding))
                 Row(Modifier.fillMaxWidth().heightIn(min = 44.dp).padding(horizontal = PagePadding)
                     .clickable(role = Role.Button) { actions.openJourney(next) }, verticalAlignment = Alignment.CenterVertically) {
                     val nextMode = next.legs.firstOrNull()?.mode
-                    Label("Next ${when (nextMode) { "ferry" -> "ferry"; "metro" -> "metro"; "train" -> "train"; else -> "service" }}",
+                    val relation = if (next.effectiveDeparture < journey.effectiveDeparture) "Earlier" else "Next"
+                    Label("$relation ${when (nextMode) { "ferry" -> "ferry"; "metro" -> "metro"; "train" -> "train"; else -> "service" }}",
                         Modifier.width(96.dp), size = 9)
-                    val nextFigure = nextServiceFigure(next, following, state.now)
+                    val nextFigure = nextServiceFigure(next, alternative.source, state.now)
                     Text(nextFigure, color = c.ink,
                         fontSize = 17.sp, fontWeight = FontWeight.Light)
                     Spacer(Modifier.weight(1f))
@@ -268,7 +298,7 @@ private fun SavedTripRow(trip: SavedTrip, state: AppState, actions: UiActions, m
     val highlighted = focused || shown
     val metadata = state.tripMetadata[trip.id].orEmpty()
     val status = state.focus?.takeIf { it.tripId == trip.id }
-        ?.let { savedTripFocusStatus(it, state.now, state.focusComplete) }
+        ?.let { savedTripFocusStatus(it, state.now, state.focusComplete, state.arrival) }
         ?: if (shown) "Shown above" else ""
     val summary = listOf(status, metadata).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "Saved trip" }
     val justAdded = state.justAddedTripId == trip.id && shown && state.focus == null

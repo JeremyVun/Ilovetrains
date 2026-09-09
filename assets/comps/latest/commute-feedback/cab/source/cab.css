@@ -1,0 +1,29 @@
+/* Cab-only composition. Product layout and colour tokens come from base.css. */
+.cab-comp .hm-hd { padding-top: 26px; }
+.cab-comp .tiny-train-lane > .tiny-train-stage { overflow: visible; }
+.cab-comp .tiny-train-consist { left: 50%; transform: translateX(-50%); }
+.cab-comp .tiny-train-car { width: 40px; height: 18px; }
+.cab-comp .tiny-train-passenger-door { fill: #F9B928; }
+.cab-comp .tiny-train-door-window { fill: #4A3328; }
+.cab-comp .tiny-train-door-seam {
+  fill: none;
+  stroke: #4A3328;
+  stroke-width: .5;
+}
+
+html[data-theme="light"] .cab-comp .tiny-train-passenger-door { fill: #E4A20C; }
+html[data-theme="light"] .cab-comp .tiny-train-door-window { fill: #3B2A22; }
+html[data-theme="light"] .cab-comp .tiny-train-door-seam { stroke: #3B2A22; }
+
+.cab-comp .cab-note {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  margin-top: 18px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.cab-comp .cab-rule { margin-top: 36px; }

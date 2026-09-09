@@ -1,0 +1,60 @@
+/* Round-specific composition only. All product geometry, type, colours and
+   controls come from base.css, copied verbatim from web/app.css. */
+
+.commute-home .hm-hd { padding-bottom: 12px; }
+.commute-home .hm-sign { overflow: visible; text-overflow: clip; }
+.commute-home .hm-rule { margin-top: 0; }
+.commute-home .tripr { cursor: default; }
+.commute-home .sy-bar .travelled { z-index: 1; }
+.commute-home .sy-bar .sy-mk { z-index: 3; }
+.commute-home .sy-bar .sy-p { z-index: 4; }
+.commute-home .sy-bar > .sy-pstn { z-index: 4; }
+
+/* C1 borrows the product's existing done treatment: line colour remains, but
+   ground ink quietens the exact portion already travelled. */
+html[data-concept="fade"] .travelled {
+  left: 0;
+  background: var(--bg);
+  opacity: .62;
+}
+
+/* Once the next leg starts, both transfer chips receive the same page-ground
+   overlay as the travelled line. The overlay sits above both fill and numeral,
+   so no saturated route colour can show through the faded number. */
+html[data-concept="fade"] .sy-p.completed::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  border-radius: inherit;
+  background: var(--bg);
+  opacity: .62;
+  pointer-events: none;
+}
+
+html[data-concept="fade"] .uncertain-copy { color: var(--ink-2); }
+.hm-estimate {
+  display: block;
+  margin-top: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.cab-comp .hm-hd { padding-top: 26px; }
+.cab-comp .tiny-train-lane > .tiny-train-stage { overflow: visible; }
+.cab-comp .tiny-train-consist { left: 50%; transform: translateX(-50%); }
+.cab-comp .cab-note {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  margin-top: 18px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.cab-comp .cab-rule { margin-top: 36px; }

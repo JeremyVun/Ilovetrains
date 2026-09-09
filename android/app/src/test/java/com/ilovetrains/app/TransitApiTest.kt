@@ -1,6 +1,10 @@
 package com.ilovetrains.app
 
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -38,6 +42,32 @@ class TransitApiTest {
         assertNull(asked.single().substringAfter('?').split('&').find { it.startsWith("transferLimit=") })
         assertTrue(asked.single().contains("modes=ferry%2Cmetro%2Ctrain"))
         assertTrue(asked.single().contains("at=2026-09-05T22%3A00%3A00Z"))
+    }
+
+    @Test fun directOnlyIsSentAsNumericZero() {
+        val asked = served(board) { api -> api.departures(alpha, bravo, AllModes, transferLimit = 0) }
+        assertTrue(asked.single().endsWith("&transferLimit=0"))
+    }
+
+    @Test fun cancelledPageDisconnectsItsBlockedHttpRequest() = runBlocking {
+        val server = ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"))
+        val received = CompletableDeferred<Unit>()
+        val serving = thread(isDaemon = true) {
+            server.accept().use { socket ->
+                socket.soTimeout = 3000
+                val reader = socket.getInputStream().bufferedReader()
+                while (!reader.readLine().isNullOrEmpty()) Unit
+                received.complete(Unit)
+                runCatching { reader.read() }
+            }
+        }
+        try {
+            val request = async { TransitApi("http://127.0.0.1:${server.localPort}").departures(alpha, bravo, AllModes) }
+            withTimeout(2000) { received.await() }
+            val before = System.nanoTime()
+            request.cancelAndJoin()
+            assertTrue("cancel waited for the socket timeout", (System.nanoTime() - before) / 1_000_000 < 2000)
+        } finally { server.close(); serving.join(4000) }
     }
 
     @Test fun flagsReadBooleansAndIgnoreEverythingElse() {
