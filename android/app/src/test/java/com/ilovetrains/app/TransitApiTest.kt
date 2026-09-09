@@ -47,7 +47,7 @@ class TransitApiTest {
 
     @Test fun directOnlyIsSentAsNumericZero() {
         val asked = served(board) { api -> api.departures(alpha, bravo, AllModes, transferLimit = 0) }
-        assertTrue(asked.single().endsWith("&transferLimit=0"))
+        assertTrue(asked.single().path.endsWith("&transferLimit=0"))
     }
 
     @Test fun cancelledPageDisconnectsItsBlockedHttpRequest() = runBlocking {
