@@ -86,7 +86,13 @@ sandbox_workspace_write.network_access=false`. `codex sandbox
 
 **This repo.** The Go server has no fixture mode; `TFNSW_BASE_URL` and
 `TFNSW_FEED_BASE_URL` can point at any host, and `tools/fixtures/` holds 27
-captured upstream responses used by Go tests through `httptest`. The web
+captured upstream responses used by Go tests through `httptest`. The server
+calls exactly one Trip Planner path upstream, `/trip`
+(`internal/tfnsw/client.go:146`); `/api/v1/stops` searches the bundled
+station list locally, and the `departure_mon` and `stop_finder` fixtures
+are probe captures used only by tests. The native feed client calls the
+GTFS schedule and realtime paths listed in `internal/native/feed.go`
+(verified 2026-09-09, build session). The web
 client has an offline test lane (`web/test/`) and `tools/shoot-states.js`
 freezes the network, seeds state and pins the clock. `AGENTS.md` is already
 a complete brief for an agent verifying a change.
@@ -485,7 +491,7 @@ and reading its grade without shelling out. Two cautions decide the shape:
 | Repo | Change | Needed by |
 | --- | --- | --- |
 | `../playtest` | Deterministic origin guard in the web driver: abort every request and refuse every navigation whose origin is not `base_url` or `app.allowed_origins`, enforced in the driver, not the prompt. | Investigation against the production ring. |
-| `../playtest` | `app.clock` for the web driver: a fixed instant and timezone applied with Playwright's clock API at context creation, honoured in record and act alike. | Stable regression baselines (Phase 3). |
+| `../playtest` | `app.clock` for the web driver: a fixed instant and timezone applied with Playwright's clock API at context creation, honoured in record and act alike. Built in this run as `../playtest/docs/backlog/web-clock/` (owner 2026-09-09). | Stable regression baselines (Phase 3). |
 | `../playtest` | Repair claim on findings: lease with TTL, heartbeat, release with outcome, compare-and-set, `external_ref` set on release. | Repair worker. |
 | GitHub | Fine-grained token for the daemon: contents, pull requests and issues on the target repos. | Owner surface. |
 | infra `../projects` | `stacks/ilovetrains` pins `ILOVETRAINS_VERSION` in `config.env` and the compose image tag reads it, replacing `latest`. | Release worker. |
@@ -514,7 +520,7 @@ prerequisites.
 | D10 | Playtest MCP | Later, one MCP per privilege, tool list bound to token role. Not required for version one. | **Agreed in principle**, owner 2026-09-09. |
 | D11 | Who arbitrates a finding between daemons? | A repair claim (lease) on the finding row in playtest; the daemon renews it while its fixer runs; queue is the findings list, events only wake the daemon. | **Agreed as unavoidable**, owner 2026-09-09. |
 | D12 | How the daemon drives Codex | `@openai/codex-sdk` (same binary and sandbox as `codex exec`, plus typed events and thread resume). Not the OpenAI Agents SDK, which bills API usage. | open, no objection raised 2026-09-09 |
-| D14 | How a regression case pins the browser clock | Add `app.clock` (fixed instant and timezone, applied with Playwright's clock API at context creation) to playtest's web driver. It is generic, every project replaying time-dependent screens needs it, and it keeps test hooks out of the app. The alternative is an app-side override read from storage state on non-production hosts, which ships without a playtest change but puts a test seam in the product. | **Playtest `app.clock`**, owner 2026-09-09. Phase 3 baselines wait on it. |
+| D14 | How a regression case pins the browser clock | Add `app.clock` (fixed instant and timezone, applied with Playwright's clock API at context creation) to playtest's web driver. It is generic, every project replaying time-dependent screens needs it, and it keeps test hooks out of the app. The alternative is an app-side override read from storage state on non-production hosts, which ships without a playtest change but puts a test seam in the product. | **Playtest `app.clock`**, owner 2026-09-09. Same day, at build start, the owner ruled it is built in `../playtest` as part of this run (its own item, `docs/backlog/web-clock/` there) so Phase 3 records its baseline now rather than waiting. |
 | D13 | Connectivity of the mac mini | Outbound HTTPS only, to analytics, playtest and GitHub. No inbound path, no tunnel. | Owner 2026-09-09: no tunnel; satisfied by D6. |
 
 ## Relationship to `commute-feedback`

@@ -5,9 +5,16 @@ daemon, the playtest lease and origin guard, the analytics columns and the
 gateway model list are other repositories' items. Every phase here is
 useful on its own and nothing in it waits on those items.
 
-Phase 0 is a global pass and runs alone. Phases 1 to 3 are independent and
-may fork in parallel after it. Phase 4 is the verification wave and runs
-last on the final sources.
+Owner ruling 2026-09-09 (build start): playtest's `app.clock` is built in
+this run too, as `../playtest/docs/backlog/web-clock/`, so Phase 3 records
+its baseline here rather than waiting.
+
+Waves. Phases 0, 1 and 2 and the playtest clock item own disjoint files and
+fork in parallel from main (each in its own `/private/tmp/hillclimb-*`
+worktree). A Fable 5 adversarial review runs between each build wave and
+its fix wave (owner approval 2026-09-09). Phase 3 forks from the merged
+result of Phase 2 and the landed playtest clock. Phase 4 is the
+verification wave and runs last on the final sources.
 
 ## Phase 0: the fixer contract
 
@@ -89,17 +96,22 @@ one paragraph on running without a key).
 
 Seam contract:
 
-- The stub listens on a port given by `--port` and serves the Trip Planner
-  paths the client calls (`internal/tfnsw/client.go`: `trip`,
-  `departure_mon`, `stop_finder`) and the feed base paths used by
-  `internal/native`. The server is pointed at it with `TFNSW_BASE_URL`
-  and `TFNSW_FEED_BASE_URL` and any non-empty `TFNSW_API_KEY`.
+- The stub listens on a port given by `--port` and serves the one Trip
+  Planner path the server calls, `/trip` (`internal/tfnsw/client.go:146`;
+  corrected 2026-09-09: `departure_mon` and `stop_finder` are probe-only
+  fixtures and `/api/v1/stops` is served from the bundled station list), and
+  the GTFS schedule and realtime feed paths in `internal/native/feed.go`.
+  The server is pointed at it with `TFNSW_BASE_URL` and
+  `TFNSW_FEED_BASE_URL` and any non-empty `TFNSW_API_KEY`. The server must
+  boot and answer `/api/v1/departures` from the bundled bootstrap timetable
+  when a feed path has no fixture: an unmatched feed request gets the same
+  404 body as any other unmatched path, and the realtime refresh already
+  logs and retains on error.
 - `stub-routes.json` maps a request to a fixture by path plus a subset of
-  query parameters (for trips: `name_origin`, `name_destination`; for
-  departures: the stop; for stop finder: `name_sf`). The first matching
-  route wins; no match returns 404 with a JSON body naming the path and
-  the query so a fixer knows which fixture to capture with
-  `tools/probe-tfnsw.sh`.
+  query parameters (for `/trip`: `name_origin` and `name_destination`; for
+  feed paths: the path alone). The first matching route wins; no match
+  returns 404 with a JSON body naming the path and the query so a fixer
+  knows which fixture to capture with `tools/probe-tfnsw.sh`.
 - Fixtures are served verbatim. Each route records an `anchor`: the
   instant at which the fixture's departures read as a few minutes ahead.
   A regression case pins the browser clock to that anchor (D14), so no
@@ -116,12 +128,34 @@ the fixture's journeys. Done
 marker: the smoke script passes with no `TFNSW_API_KEY` present in the
 environment.
 
+## Phase 2p: playtest `app.clock` (in `../playtest`)
+
+Owns: `../playtest/docs/backlog/web-clock/design.md` (the item), the
+playtest web driver and config resolution (`packages/core/src/types.ts`,
+`config/resolve.ts`, `driver.ts`, `drivers/web.ts`), the case schemas, the
+core tests, `docs/contracts/engine.md` and `README.md` there. Nothing in
+this repo.
+
+Seam contract: `app.clock: { time: <RFC 3339 instant>, timezone: <IANA> }`
+is a web-only environment key, valid in `playtest.yaml` defaults, a case
+and an `app.envs` overlay like `viewport`. It is applied at browser context
+creation for record, act and heal alike: `timezoneId` on the context and
+Playwright's clock API so that `Date.now()` and `new Date()` in the page
+return the fixed instant on every call while timers keep running (the app's
+refresh loops must not stall). It is echoed in the resolved case and the
+run manifest. Omitted means real time, as today. A mobile or API case that
+declares it is a configuration error naming the key.
+
+Verify: `npm run typecheck`, `npm run test:core`, and one real Chromium
+probe under `test:browser` that loads a page printing `new Date()` twice a
+few hundred milliseconds apart and asserts both equal the fixed instant in
+the given timezone. Done marker: landed on playtest `main`, since
+`/opt/homebrew/bin/playtest` runs that checkout's source directly.
+
 ## Phase 3: checked-in regression suite
 
-Depends on playtest `app.clock` (D14, ruled 2026-09-09): until the
-browser clock can be pinned per case, recorded baselines will not replay
-on a later day. Build the script, suite layout and seed case regardless;
-record and commit the baseline once the playtest change ships.
+Depends on Phase 2 (the stub) and Phase 2p (`app.clock`, D14). Forks from
+the merged result of both.
 
 Owns: `playtest/regressions/` (new: `playtest.yaml`, `stories/`, `state/`,
 `results/`), `tools/playtest-regressions.sh` (new), `AGENTS.md` (gate
