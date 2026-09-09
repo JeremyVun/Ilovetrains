@@ -1,0 +1,191 @@
+# Feedback hillclimbing: build plan (this repository)
+
+Scope: only the "this repo" row of the work table in `design.md`. The
+daemon, the playtest lease and origin guard, the analytics columns and the
+gateway model list are other repositories' items. Every phase here is
+useful on its own and nothing in it waits on those items.
+
+Phase 0 is a global pass and runs alone. Phases 1 to 3 are independent and
+may fork in parallel after it. Phase 4 is the verification wave and runs
+last on the final sources.
+
+## Phase 0: the fixer contract
+
+Owns: `docs/contracts/hillclimbing.md` (new), `docs/operations/deploy.md`
+(release PR flow), `AGENTS.md` (one pointer under "Read first").
+
+The contract states, for any automated fixer working in this repo:
+
+- A bug is behaviour that contradicts a file in `docs/contracts/`. The
+  fixer cites the file and section in its PR. Anything the contracts do not
+  promise is a feature and is out of bounds.
+- Never edit `docs/contracts/`, `assets/comps/latest/`,
+  `tools/baselines/`, or anything in `web/sw.js` other than the `VERSION`
+  constant. A fix that seems to need any of these stops and reports
+  `needs_owner`. The `VERSION` bump is mandatory in the same change as any
+  edit to a `SHELL` file, exactly as `AGENTS.md` already requires.
+- Every fix carries a regression: a Go test on a captured fixture for API
+  behaviour, a `web/test/` case or `shoot-states.js` state for client
+  logic, and a `playtest/regressions/` journey case for anything a user
+  sees. The regression must fail on `main` and pass on the branch, and the
+  PR shows both runs.
+- Branch `fix/<attempt-id>` where the attempt id is the finding id plus an
+  attempt number. PR title is the finding title. The PR
+  description's first line is the changelog entry, under sixty words, in
+  the voice of `user-facing-copy`; then the finding link, the contract
+  cited, gate results and the two regression runs.
+- The release PR is `release/<version>`: bumps `web/js/version.js` and
+  lists each merged fix's first line under the version. The service worker
+  `VERSION` needs no release-time bump because every fix bumped it in its
+  own change. Merging it is the deploy trigger; the daemon deploys that
+  exact merge commit and comments the job id.
+
+`deploy.md` gains a short "Release pull request" section describing that
+flow next to the existing manual steps, which remain valid, and its step 2
+notes that the stack pins the numbered tag through `config.env` once the
+infra change lands.
+
+Verify: a reader with only `AGENTS.md` and the contract can answer "may I
+change this file" for every path in the repo. Done marker: the contract
+exists, `AGENTS.md` links it, and `deploy.md` describes the release PR.
+
+## Phase 1: feedback carries platform and version
+
+Owns: `web/js/settings.js`, its tests under `web/test/`, `web/sw.js`
+(`VERSION` bump: `settings.js` is a `SHELL` file), `web/js/version.js`
+(patch bump), `android/app/src/main/java/com/ilovetrains/app/TransitApi.kt`
+and its unit test, `ios/ILoveTrains/Core/TransitAPI.swift` and its test,
+`docs/contracts/analytics.md` ("Explicit feedback").
+
+Seam contract. The submission body becomes exactly
+`{project, category, feedback, platform, clientVersion}`:
+
+- `platform` is one of `web`, `android`, `ios`, fixed per client.
+- `clientVersion` is the canonical version string: `VERSION` from
+  `web/js/version.js` on web, `BuildConfig.VERSION_NAME` on Android (already
+  derived from the same file by `build.gradle.kts:16`), and
+  `CFBundleShortVersionString` on iOS (`MARKETING_VERSION`, which the iOS
+  release process keeps equal to `version.js`).
+- Neither field is personal and neither enters `/e`, storage, logs or the
+  service worker cache; the existing sentence in `analytics.md` extends to
+  them.
+- Size arithmetic: the two fields add at most 60 bytes of encoded JSON.
+  The message cap stays 8,192 bytes and the body cap stays 10,240, so the
+  worst case is 8,192 + 60 + the fixed 70-byte envelope, under the cap.
+- Analytics ignores the fields until its own item stores them; the request
+  must succeed with 201 either way (the [verify] item in `design.md`).
+
+Verify: `(cd web && npm test)`; `tools/check-settings-browser.js` (page-local
+feedback fixture) asserts the exact body; `tools/build-android.sh --unit`
+and `tools/build-ios.sh --unit` with the feedback tests asserting the body.
+No visual change, so no visual-regression run. Done marker: all three
+clients' tests pin the five-field body and `analytics.md` states it.
+
+## Phase 2: fixture-backed TfNSW stub
+
+Owns: `tools/tfnsw-stub/` (new Go program), `tools/fixtures/stub-routes.json`
+(new), `tools/README.md` (one section), `AGENTS.md` ("Local development":
+one paragraph on running without a key).
+
+Seam contract:
+
+- The stub listens on a port given by `--port` and serves the Trip Planner
+  paths the client calls (`internal/tfnsw/client.go`: `trip`,
+  `departure_mon`, `stop_finder`) and the feed base paths used by
+  `internal/native`. The server is pointed at it with `TFNSW_BASE_URL`
+  and `TFNSW_FEED_BASE_URL` and any non-empty `TFNSW_API_KEY`.
+- `stub-routes.json` maps a request to a fixture by path plus a subset of
+  query parameters (for trips: `name_origin`, `name_destination`; for
+  departures: the stop; for stop finder: `name_sf`). The first matching
+  route wins; no match returns 404 with a JSON body naming the path and
+  the query so a fixer knows which fixture to capture with
+  `tools/probe-tfnsw.sh`.
+- Fixtures are served verbatim. Each route records an `anchor`: the
+  instant at which the fixture's departures read as a few minutes ahead.
+  A regression case pins the browser clock to that anchor (D14), so no
+  timestamp rewriting is needed and the GTFS-RT `.pb` fixtures need no
+  special handling. `--list-anchors` prints route and anchor for case
+  authors.
+- The stub has no key, reads only `tools/fixtures/`, and logs one line per
+  request.
+
+Verify: `go test ./tools/tfnsw-stub/...` covers route matching, the 404
+body and anchor listing; a smoke script in the README boots stub and
+server and fetches `/api/v1/trips` for Central to Parramatta and receives
+the fixture's journeys. Done
+marker: the smoke script passes with no `TFNSW_API_KEY` present in the
+environment.
+
+## Phase 3: checked-in regression suite
+
+Depends on playtest `app.clock` (D14, ruled 2026-09-09): until the
+browser clock can be pinned per case, recorded baselines will not replay
+on a later day. Build the script, suite layout and seed case regardless;
+record and commit the baseline once the playtest change ships.
+
+Owns: `playtest/regressions/` (new: `playtest.yaml`, `stories/`, `state/`,
+`results/`), `tools/playtest-regressions.sh` (new), `AGENTS.md` (gate
+list), `tools/README.md` (one section).
+
+Seam contract:
+
+- `playtest.yaml` declares `app.driver: web`, `mode: journey`, and
+  `base_url` from `PLAYTEST_BASE_URL`, defaulting to the port the script
+  chooses. Cases live under `stories/`. Each case sets `app.clock` to the
+  anchor of the fixtures it relies on with timezone `Australia/Sydney`,
+  and the script exports the same `TZ` for the server and the stub. Storage-state seeds under `state/` are synthetic and reuse the
+  shapes already committed to the hosted `user-stories` suite.
+- `tools/playtest-regressions.sh` boots the Phase 2 stub and the Go server
+  on free ports, exports the base URL, runs
+  `playtest ./playtest/regressions --json`, tears both down, and exits with
+  playtest's code: 0 pass, 1 gate failure, 2 infrastructure. It passes
+  `--fresh` through when given.
+- The gate command is `playtest ./playtest/regressions --no-grade --json`
+  with `PLAYTEST_LLM_BASE_URL` and every model key unset. That is
+  playtest's only keyless path (`packages/cli/src/cli.ts:540-548`):
+  committed baselines replay, drift or an action failure fails the run
+  because no model is available to heal (`docs/contracts/engine.md:1022`),
+  and a case without a baseline fails preflight instead of recording.
+  Recording a new case is a separate, explicit step the fixer runs with
+  `PLAYTEST_LLM_BASE_URL=http://127.0.0.1:8900`; the resulting baseline
+  under `results/` is committed with the case. Cases use only
+  deterministic `success:` checks; the natural language `assert` is
+  rejected by the script before the run.
+- One seed case proves the lane: "Home answers for a saved trip" using a
+  seed with one saved trip whose fixture is in `stub-routes.json`, with a
+  `success:` gate on `element_exists` for the smart header and an
+  `element_exists` text selector for the destination name. Web cases may
+  use only `element_exists`, `url_matches`, `api_called`,
+  `console_errors`, `accessibility_violations` and `invariant`; the
+  script rejects any other kind, and `assert`, before the run. The `playtest-ci` skill's hard
+  rules apply: nobody edits `story:` or `success:` to make a failure pass.
+
+Verify: the script passes twice in a row, on different days or with the
+system clock moved, on the committed baseline with no LLM base URL set, fails with exit 1 when a baseline step is deliberately
+broken (no heal, no record), and exits 2 with a clear message when the stub port is
+unreachable. Done marker: the script is listed as a gate in `AGENTS.md`
+and passes on the final sources.
+
+## Phase 4: verification wave
+
+Owns nothing. Runs on the final merged sources of Phases 0 to 3:
+
+```sh
+go test ./...
+(cd web && npm test)
+tools/build-android.sh --unit
+tools/build-ios.sh --unit
+tools/playtest-regressions.sh
+```
+
+The Android and iOS full gates run only if Phase 1 touched anything beyond
+the feedback request body. Done marker: every command exits 0 and the
+results are recorded in this file with the commit they ran against.
+
+## Closeout
+
+Migrate the fixer contract (already durable in Phase 0), the stub and the
+regression suite's descriptions into `tools/README.md` and `AGENTS.md`,
+record the feedback body in `analytics.md`, add the daemon's requirements
+to `docs/operations/deploy.md`, and delete this folder. The daemon, lease,
+origin guard and analytics columns are tracked in their own repositories.
