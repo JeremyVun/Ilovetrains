@@ -134,19 +134,19 @@ Owner files: focused site verification tooling/tests only where reusable,
 tools/README.md if adding an instrument, approved site calibration updates.
 Scratch captures/reports stay in /tmp until final frames replace calibration.
 
-- [ ] Build/run actual site nginx container on an owned loopback port. Check
+- [x] Build/run actual site nginx container on an owned loopback port. Check
   /, /privacy/, /support/, health aliases, all assets, MIME/CSP/cache headers,
   mailto links and canonical/sitemap/robots metadata. Verify JS is packaged.
-- [ ] Real browser matrix: 320×740, 390×844, 412×732, 900×900, 1440×900, light
+- [x] Real browser matrix: 320×740, 390×844, 412×732, 900×900, 1440×900, light
   and dark. Verify exact viewport, no overflow, loaded images, undistorted
   content, readable headings, footer reachability and no excessive gaps.
-- [ ] Device matrix: desktop, Android, iPhone, iPad UA, touch MacIntel iPadOS,
+- [x] Device matrix: desktop, Android, iPhone, iPad UA, touch MacIntel iPadOS,
   ordinary desktop Mac and unknown/no-JS. Check real anchors and unsupported
   dialog fallback; click/open/Close/Escape, focus restoration and Tab order.
-- [ ] Real pointer and keyboard line activation at both ends; 44px hit targets,
+- [x] Real pointer and keyboard line activation at both ends; 44px hit targets,
   one consist for repeats, complete cleanup, reduced-motion visible full lead
   car at 320px, no console errors, network or storage writes from the action.
-- [ ] Inspect privacy/support public prose and email destinations, without
+- [x] Inspect privacy/support public prose and email destinations, without
   adding headings or disclosures beyond approved facts unless code requires it.
 - [ ] Run web unit suite and applicable icon/cache checks. Verify a cold and
   returning service-worker-controlled profile picks up new icon bytes; isolate
@@ -184,19 +184,19 @@ Owner files: task-owned commits in trains_app; ../projects/stacks/ilovetrainsapp
 image pin and necessary website-only infra docs; docs/operations/deploy.md.
 Read deploy-stack and applicable infra instructions first.
 
-- [ ] Commit only approved task paths/hunks. Choose next unused numbered
+- [x] Commit only approved task paths/hunks. Choose next unused numbered
   website version after checking current source/registry/infra; do not overwrite
   old 1.0.1 just because historical notes name it. Build from committed source.
-- [ ] Build/push explicit ilovetrainsapp target, update numbered infra pin,
+- [x] Build/push explicit ilovetrainsapp target, update numbered infra pin,
   commit/push infra and use sanctioned deploy command. No secrets required.
-- [ ] Verify public HTTPS all pages/health/assets, actual deployed bytes/version,
+- [x] Verify public HTTPS all pages/health/assets, actual deployed bytes/version,
   no-transform header, readable mailto destinations, absence of injected
   blocked email-decoding script/CSP errors. Drive real public phone and desktop.
 - [ ] For PWA icon delivery, release only a clean isolated app snapshot with
   the intended icon/cache change using the app runbook. Do not inadvertently
   include unrelated native/client working-tree work. If existing coordinated
   release work owns this, record the safe handoff rather than claiming shipped.
-- [ ] Report website deployment separately from native artifact distribution.
+- [x] Report website deployment separately from native artifact distribution.
   Never treat registry push or source push alone as proof of deployment.
 
 Gate: public website exactly reflects the verified release; any deployment
@@ -225,3 +225,21 @@ its independent 1.6.0 release; no unrelated native or web-client behavior is
 included in the website image. Native/PWA Sleepers artwork was committed in
 427b27c; its independent distribution/launcher gates remain outside this
 website release and must not be represented as completed by nginx checks.
+
+## Website release verification — 10 September 2026
+
+Source `78d5153d849f` is pushed to main. Website image `1.0.2` contains
+linux/amd64 and linux/arm64 manifests with digest
+`sha256:123f4f4bb68cf09f7bbbe5e69c94cc425b9c0e224edb4a70434e09db598c535c`.
+Infra commit `28823e5` pins it; syd1 deployment job
+`0c62b138ac0af9ebfb9b95bcdabc19a6` succeeded.
+
+Packaged browser verification passed 18 page/size/scheme captures, 86 rail
+interaction/lifecycle checks, eight device/fallback cases and six modal/focus
+checks. Independent Sol review has no unresolved findings. Both modal
+placements were driven with real pointer input after scrolling settled.
+Public HTTPS verification matched all 21 checked pages/assets/health paths to
+the committed source, with correct MIME, CSP, metadata and readable mailto
+links. HTML retains no-cache/no-transform; Cloudflare applies four-hour caching
+to static assets while retaining no-transform. All public asset bytes matched.
+The full native launcher/PWA delivery gates above remain separate work.

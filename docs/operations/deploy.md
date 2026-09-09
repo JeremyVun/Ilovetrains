@@ -47,6 +47,14 @@ Cloudflare from replacing email links with script-dependent obfuscation.
 [Website contract](../contracts/app-website.md)
 records copy, privacy and screenshot requirements.
 
+Latest website release: **1.0.2**, 10 September 2026, source `78d5153d849f`,
+infra pin `28823e5`. Deployment job `0c62b138ac0af9ebfb9b95bcdabc19a6`
+succeeded on syd1. The multi-architecture manifest digest is
+`sha256:123f4f4bb68cf09f7bbbe5e69c94cc425b9c0e224edb4a70434e09db598c535c`.
+Public verification matched 21 pages/assets/health paths to the release.
+Cloudflare preserves HTML no-cache/no-transform but applies `max-age=14400`
+to static assets; verify their bytes on the public origin after each release.
+
 The `timetables` volume at `/data` contains public schedules and source caches,
 never personal client state. The image initializes that directory for its
 unprivileged runtime user. A failed upstream refresh retains the validated
