@@ -22,6 +22,9 @@ internal interface TravelTrackerRuntime {
     fun haptic()
 }
 
+// A longer silence than the tracker's own loops means the app was not observing.
+internal const val TravelTrackerObservationGap = 30_000L
+
 private enum class TravelTrackerCueKind { GetOff, Change, MissedTransfer, Cancellation }
 
 private data class TravelTrackerCue(val kind: TravelTrackerCueKind, val legIndex: Int)
@@ -36,6 +39,7 @@ internal class TravelTrackerLifecycle(
     private var surfaceRequested = false
     private var permissionRequest: (() -> Unit)? = null
     private var observedRevision: TravelTrackerRevision? = null
+    private var observedAt: Long? = null
     private val cued = mutableSetOf<TravelTrackerCue>()
     private var pendingCue = false
 
@@ -49,6 +53,7 @@ internal class TravelTrackerLifecycle(
 
     fun activityResumed() {
         foreground = true
+        pendingCue = false
     }
 
     fun activityStopped() {
@@ -179,14 +184,16 @@ internal class TravelTrackerLifecycle(
 
     private fun observe(focus: FocusedJourney, projection: TravelTrackerState, now: Long,
                         journeyAlerts: Boolean, notificationsAllowed: Boolean) {
-        val baseline = observedRevision != projection.revision
-        if (baseline) {
+        val generation = observedRevision != projection.revision
+        if (generation) {
             observedRevision = projection.revision
             cued.clear()
-            pendingCue = false
         }
+        val continuing = !generation && observedAt?.let { now - it in 0..TravelTrackerObservationGap } == true
+        if (!continuing) pendingCue = false
+        observedAt = now
         val fired = cues(focus, projection, now).filter { cued.add(it) }
-        if (baseline || !journeyAlerts || fired.isEmpty()) return
+        if (!continuing || !journeyAlerts || fired.isEmpty()) return
         if (foreground) runtime.haptic() else if (notificationsAllowed) pendingCue = true
     }
 
@@ -195,7 +202,9 @@ internal class TravelTrackerLifecycle(
         val active = legs.getOrNull(projection.activeLegIndex)
         if (active != null && now >= active.effectiveArrival - TravelTrackerAlertLead) when (projection.stage) {
             TravelTrackerStage.Final -> add(TravelTrackerCue(TravelTrackerCueKind.GetOff, projection.activeLegIndex))
-            TravelTrackerStage.Ride -> add(TravelTrackerCue(TravelTrackerCueKind.Change, projection.activeLegIndex))
+            TravelTrackerStage.Ride -> if (projection.missedConnection?.fromLegIndex != projection.activeLegIndex) {
+                add(TravelTrackerCue(TravelTrackerCueKind.Change, projection.activeLegIndex))
+            }
             else -> Unit
         }
         if (projection.stage == TravelTrackerStage.MissedTransfer) {

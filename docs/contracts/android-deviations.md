@@ -67,16 +67,14 @@ update clocks readable in expanded content. There is no unbounded chronometer
 beside an expired instruction or persistent `Live` label. Ferry side-only labels
 remain `Side A`/`Side B`, following the shared platform vocabulary.
 
-Journey alerts moved the ongoing notification to a new channel id, because a
-created channel's vibration cannot be changed; the retired `current_journey`
-channel is deleted on create, so an existing install keeps one `Current journey`
-channel in system settings. At default importance the re-alerting post also
-plays that channel's notification sound, which the rider can silence there.
-Android shows a foreground-service notification for the first time up to ten
-seconds after the service starts, and that first showing alerts whatever it
-holds by then. The opening notification therefore shows immediately and
-silences itself through group alert behaviour, so starting to follow a journey
-cannot cue and only an alert lead, missed connection or cancellation does.
+The journey alert channel replaces the retired `current_journey`, which is
+deleted on create so an existing install keeps one `Current journey` channel in
+system settings. Android shows a foreground-service notification for the first
+time up to ten seconds after the service starts, and that first showing alerts
+whatever it holds by then. The opening notification therefore shows immediately
+and silences itself through group alert behaviour, so starting to follow a
+journey cannot cue and only an alert lead, missed connection or cancellation
+does.
 
 The service recomputes presentation from wall time and refreshes the focused
 service while the app is backgrounded. Sticky process restart can restore the

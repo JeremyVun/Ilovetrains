@@ -22,10 +22,7 @@ class TravelTrackerStateTest {
             assertEquals(case.getString("name"), expected.getInt("activeLeg"), state.activeLegIndex)
             assertEquals(case.getString("name"), expected.getString("eventName"), state.event.name)
             assertEquals(case.getString("name"), expected.getInt("countdown"), state.event.countdownMinutes)
-            val lead = state.event.deadline - TravelTrackerAlertLead
-            val riding = state.stage == TravelTrackerStage.Ride || state.stage == TravelTrackerStage.Final
-            assertEquals(case.getString("name"),
-                if (riding && lead > case.getLong("now")) lead else state.event.deadline, state.nextBoundary)
+            assertEquals(case.getString("name"), expected.getLong("nextBoundary"), state.nextBoundary)
             assertEquals(case.getString("name"), expected.getString("headlineLead"), state.headline.lead)
             assertEquals(case.getString("name"), expected.getString("headlineEmphasis"), state.headline.emphasis)
             assertEquals(case.getString("name"), expected.getString("instruction"), state.instruction)

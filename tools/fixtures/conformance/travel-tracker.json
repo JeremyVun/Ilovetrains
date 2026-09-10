@@ -25,6 +25,7 @@
       "name": "ride", "now": 1788806640000,
       "expected": {
         "stage": "ride", "activeLeg": 0, "eventName": "Central", "countdown": 5,
+        "nextBoundary": 1788806820000,
         "headlineLead": "Central in ", "headlineEmphasis": "5 min.",
         "instruction": "Get off on Platform 21, then take M1 from Platform 26.",
         "connection": "7 min to change", "destination": "Kellyville", "eta": "about 05:46",
@@ -37,6 +38,7 @@
       "name": "transfer", "now": 1788807120000,
       "expected": {
         "stage": "transfer", "activeLeg": 1, "eventName": "M1", "countdown": 4,
+        "nextBoundary": 1788807360000,
         "headlineLead": "M1 leaves in ", "headlineEmphasis": "4 min.",
         "instruction": "Go to Platform 26 for Tallawong.", "connection": "Departs 04:56",
         "destination": "Kellyville", "eta": "about 05:46", "segmentsMinutes": [11, 7, 50],
@@ -49,6 +51,7 @@
       "name": "final", "now": 1788809940000,
       "expected": {
         "stage": "final", "activeLeg": 1, "eventName": "Kellyville", "countdown": 7,
+        "nextBoundary": 1788810240000,
         "headlineLead": "Kellyville in ", "headlineEmphasis": "7 min.",
         "instruction": "Get off on Platform 2.", "connection": null,
         "destination": "Kellyville", "eta": "about 05:46", "segmentsMinutes": [11, 7, 50],
@@ -61,6 +64,7 @@
       "name": "unknown-platform", "now": 1788809940000, "finalPlatform": null,
       "expected": {
         "stage": "final", "activeLeg": 1, "eventName": "Kellyville", "countdown": 7,
+        "nextBoundary": 1788810240000,
         "headlineLead": "Kellyville in ", "headlineEmphasis": "7 min.",
         "instruction": "Get off at Kellyville.", "connection": null,
         "destination": "Kellyville", "eta": "about 05:46", "segmentsMinutes": [11, 7, 50],
@@ -72,6 +76,7 @@
       "name": "tight-transfer", "now": 1788807120000, "onwardDeparture": 1788807180000,
       "expected": {
         "stage": "transfer", "activeLeg": 1, "eventName": "M1", "countdown": 1,
+        "nextBoundary": 1788807180000,
         "headlineLead": "M1 leaves in ", "headlineEmphasis": "1 min.",
         "instruction": "Go to Platform 26 for Tallawong.", "connection": "Tight change · departs 04:53",
         "destination": "Kellyville", "eta": "about 05:46", "segmentsMinutes": [11, 4, 53],
@@ -85,6 +90,7 @@
       "offline": true, "retained": true,
       "expected": {
         "stage": "ride", "activeLeg": 0, "eventName": "Central", "countdown": 5,
+        "nextBoundary": 1788806820000,
         "headlineLead": "Central in ", "headlineEmphasis": "5 min.",
         "instruction": "Get off on Platform 21, then take M1 from Platform 26.",
         "connection": "7 min to change", "destination": "Kellyville", "eta": "about 05:46",
@@ -97,6 +103,7 @@
       "name": "long-content", "now": 1788806640000, "changeName": "Bondi Junction Station",
       "expected": {
         "stage": "ride", "activeLeg": 0, "eventName": "Bondi Junction", "countdown": 5,
+        "nextBoundary": 1788806820000,
         "headlineLead": "Bondi Junction in ", "headlineEmphasis": "5 min.",
         "instruction": "Get off on Platform 21, then take M1 from Platform 26.",
         "connection": "7 min to change", "destination": "Kellyville", "eta": "about 05:46",
