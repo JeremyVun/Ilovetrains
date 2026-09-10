@@ -11,6 +11,8 @@ enum class TravelTrackerPlatformRole { Alight, Board }
 enum class TravelTrackerFreshness { Live, Retained, Offline, Stale, Scheduled }
 enum class TravelTrackerSegmentKind { Ride, Gap }
 
+internal const val TravelTrackerAlertLead = 2 * 60_000L
+
 data class TravelTrackerIdentity(
     val tripId: String,
     val reverse: Boolean,
@@ -173,7 +175,7 @@ data class TravelTrackerState(
                 retained = focus.journey.retained,
                 cancelled = cancelledLeg != null,
                 arrivalCancelled = last.cancelled,
-                nextBoundary = if (now >= projectionEnd && arrival != null) now + 30_000 else position.boundary,
+                nextBoundary = if (now >= projectionEnd && arrival != null) now + 30_000 else trackerNextBoundary(position, now),
                 freshUntil = source.second,
             )
         }
@@ -181,6 +183,12 @@ data class TravelTrackerState(
 }
 
 private data class TrackerPosition(val stage: TravelTrackerStage, val legIndex: Int, val boundary: Long)
+
+private fun trackerNextBoundary(position: TrackerPosition, now: Long): Long {
+    val lead = position.boundary - TravelTrackerAlertLead
+    val riding = position.stage == TravelTrackerStage.Ride || position.stage == TravelTrackerStage.Final
+    return if (riding && lead > now) lead else position.boundary
+}
 
 private fun trackerPosition(legs: List<Leg>, now: Long, missedIndex: Int?, projectionEnd: Long): TrackerPosition {
     if (now < legs.first().effectiveDeparture) {

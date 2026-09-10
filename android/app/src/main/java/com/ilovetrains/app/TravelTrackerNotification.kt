@@ -22,32 +22,44 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 internal object TravelTrackerNotification {
-    const val ChannelId = "current_journey"
+    // A channel is immutable once created, so enabling vibration needs a new id.
+    const val ChannelId = "current_journey_alerts"
+    private const val RetiredChannelId = "current_journey"
+    private const val OpeningGroup = "current_journey_opening"
     const val NotificationId = 4108
 
     fun createChannel(context: Context) {
+        val manager = context.getSystemService(NotificationManager::class.java)
+        manager.deleteNotificationChannel(RetiredChannelId)
         val channel = NotificationChannel(ChannelId, "Current journey", NotificationManager.IMPORTANCE_DEFAULT).apply {
             description = "The next instruction for your current public transport journey"
             lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+            enableVibration(true)
         }
-        context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        manager.createNotificationChannel(channel)
     }
 
+    // The system alerts the first time it shows a foreground-service notification, so open
+    // immediately and silently and leave every later alert to a cue.
     fun opening(context: Context): Notification = baseBuilder(
         context,
         title = "Opening current journey",
         text = "Getting the latest instruction.",
         subtext = null,
         revision = null,
-    ).setStyle(Notification.BigTextStyle().bigText("Getting the latest instruction.")).build()
+    ).setStyle(Notification.BigTextStyle().bigText("Getting the latest instruction."))
+        .setGroup(OpeningGroup)
+        .setGroupAlertBehavior(Notification.GROUP_ALERT_SUMMARY)
+        .apply { if (Build.VERSION.SDK_INT >= 31) setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE) }
+        .build()
 
-    fun build(context: Context, focus: FocusedJourney, state: TravelTrackerState): Notification {
+    fun build(context: Context, focus: FocusedJourney, state: TravelTrackerState, alert: Boolean = false): Notification {
         val eventClock = clock(state.event.deadline)
         val etaClock = clock(state.eta)
         val provenance = provenance(focus, state)
         val compactTitle = "${state.headline.text.trim()} · $eventClock"
         val compactBody = compactBody(state, etaClock)
-        val builder = baseBuilder(context, compactTitle, compactBody, provenance, state.revision)
+        val builder = baseBuilder(context, compactTitle, compactBody, provenance, state.revision, alert)
 
         if (Build.VERSION.SDK_INT >= 36 && state.missedConnection == null &&
             context.resources.configuration.fontScale <= 1f && fitsProgressTemplate(compactTitle, compactBody, provenance)) {
@@ -73,6 +85,7 @@ internal object TravelTrackerNotification {
         text: CharSequence,
         subtext: String?,
         revision: TravelTrackerRevision?,
+        alert: Boolean = false,
     ): Notification.Builder {
         val builder = Notification.Builder(context, ChannelId)
         builder.setSmallIcon(R.drawable.ic_notification_train)
@@ -80,7 +93,7 @@ internal object TravelTrackerNotification {
             .setContentText(text)
             .setSubText(subtext)
             .setOngoing(true)
-            .setOnlyAlertOnce(true)
+            .setOnlyAlertOnce(!alert)
             .setCategory("navigation")
             .setVisibility(Notification.VISIBILITY_PRIVATE)
             .setShowWhen(false)

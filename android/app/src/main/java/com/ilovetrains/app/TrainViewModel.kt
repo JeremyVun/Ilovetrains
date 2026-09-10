@@ -141,6 +141,7 @@ class TrainViewModel private constructor(
         mutable.value = mutable.value.copy(trips = ranked, totalTrips = data.trips.size, focus = focus,
             focusComplete = focus?.let { f -> data.rides.any { it.tripId == f.tripId && it.reverse == f.reverse && it.departure == f.journey.departure } } == true,
             appearance = data.appearance, enabledModes = data.modes, useLocation = data.useLocation,
+            journeyAlerts = data.journeyAlerts,
             transferLimit = if (data.flags[TransferLimitFlag] == true) data.transferLimit else null,
             home = data.home ?: automaticHome(data), automaticHome = automaticHome(data), homeIsManual = data.home != null,
             recentFrom = data.recentFrom, recentTo = data.recentTo,
@@ -155,7 +156,7 @@ class TrainViewModel private constructor(
         val recordedComplete = focus?.let { subject ->
             data.rides.any { it.tripId == subject.tripId && it.reverse == subject.reverse && it.departure == subject.journey.departure }
         } == true
-        return tracker.reconcile(focus, visibleFocus(now), now, recordedComplete, arrivalResult)
+        return tracker.reconcile(focus, visibleFocus(now), now, recordedComplete, arrivalResult, data.journeyAlerts)
     }
 
     fun attachActivity(
@@ -228,7 +229,7 @@ class TrainViewModel private constructor(
         val focus = visibleFocus()?.takeIf { it.trackerIdentity == presentation.revision.identity }
             ?: return TravelTrackerServiceState.Stop
         if (!tracker.accepts(presentation.revision)) return TravelTrackerServiceState.Stop
-        return TravelTrackerServiceState.Active(focus, presentation)
+        return TravelTrackerServiceState.Active(focus, presentation, tracker.consumeCue())
     }
 
     internal fun trackerBackgroundRefresh() {
@@ -941,6 +942,9 @@ class TrainViewModel private constructor(
         data = data.copy(useLocation = enabled)
         if (!enabled) { cancelSetupLocation(); stopArrivalMonitoring(clearWindow = true); fix = null; mutable.value = mutable.value.copy(distanceMetres = null, nearestStation = null) }
         persist(); syncPersonal(); if (enabled) { onLocationRequest?.invoke(); ensureArrivalMonitoring() } else { onLocationDisabled?.invoke(); choosePrediction(); refresh() }
+    }
+    override fun setJourneyAlerts(enabled: Boolean) {
+        data = data.copy(journeyAlerts = enabled); persist(); syncPersonal()
     }
     override fun requestLocation() {
         if (mutable.value.screen == Screen.Setup && !mutable.value.selectingHome && mutable.value.setupFrom == null) {

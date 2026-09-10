@@ -327,6 +327,93 @@ class TravelTrackerIntegrationTest {
         assertNull(model.trackerActiveRevision())
     }
 
+    @Test fun backgroundJourneyAlertPostsOnceOnTheVibratingChannel() {
+        grantNotifications()
+        launchActivity()
+        clearFocus()
+        val channel = notifications.getNotificationChannel(TravelTrackerNotification.ChannelId)
+        assertEquals(NotificationManager.IMPORTANCE_DEFAULT, channel?.importance)
+        assertTrue("tracker channel does not vibrate", channel?.shouldVibrate() == true)
+        assertNull("retired channel survived", notifications.getNotificationChannel("current_journey"))
+
+        val alerted = driveToTheAlertLead("alerts-on", journeyAlerts = true, background = true)
+        assertEquals("expected one alerting post, observed $alerted", 1, alerted.count { it.first })
+        assertTrue(containsFragment(alerted.first { it.first }.second, "Kellyville in"))
+        assertFalse("the alerting post was not followed by a silent post: $alerted", alerted.last().first)
+        assertFalse("the first background post alerted: $alerted", alerted.first().first)
+
+        val silent = driveToTheAlertLead("alerts-off", journeyAlerts = false, background = true)
+        assertEquals("journey alerts off still alerted: $silent", 0, silent.count { it.first })
+    }
+
+    @Test fun aForegroundJourneyAlertVibratesAndLeavesTheNotificationSilent() {
+        grantNotifications()
+        launchActivity()
+        val before = appVibrations()
+        val samples = driveToTheAlertLead("alerts-foreground", journeyAlerts = true, background = false)
+        assertEquals("a foreground transition alerted the notification: $samples", 0, samples.count { it.first })
+        waitUntil("the foreground transition did not vibrate", 10_000) { appVibrations() > before }
+    }
+
+    private fun appVibrations(): Int =
+        Regex("com\\.ilovetrains\\.app \\(uid=").findAll(shell("dumpsys vibrator_manager")).count()
+
+    private fun driveToTheAlertLead(
+        tripId: String,
+        journeyAlerts: Boolean,
+        background: Boolean,
+    ): List<Pair<Boolean, String>> {
+        shell("am start -n ${context.packageName}/.MainActivity")
+        instrumentation.waitForIdleSync()
+        waitReady()
+        SystemClock.sleep(500)
+        onMain { model.setJourneyAlerts(journeyAlerts) }
+        clearFocus()
+        val focus = leadJourney(tripId, System.currentTimeMillis())
+        setFocus(focus)
+        var observed = "no tracker notification"
+        try {
+            waitForNotification(12_000) { observed = text(it); observed.contains("M1 leaves") }
+        } catch (failure: AssertionError) {
+            throw AssertionError("$tripId expected the change stage but observed $observed", failure)
+        }
+        if (background) shell("input keyevent HOME")
+        val samples = mutableListOf<Pair<Boolean, String>>()
+        var last: Boolean? = null
+        var finalStage = false
+        val end = SystemClock.elapsedRealtime() + 30_000
+        while (SystemClock.elapsedRealtime() < end) {
+            val posted = notifications.activeNotifications.firstOrNull { it.id == TravelTrackerNotification.NotificationId }
+            val rendered = posted?.let { text(it.notification) }
+            if (posted != null && rendered != null && !rendered.contains("Opening current journey")) {
+                assertEquals(TravelTrackerNotification.ChannelId, posted.notification.channelId)
+                val alerting = posted.notification.flags and Notification.FLAG_ONLY_ALERT_ONCE == 0
+                if (alerting != last) {
+                    samples += alerting to rendered
+                    last = alerting
+                    if (alerting) File(context.getExternalFilesDir(null), "journey-alert-$tripId.txt")
+                        .writeText(shell("dumpsys notification --noredact"))
+                }
+                if (containsFragment(rendered, "Kellyville in")) finalStage = true
+            }
+            if (finalStage && last == false && samples.size >= if (journeyAlerts && background) 3 else 1) break
+            SystemClock.sleep(20)
+        }
+        assertTrue("background journey never reached the final stage", finalStage)
+        println("JOURNEY_ALERT_SAMPLES trip=$tripId alerts=$journeyAlerts background=$background samples=$samples")
+        return samples
+    }
+
+    // The tracker starts at the change, boards fifteen seconds in and reaches the last leg's
+    // alert lead, two minutes before its arrival, five seconds after that.
+    private fun leadJourney(tripId: String, now: Long): FocusedJourney {
+        val focus = fixture("ride", tripId)
+        val first = focus.journey.legs[0].copy(departure = now - 40_000, arrival = now - 10_000)
+        val second = focus.journey.legs[1].copy(departure = now + 15_000, arrival = now + 140_000)
+        val journey = focus.journey.copy(legs = listOf(first, second))
+        return focus.copy(journey = journey, board = focus.board.copy(generatedAt = now, journeys = listOf(journey)))
+    }
+
     @Test fun lockedServiceAdvancesStagesAndCompletes() {
         grantNotifications()
         launchActivity()

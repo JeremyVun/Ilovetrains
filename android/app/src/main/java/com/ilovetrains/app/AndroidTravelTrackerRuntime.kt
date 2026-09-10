@@ -4,6 +4,11 @@ import android.annotation.SuppressLint
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 
 internal class AndroidTravelTrackerSessionStore(context: Context) : TravelTrackerSessionStore {
     private val preferences = context.getSharedPreferences("tracker-v1", Context.MODE_PRIVATE)
@@ -73,7 +78,27 @@ internal class AndroidTravelTrackerRuntime(private val context: Context) : Trave
     override fun stopService() {
         context.stopService(Intent(context, TravelTrackerService::class.java))
     }
+
+    override fun haptic() {
+        val vibrator = if (Build.VERSION.SDK_INT >= 31) {
+            context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION") context.getSystemService(Vibrator::class.java)
+        }
+        if (vibrator?.hasVibrator() != true) return
+        val effect = if (Build.VERSION.SDK_INT >= 29) {
+            VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK)
+        } else {
+            VibrationEffect.createOneShot(20, VibrationEffect.DEFAULT_AMPLITUDE)
+        }
+        runCatching { vibrator.vibrate(effect, NotificationVibration) }
+    }
 }
+
+private val NotificationVibration: AudioAttributes = AudioAttributes.Builder()
+    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+    .build()
 
 internal fun Intent.putTrackerRevision(revision: TravelTrackerRevision): Intent =
     putExtra(TravelTrackerService.ExtraTripId, revision.identity.tripId)

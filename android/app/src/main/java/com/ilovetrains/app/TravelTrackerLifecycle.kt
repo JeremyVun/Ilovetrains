@@ -19,7 +19,15 @@ internal interface TravelTrackerRuntime {
     fun notificationsAllowed(): Boolean
     fun startService(revision: TravelTrackerRevision): Boolean
     fun stopService()
+    fun haptic()
 }
+
+// A longer silence than the tracker's own loops means the app was not observing.
+internal const val TravelTrackerObservationGap = 30_000L
+
+private enum class TravelTrackerCueKind { GetOff, Change, MissedTransfer, Cancellation }
+
+private data class TravelTrackerCue(val kind: TravelTrackerCueKind, val legIndex: Int)
 
 internal class TravelTrackerLifecycle(
     private val store: TravelTrackerSessionStore,
@@ -30,6 +38,10 @@ internal class TravelTrackerLifecycle(
     private var serviceRunning = false
     private var surfaceRequested = false
     private var permissionRequest: (() -> Unit)? = null
+    private var observedRevision: TravelTrackerRevision? = null
+    private var observedAt: Long? = null
+    private val cued = mutableSetOf<TravelTrackerCue>()
+    private var pendingCue = false
 
     fun attachActivity(requestPermission: () -> Unit) {
         permissionRequest = requestPermission
@@ -41,6 +53,7 @@ internal class TravelTrackerLifecycle(
 
     fun activityResumed() {
         foreground = true
+        pendingCue = false
     }
 
     fun activityStopped() {
@@ -58,7 +71,7 @@ internal class TravelTrackerLifecycle(
     }
 
     fun reconcile(focus: FocusedJourney?, visibleFocus: FocusedJourney?, now: Long, recordedComplete: Boolean = false,
-                  arrival: ArrivalResult? = null): TravelTrackerState? {
+                  arrival: ArrivalResult? = null, journeyAlerts: Boolean = true): TravelTrackerState? {
         val identity = focus?.trackerIdentity
         var changed = false
 
@@ -122,7 +135,10 @@ internal class TravelTrackerLifecycle(
             return null
         }
 
-        if (!runtime.notificationsAllowed()) {
+        val allowed = runtime.notificationsAllowed()
+        observe(focus, projection, now, journeyAlerts, allowed)
+
+        if (!allowed) {
             stopSurface()
             requestPermissionOnce()
             return projection
@@ -135,6 +151,12 @@ internal class TravelTrackerLifecycle(
             }
         }
         return projection
+    }
+
+    fun consumeCue(): Boolean {
+        val value = pendingCue
+        pendingCue = false
+        return value
     }
 
     fun permissionResult() {
@@ -160,6 +182,39 @@ internal class TravelTrackerLifecycle(
         TravelTrackerRevision(it, session.generation)
     }
 
+    private fun observe(focus: FocusedJourney, projection: TravelTrackerState, now: Long,
+                        journeyAlerts: Boolean, notificationsAllowed: Boolean) {
+        val generation = observedRevision != projection.revision
+        if (generation) {
+            observedRevision = projection.revision
+            cued.clear()
+        }
+        val continuing = !generation && observedAt?.let { now - it in 0..TravelTrackerObservationGap } == true
+        if (!continuing) pendingCue = false
+        observedAt = now
+        val fired = cues(focus, projection, now).filter { cued.add(it) }
+        if (!continuing || !journeyAlerts || fired.isEmpty()) return
+        if (foreground) runtime.haptic() else if (notificationsAllowed) pendingCue = true
+    }
+
+    private fun cues(focus: FocusedJourney, projection: TravelTrackerState, now: Long): List<TravelTrackerCue> = buildList {
+        val legs = focus.journey.legs
+        val active = legs.getOrNull(projection.activeLegIndex)
+        if (active != null && now >= active.effectiveArrival - TravelTrackerAlertLead) when (projection.stage) {
+            TravelTrackerStage.Final -> add(TravelTrackerCue(TravelTrackerCueKind.GetOff, projection.activeLegIndex))
+            TravelTrackerStage.Ride -> if (projection.missedConnection?.fromLegIndex != projection.activeLegIndex) {
+                add(TravelTrackerCue(TravelTrackerCueKind.Change, projection.activeLegIndex))
+            }
+            else -> Unit
+        }
+        if (projection.stage == TravelTrackerStage.MissedTransfer) {
+            add(TravelTrackerCue(TravelTrackerCueKind.MissedTransfer, projection.activeLegIndex))
+        }
+        if (projection.event.kind == TravelTrackerEventKind.Cancellation) {
+            add(TravelTrackerCue(TravelTrackerCueKind.Cancellation, legs.indexOfFirst { it.cancelled }))
+        }
+    }
+
     private fun requestPermissionOnce() {
         val request = permissionRequest ?: return
         if (!foreground || session.notificationPrompted) return
@@ -182,12 +237,13 @@ internal object DisabledTravelTrackerRuntime : TravelTrackerRuntime {
     override fun notificationsAllowed() = false
     override fun startService(revision: TravelTrackerRevision) = false
     override fun stopService() = Unit
+    override fun haptic() = Unit
 }
 
 internal sealed interface TravelTrackerServiceState {
     data object Pending : TravelTrackerServiceState
     data object Stop : TravelTrackerServiceState
-    data class Active(val focus: FocusedJourney, val presentation: TravelTrackerState) : TravelTrackerServiceState
+    data class Active(val focus: FocusedJourney, val presentation: TravelTrackerState, val alert: Boolean = false) : TravelTrackerServiceState
 }
 
 internal class MemoryTravelTrackerSessionStore : TravelTrackerSessionStore {

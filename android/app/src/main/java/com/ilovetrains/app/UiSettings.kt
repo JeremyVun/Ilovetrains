@@ -107,6 +107,11 @@ private fun SettingsMain(state: AppState, actions: UiActions, feedback: () -> Un
             else -> "Automatic — ${state.home.shortName}"
         }
         SettingsPersonalRow(Icons.Outlined.Home, "Home", homeValue, if (state.homeIsManual) "Change  ›" else "Set  ›", actions::chooseHome)
+        SettingsPersonalRow(null, "Journey alerts",
+            if (state.journeyAlerts) "Journey alerts use vibration" else "Journey alerts are off",
+            if (state.journeyAlerts) "TURN OFF" else "TURN ON",
+            { actions.setJourneyAlerts(!state.journeyAlerts) }, primaryState = true,
+            toggleState = if (state.journeyAlerts) ToggleableState.On else ToggleableState.Off)
 
         Spacer(Modifier.height(22.dp)); SettingsSection("Services")
         Row(Modifier.fillMaxWidth()) {

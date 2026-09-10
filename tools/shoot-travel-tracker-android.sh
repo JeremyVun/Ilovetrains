@@ -120,7 +120,7 @@ set_channel_enabled() {
   local wanted="$1" xml="$out/logs/channel-setting.xml"
   adb shell am start -a android.settings.CHANNEL_NOTIFICATION_SETTINGS \
     --es android.provider.extra.APP_PACKAGE "$package" \
-    --es android.provider.extra.CHANNEL_ID current_journey >/dev/null
+    --es android.provider.extra.CHANNEL_ID current_journey_alerts >/dev/null
   sleep 1
   adb shell uiautomator dump /sdcard/ilovetrains-channel.xml >/dev/null
   adb pull /sdcard/ilovetrains-channel.xml "$xml" >/dev/null
