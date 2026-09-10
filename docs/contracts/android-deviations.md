@@ -76,7 +76,7 @@ Android shows a foreground-service notification for the first time up to ten
 seconds after the service starts, and that first showing alerts whatever it
 holds by then. The opening notification therefore shows immediately and
 silences itself through group alert behaviour, so starting to follow a journey
-cannot cue and only a stage transition does.
+cannot cue and only an alert lead, missed connection or cancellation does.
 
 The service recomputes presentation from wall time and refreshes the focused
 service while the app is backgrounded. Sticky process restart can restore the

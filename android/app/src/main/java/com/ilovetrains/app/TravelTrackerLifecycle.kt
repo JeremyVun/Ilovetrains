@@ -22,13 +22,7 @@ internal interface TravelTrackerRuntime {
     fun haptic()
 }
 
-private data class TravelTrackerObservation(
-    val stage: TravelTrackerStage,
-    val legIndex: Int,
-    val cancelled: Boolean,
-)
-
-private enum class TravelTrackerCueKind { Final, Transfer, MissedTransfer, Cancellation }
+private enum class TravelTrackerCueKind { GetOff, Change, MissedTransfer, Cancellation }
 
 private data class TravelTrackerCue(val kind: TravelTrackerCueKind, val legIndex: Int)
 
@@ -42,7 +36,6 @@ internal class TravelTrackerLifecycle(
     private var surfaceRequested = false
     private var permissionRequest: (() -> Unit)? = null
     private var observedRevision: TravelTrackerRevision? = null
-    private var observed: TravelTrackerObservation? = null
     private val cued = mutableSetOf<TravelTrackerCue>()
     private var pendingCue = false
 
@@ -138,7 +131,7 @@ internal class TravelTrackerLifecycle(
         }
 
         val allowed = runtime.notificationsAllowed()
-        observe(projection, journeyAlerts, allowed)
+        observe(focus, projection, now, journeyAlerts, allowed)
 
         if (!allowed) {
             stopSurface()
@@ -184,33 +177,32 @@ internal class TravelTrackerLifecycle(
         TravelTrackerRevision(it, session.generation)
     }
 
-    private fun observe(projection: TravelTrackerState, journeyAlerts: Boolean, notificationsAllowed: Boolean) {
-        val previous = observed.takeIf { observedRevision == projection.revision }
-        if (previous == null) {
+    private fun observe(focus: FocusedJourney, projection: TravelTrackerState, now: Long,
+                        journeyAlerts: Boolean, notificationsAllowed: Boolean) {
+        val baseline = observedRevision != projection.revision
+        if (baseline) {
             observedRevision = projection.revision
             cued.clear()
             pendingCue = false
         }
-        val current = TravelTrackerObservation(projection.stage, projection.activeLegIndex,
-            projection.event.kind == TravelTrackerEventKind.Cancellation)
-        observed = current
-        if (previous == null || !journeyAlerts) return
-        val fired = cues(previous, current).filter { cued.add(it) }
-        if (fired.isEmpty()) return
+        val fired = cues(focus, projection, now).filter { cued.add(it) }
+        if (baseline || !journeyAlerts || fired.isEmpty()) return
         if (foreground) runtime.haptic() else if (notificationsAllowed) pendingCue = true
     }
 
-    private fun cues(previous: TravelTrackerObservation, current: TravelTrackerObservation): List<TravelTrackerCue> = buildList {
-        if (current.stage != previous.stage || current.legIndex != previous.legIndex) {
-            when (current.stage) {
-                TravelTrackerStage.Final -> add(TravelTrackerCue(TravelTrackerCueKind.Final, current.legIndex))
-                TravelTrackerStage.Transfer -> add(TravelTrackerCue(TravelTrackerCueKind.Transfer, current.legIndex))
-                TravelTrackerStage.MissedTransfer -> add(TravelTrackerCue(TravelTrackerCueKind.MissedTransfer, current.legIndex))
-                TravelTrackerStage.Boarding, TravelTrackerStage.Ride -> Unit
-            }
+    private fun cues(focus: FocusedJourney, projection: TravelTrackerState, now: Long): List<TravelTrackerCue> = buildList {
+        val legs = focus.journey.legs
+        val active = legs.getOrNull(projection.activeLegIndex)
+        if (active != null && now >= active.effectiveArrival - TravelTrackerAlertLead) when (projection.stage) {
+            TravelTrackerStage.Final -> add(TravelTrackerCue(TravelTrackerCueKind.GetOff, projection.activeLegIndex))
+            TravelTrackerStage.Ride -> add(TravelTrackerCue(TravelTrackerCueKind.Change, projection.activeLegIndex))
+            else -> Unit
         }
-        if (current.cancelled && !previous.cancelled) {
-            add(TravelTrackerCue(TravelTrackerCueKind.Cancellation, current.legIndex))
+        if (projection.stage == TravelTrackerStage.MissedTransfer) {
+            add(TravelTrackerCue(TravelTrackerCueKind.MissedTransfer, projection.activeLegIndex))
+        }
+        if (projection.event.kind == TravelTrackerEventKind.Cancellation) {
+            add(TravelTrackerCue(TravelTrackerCueKind.Cancellation, legs.indexOfFirst { it.cancelled }))
         }
     }
 

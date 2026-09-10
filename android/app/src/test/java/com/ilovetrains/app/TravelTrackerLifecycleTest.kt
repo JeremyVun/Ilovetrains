@@ -157,8 +157,9 @@ class TravelTrackerLifecycleTest {
         val from = Station("from-$name", "From Station")
         val change = Station("change-$name", "Change Station")
         val to = Station("to-$name", "To Station")
-        val first = Leg("T1", "train", "To", from, change, NOW - 60_000, NOW + 120_000)
-        val second = Leg("M1", "metro", "To", change, to, if (missed) NOW + 60_000 else NOW + 180_000, ARRIVAL)
+        val first = Leg("T1", "train", "To", from, change, NOW - 60_000, CHANGE_ARRIVAL)
+        val second = Leg("M1", "metro", "To", change, to,
+            if (missed) NOW + 60_000 else ONWARD_DEPARTURE, ONWARD_ARRIVAL)
         val legs = listOf(first, second).mapIndexed { index, leg ->
             if (index == cancelledLeg) leg.copy(cancelled = true) else leg
         }
@@ -166,59 +167,98 @@ class TravelTrackerLifecycleTest {
         return FocusedJourney("trip-$name", false, journey, BoardData(from, to, listOf(journey), NOW, source = "live"), pinned = false)
     }
 
-    private fun focus(name: String, pinned: Boolean): FocusedJourney {
+    private fun focus(name: String, pinned: Boolean, arrivalDelay: Long = 0): FocusedJourney {
         val from = Station("from-$name", "From Station")
         val to = Station("to-$name", "To Station")
-        val journey = Journey(listOf(Leg("T1", "train", "To", from, to, NOW - 60_000, ARRIVAL)))
+        val journey = Journey(listOf(Leg("T1", "train", "To", from, to, NOW - 60_000, ARRIVAL,
+            estimatedArrival = if (arrivalDelay == 0L) null else ARRIVAL + arrivalDelay)))
         val board = BoardData(from, to, listOf(journey), NOW, source = "live")
         return FocusedJourney("trip-$name", false, journey, board, pinned)
     }
 
-    @Test fun landingInAStageNeverCuesAndEachTransitionCuesOnce() {
+    @Test fun theLastLegCuesBeforeItsArrivalAndNeverAtDeparture() {
         val runtime = FakeRuntime(allowed = true)
         val lifecycle = TravelTrackerLifecycle(FakeStore(), runtime)
         lifecycle.activityResumed()
-        val trip = connecting("cues")
+        val trip = focus("last-leg", pinned = false)
 
-        assertEquals(TravelTrackerStage.Ride, requireNotNull(lifecycle.reconcile(trip, trip, NOW)).stage)
+        assertEquals(TravelTrackerStage.Final, requireNotNull(lifecycle.reconcile(trip, trip, NOW)).stage)
+        assertEquals(0, runtime.haptics)
+        lifecycle.reconcile(trip, trip, ARRIVAL - LEAD - 1_000)
         assertEquals(0, runtime.haptics)
 
-        assertEquals(TravelTrackerStage.Transfer, requireNotNull(lifecycle.reconcile(trip, trip, NOW + 150_000)).stage)
+        lifecycle.reconcile(trip, trip, ARRIVAL - LEAD)
         assertEquals(1, runtime.haptics)
-        lifecycle.reconcile(trip, trip, NOW + 160_000)
+        lifecycle.reconcile(trip, trip, ARRIVAL - 60_000)
+        lifecycle.reconcile(trip, trip, ARRIVAL - 30_000)
         assertEquals(1, runtime.haptics)
-
-        assertEquals(TravelTrackerStage.Final, requireNotNull(lifecycle.reconcile(trip, trip, NOW + 200_000)).stage)
-        assertEquals(2, runtime.haptics)
-        lifecycle.reconcile(trip, trip, NOW + 210_000)
-        lifecycle.reconcile(trip, trip, NOW + 220_000)
-        assertEquals(2, runtime.haptics)
         assertFalse(lifecycle.consumeCue())
     }
 
-    @Test fun restoringIntoFinalDoesNotCueAndAGenerationBumpResetsTheObservation() {
+    @Test fun aChangeCuesBeforeItsArrivalWhileTransferAndFinalEntryStaySilent() {
+        val runtime = FakeRuntime(allowed = true)
+        val lifecycle = TravelTrackerLifecycle(FakeStore(), runtime)
+        lifecycle.activityResumed()
+        val trip = connecting("change")
+
+        assertEquals(TravelTrackerStage.Ride, requireNotNull(lifecycle.reconcile(trip, trip, NOW)).stage)
+        lifecycle.reconcile(trip, trip, CHANGE_ARRIVAL - LEAD - 1_000)
+        assertEquals(0, runtime.haptics)
+
+        lifecycle.reconcile(trip, trip, CHANGE_ARRIVAL - LEAD)
+        assertEquals(1, runtime.haptics)
+
+        assertEquals(TravelTrackerStage.Transfer,
+            requireNotNull(lifecycle.reconcile(trip, trip, CHANGE_ARRIVAL + 20_000)).stage)
+        assertEquals(TravelTrackerStage.Final,
+            requireNotNull(lifecycle.reconcile(trip, trip, ONWARD_DEPARTURE + 20_000)).stage)
+        assertEquals(1, runtime.haptics)
+
+        lifecycle.reconcile(trip, trip, ONWARD_ARRIVAL - LEAD)
+        assertEquals(2, runtime.haptics)
+        lifecycle.reconcile(trip, trip, ONWARD_ARRIVAL - 30_000)
+        assertEquals(2, runtime.haptics)
+    }
+
+    @Test fun aFirstObservationInsideTheLeadRecordsTheBaselineAndTheNextGenerationCuesAgain() {
         val store = FakeStore()
         val runtime = FakeRuntime(allowed = true)
         val lifecycle = TravelTrackerLifecycle(store, runtime)
         lifecycle.activityResumed()
-        val trip = connecting("restore")
+        val trip = focus("restore", pinned = false)
 
-        assertEquals(TravelTrackerStage.Final, requireNotNull(lifecycle.reconcile(trip, trip, NOW + 200_000)).stage)
+        lifecycle.reconcile(trip, trip, ARRIVAL - 60_000)
+        lifecycle.reconcile(trip, trip, ARRIVAL - 30_000)
         assertEquals(0, runtime.haptics)
 
         val restored = TravelTrackerLifecycle(store, runtime)
         restored.activityResumed()
-        restored.reconcile(trip, trip, NOW + 210_000)
-        restored.reconcile(trip, trip, NOW + 220_000)
+        restored.reconcile(trip, trip, ARRIVAL - 20_000)
         assertEquals(0, runtime.haptics)
 
-        val replacement = connecting("replacement")
-        assertEquals(TravelTrackerStage.Ride, requireNotNull(restored.reconcile(replacement, replacement, NOW)).stage)
-        restored.reconcile(replacement, replacement, NOW + 150_000)
+        val replacement = focus("restore-next", pinned = false)
+        restored.reconcile(replacement, replacement, NOW)
+        restored.reconcile(replacement, replacement, ARRIVAL - LEAD)
         assertEquals(1, runtime.haptics)
     }
 
-    @Test fun aBackgroundTransitionLeavesOneCueForTheNextNotificationPost() {
+    @Test fun anEstimateMovingTheArrivalLaterDoesNotCueTheLegAgain() {
+        val runtime = FakeRuntime(allowed = true)
+        val lifecycle = TravelTrackerLifecycle(FakeStore(), runtime)
+        lifecycle.activityResumed()
+        val trip = focus("delayed", pinned = false)
+
+        lifecycle.reconcile(trip, trip, NOW)
+        lifecycle.reconcile(trip, trip, ARRIVAL - LEAD)
+        assertEquals(1, runtime.haptics)
+
+        val later = focus("delayed", pinned = false, arrivalDelay = 5 * 60_000)
+        lifecycle.reconcile(later, later, ARRIVAL - 60_000)
+        lifecycle.reconcile(later, later, ARRIVAL + 4 * 60_000)
+        assertEquals(1, runtime.haptics)
+    }
+
+    @Test fun aBackgroundCueWaitsForTheNextNotificationPostAndIsConsumedOnce() {
         val runtime = FakeRuntime(allowed = true)
         val lifecycle = TravelTrackerLifecycle(FakeStore(), runtime)
         lifecycle.activityStopped()
@@ -227,8 +267,8 @@ class TravelTrackerLifecycleTest {
         lifecycle.reconcile(trip, trip, NOW)
         assertFalse(lifecycle.consumeCue())
 
-        lifecycle.reconcile(trip, trip, NOW + 200_000)
-        lifecycle.reconcile(trip, trip, NOW + 201_000)
+        lifecycle.reconcile(trip, trip, CHANGE_ARRIVAL - LEAD)
+        lifecycle.reconcile(trip, trip, CHANGE_ARRIVAL - LEAD + 1_000)
         assertEquals(0, runtime.haptics)
         assertTrue(lifecycle.consumeCue())
         assertFalse(lifecycle.consumeCue())
@@ -242,8 +282,8 @@ class TravelTrackerLifecycleTest {
         missedLifecycle.reconcile(missed, missed, NOW)
         assertEquals(0, runtime.haptics)
         assertEquals(TravelTrackerStage.MissedTransfer,
-            requireNotNull(missedLifecycle.reconcile(missed, missed, NOW + 150_000)).stage)
-        missedLifecycle.reconcile(missed, missed, NOW + 160_000)
+            requireNotNull(missedLifecycle.reconcile(missed, missed, CHANGE_ARRIVAL + 10_000)).stage)
+        missedLifecycle.reconcile(missed, missed, CHANGE_ARRIVAL + 20_000)
         assertEquals(1, runtime.haptics)
 
         val cancelledRuntime = FakeRuntime(allowed = true)
@@ -263,38 +303,35 @@ class TravelTrackerLifecycleTest {
         val lifecycle = TravelTrackerLifecycle(FakeStore(), runtime)
         lifecycle.attachActivity {}
         lifecycle.activityResumed()
-        val trip = connecting("denied")
+        val trip = focus("denied", pinned = false)
 
         lifecycle.reconcile(trip, trip, NOW)
-        lifecycle.reconcile(trip, trip, NOW + 200_000)
+        lifecycle.reconcile(trip, trip, ARRIVAL - LEAD)
         assertEquals(1, runtime.haptics)
         assertTrue(runtime.starts.isEmpty())
         assertFalse(lifecycle.consumeCue())
 
         lifecycle.activityStopped()
-        val background = connecting("denied-background")
+        val background = focus("denied-background", pinned = false)
         lifecycle.reconcile(background, background, NOW)
-        lifecycle.reconcile(background, background, NOW + 200_000)
+        lifecycle.reconcile(background, background, ARRIVAL - LEAD)
         assertEquals(1, runtime.haptics)
         assertFalse(lifecycle.consumeCue())
     }
 
-    @Test fun theSettingOffSuppressesEveryCue() {
+    @Test fun theSettingOffSuppressesEveryCueAndTurningItOnDoesNotReplayOne() {
         val runtime = FakeRuntime(allowed = true)
         val lifecycle = TravelTrackerLifecycle(FakeStore(), runtime)
         lifecycle.activityResumed()
         val trip = connecting("off")
 
         lifecycle.reconcile(trip, trip, NOW, journeyAlerts = false)
-        lifecycle.reconcile(trip, trip, NOW + 150_000, journeyAlerts = false)
-        lifecycle.reconcile(trip, trip, NOW + 200_000, journeyAlerts = false)
+        lifecycle.reconcile(trip, trip, CHANGE_ARRIVAL - LEAD, journeyAlerts = false)
+        lifecycle.reconcile(trip, trip, ONWARD_ARRIVAL - LEAD, journeyAlerts = false)
         assertEquals(0, runtime.haptics)
         assertFalse(lifecycle.consumeCue())
 
-        lifecycle.activityStopped()
-        val background = connecting("off-background")
-        lifecycle.reconcile(background, background, NOW, journeyAlerts = false)
-        lifecycle.reconcile(background, background, NOW + 200_000, journeyAlerts = false)
+        lifecycle.reconcile(trip, trip, ONWARD_ARRIVAL - LEAD + 1_000)
         assertEquals(0, runtime.haptics)
         assertFalse(lifecycle.consumeCue())
     }
@@ -302,5 +339,9 @@ class TravelTrackerLifecycleTest {
     private companion object {
         const val NOW = 1_000_000L
         const val ARRIVAL = NOW + 600_000L
+        const val LEAD = 120_000L
+        const val CHANGE_ARRIVAL = NOW + 600_000L
+        const val ONWARD_DEPARTURE = NOW + 660_000L
+        const val ONWARD_ARRIVAL = NOW + 1_800_000L
     }
 }

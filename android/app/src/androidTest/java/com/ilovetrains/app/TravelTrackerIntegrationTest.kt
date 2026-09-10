@@ -336,13 +336,13 @@ class TravelTrackerIntegrationTest {
         assertTrue("tracker channel does not vibrate", channel?.shouldVibrate() == true)
         assertNull("retired channel survived", notifications.getNotificationChannel("current_journey"))
 
-        val alerted = driveTransferToFinal("alerts-on", journeyAlerts = true, background = true)
+        val alerted = driveToTheAlertLead("alerts-on", journeyAlerts = true, background = true)
         assertEquals("expected one alerting post, observed $alerted", 1, alerted.count { it.first })
         assertTrue(containsFragment(alerted.first { it.first }.second, "Kellyville in"))
         assertFalse("the alerting post was not followed by a silent post: $alerted", alerted.last().first)
         assertFalse("the first background post alerted: $alerted", alerted.first().first)
 
-        val silent = driveTransferToFinal("alerts-off", journeyAlerts = false, background = true)
+        val silent = driveToTheAlertLead("alerts-off", journeyAlerts = false, background = true)
         assertEquals("journey alerts off still alerted: $silent", 0, silent.count { it.first })
     }
 
@@ -350,7 +350,7 @@ class TravelTrackerIntegrationTest {
         grantNotifications()
         launchActivity()
         val before = appVibrations()
-        val samples = driveTransferToFinal("alerts-foreground", journeyAlerts = true, background = false)
+        val samples = driveToTheAlertLead("alerts-foreground", journeyAlerts = true, background = false)
         assertEquals("a foreground transition alerted the notification: $samples", 0, samples.count { it.first })
         waitUntil("the foreground transition did not vibrate", 10_000) { appVibrations() > before }
     }
@@ -358,7 +358,7 @@ class TravelTrackerIntegrationTest {
     private fun appVibrations(): Int =
         Regex("com\\.ilovetrains\\.app \\(uid=").findAll(shell("dumpsys vibrator_manager")).count()
 
-    private fun driveTransferToFinal(
+    private fun driveToTheAlertLead(
         tripId: String,
         journeyAlerts: Boolean,
         background: Boolean,
@@ -369,13 +369,13 @@ class TravelTrackerIntegrationTest {
         SystemClock.sleep(500)
         onMain { model.setJourneyAlerts(journeyAlerts) }
         clearFocus()
-        val focus = transferToFinalJourney(tripId, System.currentTimeMillis())
+        val focus = leadJourney(tripId, System.currentTimeMillis())
         setFocus(focus)
         var observed = "no tracker notification"
         try {
             waitForNotification(12_000) { observed = text(it); observed.contains("M1 leaves") }
         } catch (failure: AssertionError) {
-            throw AssertionError("$tripId expected the transfer stage but observed $observed", failure)
+            throw AssertionError("$tripId expected the change stage but observed $observed", failure)
         }
         if (background) shell("input keyevent HOME")
         val samples = mutableListOf<Pair<Boolean, String>>()
@@ -404,10 +404,12 @@ class TravelTrackerIntegrationTest {
         return samples
     }
 
-    private fun transferToFinalJourney(tripId: String, now: Long): FocusedJourney {
+    // The tracker starts at the change, boards fifteen seconds in and reaches the last leg's
+    // alert lead, two minutes before its arrival, five seconds after that.
+    private fun leadJourney(tripId: String, now: Long): FocusedJourney {
         val focus = fixture("ride", tripId)
-        val first = focus.journey.legs[0].copy(departure = now - 20_000, arrival = now - 5_000)
-        val second = focus.journey.legs[1].copy(departure = now + 12_000, arrival = now + 60_000)
+        val first = focus.journey.legs[0].copy(departure = now - 40_000, arrival = now - 10_000)
+        val second = focus.journey.legs[1].copy(departure = now + 15_000, arrival = now + 140_000)
         val journey = focus.journey.copy(legs = listOf(first, second))
         return focus.copy(journey = journey, board = focus.board.copy(generatedAt = now, journeys = listOf(journey)))
     }
