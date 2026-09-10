@@ -133,11 +133,6 @@ ends, is dismissed or expires. Without permission, with the location
 preference off or with no session it never starts, and the app suspends and
 reconciles on resume as before.
 
-Journey alerts are decided when the controller publishes an update for the
-same identity, generation and session, so a transition observed while no Live
-Activity exists cues nothing, including the on-screen haptic. Every publishing
-path is shared, so a transition cues once whether the app is on screen or not.
-
 The shared behavior remains defined by [ui.md](ui.md),
 [client-storage.md](client-storage.md) and [native-data.md](native-data.md).
 

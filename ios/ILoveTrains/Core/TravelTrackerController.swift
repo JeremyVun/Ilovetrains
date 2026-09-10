@@ -88,13 +88,22 @@ struct TravelTrackerAlert: Equatable, Sendable {
     var body: String
 }
 
+struct TravelTrackerCue: Equatable, Sendable {
+    enum Kind: String, Equatable, Sendable { case getOff, change, missedConnection, cancellation }
+
+    var kind: Kind
+    var legIndex: Int?
+    var alert: TravelTrackerAlert
+}
+
 protocol TravelTrackerHapticPerforming: Sendable {
     func impact() async
 }
 
 struct UIKitTravelTrackerHaptics: TravelTrackerHapticPerforming {
+    // The buzz must not hold up the publication that carries the same moment to the tracker surface.
     func impact() async {
-        await MainActor.run {
+        Task { @MainActor in
             let generator = UIImpactFeedbackGenerator(style: .medium)
             generator.prepare()
             generator.impactOccurred()
@@ -190,14 +199,17 @@ actor TravelTrackerController {
         var active: TravelTrackerSession.Active
         var attributes: TravelTrackerActivityAttributes
         var content: ActivityContent<TravelTrackerActivityAttributes.ContentState>
-        var alert: TravelTrackerAlert?
+        var cue: TravelTrackerCue?
     }
 
-    private struct PublishedCue: Equatable {
+    private struct CueSession: Equatable {
         var generation: Int
         var sessionId: UUID
-        var stage: TravelTrackerActivityAttributes.Stage
-        var eventKind: TravelTrackerActivityAttributes.EventKind
+    }
+
+    private struct CueKey: Hashable {
+        var kind: TravelTrackerCue.Kind
+        var legIndex: Int?
     }
 
     private let store: TravelTrackerSessionStoring
@@ -216,7 +228,8 @@ actor TravelTrackerController {
     private var retryAfter: Date?
     private var lastPublishedStage: TravelTrackerActivityAttributes.Stage?
     private var lastPublishedContent: TravelTrackerActivityAttributes.ContentState?
-    private var lastCue: PublishedCue?
+    private var cueSession: CueSession?
+    private var cuedKeys: Set<CueKey> = []
     private var alertsEnabled = true
     private var inBackground = false
     private var lastDeliveredAlert: TravelTrackerAlert?
@@ -347,7 +360,7 @@ actor TravelTrackerController {
             active: active,
             attributes: attributes,
             content: ActivityContent(state: contentState, staleDate: contentState.staleDate),
-            alert: TravelTrackerAlertCopy.alert(state: state, focus: focus)
+            cue: TravelTrackerCue.pending(state: state, focus: focus, now: now)
         ))
         return state
     }
@@ -466,11 +479,11 @@ actor TravelTrackerController {
         guard let desired else {
             observationTask?.cancel()
             observationTask = nil
+            forgetCues()
             guard let id = currentActivityId else { return }
             currentActivityId = nil
             currentActivitySessionId = nil
             lastPublishedContent = nil
-            lastCue = nil
             session.active?.activityId = nil
             await store.save(session)
             await driver.end(id: id)
@@ -481,18 +494,21 @@ actor TravelTrackerController {
               active.generation == desired.active.generation,
               active.sessionId == desired.active.sessionId else { return }
 
+        // On screen the cue belongs to the moment, not to the surface, so decide it before the activity guards.
+        let observed = cueing(desired)
+        let cue = alertsEnabled ? observed : nil
+        if cue != nil, !inBackground {
+            deliveredHaptics += 1
+            await haptics.impact()
+        }
+
         if let id = currentActivityId, currentActivitySessionId == active.sessionId {
-            let cue = cueing(desired.content.state, sessionId: active.sessionId) && alertsEnabled
-            guard cue || !samePublishedContent(lastPublishedContent, desired.content.state) else { return }
-            let alert = cue && inBackground ? desired.alert : nil
+            let alert = inBackground ? cue?.alert : nil
+            guard alert != nil || !samePublishedContent(lastPublishedContent, desired.content.state) else { return }
             await driver.update(id: id, content: desired.content, alert: alert)
             lastDeliveredAlert = alert ?? lastDeliveredAlert
             lastPublishedStage = desired.content.state.stage
             lastPublishedContent = desired.content.state
-            if cue && !inBackground {
-                deliveredHaptics += 1
-                await haptics.impact()
-            }
             return
         }
         if let id = currentActivityId {
@@ -501,7 +517,6 @@ actor TravelTrackerController {
             currentActivityId = nil
             currentActivitySessionId = nil
             lastPublishedContent = nil
-            lastCue = nil
             await driver.end(id: id)
             guard sequence == publicationSequence else { return }
         }
@@ -525,7 +540,6 @@ actor TravelTrackerController {
             currentActivitySessionId = active.sessionId
             lastPublishedStage = desired.content.state.stage
             lastPublishedContent = desired.content.state
-            _ = cueing(desired.content.state, sessionId: active.sessionId)
             await store.save(session)
             observe(id: id, active: active)
         } catch {
@@ -539,23 +553,24 @@ actor TravelTrackerController {
         }
     }
 
-    private func cueing(
-        _ content: TravelTrackerActivityAttributes.ContentState,
-        sessionId: UUID
-    ) -> Bool {
-        let next = PublishedCue(
-            generation: content.generation,
-            sessionId: sessionId,
-            stage: content.stage,
-            eventKind: content.eventKind
+    private func cueing(_ desired: DesiredPublication) -> TravelTrackerCue? {
+        let session = CueSession(
+            generation: desired.content.state.generation,
+            sessionId: desired.active.sessionId
         )
-        defer { lastCue = next }
-        guard let previous = lastCue,
-              previous.generation == next.generation,
-              previous.sessionId == next.sessionId else { return false }
-        if next.eventKind == .cancellation { return previous.eventKind != .cancellation }
-        guard next.stage != previous.stage else { return false }
-        return next.stage == .final || next.stage == .transfer || next.stage == .missedTransfer
+        let firstObservation = cueSession != session
+        if firstObservation {
+            cueSession = session
+            cuedKeys = []
+        }
+        guard let cue = desired.cue else { return nil }
+        guard cuedKeys.insert(CueKey(kind: cue.kind, legIndex: cue.legIndex)).inserted else { return nil }
+        return firstObservation ? nil : cue
+    }
+
+    private func forgetCues() {
+        cueSession = nil
+        cuedKeys = []
     }
 
     private func observe(id: String, active: TravelTrackerSession.Active) {
@@ -576,7 +591,7 @@ actor TravelTrackerController {
         currentActivityId = nil
         currentActivitySessionId = nil
         lastPublishedContent = nil
-        lastCue = nil
+        forgetCues()
         session.active = nil
         session.suppressedIdentity = active.identity
         session.suppression = .dismissed
@@ -639,26 +654,48 @@ private extension TravelTrackerSystemActivityState {
     }
 }
 
-enum TravelTrackerAlertCopy {
-    static func alert(state: TravelTrackerState, focus: FocusedJourney) -> TravelTrackerAlert? {
+extension TravelTrackerCue {
+    static func pending(state: TravelTrackerState, focus: FocusedJourney, now: Millis) -> TravelTrackerCue? {
         if state.event.kind == .cancellation {
-            return TravelTrackerAlert(title: "Service cancelled", body: "The planned service has been cancelled.")
+            return TravelTrackerCue(
+                kind: .cancellation,
+                legIndex: nil,
+                alert: TravelTrackerAlert(title: "Service cancelled", body: "The planned service has been cancelled.")
+            )
         }
+        if state.stage == .missedTransfer {
+            return TravelTrackerCue(
+                kind: .missedConnection,
+                legIndex: state.activeLegIndex,
+                alert: TravelTrackerAlert(title: "Connection missed", body: "The planned connection has been missed.")
+            )
+        }
+        let legs = focus.journey.legs
+        guard let lead = state.alertLead, now >= lead, legs.indices.contains(state.activeLegIndex) else { return nil }
+        let station = legs[state.activeLegIndex].to.shortName
         switch state.stage {
         case .final:
-            return TravelTrackerAlert(title: "Get off next", body: "Get off at \(state.event.name), the next stop.")
-        case .transfer:
-            let legs = focus.journey.legs
-            let station = legs.indices.contains(state.activeLegIndex)
-                ? legs[state.activeLegIndex].from.shortName
-                : state.destination
-            return TravelTrackerAlert(
-                title: "Change at next stop",
-                body: "Change to \(state.event.name) at \(station), the next stop."
+            return TravelTrackerCue(
+                kind: .getOff,
+                legIndex: state.activeLegIndex,
+                alert: TravelTrackerAlert(
+                    title: "Get off soon",
+                    body: "Get off at \(station) in about 2 minutes."
+                )
             )
-        case .missedTransfer:
-            return TravelTrackerAlert(title: "Connection missed", body: "The planned connection has been missed.")
-        case .boarding, .ride:
+        case .ride:
+            guard legs.indices.contains(state.activeLegIndex + 1) else { return nil }
+            let next = legs[state.activeLegIndex + 1]
+            let service = next.line.isEmpty ? trackerVehicle(next.mode) : next.line
+            return TravelTrackerCue(
+                kind: .change,
+                legIndex: state.activeLegIndex,
+                alert: TravelTrackerAlert(
+                    title: "Change services soon",
+                    body: "Get off at \(station) in about 2 minutes to change to \(service)."
+                )
+            )
+        default:
             return nil
         }
     }
@@ -685,7 +722,9 @@ enum TravelTrackerActivityContentMapper {
     ) -> TravelTrackerActivityAttributes.ContentState {
         let legs = focus.journey.legs
         let freshBoundary = state.freshUntil ?? 0
-        let staleAt = min(state.nextBoundary, freshBoundary)
+        var boundary = state.nextBoundary
+        if let lead = state.alertLead, lead > now { boundary = min(boundary, lead) }
+        let staleAt = min(boundary, freshBoundary)
         var content = TravelTrackerActivityAttributes.ContentState(
             generation: state.revision.generation,
             stage: .init(state.stage),
@@ -714,7 +753,7 @@ enum TravelTrackerActivityContentMapper {
             progress: min(1, max(0, state.progress)),
             provenance: state.provenance,
             staleProvenance: staleProvenance(focus: focus, state: state),
-            nextBoundary: date(state.nextBoundary),
+            nextBoundary: date(boundary),
             staleDate: date(staleAt),
             cancelled: state.cancelled,
             arrivalCancelled: state.arrivalCancelled

@@ -606,12 +606,13 @@ final class ControllerTests: XCTestCase {
 
         StubbedDepartures.body = try departuresBody(data, arrival: arrival + 120_000)
         confirmArrival(model, at: b)
+        for _ in 0..<300 where !model.state.focusComplete { try await Task.sleep(for: .milliseconds(10)) }
         XCTAssertTrue(model.state.focusComplete, "the fix at the destination records the ride")
 
         try await refreshed(model, arrival: arrival + 120_000)
         XCTAssertTrue(model.state.focusComplete, "location-based completion is unchanged by a timetable move")
         var persisted = await store.load()
-        for _ in 0..<50 where !persisted.rides.isEmpty { try await Task.sleep(for: .milliseconds(10)); persisted = await store.load() }
+        for _ in 0..<50 where persisted.rides.isEmpty { try await Task.sleep(for: .milliseconds(10)); persisted = await store.load() }
         XCTAssertEqual(persisted.rides.map(\.arrival), [arrival + 120_000], "the row takes the moved arrival instead")
         model.pause()
     }

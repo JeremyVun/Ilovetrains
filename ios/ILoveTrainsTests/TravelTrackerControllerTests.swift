@@ -183,31 +183,86 @@ final class TravelTrackerControllerTests: XCTestCase {
         XCTAssertEqual(content.staleDate, min(content.nextBoundary, Date(timeIntervalSince1970: focus.board.generatedAt / 1_000 + 90)))
     }
 
-    func testRideToFinalAlertsInBackgroundAndCuesOnlyOnce() async {
+    func testLastLegCuesTwoMinutesBeforeArrivalAndNotAtItsDeparture() async {
         let now = 1_800_000_000_000.0
         let driver = TrackerDriver()
         let haptics = TrackerHaptics()
         let controller = TravelTrackerController(store: TrackerStore(), driver: driver, haptics: haptics)
-        let focus = trackerFocus(id: "cue", now: now, pinned: false)
+        let focus = trackerFocus(id: "get-off", now: now, pinned: false)
+        let lastLeg = focus.journey.legs[1]
 
         await controller.reconcile(focus: focus, visibleFocus: focus, now: now, recordedComplete: false, background: true)
         await controller.awaitPublications()
-        XCTAssertTrue(driver.alerts.isEmpty, "The first publication of a session lands in a stage rather than moving into one")
+        XCTAssertTrue(driver.alerts.isEmpty)
 
-        await controller.reconcile(focus: focus, visibleFocus: focus, now: now + 800_000, recordedComplete: false, background: true)
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: lastLeg.effectiveDeparture + 1_000,
+                                   recordedComplete: false, background: true)
         await controller.awaitPublications()
-        XCTAssertEqual(driver.alerts.map(\.title), ["Get off next"])
-        XCTAssertEqual(driver.alerts.first?.body, "Get off at \(focus.journey.legs[1].to.shortName), the next stop.")
+        XCTAssertTrue(driver.alerts.isEmpty, "Departing on the last leg is a departure, which never cues")
+
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: lastLeg.effectiveArrival - trackerAlertLead,
+                                   recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertEqual(driver.alerts.map(\.title), ["Get off soon"])
+        XCTAssertEqual(driver.alerts.first?.body, "Get off at \(lastLeg.to.shortName) in about 2 minutes.")
         XCTAssertEqual(haptics.impacts, 0)
 
-        let updatesAfterCue = driver.updateCount
-        await controller.reconcile(focus: focus, visibleFocus: focus, now: now + 860_000, recordedComplete: false, background: true)
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: lastLeg.effectiveArrival - 30_000,
+                                   recordedComplete: false, background: true)
         await controller.awaitPublications()
-        XCTAssertEqual(driver.alerts.count, 1, "A same-stage update must not cue again")
-        XCTAssertEqual(driver.updateCount, updatesAfterCue)
+        XCTAssertEqual(driver.alerts.count, 1, "The get-off cue fires once for the leg")
     }
 
-    func testForegroundTransitionVibratesInsteadOfAlerting() async {
+    func testSingleLegJourneyDoesNotCueWhenItDeparts() async {
+        let now = 1_800_000_000_000.0
+        let driver = TrackerDriver()
+        let haptics = TrackerHaptics()
+        let controller = TravelTrackerController(store: TrackerStore(), driver: driver, haptics: haptics)
+        let focus = trackerFocus(id: "single", now: now, pinned: false, legCount: 1)
+        let leg = focus.journey.legs[0]
+
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: leg.effectiveDeparture - 60_000,
+                                   recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: leg.effectiveDeparture + 1_000,
+                                   recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertTrue(driver.alerts.isEmpty, "Boarding into the only leg is a departure")
+        XCTAssertEqual(haptics.impacts, 0)
+
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: leg.effectiveArrival - trackerAlertLead,
+                                   recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertEqual(driver.alerts.map(\.title), ["Get off soon"])
+    }
+
+    func testRideLegCuesAtItsLeadAndEnteringTransferDoesNot() async {
+        let now = 1_800_000_000_000.0
+        let driver = TrackerDriver()
+        let haptics = TrackerHaptics()
+        let controller = TravelTrackerController(store: TrackerStore(), driver: driver, haptics: haptics)
+        let focus = trackerFocus(id: "change", now: now, pinned: false)
+        let riding = focus.journey.legs[0]
+
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: riding.effectiveArrival - trackerAlertLead,
+                                   recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertEqual(driver.alerts.map(\.title), ["Change services soon"])
+        XCTAssertEqual(
+            driver.alerts.first?.body,
+            "Get off at \(riding.to.shortName) in about 2 minutes to change to \(focus.journey.legs[1].line)."
+        )
+
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: riding.effectiveArrival + 60_000,
+                                   recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertEqual(driver.alerts.count, 1, "Entering the transfer stage is not a cue")
+    }
+
+    func testForegroundCueVibratesInsteadOfAlerting() async {
         let now = 1_800_000_000_000.0
         let driver = TrackerDriver()
         let haptics = TrackerHaptics()
@@ -216,14 +271,37 @@ final class TravelTrackerControllerTests: XCTestCase {
 
         await controller.reconcile(focus: focus, visibleFocus: focus, now: now, recordedComplete: false)
         await controller.awaitPublications()
-        await controller.reconcile(focus: focus, visibleFocus: focus, now: now + 800_000, recordedComplete: false)
+        await controller.reconcile(focus: focus, visibleFocus: focus,
+                                   now: focus.journey.legs[0].effectiveArrival - trackerAlertLead,
+                                   recordedComplete: false)
         await controller.awaitPublications()
 
         XCTAssertEqual(haptics.impacts, 1)
         XCTAssertTrue(driver.alerts.isEmpty)
     }
 
-    func testRestoreIntoFinalStageDoesNotCue() async {
+    func testCueVibratesOnScreenWithNoLiveActivity() async {
+        let now = 1_800_000_000_000.0
+        let driver = TrackerDriver()
+        driver.activitiesEnabled = false
+        let haptics = TrackerHaptics()
+        let controller = TravelTrackerController(store: TrackerStore(), driver: driver, haptics: haptics)
+        let focus = trackerFocus(id: "no-surface", now: now, pinned: false)
+
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now, recordedComplete: false)
+        await controller.awaitPublications()
+        XCTAssertTrue(driver.current.isEmpty)
+        XCTAssertEqual(haptics.impacts, 0)
+
+        await controller.reconcile(focus: focus, visibleFocus: focus,
+                                   now: focus.journey.legs[0].effectiveArrival - trackerAlertLead,
+                                   recordedComplete: false)
+        await controller.awaitPublications()
+        XCTAssertEqual(haptics.impacts, 1, "An on-screen cue does not depend on a tracker surface")
+        XCTAssertTrue(driver.alerts.isEmpty)
+    }
+
+    func testRestoreInsideALeadDoesNotCueButLaterLegsStillDo() async {
         let now = 1_800_000_000_000.0
         let store = TrackerStore()
         let driver = TrackerDriver()
@@ -234,11 +312,42 @@ final class TravelTrackerControllerTests: XCTestCase {
         await controller.awaitPublications()
 
         controller = TravelTrackerController(store: store, driver: driver, haptics: haptics)
-        await controller.reconcile(focus: focus, visibleFocus: focus, now: now + 800_000, recordedComplete: false, background: true)
+        await controller.reconcile(focus: focus, visibleFocus: focus,
+                                   now: focus.journey.legs[0].effectiveArrival - 60_000,
+                                   recordedComplete: false, background: true)
         await controller.awaitPublications()
+        XCTAssertTrue(driver.alerts.isEmpty, "A first observation already past a lead only records the baseline")
 
-        XCTAssertTrue(driver.alerts.isEmpty)
-        XCTAssertEqual(haptics.impacts, 0)
+        await controller.reconcile(focus: focus, visibleFocus: focus,
+                                   now: focus.journey.legs[1].effectiveArrival - trackerAlertLead,
+                                   recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertEqual(driver.alerts.map(\.title), ["Get off soon"])
+    }
+
+    func testArrivalMovingLaterAfterACueDoesNotCueAgain() async {
+        let now = 1_800_000_000_000.0
+        let driver = TrackerDriver()
+        let haptics = TrackerHaptics()
+        let controller = TravelTrackerController(store: TrackerStore(), driver: driver, haptics: haptics)
+        var focus = trackerFocus(id: "delayed", now: now, pinned: false)
+        let arrival = focus.journey.legs[0].effectiveArrival
+
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: arrival - trackerAlertLead,
+                                   recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertEqual(driver.alerts.count, 1)
+
+        focus.journey.legs[0].estimatedArrival = arrival + 600_000
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: arrival - 60_000,
+                                   recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: arrival + 600_000 - trackerAlertLead,
+                                   recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertEqual(driver.alerts.count, 1, "A later estimate does not repeat a cue already given for the leg")
     }
 
     func testReplacedIdentityStartsANewGenerationWithoutCueing() async {
@@ -251,7 +360,9 @@ final class TravelTrackerControllerTests: XCTestCase {
         await controller.awaitPublications()
 
         let replacement = trackerFocus(id: "replacement", now: now, pinned: false)
-        await controller.reconcile(focus: replacement, visibleFocus: replacement, now: now + 800_000, recordedComplete: false, background: true)
+        await controller.reconcile(focus: replacement, visibleFocus: replacement,
+                                   now: replacement.journey.legs[0].effectiveArrival - trackerAlertLead,
+                                   recordedComplete: false, background: true)
         await controller.awaitPublications()
 
         let session = await controller.snapshot()
@@ -266,17 +377,19 @@ final class TravelTrackerControllerTests: XCTestCase {
         let haptics = TrackerHaptics()
         let controller = TravelTrackerController(store: TrackerStore(), driver: driver, haptics: haptics)
         let focus = trackerFocus(id: "silent", now: now, pinned: false)
+        let lead = focus.journey.legs[0].effectiveArrival - trackerAlertLead
 
-        await controller.reconcile(focus: focus, visibleFocus: focus, now: now, recordedComplete: false, journeyAlerts: false, background: true)
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now, recordedComplete: false,
+                                   journeyAlerts: false, background: true)
         await controller.awaitPublications()
-        await controller.reconcile(focus: focus, visibleFocus: focus, now: now + 800_000, recordedComplete: false, journeyAlerts: false, background: true)
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: lead, recordedComplete: false,
+                                   journeyAlerts: false, background: true)
         await controller.awaitPublications()
-
-        XCTAssertEqual(driver.updateCount, 1, "The tracker surface still updates while alerts are off")
         XCTAssertTrue(driver.alerts.isEmpty)
         XCTAssertEqual(haptics.impacts, 0)
 
-        await controller.reconcile(focus: focus, visibleFocus: focus, now: now + 800_000, recordedComplete: false, journeyAlerts: false)
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: lead + 1_000, recordedComplete: false,
+                                   journeyAlerts: false)
         await controller.awaitPublications()
         XCTAssertEqual(haptics.impacts, 0)
     }
