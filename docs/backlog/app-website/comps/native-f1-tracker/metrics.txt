@@ -1,6 +1,0 @@
-simulator=C8400E13-B0B3-469D-8FE9-F5E57F2BD3E0
-device=Codex-r9-activity-47800
-capture_pixels=1206x2622
-settle_seconds=3
-content_size=large
-states=marketing-ferry-active marketing-ferry-active-light

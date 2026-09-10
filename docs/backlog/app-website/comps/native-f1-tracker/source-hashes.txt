@@ -1,4 +1,0 @@
-45b02e4a9127811772c791c989dd5703606acec6a62c9da16c21939f35b5fcec  /Users/jeremy/projects/trains_app/ios/ILoveTrains/Core/TrainViewModel.swift
-70fd107e1d8a5aef6e1c98803abe099485fe7f8037143931c9e9046ab6bec639  /Users/jeremy/projects/trains_app/ios/ILoveTrains/UI/Common.swift
-e2e9b4908323ccbd9860afd0fd923cda8e376f8cab8eb94b62fdfce5faa659b4  /Users/jeremy/projects/trains_app/ios/ILoveTrains/UI/JourneyAxisLayout.swift
-ecc32512f0e1b94eb33187639d4f29d0d6b8dac83d36734a21a92b79534b7a1c  /Users/jeremy/projects/trains_app/ios/ILoveTrains/UI/HomeView.swift

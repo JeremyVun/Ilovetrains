@@ -127,6 +127,11 @@ Both apps exist (`android/`, `ios/`) and lag the web by one round. Remaining:
 - Home-screen widgets, background ride detection and notifications.
   OS-rendered artifacts (icons, widgets) pass through the real renderer
   before a verdict.
+- **Sleepers icon delivery**: the artwork, `tools/make-icons.sh` and the
+  worker VERSION bump are in main, and the real iOS SpringBoard render is
+  accepted. Still owed: the Android launcher rendered through the real
+  adaptive mask, and a returning service-worker profile picking up the new
+  PWA icon bytes on the next app deployment.
 - Physical iPhone verification, waiting on a connected phone and an Xcode
   account sign-in (`docs/operations/ios.md`).
 

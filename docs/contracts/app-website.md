@@ -66,7 +66,9 @@ and transfer phones share the next stage, followed by the green tracker stage.
 Phone layouts stack the screens in ordinary scrolling, without gallery controls.
 
 Real iOS simulator screenshots are served in the matching colour scheme and
-must not be redrawn as invented app UI. The hero shows Parramatta to Central;
+must not be redrawn as invented app UI. A recapture comes from the current
+native renderer with a fixed example clock, then a lossless WebP export whose
+decoded pixels match the PNG. The hero shows Parramatta to Central;
 the in-app tracker shows the F1 ferry from Circular Quay to Manly, with the
 travelled segment dimmed at 8/22 progress. The iPhone Live Activity shows
 Chatswood to Bondi Junction, changing from M1 to T4 at Martin Place. Both
@@ -74,6 +76,8 @@ tracker examples appear as complete proportional phones, side by side on
 desktop and stacked on mobile. The ActivityKit screenshot is a real native
 Notification Center capture with a fixed example clock, reused in both site
 schemes; it does not claim continuously advancing background instructions.
+Its lock-screen date reads “Sat 1 Jan” because CoreSimulator's time override
+does not composite the date; that artifact is accepted, never repainted.
 The board and journey-detail examples retain their captured routes. The public WebP copies
 use lossless encoding and decode to the source pixels. HTML `picture` selects
 the scheme, and below-fold screenshots load lazily. Screenshot widths retain

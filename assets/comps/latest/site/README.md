@@ -1,17 +1,14 @@
-# Selected public website — R9 A
+# Public website calibration
 
-Owner selected A on 9 September 2026, then requested the green Sydney dot, Sleepers beside the header wordmark and the iPhone Live Activity showcase. The owner then rejected the detached card and requested a complete phone
-screen with a busy transfer route. These real browser frames show that
-refinement: Chatswood → Bondi Junction via Martin Place, M1 to T4. The full app screenshots retain their original proportions and controls. The complete iPhone screen is an unchanged real ActivityKit Notification
-Center capture. Both website schemes reuse the same native system image.
-Its simulator date artifact and fixed clock are recorded in the backlog
-comp provenance; no screenshot pixels were repainted.
+Real browser frames of the packaged website at 390×844 dark and 1440×900
+light: landing, header detail, the F1 in-app tracker, the iPhone Live
+Activity stage, privacy and support. `sleepers-springboard.png` is the real
+iOS SpringBoard rendering of the Sleepers icon. The packaged site and the
+public origin are judged against these frames; rules live in
+`docs/contracts/app-website.md`.
 
-The desktop and phone landing frames and tracker/header detail frames are the current website layout calibration. `sleepers-springboard.png` remains the selected real iOS icon-rendering evidence. Build source and rules are in `docs/backlog/app-website/` until closeout.
-
-The F1 in-app screenshot was retaken in both schemes on 10 September from
-the current native renderer. Its travelled 8/22 segment is dimmed. The current
-landing/tracker calibration frames include the new screenshot. Native capture
-provenance is in `docs/backlog/app-website/comps/native-f1-tracker/`.
-
-These frames prove the prototype appearance, not production packaging or native background-update behavior. The packaged site must be checked against them during the build.
+The app screenshots inside the frames are complete 1206×2622 iOS simulator
+captures with fixed example clocks. The Live Activity screen is one real
+ActivityKit Notification Center capture reused in both schemes; its lock
+screen reads “Sat 1 Jan” because CoreSimulator's time override does not
+composite the date. No screenshot pixels were repainted.
