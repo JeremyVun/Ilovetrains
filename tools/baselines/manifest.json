@@ -5,10 +5,10 @@
     "device": "Google Chrome 152.0.7977.84, 390x844 css @2x"
   },
   "ios": {
-    "commit": "a21dbec",
-    "date": "2026-09-09",
-    "device": "Codex-commute-feedback-01 1206x2622px, content size large",
-    "simulator": "Codex-commute-feedback-01",
+    "commit": "52d1d57",
+    "date": "2026-09-10",
+    "device": "haptics-ios 1206x2622px, content size large",
+    "simulator": "haptics-ios",
     "tracker": {
       "commit": "116efdc",
       "date": "2026-09-08",

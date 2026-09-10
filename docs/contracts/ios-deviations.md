@@ -9,8 +9,9 @@ iOS implementation requested on 2026-09-07.
   text. Accessibility-size layout checks do not establish full Dynamic Type
   support. Content remains scrollable rather than clipping a fixed web frame.
 - Location uses the native When In Use permission sheet after an explicit
-  action in setup or Settings. There is no footer permission popup and no
-  background tracking. Denied or restricted permission is labelled
+  action in setup or Settings. There is no footer permission popup. The only
+  background use is the followed-journey keepalive below, which asks for no
+  further permission. Denied or restricted permission is labelled
   `Location is blocked`; the
   row’s `OPEN SETTINGS ›` action opens the app's iOS Settings page. Setup
   follows the shared native location flow in [ui.md](ui.md#setup-and-station-search).
@@ -75,8 +76,10 @@ monitor it across Home, detail and Settings with already-granted permission.
 Provider updates target ten seconds; accepted evidence is at least five seconds
 apart. Setup lookups share the owner. Backgrounding, disabling location,
 permission loss, unpinning, deleting or replacing focus stops collection and
-clears the raw window; late callbacks cannot cross generations. No background
-GPS or location payload is introduced. Persist only the identity-bound guard,
+clears the raw window; late callbacks cannot cross generations. The tracker's
+background keepalive runs a separate provider whose fixes are discarded, so no
+background position reaches the guard and no location payload leaves the
+phone. Persist only the identity-bound guard,
 retention checkpoint and optional completion basis/time described in
 [client-storage.md](client-storage.md#final-arrival-decision).
 
@@ -92,7 +95,7 @@ can request one and iOS permits it. Pinning alone does not start tracking;
 replacing an already-tracked focus also replaces its activity. The containing
 app publishes focused journey updates through ActivityKit, and the widget
 extension renders the lock-screen and Dynamic Island surfaces. No push token,
-background location permission or personal server state is introduced.
+`Always` location permission or personal server state is introduced.
 
 The accepted short sentence, platform roles, destination arrival and quiet trip
 line remain the visual target. Native system countdowns show a bounded clock
@@ -112,12 +115,28 @@ the app is absent, and never represents live location. A missed connection
 with overlapping leg times omits the trip line and labels the destination ETA
 as planned, including before the current train reaches the change station.
 New platform/cancellation information, journey
-stage changes and completion require app execution; they reconcile when the
-app resumes. The activity may remain after expected arrival until the app or
+stage changes and completion require app execution: they happen at the real
+moment while the keepalive below runs, and otherwise reconcile when the app
+resumes. The activity may remain after expected arrival until the app or
 iOS ends it. A timer reaching zero never records a ride. Dismissal suppresses
 recreation for that focus without clearing the journey, and an old activity's
 tap cannot restore a replaced focus. Session persistence is defined in
 [client-storage.md](client-storage.md#native-tracker-sessions).
+
+While a tracker session is active for the visible focus, the location
+preference is on and permission is granted, backgrounding starts coarse
+location updates (100 m accuracy and distance filter, no automatic pausing,
+the system background indicator shown) purely to keep the refresh, reconcile
+and publish loop scheduled. The arrival guard's own monitoring stops as it
+always did. The keepalive stops when the app returns and when the session
+ends, is dismissed or expires. Without permission, with the location
+preference off or with no session it never starts, and the app suspends and
+reconciles on resume as before.
+
+Journey alerts are decided when the controller publishes an update for the
+same identity, generation and session, so a transition observed while no Live
+Activity exists cues nothing, including the on-screen haptic. Every publishing
+path is shared, so a transition cues once whether the app is on screen or not.
 
 The shared behavior remains defined by [ui.md](ui.md),
 [client-storage.md](client-storage.md) and [native-data.md](native-data.md).

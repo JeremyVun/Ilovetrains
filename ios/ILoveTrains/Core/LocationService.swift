@@ -120,3 +120,46 @@ final class LocationService: NSObject, LocationProviding, @preconcurrency CLLoca
         }
     }
 }
+
+@MainActor
+protocol TrackerKeepaliveDriving: AnyObject {
+    var isRunning: Bool { get }
+    func start() -> Bool
+    func stop()
+}
+
+/// Coarse background location that only keeps the tracker loop scheduled while a journey is followed.
+@MainActor
+final class TrackerKeepalive: NSObject, TrackerKeepaliveDriving, @preconcurrency CLLocationManagerDelegate {
+    private var manager: CLLocationManager?
+
+    var isRunning: Bool { manager != nil }
+
+    func start() -> Bool {
+        if manager != nil { return true }
+        let current = CLLocationManager()
+        let status = current.authorizationStatus
+        guard status == .authorizedWhenInUse || status == .authorizedAlways else { return false }
+        current.delegate = self
+        current.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        current.distanceFilter = 100
+        current.pausesLocationUpdatesAutomatically = false
+        current.allowsBackgroundLocationUpdates = true
+        current.showsBackgroundLocationIndicator = true
+        current.startUpdatingLocation()
+        manager = current
+        return true
+    }
+
+    func stop() {
+        guard let current = manager else { return }
+        manager = nil
+        current.stopUpdatingLocation()
+        current.allowsBackgroundLocationUpdates = false
+        current.delegate = nil
+    }
+
+    // Its fixes are deliberately discarded: background positions must never reach the arrival guard.
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {}
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {}
+}

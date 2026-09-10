@@ -157,6 +157,7 @@ struct UserData: Codable, Equatable, Sendable {
     var transferLimit: TransferLimit
     var flags: [String: Bool]
     var useLocation: Bool
+    var journeyAlerts: Bool
     var home: Station?
     var recentFrom: [Station]
     var recentTo: [Station]
@@ -175,6 +176,7 @@ struct UserData: Codable, Equatable, Sendable {
         transferLimit: TransferLimit = .two,
         flags: [String: Bool] = [:],
         useLocation: Bool = true,
+        journeyAlerts: Bool = true,
         home: Station? = nil,
         recentFrom: [Station] = [],
         recentTo: [Station] = []
@@ -192,6 +194,7 @@ struct UserData: Codable, Equatable, Sendable {
         self.transferLimit = transferLimit
         self.flags = flags
         self.useLocation = useLocation
+        self.journeyAlerts = journeyAlerts
         self.home = home
         self.recentFrom = recentFrom
         self.recentTo = recentTo
@@ -199,7 +202,7 @@ struct UserData: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case schemaVersion, trips, history, rides, votes, lastTripId, lastReverse, focus, lastAnswer
-        case appearance, modes, transferLimit, flags, useLocation, home, recentFrom, recentTo
+        case appearance, modes, transferLimit, flags, useLocation, journeyAlerts, home, recentFrom, recentTo
     }
 
     init(from decoder: Decoder) throws {
@@ -224,6 +227,7 @@ struct UserData: Codable, Equatable, Sendable {
         transferLimit = (try? container.decodeIfPresent(TransferLimit.self, forKey: .transferLimit)) ?? .two
         flags = Self.lossyFlags(container)
         useLocation = (try? container.decodeIfPresent(Bool.self, forKey: .useLocation)) ?? true
+        journeyAlerts = (try? container.decodeIfPresent(Bool.self, forKey: .journeyAlerts)) ?? true
         home = try? container.decodeIfPresent(Station.self, forKey: .home)
         recentFrom = Self.recent(Self.lossyArray(container, forKey: .recentFrom))
         recentTo = Self.recent(Self.lossyArray(container, forKey: .recentTo))
@@ -247,6 +251,7 @@ struct UserData: Codable, Equatable, Sendable {
         try container.encode(value.transferLimit, forKey: .transferLimit)
         try container.encode(value.flags, forKey: .flags)
         try container.encode(value.useLocation, forKey: .useLocation)
+        try container.encode(value.journeyAlerts, forKey: .journeyAlerts)
         try container.encodeIfPresent(value.home, forKey: .home)
         try container.encode(value.recentFrom, forKey: .recentFrom)
         try container.encode(value.recentTo, forKey: .recentTo)

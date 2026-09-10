@@ -34,6 +34,7 @@ struct AppState {
     var flags: [String: Bool] = [:]
     var tinyTrain = false
     var useLocation = true
+    var journeyAlerts = true
     var locationGranted = false
     var locationDenied = false
     var distanceMetres: Int?

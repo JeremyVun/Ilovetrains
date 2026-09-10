@@ -183,6 +183,104 @@ final class TravelTrackerControllerTests: XCTestCase {
         XCTAssertEqual(content.staleDate, min(content.nextBoundary, Date(timeIntervalSince1970: focus.board.generatedAt / 1_000 + 90)))
     }
 
+    func testRideToFinalAlertsInBackgroundAndCuesOnlyOnce() async {
+        let now = 1_800_000_000_000.0
+        let driver = TrackerDriver()
+        let haptics = TrackerHaptics()
+        let controller = TravelTrackerController(store: TrackerStore(), driver: driver, haptics: haptics)
+        let focus = trackerFocus(id: "cue", now: now, pinned: false)
+
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertTrue(driver.alerts.isEmpty, "The first publication of a session lands in a stage rather than moving into one")
+
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now + 800_000, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertEqual(driver.alerts.map(\.title), ["Get off next"])
+        XCTAssertEqual(driver.alerts.first?.body, "Get off at \(focus.journey.legs[1].to.shortName), the next stop.")
+        XCTAssertEqual(haptics.impacts, 0)
+
+        let updatesAfterCue = driver.updateCount
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now + 860_000, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertEqual(driver.alerts.count, 1, "A same-stage update must not cue again")
+        XCTAssertEqual(driver.updateCount, updatesAfterCue)
+    }
+
+    func testForegroundTransitionVibratesInsteadOfAlerting() async {
+        let now = 1_800_000_000_000.0
+        let driver = TrackerDriver()
+        let haptics = TrackerHaptics()
+        let controller = TravelTrackerController(store: TrackerStore(), driver: driver, haptics: haptics)
+        let focus = trackerFocus(id: "foreground", now: now, pinned: false)
+
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now, recordedComplete: false)
+        await controller.awaitPublications()
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now + 800_000, recordedComplete: false)
+        await controller.awaitPublications()
+
+        XCTAssertEqual(haptics.impacts, 1)
+        XCTAssertTrue(driver.alerts.isEmpty)
+    }
+
+    func testRestoreIntoFinalStageDoesNotCue() async {
+        let now = 1_800_000_000_000.0
+        let store = TrackerStore()
+        let driver = TrackerDriver()
+        let haptics = TrackerHaptics()
+        let focus = trackerFocus(id: "restored", now: now, pinned: false)
+        var controller = TravelTrackerController(store: store, driver: driver, haptics: haptics)
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+
+        controller = TravelTrackerController(store: store, driver: driver, haptics: haptics)
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now + 800_000, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+
+        XCTAssertTrue(driver.alerts.isEmpty)
+        XCTAssertEqual(haptics.impacts, 0)
+    }
+
+    func testReplacedIdentityStartsANewGenerationWithoutCueing() async {
+        let now = 1_800_000_000_000.0
+        let driver = TrackerDriver()
+        let haptics = TrackerHaptics()
+        let controller = TravelTrackerController(store: TrackerStore(), driver: driver, haptics: haptics)
+        let first = trackerFocus(id: "first", now: now, pinned: false)
+        await controller.reconcile(focus: first, visibleFocus: first, now: now, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+
+        let replacement = trackerFocus(id: "replacement", now: now, pinned: false)
+        await controller.reconcile(focus: replacement, visibleFocus: replacement, now: now + 800_000, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+
+        let session = await controller.snapshot()
+        XCTAssertEqual(session.generation, 2)
+        XCTAssertTrue(driver.alerts.isEmpty)
+        XCTAssertEqual(haptics.impacts, 0)
+    }
+
+    func testJourneyAlertsOffKeepsTheUpdateSilent() async {
+        let now = 1_800_000_000_000.0
+        let driver = TrackerDriver()
+        let haptics = TrackerHaptics()
+        let controller = TravelTrackerController(store: TrackerStore(), driver: driver, haptics: haptics)
+        let focus = trackerFocus(id: "silent", now: now, pinned: false)
+
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now, recordedComplete: false, journeyAlerts: false, background: true)
+        await controller.awaitPublications()
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now + 800_000, recordedComplete: false, journeyAlerts: false, background: true)
+        await controller.awaitPublications()
+
+        XCTAssertEqual(driver.updateCount, 1, "The tracker surface still updates while alerts are off")
+        XCTAssertTrue(driver.alerts.isEmpty)
+        XCTAssertEqual(haptics.impacts, 0)
+
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now + 800_000, recordedComplete: false, journeyAlerts: false)
+        await controller.awaitPublications()
+        XCTAssertEqual(haptics.impacts, 0)
+    }
+
     private func waitFor(_ predicate: @escaping () async -> Bool) async {
         for _ in 0..<50 {
             if await predicate() { return }
@@ -207,6 +305,7 @@ private final class TrackerDriver: @unchecked Sendable, TravelTrackerActivityDri
     private var continuations: [String: AsyncStream<TravelTrackerSystemActivityState>.Continuation] = [:]
     private(set) var ended: [String] = []
     private var updates = 0
+    private var alerted: [TravelTrackerAlert?] = []
 
     init(requestDelay: Duration = .zero) {
         self.requestDelay = requestDelay
@@ -214,6 +313,7 @@ private final class TrackerDriver: @unchecked Sendable, TravelTrackerActivityDri
 
     var current: [TravelTrackerActivityRecord] { lock.withLock { records } }
     var updateCount: Int { lock.withLock { updates } }
+    var alerts: [TravelTrackerAlert] { lock.withLock { alerted.compactMap { $0 } } }
 
     func activities() async -> [TravelTrackerActivityRecord] { current }
 
@@ -231,9 +331,10 @@ private final class TrackerDriver: @unchecked Sendable, TravelTrackerActivityDri
 
     func update(
         id: String,
-        content: ActivityContent<TravelTrackerActivityAttributes.ContentState>
+        content: ActivityContent<TravelTrackerActivityAttributes.ContentState>,
+        alert: TravelTrackerAlert?
     ) async {
-        lock.withLock { updates += 1 }
+        lock.withLock { updates += 1; alerted.append(alert) }
     }
 
     func end(id: String) async {
@@ -254,6 +355,15 @@ private final class TrackerDriver: @unchecked Sendable, TravelTrackerActivityDri
             continuations[id]?.yield(state)
         }
     }
+}
+
+private final class TrackerHaptics: @unchecked Sendable, TravelTrackerHapticPerforming {
+    private let lock = NSLock()
+    private var count = 0
+
+    var impacts: Int { lock.withLock { count } }
+
+    func impact() async { lock.withLock { count += 1 } }
 }
 
 private func trackerFocus(
