@@ -76,6 +76,20 @@ final class StorageTests: XCTestCase {
         XCTAssertEqual(try decode(#"{"flags": {"transferLimit": 1, "other": true}}"#).flags, ["other": true])
     }
 
+    func testJourneyAlertsDefaultToOnAndSurviveARestart() async throws {
+        let decode = { (json: String) in try JSONDecoder().decode(UserData.self, from: Data(json.utf8)) }
+        XCTAssertTrue(try decode(#"{"schemaVersion": 1, "appearance": "dark"}"#).journeyAlerts)
+        XCTAssertTrue(try decode(#"{"journeyAlerts": "off"}"#).journeyAlerts)
+        XCTAssertFalse(try decode(#"{"journeyAlerts": false}"#).journeyAlerts)
+
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = DeviceStore(directory: directory)
+        try await store.save(UserData(journeyAlerts: false))
+        let restored = await store.load()
+        XCTAssertFalse(restored.journeyAlerts)
+    }
+
     func testTheCapAppliesOnlyWithTheFlagAndTheTwoPreference() throws {
         let capped = UserData(transferLimit: .two, flags: ["transferLimit": true])
         let uncapped = UserData(transferLimit: .any, flags: ["transferLimit": true])

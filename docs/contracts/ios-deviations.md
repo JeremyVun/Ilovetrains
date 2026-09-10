@@ -125,9 +125,9 @@ tap cannot restore a replaced focus. Session persistence is defined in
 
 While a tracker session is active for the visible focus, the location
 preference is on and permission is granted, backgrounding starts coarse
-location updates (100 m accuracy and distance filter, no automatic pausing,
-the system background indicator shown) purely to keep the refresh, reconcile
-and publish loop scheduled. The arrival guard's own monitoring stops as it
+location updates (hundred-metre accuracy, a 100 m distance filter, no
+automatic pausing, the system background indicator shown) purely to keep the
+refresh, reconcile and publish loop scheduled. The arrival guard's own monitoring stops as it
 always did. The keepalive stops when the app returns and when the session
 ends, is dismissed or expires. Without permission, with the location
 preference off or with no session it never starts, and the app suspends and

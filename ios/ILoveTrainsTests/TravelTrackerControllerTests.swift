@@ -394,6 +394,80 @@ final class TravelTrackerControllerTests: XCTestCase {
         XCTAssertEqual(haptics.impacts, 0)
     }
 
+    func testCancelledJourneyStillCuesItsLead() async {
+        let now = 1_800_000_000_000.0
+        let driver = TrackerDriver()
+        let haptics = TrackerHaptics()
+        let controller = TravelTrackerController(store: TrackerStore(), driver: driver, haptics: haptics)
+        var focus = trackerFocus(id: "cancelled", now: now, pinned: false)
+        let riding = focus.journey.legs[0]
+
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        focus.journey.legs[1].cancelled = true
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now + 1_000, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertEqual(driver.alerts.map(\.title), ["Service cancelled"])
+
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: riding.effectiveArrival - trackerAlertLead,
+                                   recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertEqual(driver.alerts.map(\.title), ["Service cancelled", "Change services soon"],
+                       "A cancellation cannot swallow the rest of the journey's cues")
+    }
+
+    func testMissedConnectionCuesInsteadOfTheChangeOnThatLeg() async {
+        let now = 1_800_000_000_000.0
+        let driver = TrackerDriver()
+        let haptics = TrackerHaptics()
+        let controller = TravelTrackerController(store: TrackerStore(), driver: driver, haptics: haptics)
+        var focus = trackerFocus(id: "missed", now: now, pinned: false)
+        let riding = focus.journey.legs[0]
+        focus.journey.legs[1].estimatedDeparture = riding.effectiveArrival - 60_000
+
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: riding.effectiveArrival - trackerAlertLead,
+                                   recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertTrue(driver.alerts.isEmpty, "A leg whose connection is already missed does not cue a change")
+
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: riding.effectiveArrival + 1_000,
+                                   recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertEqual(driver.alerts.map(\.title), ["Connection missed"])
+    }
+
+    func testAGapInObservationRecordsTheBaselineInsteadOfCueing() async {
+        let now = 1_800_000_000_000.0
+        let clock = TrackerClock()
+        let driver = TrackerDriver()
+        let haptics = TrackerHaptics()
+        let controller = TravelTrackerController(store: TrackerStore(), driver: driver, haptics: haptics, clock: clock.now)
+        let focus = trackerFocus(id: "gap", now: now, pinned: false)
+        let lead = focus.journey.legs[0].effectiveArrival - trackerAlertLead
+
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+
+        clock.advance(trackerObservationGap + 1)
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: lead, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertTrue(driver.alerts.isEmpty, "A lead passed while the app was not observing is not a live moment")
+
+        let next = trackerFocus(id: "gap-next", now: now, pinned: false)
+        clock.advance(1)
+        await controller.reconcile(focus: next, visibleFocus: next, now: now, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        clock.advance(1)
+        await controller.reconcile(focus: next, visibleFocus: next,
+                                   now: next.journey.legs[0].effectiveArrival - trackerAlertLead,
+                                   recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertEqual(driver.alerts.map(\.title), ["Change services soon"], "A session observed live still cues")
+    }
+
     private func waitFor(_ predicate: @escaping () async -> Bool) async {
         for _ in 0..<50 {
             if await predicate() { return }
@@ -476,7 +550,16 @@ private final class TrackerHaptics: @unchecked Sendable, TravelTrackerHapticPerf
 
     var impacts: Int { lock.withLock { count } }
 
-    func impact() async { lock.withLock { count += 1 } }
+    func impact() { lock.withLock { count += 1 } }
+}
+
+private final class TrackerClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = Date(timeIntervalSince1970: 1_800_000_000)
+
+    var now: @Sendable () -> Date { { self.lock.withLock { self.value } } }
+
+    func advance(_ seconds: TimeInterval) { lock.withLock { value = value.addingTimeInterval(seconds) } }
 }
 
 private func trackerFocus(

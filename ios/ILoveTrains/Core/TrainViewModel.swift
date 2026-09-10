@@ -44,7 +44,6 @@ final class TrainViewModel: ObservableObject {
     private var recommendationPagingAt: [String: Millis] = [:]
     private var active = false
     private var background = false
-    private var backgroundTicks = 0
     private var trackerSessionActive = false
     private var setupOriginEdited = false
     private var setupLocationRequested = false
@@ -274,7 +273,6 @@ final class TrainViewModel: ObservableObject {
                 do { try await Task.sleep(for: .seconds(1)) } catch { return }
                 guard let self else { return }
                 self.state.now = epochNow(); ticks += 1
-                if self.background { self.backgroundTicks += 1 }
                 if self.data.focus != nil, self.arrivalWindow == nil, !self.background { self.beginArrivalMonitoring() }
                 self.settleFocus()
                 if ticks % 30 == 0, self.state.ready {
@@ -802,7 +800,7 @@ final class TrainViewModel: ObservableObject {
         let current = epochNow()
         #endif
         state.now = current
-        guard data.useLocation, active else { return }
+        guard data.useLocation, active, !background else { return }
         guard (0...300_000).contains(current - value.at) else { locationFailed(.unavailable); return }
         fix = value
         let here = stationHere(data: data, stations: state.stations, fix: value, now: current)
@@ -1207,7 +1205,6 @@ private extension TrainViewModel {
             + "|rides=\(data.rides.count)"
             + "|monitoring=\(location.isMonitoring)"
             + "|keepalive=\(keepalive.isRunning)"
-            + "|bgticks=\(backgroundTicks)"
             + "|screen=\(state.screen.rawValue)"
             + "|selected=\(state.selectedTripId ?? "none")"
             + "|pinned=\(data.focus?.pinned.description ?? "none")"

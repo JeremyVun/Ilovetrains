@@ -345,10 +345,11 @@ final class ControllerTests: XCTestCase {
         )])
         let board = BoardData(from: savedFrom, to: savedTo, journeys: [journey], generatedAt: now, source: "live")
         let focus = FocusedJourney(tripId: trip.id, reverse: false, journey: journey, board: board, pinned: false)
-        let (store, model) = try await model(data: UserData(trips: [trip], focus: focus))
+        let (store, model) = try await model(data: UserData(trips: [trip], focus: focus),
+                                            undoWindow: defaultUndoWindow, location: monitoringLocation())
         model.resume()
 
-        confirmArrival(model, at: savedTo)
+        try await confirmArrival(model, at: savedTo)
 
         XCTAssertTrue(model.state.focusComplete)
         try await settled(store) { $0.rides.count == 1 }
@@ -599,14 +600,13 @@ final class ControllerTests: XCTestCase {
                                    board: BoardData(from: a, to: b, journeys: [journey], generatedAt: departure, source: "live"))
         var data = UserData(trips: [trip], focus: focus)
         data.useLocation = true
-        let (store, model) = try await networkedModel(data: data, arrival: arrival)
+        let (store, model) = try await networkedModel(data: data, arrival: arrival, location: monitoringLocation())
         model.resume()
         try await refreshed(model, arrival: arrival)
         XCTAssertFalse(model.state.focusComplete)
 
         StubbedDepartures.body = try departuresBody(data, arrival: arrival + 120_000)
-        confirmArrival(model, at: b)
-        for _ in 0..<300 where !model.state.focusComplete { try await Task.sleep(for: .milliseconds(10)) }
+        try await confirmArrival(model, at: b)
         XCTAssertTrue(model.state.focusComplete, "the fix at the destination records the ride")
 
         try await refreshed(model, arrival: arrival + 120_000)
@@ -784,6 +784,128 @@ final class ControllerTests: XCTestCase {
         XCTFail("The focused journey never took the refreshed arrival")
     }
 
+    func testKeepaliveRunsOnlyForAPermittedSessionAndStopsOnResume() async throws {
+        let (data, _) = travellingFocus()
+        let location = ControlledLocation()
+        location.granted = true
+        location.immediatePermission = true
+        let keepalive = FakeKeepalive()
+        let store = DeviceStore(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        try await store.save(data)
+        let model = TrainViewModel(store: store, location: location, keepalive: keepalive)
+        model.networkDisabled = true
+        model.resume()
+        try await settled { model.state.focus != nil }
+
+        model.pause()
+        try await settled { keepalive.running }
+        model.resume()
+        XCTAssertFalse(keepalive.running, "Returning to the screen ends the background keepalive")
+        model.pause()
+        model.resume()
+    }
+
+    func testKeepaliveStaysOffWithoutPermissionOrPreference() async throws {
+        let (data, _) = travellingFocus()
+        let denied = ControlledLocation()
+        denied.immediatePermission = false
+        let keepalive = FakeKeepalive()
+        let store = DeviceStore(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        try await store.save(data)
+        let model = TrainViewModel(store: store, location: denied, keepalive: keepalive)
+        model.networkDisabled = true
+        model.resume()
+        try await settled { model.state.focus != nil }
+        model.pause()
+        XCTAssertFalse(keepalive.running, "Without permission the app suspends as it always did")
+
+        var permitted = data
+        permitted.useLocation = false
+        let granted = ControlledLocation()
+        granted.granted = true
+        granted.immediatePermission = true
+        let offStore = DeviceStore(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        try await offStore.save(permitted)
+        let offKeepalive = FakeKeepalive()
+        let offModel = TrainViewModel(store: offStore, location: granted, keepalive: offKeepalive)
+        offModel.networkDisabled = true
+        offModel.resume()
+        try await settled { offModel.state.focus != nil }
+        offModel.pause()
+        XCTAssertFalse(offKeepalive.running, "The location preference governs the keepalive too")
+    }
+
+    func testKeepaliveStopsWhenTheSessionEndsInTheBackground() async throws {
+        let (data, _) = travellingFocus()
+        let location = ControlledLocation()
+        location.granted = true
+        location.immediatePermission = true
+        let keepalive = FakeKeepalive()
+        let store = DeviceStore(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        try await store.save(data)
+        let model = TrainViewModel(store: store, location: location, keepalive: keepalive)
+        model.networkDisabled = true
+        model.resume()
+        try await settled { model.state.focus != nil }
+        model.pause()
+        try await settled { keepalive.running }
+
+        model.deleteTrip(id: "trip")
+        try await settled { !keepalive.running }
+        XCTAssertFalse(keepalive.running, "A session that ends in the background suspends the app")
+    }
+
+    func testBackgroundFixesCannotReachTheArrivalGuard() async throws {
+        let (data, _) = travellingFocus()
+        let location = ControlledLocation()
+        location.granted = true
+        location.immediatePermission = true
+        let keepalive = FakeKeepalive()
+        let store = DeviceStore(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        try await store.save(data)
+        let model = TrainViewModel(store: store, location: location, keepalive: keepalive)
+        model.networkDisabled = true
+        model.resume()
+        try await settled { model.state.focus != nil }
+        let destination = try XCTUnwrap(data.focus?.journey.legs.last?.to)
+        model.pause()
+        try await settled { keepalive.running }
+
+        let now = epochNow()
+        for offset in [-30_000.0, -15_000.0, 0] {
+            model.receiveLocation(Fix(lat: destination.lat, lon: destination.lon, at: now + offset, speed: 0, accuracyMetres: 20))
+        }
+        XCTAssertFalse(model.state.focusComplete, "A background fix cannot confirm an arrival")
+        let persisted = await store.load()
+        XCTAssertTrue(persisted.rides.isEmpty)
+        model.resume()
+    }
+
+    private func settled(_ condition: @escaping () -> Bool) async throws {
+        for _ in 0..<300 {
+            if condition() { return }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTFail("The controller never reached the expected state")
+    }
+
+    private func travellingFocus() -> (data: UserData, arrival: Millis) {
+        let second = 1000.0
+        let now = (epochNow() / second).rounded() * second
+        let departure = now - 300_000, arrival = now + 900_000
+        let a = Station(id: "200060", name: "Central Station", lat: -33.8840, lon: 151.2062)
+        let b = Station(id: "215020", name: "Parramatta Station", lat: -33.8170, lon: 151.0050)
+        let journey = Journey(legs: [Leg(line: "T1", mode: "train", headsign: "Parramatta", from: a, to: b,
+                                         departure: departure, arrival: arrival)])
+        let trip = SavedTrip(id: "trip", from: a, to: b, createdAt: departure)
+        let focus = FocusedJourney(tripId: trip.id, reverse: false, journey: journey,
+                                   board: BoardData(from: a, to: b, journeys: [journey], generatedAt: departure, source: "live"),
+                                   pinned: false)
+        var data = UserData(trips: [trip], focus: focus)
+        data.useLocation = true
+        return (data, arrival)
+    }
+
     private func departedFocus(rides: Bool = false) -> (data: UserData, stale: Millis) {
         let second = 1000.0
         let now = (epochNow() / second).rounded() * second
@@ -845,17 +967,26 @@ final class ControllerTests: XCTestCase {
         Leg(line: line, mode: "train", headsign: to.name, from: from, to: to, departure: departure, arrival: arrival)
     }
 
-    private func confirmArrival(_ model: TrainViewModel, at station: Station) {
-        let now = epochNow()
-        for offset in [-30_000.0, -15_000.0, 0] {
-            model.receiveLocation(Fix(
-                lat: station.lat,
-                lon: station.lon,
-                at: now + offset,
-                speed: 0,
-                accuracyMetres: 20
-            ))
+    /// A mean speed needs three fixes spanning 30 s, and a fix older than 30 s is rejected, so the
+    /// span has to be built over real time rather than from one instant exactly on both boundaries.
+    private func confirmArrival(_ model: TrainViewModel, at station: Station) async throws {
+        func report(_ at: Millis) {
+            model.receiveLocation(Fix(lat: station.lat, lon: station.lon, at: at, speed: 0, accuracyMetres: 20))
         }
+        let start = epochNow()
+        report(start - 29_000)
+        try await Task.sleep(for: .seconds(2))
+        let now = epochNow()
+        for offset in [-14_000.0, -7_000.0, 0] { report(now + offset) }
+    }
+
+    /// Arrival evidence is only collected while the app is monitoring, which keeps the window
+    /// from being rebuilt underneath the fixes.
+    private func monitoringLocation() -> ControlledLocation {
+        let location = ControlledLocation()
+        location.granted = true
+        location.immediatePermission = true
+        return location
     }
 
     private func settled(_ store: DeviceStore, _ check: @escaping (UserData) -> Bool) async throws {
@@ -953,12 +1084,13 @@ final class ControllerTests: XCTestCase {
         XCTAssertEqual(presentation.selected, selected)
     }
 
-    private func model(data: UserData, undoWindow: Duration, cached: BoardData? = nil) async throws -> (DeviceStore, TrainViewModel) {
+    private func model(data: UserData, undoWindow: Duration, cached: BoardData? = nil,
+                       location: (any LocationProviding)? = nil) async throws -> (DeviceStore, TrainViewModel) {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let store = DeviceStore(directory: directory)
         if let cached { try await store.cache(cached, modes: data.modes) }
         try await store.save(data)
-        let model = TrainViewModel(store: store, undoWindow: undoWindow)
+        let model = TrainViewModel(store: store, location: location, undoWindow: undoWindow)
         model.networkDisabled = true
         for _ in 0..<200 {
             if model.state.ready { return (store, model) }
@@ -1010,6 +1142,20 @@ final class StubbedDepartures: URLProtocol {
 }
 
 @MainActor
+private final class FakeKeepalive: TrackerKeepaliveDriving {
+    var permitted = true
+    private(set) var running = false
+
+    var isRunning: Bool { running }
+
+    func start() -> Bool {
+        running = permitted
+        return running
+    }
+
+    func stop() { running = false }
+}
+
 private final class ControlledLocation: LocationProviding {
     var onPermission: ((Bool, Bool) -> Void)?
     var onFix: ((Fix) -> Void)?
