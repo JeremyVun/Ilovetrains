@@ -98,6 +98,7 @@ struct TravelTrackerState: Equatable, Sendable {
     var cancelled: Bool
     var arrivalCancelled: Bool
     var nextBoundary: Millis
+    var alertLead: Millis?
     var freshUntil: Millis?
 
     static func derive(
@@ -191,10 +192,15 @@ struct TravelTrackerState: Equatable, Sendable {
             cancelled: cancelledLeg != nil,
             arrivalCancelled: last.cancelled,
             nextBoundary: position.boundary,
+            alertLead: position.stage == .ride || position.stage == .final
+                ? position.boundary - trackerAlertLead
+                : nil,
             freshUntil: source.1
         )
     }
 }
+
+let trackerAlertLead: Millis = 120_000
 
 private struct TrackerPosition {
     var stage: TravelTrackerStage
@@ -402,7 +408,7 @@ private func trackerPlatform(_ raw: String?, mode: String) -> String? {
     return "\(place) \(value)"
 }
 
-private func trackerVehicle(_ mode: String) -> String {
+func trackerVehicle(_ mode: String) -> String {
     switch mode.lowercased() {
     case "ferry": "Ferry"
     case "metro": "Metro"

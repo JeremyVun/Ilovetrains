@@ -30,6 +30,16 @@ struct SettingsLocationPresentation: Equatable {
     }
 }
 
+struct SettingsJourneyAlertsPresentation: Equatable {
+    let subtitle: String
+    let mark: String
+
+    init(enabled: Bool) {
+        subtitle = enabled ? "Journey alerts use vibration" : "Journey alerts are off"
+        mark = enabled ? "TURN OFF" : "TURN ON"
+    }
+}
+
 struct SettingsTransferLimitPresentation: Equatable {
     let subtitle: String
     let mark: String
@@ -122,6 +132,11 @@ private struct SettingsMain: View {
         }
         personalRow(icon: "house", title: "Home", value: homeValue,
                     state: model.state.homeIsManual ? "Change  ›" : "Set  ›", id: "home-setting", action: model.chooseHome)
+        personalRow(title: "Journey alerts", value: journeyAlertsPresentation.subtitle,
+                    state: journeyAlertsPresentation.mark, id: "journey-alerts-setting",
+                    markColor: colors.ink, selected: model.state.journeyAlerts) {
+            model.setJourneyAlerts(!model.state.journeyAlerts)
+        }
 
         Spacer().frame(height: 22); settingsSection("Services")
         HStack(spacing: 0) {
@@ -159,6 +174,9 @@ private struct SettingsMain: View {
         SettingsLocationPresentation(useLocation: model.state.useLocation,
                                      granted: model.state.locationGranted,
                                      denied: model.state.locationDenied)
+    }
+    private var journeyAlertsPresentation: SettingsJourneyAlertsPresentation {
+        SettingsJourneyAlertsPresentation(enabled: model.state.journeyAlerts)
     }
     private var transferLimitPresentation: SettingsTransferLimitPresentation {
         SettingsTransferLimitPresentation(limit: model.state.transferLimit)

@@ -1,5 +1,8 @@
 import Foundation
 import Combine
+#if DEBUG
+import OSLog
+#endif
 
 private enum BoardFetch: Sendable {
     case local(OfflinePlanResult?)
@@ -40,6 +43,8 @@ final class TrainViewModel: ObservableObject {
     private var lastRealtimeAttempt = 0.0
     private var recommendationPagingAt: [String: Millis] = [:]
     private var active = false
+    private var background = false
+    private var trackerSessionActive = false
     private var setupOriginEdited = false
     private var setupLocationRequested = false
     private var setupLocationResolved = false
@@ -55,6 +60,7 @@ final class TrainViewModel: ObservableObject {
     private var arrivalGeneration = 0
     private let undoWindow: Duration
     let location: any LocationProviding
+    private let keepalive: any TrackerKeepaliveDriving
     #if DEBUG
     var seeded = false
     var networkDisabled = false
@@ -67,9 +73,11 @@ final class TrainViewModel: ObservableObject {
         planner: OfflinePlanner = OfflinePlanner(),
         tracker: TravelTrackerController? = nil,
         location: (any LocationProviding)? = nil,
+        keepalive: (any TrackerKeepaliveDriving)? = nil,
         undoWindow: Duration = defaultUndoWindow
     ) {
         self.location = location ?? LocationService()
+        self.keepalive = keepalive ?? TrackerKeepalive()
         self.api = api; self.planner = planner; self.undoWindow = undoWindow
         var trackerDirectory: URL?
         #if DEBUG
@@ -159,6 +167,7 @@ final class TrainViewModel: ObservableObject {
             || focus.map { f in data.rides.contains { $0.tripId == f.tripId && $0.reverse == f.reverse && $0.departure == f.journey.departure } } ?? false
         if data.focus == nil { state.arrival = nil }
         state.appearance = data.appearance; state.enabledModes = data.modes; state.useLocation = data.useLocation
+        state.journeyAlerts = data.journeyAlerts
         state.transferLimit = data.transferLimit; state.flags = data.flags
         state.automaticHome = automaticHome(data: data); state.home = data.home ?? state.automaticHome; state.homeIsManual = data.home != nil
         state.recentFrom = data.recentFrom; state.recentTo = data.recentTo
@@ -201,17 +210,23 @@ final class TrainViewModel: ObservableObject {
             return
         }
         #endif
+        let alerts = data.journeyAlerts
+        let inBackground = background
         trackerTask = Task {
             await previous?.value
-            await tracker.reconcile(
+            let published = await tracker.reconcile(
                 focus: storedFocus,
                 visibleFocus: visibleFocus,
                 now: now,
                 recordedComplete: complete,
                 arrivalState: arrivalState,
                 arrivalMoving: arrivalMoving,
+                journeyAlerts: alerts,
+                background: inBackground,
                 debugStaticCountdown: debugCountdown
             )
+            trackerSessionActive = published != nil
+            if background, !startTrackerKeepalive() { suspend() }
             #if DEBUG
             await tracker.awaitPublications()
             publishTrackerDebugStatus(await tracker.debugStatus())
@@ -237,10 +252,13 @@ final class TrainViewModel: ObservableObject {
 
     func resume() {
         active = true
+        let returningFromKeepalive = keepalive.isRunning
+        keepalive.stop()
+        background = false
         #if DEBUG
         if seeded { return }
         #endif
-        guard loop == nil else { return }
+        guard loop == nil || returningFromKeepalive else { return }
         state.justAddedTripId = nil
         state.now = epochNow(); location.refreshPermission()
         if state.ready {
@@ -248,13 +266,14 @@ final class TrainViewModel: ObservableObject {
             beginArrivalMonitoring()
             choosePrediction(); syncPersonal(); refresh(); refreshSharedData(refreshBoard: false); refreshFlags(); silentLocation()
         }
+        guard loop == nil else { return }
         loop = Task { [weak self] in
             var ticks = 0
             while !Task.isCancelled {
                 do { try await Task.sleep(for: .seconds(1)) } catch { return }
                 guard let self else { return }
                 self.state.now = epochNow(); ticks += 1
-                if self.data.focus != nil, self.arrivalWindow == nil { self.beginArrivalMonitoring() }
+                if self.data.focus != nil, self.arrivalWindow == nil, !self.background { self.beginArrivalMonitoring() }
                 self.settleFocus()
                 if ticks % 30 == 0, self.state.ready {
                     self.refreshFlags()
@@ -264,6 +283,29 @@ final class TrainViewModel: ObservableObject {
         }
     }
     func pause() {
+        background = true
+        if startTrackerKeepalive() {
+            clearArrivalMonitoring()
+            state.distanceMetres = nil; state.nearestStation = nil; state.earlierLoading = false
+            earlierTask?.cancel(); earlierTask = nil
+            fix = nil
+            return
+        }
+        suspend()
+    }
+
+    /// Background location keeps the followed journey's refresh, reconcile and publish loop alive.
+    private func startTrackerKeepalive() -> Bool {
+        guard background, trackerSessionActive, state.focus != nil,
+              data.useLocation, state.locationGranted else {
+            keepalive.stop()
+            return false
+        }
+        return keepalive.start()
+    }
+
+    private func suspend() {
+        keepalive.stop()
         active = false; loop?.cancel(); loop = nil
         boardTask?.cancel(); supplementTask?.cancel(); supplementTask = nil; focusTask?.cancel(); historyTask?.cancel(); earlierTask?.cancel(); earlierTask = nil
         realtimeTask?.cancel(); realtimeTask = nil
@@ -273,7 +315,7 @@ final class TrainViewModel: ObservableObject {
         state.nearestStation = nil; fix = nil; location.stop()
     }
     private func silentLocation() {
-        guard data.useLocation, active else { return }
+        guard data.useLocation, active, !background else { return }
         if data.focus != nil {
             beginArrivalMonitoring()
             return
@@ -704,7 +746,7 @@ final class TrainViewModel: ObservableObject {
     }
 
     private func beginArrivalMonitoring() {
-        guard active, data.useLocation, let focus = data.focus else {
+        guard active, !background, data.useLocation, let focus = data.focus else {
             settleFocus()
             return
         }
@@ -758,7 +800,7 @@ final class TrainViewModel: ObservableObject {
         let current = epochNow()
         #endif
         state.now = current
-        guard data.useLocation, active else { return }
+        guard data.useLocation, active, !background else { return }
         guard (0...300_000).contains(current - value.at) else { locationFailed(.unavailable); return }
         fix = value
         let here = stationHere(data: data, stations: state.stations, fix: value, now: current)
@@ -998,6 +1040,11 @@ final class TrainViewModel: ObservableObject {
         if enabled { data.modes.insert(mode) } else { data.modes.remove(mode) }
         applyPreferenceChange()
     }
+    func setJourneyAlerts(_ enabled: Bool) {
+        guard data.journeyAlerts != enabled else { return }
+        data.journeyAlerts = enabled
+        persist(); syncPersonal()
+    }
     func setTransferLimit(_ value: TransferLimit) {
         guard data.transferLimit != value else { return }
         data.transferLimit = value
@@ -1157,10 +1204,12 @@ private extension TrainViewModel {
             + "|guard=\(data.focus?.arrivalGuard?.armed == true)"
             + "|rides=\(data.rides.count)"
             + "|monitoring=\(location.isMonitoring)"
+            + "|keepalive=\(keepalive.isRunning)"
             + "|screen=\(state.screen.rawValue)"
             + "|selected=\(state.selectedTripId ?? "none")"
             + "|pinned=\(data.focus?.pinned.description ?? "none")"
             + "|by=\(data.focus?.pinned == false ? "inferred" : data.focus == nil ? "none" : "pin")"
+        Logger(subsystem: "com.ilovetrains.ios", category: "tracker").debug("\(self.state.trackerDriverStatus, privacy: .public)")
     }
 
     func configureTrackerDebugAfterLoad() -> Bool {

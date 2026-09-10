@@ -31,6 +31,10 @@
 			<array><string>ilovetrains</string></array>
 		</dict>
 	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Show the right trip from your nearest station. Your location stays on this phone.</string>
 	<key>UIApplicationSceneManifest</key>
