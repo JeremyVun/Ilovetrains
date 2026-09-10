@@ -62,6 +62,15 @@ class StorageTest {
             Wire.user(JSONObject("""{"flags":{"transferLimit":false,"other":"yes","count":2}}""")).flags)
     }
 
+    @Test fun journeyAlertsSurviveRestartAndDefaultToOn() {
+        val off = UserData(journeyAlerts = false)
+        assertEquals(off, Wire.user(JSONObject(Wire.user(off).toString())))
+        assertTrue(Wire.user(JSONObject(Wire.user(UserData()).toString())).journeyAlerts)
+        assertTrue(Wire.user(JSONObject("{}")).journeyAlerts)
+        assertTrue(Wire.user(JSONObject("""{"journeyAlerts":"no"}""")).journeyAlerts)
+        assertFalse(Wire.user(JSONObject("""{"journeyAlerts":false}""")).journeyAlerts)
+    }
+
     @Test fun transferConstraintNeedsBothTheFlagAndThePreferenceAndBoundsOfflineRouting() {
         val on = mapOf("transferLimit" to true)
         assertEquals(2, UserData(flags = on).maxTransfers)

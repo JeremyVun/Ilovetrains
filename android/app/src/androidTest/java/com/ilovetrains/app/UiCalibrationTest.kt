@@ -575,7 +575,7 @@ class UiCalibrationTest {
 
         compose.onAllNodesWithText("ON").assertCountEquals(3)
         compose.onAllNodesWithText("OFF").assertCountEquals(1)
-        compose.onAllNodesWithText("TURN OFF").assertCountEquals(1)
+        compose.onAllNodesWithText("TURN OFF").assertCountEquals(2)
         compose.onAllNodesWithText("Use my location").assertCountEquals(0)
     }
 
@@ -608,6 +608,40 @@ class UiCalibrationTest {
         check(true, true, false, "Nearby trips use location", "TURN OFF", ToggleableState.On, "set:false")
     }
 
+    @Test fun settingsJourneyAlertsRowFollowsHomeAndTogglesTheSetting() {
+        val fixture = Fixtures()
+        val state = mutableStateOf(fixture.settingsState)
+        var density = 1f
+        val actions = object : UiActions by NoActions {
+            val calls = mutableListOf<Boolean>()
+            override fun setJourneyAlerts(enabled: Boolean) {
+                calls += enabled
+                state.value = state.value.copy(journeyAlerts = enabled)
+            }
+        }
+        compose.setContent {
+            density = LocalDensity.current.density
+            TrainApp(state.value, actions)
+        }
+
+        val on = compose.onNodeWithContentDescription("Journey alerts, Journey alerts use vibration, TURN OFF")
+        assertEquals(ToggleableState.On, on.fetchSemanticsNode().config.getOrNull(SemanticsProperties.ToggleableState))
+        val alertsBounds = on.fetchSemanticsNode().boundsInRoot
+        val locationBounds = compose.onNodeWithContentDescription("Use location, Nearby trips use location, TURN OFF")
+            .fetchSemanticsNode().boundsInRoot
+        assertEquals(72f * density, alertsBounds.height, 1f)
+        val betweenRows = alertsBounds.top - locationBounds.bottom
+        assertTrue("Journey alerts is not the row after Home: $betweenRows",
+            betweenRows >= 72f * density && betweenRows <= 76f * density)
+        on.assertIsDisplayed().assertHasClickAction().performClick()
+
+        val off = compose.onNodeWithContentDescription("Journey alerts, Journey alerts are off, TURN ON")
+        assertEquals(ToggleableState.Off, off.fetchSemanticsNode().config.getOrNull(SemanticsProperties.ToggleableState))
+        assertEquals(72f * density, off.fetchSemanticsNode().boundsInRoot.height, 1f)
+        off.performClick()
+        compose.runOnIdle { assertEquals(listOf(false, true), actions.calls) }
+    }
+
     @Test fun settingsLocationRowKeepsItsGeometryAtPhoneWidthsInBothSchemes() {
         val fixture = Fixtures()
         val state = mutableStateOf(fixture.settingsState)
@@ -634,8 +668,9 @@ class UiCalibrationTest {
                     .fetchSemanticsNode().boundsInRoot
                 val subtitleBounds = compose.onNodeWithText(subtitle, useUnmergedTree = true)
                     .fetchSemanticsNode().boundsInRoot
-                val markBounds = compose.onNodeWithText(mark, useUnmergedTree = true)
-                    .fetchSemanticsNode().boundsInRoot
+                val markBounds = compose.onAllNodesWithText(mark, useUnmergedTree = true)
+                    .fetchSemanticsNodes().map { it.boundsInRoot }
+                    .single { it.top >= row.top && it.bottom <= row.bottom }
                 assertTrue("$widthDp/${appearance.name}: subtitle overlaps action", subtitleBounds.right <= markBounds.left)
                 assertTrue("$widthDp/${appearance.name}: action leaves the row", markBounds.right <= row.right)
                 row.height
@@ -884,7 +919,8 @@ private object NoActions : UiActions {
     override fun saveTrip(from: Station, to: Station) {} ; override fun deleteTrip(id: String) {} ; override fun undoDelete() {} ; override fun openSettings() {}
     override fun setAppearance(value: Appearance) {} ; override fun setMode(mode: String, enabled: Boolean) {}
     override fun setTransferLimit(value: TransferLimit) {}
-    override fun setUseLocation(enabled: Boolean) {} ; override fun requestLocation() {} ; override fun chooseHome() {}
+    override fun setUseLocation(enabled: Boolean) {} ; override fun setJourneyAlerts(enabled: Boolean) {}
+    override fun requestLocation() {} ; override fun chooseHome() {}
     override fun setHome(station: Station?) {} ; override fun refresh() {} ; override fun earlier() {}
     override fun updateTimetable() {} ; override fun setFeedbackDraft(text: String) {} ; override fun setFeedbackCategory(category: String) {}
     override fun feedback(text: String, category: String) {} ; override fun dismissMessage() {}

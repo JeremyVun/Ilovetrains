@@ -16,7 +16,7 @@ data class UserData(
     val lastTripId: String? = null, val lastReverse: Boolean = false,
     val focus: FocusedJourney? = null, val lastAnswer: LastAnswer? = null,
     val appearance: Appearance = Appearance.System, val modes: Set<String> = AllModes,
-    val useLocation: Boolean = true, val home: Station? = null,
+    val useLocation: Boolean = true, val journeyAlerts: Boolean = true, val home: Station? = null,
     val recentFrom: List<Station> = emptyList(), val recentTo: List<Station> = emptyList(),
     val transferLimit: TransferLimit = TransferLimit.Two, val flags: Map<String, Boolean> = emptyMap()
 )
@@ -138,6 +138,7 @@ object Wire {
         .put("votes", d.votes.jsonEach { JSONObject().put("day", it.day).put("station", station(it.station)) })
         .put("lastTripId", d.lastTripId).put("lastReverse", d.lastReverse).put("focus", d.focus?.let(::focus))
         .put("appearance", d.appearance.name).put("modes", JSONArray(d.modes.toList())).put("useLocation", d.useLocation)
+        .put("journeyAlerts", d.journeyAlerts)
         .put("home", d.home?.let(::station)).put("recentFrom", d.recentFrom.jsonEach(::station)).put("recentTo", d.recentTo.jsonEach(::station))
         .put("transferLimit", d.transferLimit.wire).put("flags", JSONObject(d.flags))
         .put("lastAnswer", d.lastAnswer?.let { JSONObject().put("tripId", it.tripId).put("reverse", it.reverse).put("at", it.at).put("stationId", it.stationId).put("board", board(it.board)).put("journey", journey(it.journey)) })
@@ -152,7 +153,8 @@ object Wire {
             o.optJSONObject("lastAnswer")?.let { runCatching { LastAnswer(it.getString("tripId"), it.optBoolean("reverse"), it.getLong("at"), it.stringOrNull("stationId"), board(it.getJSONObject("board")), journey(it.getJSONObject("journey"))) }.getOrNull() },
             runCatching { Appearance.valueOf(o.optString("appearance")) }.getOrDefault(Appearance.System),
             o.optJSONArray("modes")?.let { a -> (0 until a.length()).map { a.optString(it) }.filter { it in AllModes }.toSet() } ?: AllModes,
-            o.optBoolean("useLocation", true), o.optJSONObject("home")?.let { runCatching { station(it) }.getOrNull() },
+            o.optBoolean("useLocation", true), o.opt("journeyAlerts") as? Boolean ?: true,
+            o.optJSONObject("home")?.let { runCatching { station(it) }.getOrNull() },
             o.optJSONArray("recentFrom").readEach(::station).take(3), o.optJSONArray("recentTo").readEach(::station).take(3),
             transferLimitOf(o.stringOrNull("transferLimit")), flagsOf(o.optJSONObject("flags")))
     }

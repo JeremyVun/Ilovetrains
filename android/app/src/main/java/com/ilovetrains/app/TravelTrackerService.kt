@@ -58,7 +58,7 @@ class TravelTrackerService : Service() {
                 is TravelTrackerServiceState.Active -> {
                     getSystemService(NotificationManager::class.java).notify(
                         TravelTrackerNotification.NotificationId,
-                        TravelTrackerNotification.build(this@TravelTrackerService, value.focus, value.presentation),
+                        TravelTrackerNotification.build(this@TravelTrackerService, value.focus, value.presentation, value.alert),
                     )
                     val elapsed = SystemClock.elapsedRealtime()
                     if (lastRefreshAt == 0L || elapsed - lastRefreshAt >= 30_000) {

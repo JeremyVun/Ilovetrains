@@ -88,6 +88,7 @@ data class AppState(
     // Null while the transferLimit flag is off, which is when Settings offers no choice.
     val transferLimit: TransferLimit? = null,
     val useLocation: Boolean = true, val locationGranted: Boolean = false, val locationDenied: Boolean = false,
+    val journeyAlerts: Boolean = true,
     val distanceMetres: Int? = null, val receipt: String? = null, val home: Station? = null, val homeIsManual: Boolean = false,
     val automaticHome: Station? = null, val focusComplete: Boolean = false,
     val arrival: ArrivalResult? = null,
@@ -128,6 +129,7 @@ interface UiActions {
     fun setMode(mode: String, enabled: Boolean)
     fun setTransferLimit(value: TransferLimit)
     fun setUseLocation(enabled: Boolean)
+    fun setJourneyAlerts(enabled: Boolean)
     fun requestLocation()
     fun chooseHome()
     fun setHome(station: Station?)
