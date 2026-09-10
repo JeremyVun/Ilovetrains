@@ -74,15 +74,12 @@ Turn the analytics feedback inbox into verified fix pull requests with the
 owner approving every merge and release. This repo's share shipped on
 2026-09-10: the [automated fixes contract](contracts/hillclimbing.md),
 platform and version on feedback, the fixture-backed TfNSW stub and the
-checked-in playtest regression suite (`tools/README.md`). What remains lives
-in other repositories: the daemon (a new `hillclimb` repo: intake, sealed
-triage, discovery case writer, repair worker, release worker, GitHub digest),
-playtest's web-driver origin guard and finding repair lease, the analytics
-`platform` and `client_version` columns, and the infra stack pinning the
-numbered image tag. The daemon's design, trust boundaries and the
-cross-repository work table are in git history at
-`docs/backlog/feedback-hillclimbing/design.md` (last at commit d2eee3b);
-start the daemon repo from that document.
+checked-in playtest regression suite (`tools/README.md`). The daemon that
+runs the loop lives in `~/projects/hillclimb` (its `docs/project.md` and
+`docs/backlog/daemon/` hold the design, the trust boundaries and the
+cross-repository work); the playtest repair claim and web origin guard, the
+analytics `platform` and `client_version` columns, and the infra
+`ILOVETRAINS_VERSION` pin are tracked from there.
 
 ## Design system and tooling as infrastructure
 The comps loop is how the product moves and the native ports copy a design

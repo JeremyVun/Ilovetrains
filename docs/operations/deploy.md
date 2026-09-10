@@ -90,8 +90,8 @@ generation; the bundled bootstrap serves a new volume immediately.
    The stack uses `docker-compose.yml` and `config.env`. Its pre-commit hook
    seals the gitignored `secrets.env` into the committed `secrets.env.age`;
    the VM decrypts it during reconciliation. Once the infra change lands,
-   `config.env` will pin the released numbered image tag instead of `latest`,
-   as the app website stack already does; it has not landed yet.
+   `config.env` will pin the released numbered image tag in
+   `ILOVETRAINS_VERSION` instead of `latest`; it has not landed yet.
 
 3. Deploy through the infra repository:
 
