@@ -719,16 +719,23 @@ frames are shots of the built client from `tools/shoot-states.js`,
 than left to rot.
 
 An accepted, not-yet-built design may be retained here as an explicitly labelled
-visual target with its reproducible comp source. The 2026-09-08
-[travel tracker target](../../assets/comps/latest/travel-tracker/README.md) uses
-short prose plus the quiet trip line. Its browser frames remain the iOS visual
-target; [Android calibration](../../assets/comps/latest/travel-tracker/android/README.md)
-contains actual system-rendered cards from the production integration. Neither
-set establishes completion of the remaining native verification gates.
-Replace illustrations with verified native exemplars as implementation lands. Platform
-boxes on that line remain an optional visual follow-up, not part of the accepted
-baseline. The active behavior/design boundary is in its
-[backlog handoff](../backlog/persistent-travel-tracker/design.md).
+visual target with its reproducible comp source, and is replaced by native
+exemplars once the implementation is verified.
+
+The native travel tracker's calibration is
+[`assets/comps/latest/travel-tracker/`](../../assets/comps/latest/travel-tracker/README.md):
+real Android notification cards and iOS ActivityKit surfaces from the shipped
+clients. The accepted composition, short prose plus a quiet trip line, reads the
+same through every stage: a headline naming the next event with the countdown
+emphasised inside the sentence; one smaller instruction giving platform roles
+with the numbers emphasised, both the alighting and the onward boarding platform
+before a change; the change window or onward departure on the next row, sharing
+it with last-update provenance rather than replacing the number; destination at
+left and approximate arrival at right, fixed in place; and a quiet proportional
+trip line underneath with one progress marker. No app header, repeated platform
+graphics or caption stacks. The OS owns the container, so Android's templates
+and iOS's Island decide the actual geometry. Platform-number boxes on the line
+are an optional visual follow-up, not part of the accepted baseline.
 
 The board, home and detail calibration frames are listed below.
 `tools/check-settings-browser.js --frames assets/comps/latest` adds twelve

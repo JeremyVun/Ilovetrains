@@ -120,7 +120,10 @@
   opens the locked notification shade. The accessibility check detects missing
   facts; pixel review must still check ellipsis and clipping.
 - `shoot-travel-tracker-ios.sh` — capture the app's real ActivityKit surfaces
-  on an explicitly owned, booted simulator. Set `ILOVETRAINS_SIMULATOR_ID`,
+  on an explicitly owned, booted simulator. Create it fresh for the run: a
+  simulator reused across earlier drives reported the tracker idle and failed
+  the capture and cold-tap tests that pass on a new device.
+  Set `ILOVETRAINS_SIMULATOR_ID`,
   `ILOVETRAINS_IOS_BUILD_DIR` and an empty `OUT`, then pass `402x874` (Island)
   or `390x844`. `SURFACES=notification-center,compact,expanded` is the default;
   Notification Center is not a device-lock test. `TRACKER_CASES`, `SCHEMES` and
@@ -369,11 +372,6 @@ on someone's behalf.
 on `PATH`.
 
 ## comps/
-
-A frozen, accepted travel-tracker reference lives in
-[`comps/persistent-travel-tracker/`](comps/persistent-travel-tracker/README.md).
-It reproduces the labelled visual targets under `assets/comps/latest/travel-tracker/`;
-it is not product code or native-rendering evidence.
 
 A round is a directory of HTML plus a one-line shoot, not a copied `shoot.js`:
 

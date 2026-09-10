@@ -1,8 +1,11 @@
 # Native travel surfaces
 
 Checked 2026-09-08 against the official sources below. These are platform
-constraints for the persistent travel tracker. The accepted visual design and
-build handoff are in [the backlog](../backlog/persistent-travel-tracker/design.md);
+constraints for the persistent travel tracker. Its binding behavior is in
+[android-deviations](../contracts/android-deviations.md#persistent-travel-tracker),
+[ios-deviations](../contracts/ios-deviations.md#persistent-travel-tracker),
+[native-data](../contracts/native-data.md#native-travel-tracker-data) and
+[client-storage](../contracts/client-storage.md#native-tracker-sessions);
 visual acceptance does not prove native execution behavior.
 
 ## Android

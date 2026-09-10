@@ -119,6 +119,19 @@ recreation for that focus without clearing the journey, and an old activity's
 tap cannot restore a replaced focus. Session persistence is defined in
 [client-storage.md](client-storage.md#native-tracker-sessions).
 
+Calibration exemplars are the real ActivityKit captures in
+`assets/comps/latest/travel-tracker/ios/`, reproduced with
+`tools/shoot-travel-tracker-ios.sh` on a freshly created simulator. They cover
+the ten fixture states at default text on a 402-point iPhone 17 Pro in both
+appearances, plus compact and expanded Dynamic Island frames. The UI suite
+proves automatic entry, denial, wall-clock stale boundaries, dismissal,
+replacement, stale-link rejection and a Live Activity tap cold-launching the
+matching journey. Accepted verification limits (owner ruling 2026-09-10):
+enlarged accessibility text, the 390-point phone width, the minimal Dynamic
+Island beside a competing activity and VoiceOver traversal of the card are
+unverified, as is delivery on a physical iPhone. Treat a defect found there as
+a bug to fix, not a contract exception.
+
 The shared behavior remains defined by [ui.md](ui.md),
 [client-storage.md](client-storage.md) and [native-data.md](native-data.md).
 

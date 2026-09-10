@@ -107,23 +107,6 @@ the last and make the ports mechanical. Still to build:
 
 ## Native Android and iOS
 Both apps exist (`android/`, `ios/`) and lag the web by one round. Remaining:
-- **[Persistent travel tracker](backlog/persistent-travel-tracker/design.md)**
-  (build in progress 2026-09-08; [build handoff](backlog/persistent-travel-tracker/build_plan.md)):
-  an ongoing
-  notification or lock-screen view, like a food-delivery status, showing the
-  next change or get-off station, arrival and progress without reopening the
-  app. Android system notification rendering (Live Updates where supported)
-  and iOS Live Activities. Accepted baseline: short prose with a quiet trip
-  line; [selected frames](../assets/comps/latest/travel-tracker/README.md).
-  Android's production service and notification integration pass the Android
-  15/16.1 emulator layout and lifecycle gates; physical-device delivery and power
-  remain unverified. iOS ActivityKit integration is implemented against the
-  accepted design; final routing and visual calibration remain in progress.
-  Its unit, inference, denial and wall-clock lifecycle checks passed. The
-  notification must not imply continuous GPS. Appears automatically when
-  travel mode detects travel. Platform boxes on the line are an optional visual
-  refinement, not a build prerequisite; pin-triggered entry is a separate
-  optional follow-up A/B test.
 - Home-screen widgets, background ride detection and notifications.
   OS-rendered artifacts (icons, widgets) pass through the real renderer
   before a verdict.
@@ -136,6 +119,13 @@ Both apps exist (`android/`, `ios/`) and lag the web by one round. Remaining:
   account sign-in (`docs/operations/ios.md`).
 
 ## Candidates (unscheduled)
+- **Travel tracker follow-ups** (the tracker shipped in 1.6.0; contracts in
+  `ios-deviations.md`, `android-deviations.md`, `native-data.md` and
+  `client-storage.md`): platform-number boxes on the trip line in the app's
+  visual language, which the owner wants to see but has not required; an A/B
+  test of pin-triggered entry beside the automatic travel-mode baseline; and
+  the iOS verification drives accepted as limits on 2026-09-10: enlarged
+  text, the 390-point phone, the minimal Dynamic Island and VoiceOver.
 - **Ride history as a stat**: "you rode this 4 times this week" in the
   saved-trip row's meta, beside "last ridden Friday". Count only what can
   actually be observed; a count inferred from app opens is a count of looks

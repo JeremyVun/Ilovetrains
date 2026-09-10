@@ -24,9 +24,7 @@ Separate wall-clock tests observed timer advancement and clamping with the app
 absent, same-activity recovery, foreground transfer publication and removal.
 The marker shows the last published timetable position. Instructions do not
 advance without app execution; source time remains visible from publication.
-Cold-tap routing, the 390-point phone drive, enlarged-text rendering, minimal
+Cold-tap routing is verified by the UI suite on a fresh simulator. The
+390-point phone drive, enlarged-text rendering, minimal
 Island and actual VoiceOver traversal remain unverified. Simulator captures do not establish physical-device delivery or
 power use.
-
-See the [build handoff](../../../../../docs/backlog/persistent-travel-tracker/build_plan.md)
-for completed gates and remaining verification.

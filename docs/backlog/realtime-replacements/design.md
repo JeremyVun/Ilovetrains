@@ -20,9 +20,9 @@ identity guess, setting, feature flag or server-side personal state.
 
 Read [native-data](../../contracts/native-data.md), [API](../../contracts/api.md),
 [storage](../../contracts/client-storage.md) and [UI](../../contracts/ui.md).
-Concurrent `persistent-travel-tracker` work touches native models, refreshes,
-presentation and these contracts. Preserve its partial-focus freshness and
-tracker session behavior; do not revert or commit that work incidentally.
+The shipped native travel tracker shares native models, refreshes and
+presentation with this work. Preserve its partial-focus freshness and
+[tracker session behavior](../../contracts/client-storage.md#native-tracker-sessions).
 
 ## Verified starting point
 
