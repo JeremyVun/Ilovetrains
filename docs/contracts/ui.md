@@ -601,12 +601,74 @@ matching guarded focus; other timetable rows retain their normal time styling.
 Native tracker lifecycle must not end/suppress the session, or settle a ride,
 solely because its projection reaches the final endpoint. Publish the same
 unconfirmed semantics using its existing quiet instruction/context rows.
-In the background, no new GPS collection occurs: a guarded session remains
-unconfirmed until permitted foreground evidence, correction or expiry.
-iOS cannot promise a fresh transition while suspended; keep its published
-absolute last estimate and established stale fallback, and reconcile before
+A guarded session remains unconfirmed until permitted foreground evidence,
+correction or expiry; background fixes never feed the arrival guard.
+While a journey is followed, iOS keeps running in the background through
+coarse background location updates (hundred-metre accuracy, a 100 m distance
+filter, no `Always` permission, the background indicator shown, fixes
+discarded, stopped when the session ends, is dismissed or expires),
+so its refresh loop, stage transitions and journey alerts happen at the real
+moment as they do inside the Android service. Without location permission or
+with the location preference off, iOS falls back to its published absolute
+last estimate and established stale fallback, and reconciles before
 publishing on resume. OS removal of a surface is not completion. Preserve
 existing dismissal suppression, identity generations and serialized ownership.
+
+### Journey alerts
+
+A journey alert is one cue that the rider's next action is imminent. Legs
+carry no intermediate stops, so "the next stop" is approximated by time: the
+alert lead is 2 minutes before a leg's effective arrival, recomputed from the
+latest estimate on every refresh. The tracker cues when it observes, live:
+
+- get off: on the last leg (`Final`), `now ≥ effectiveArrival − lead`;
+- change: on a leg followed by another (`Ride`), `now ≥ effectiveArrival − lead`;
+- missed connection: the transition into `MissedTransfer`;
+- cancelled: a `Cancellation` event kind appearing.
+
+Departure (entering `Boarding`, `Ride` or `Final`), entering `Transfer` and
+completion never cue. A leg shorter than the lead is inside its lead from the
+moment it is ridden and cues then. The change cue is skipped on a leg whose
+connection is already known missed; that leg gets the missed-connection cue
+instead. The four cues are independent: when more than one becomes new in the
+same observation, one buzz is delivered and the alert carries the cancellation,
+else the missed connection, else the lead cue.
+
+Each cue fires once per leg per identity generation. The first observation of
+a generation, and any observation more than 30 s after the previous one (the
+app was not observing: suspended, or backgrounded without a surface), records
+the baseline and does not cue, so a launch, restore or resume already past a
+lead is silent. A refresh that re-renders the same state does not cue, and an
+estimate that moves an arrival later after its cue fired does not cue again.
+On Android the lead boundary joins `nextBoundary` so the service tick wakes
+for it; iOS observes at 1 Hz. The decision lives in the shared tracker
+lifecycle (Android) or controller (iOS) so the on-screen client and the
+background surface can never cue the same moment twice, and it does not depend
+on a surface existing: on screen the haptic fires with or without a
+notification or Live Activity.
+
+Delivery is the lowest common denominator of the two platforms: one buzz,
+and the existing tracker surface says what changed. There are no distinct
+patterns per cue.
+
+| Client | App on screen | App in background |
+| --- | --- | --- |
+| Android | one short predefined click effect through the system vibrator, under the system's notification vibration settings | the ongoing tracker notification re-alerts once with the channel's vibration and default sound (default importance; existing installs migrate to a new channel id because channels are immutable), then returns to silent updates |
+| iOS | one medium impact haptic, under the System Haptics setting | the Live Activity update carries an alert configuration; iPhone wakes the lock screen with the activity and vibrates and sounds under the notification settings; the alert title and body (Apple Watch only) use the copy below |
+
+Background alerts follow Do Not Disturb and the ringer on both platforms;
+the on-screen haptic follows only the haptic settings named above. The
+background cue rides on the
+tracker surface: no notification permission on Android, or no Live Activity
+on iOS, means no background cue, and no new permission prompt is introduced.
+Alert copy: `Get off soon` / `Get off at <station> in about 2 minutes.`;
+`Change services soon` / `Get off at <station> in about 2 minutes to change to <service>.`;
+`Connection missed` / `The planned connection has been missed.`;
+`Service cancelled` / `The planned service has been cancelled.`
+
+`preferences.journeyAlerts` (default on) governs every cue. Off means no
+haptic, no re-alert and silent Live Activity updates, exactly as before the
+feature existed. Web has no tracker surface and no alerts.
 
 ### Completed-route treatment
 
@@ -900,6 +962,11 @@ it is still current. Home shows an eligible suggestion or the filtered empty
 state. A saved pair remains eligible for alternative routes only when its
 endpoints support the enabled modes; focus never bypasses that check.
 Preferences cause no new history or prediction exposure event.
+
+Native clients add a `Journey alerts` row directly after the Home row, in the
+transfer limit's composition (the Location row without its icon column) with
+an on/off mark. Its subtitle reads `Journey alerts use vibration` when on and
+`Journey alerts are off` when off. Web has no row.
 
 The transfer limit is one row inside Services, directly after the services
 note, and it appears only while the backend publishes the `transferLimit` flag

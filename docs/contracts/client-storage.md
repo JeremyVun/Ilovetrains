@@ -128,7 +128,8 @@ read/write atomic and migration simple):
     "homeOverride": {"id": "213820", "name": "Rhodes",
                      "location": {"lat": -33.8308, "lon": 151.0879}},
     "enabledModes": ["train", "metro", "ferry"],
-    "transferLimit": "two"
+    "transferLimit": "two",
+    "journeyAlerts": true
   },
   "flags": {"transferLimit": false},
   "cache": {
@@ -154,7 +155,9 @@ read/write atomic and migration simple):
   malformed `homeOverride` drops; and `enabledModes` keeps only `train`,
   `metro` and `ferry` in that stable order. Missing or non-array modes means
   all three, while an explicit `[]` remains all-off. `transferLimit` accepts
-  only `direct`, `two` and `any`; anything else, or its absence, reads as `two`. The
+  only `direct`, `two` and `any`; anything else, or its absence, reads as `two`.
+  `journeyAlerts` accepts only a boolean and reads as `true` when absent; it is
+  native-only (see "Journey alerts" in the UI contract) and web ignores it. The
   schema stays version 1. The preference document never leaves the device; the
   selected mode allow-list and, while capped, the transfer limit are sent only
   with the stateless departures query they shape.
