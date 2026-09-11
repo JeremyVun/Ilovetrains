@@ -5,10 +5,10 @@
     "device": "Google Chrome 152.0.7977.84, 390x844 css @2x"
   },
   "ios": {
-    "commit": "52d1d57",
-    "date": "2026-09-10",
-    "device": "haptics-ios 1206x2622px, content size large",
-    "simulator": "haptics-ios",
+    "commit": "8c7eaf4",
+    "date": "2026-09-11",
+    "device": "tcr-p3-vr iPhone 17 1206x2622px, content size large",
+    "simulator": "tcr-p3-vr iPhone 17",
     "tracker": {
       "commit": "116efdc",
       "date": "2026-09-08",
