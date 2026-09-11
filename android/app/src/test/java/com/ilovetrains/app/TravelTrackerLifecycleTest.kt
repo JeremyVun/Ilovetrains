@@ -298,8 +298,54 @@ class TravelTrackerLifecycleTest {
         lifecycle.observeUntil(trip, NOW, ARRIVAL - LEAD)
         assertEquals(1, runtime.haptics)
 
+        val slightly = focus("delayed", pinned = false, arrivalDelay = 4 * 60_000)
+        lifecycle.observeUntil(slightly, ARRIVAL - LEAD, ARRIVAL - 30_000)
+        assertEquals(1, runtime.haptics)
+
         val later = focus("delayed", pinned = false, arrivalDelay = 5 * 60_000)
-        lifecycle.observeUntil(later, ARRIVAL - LEAD, ARRIVAL + 4 * 60_000)
+        lifecycle.observeUntil(later, ARRIVAL - 30_000, ARRIVAL + 4 * 60_000)
+        assertEquals("a five-minute arrival delay cues once", 2, runtime.haptics)
+
+        val worse = focus("delayed", pinned = false, arrivalDelay = 9 * 60_000)
+        lifecycle.observeUntil(worse, ARRIVAL + 4 * 60_000, ARRIVAL + 8 * 60_000)
+        assertEquals(2, runtime.haptics)
+    }
+
+    @Test fun aRecoveredThenLostAgainArrivalCuesTheDelayTwice() {
+        val runtime = FakeRuntime(allowed = true)
+        val lifecycle = TravelTrackerLifecycle(FakeStore(), runtime)
+        lifecycle.activityResumed()
+        val onTime = single("rearm", NOW - 60_000, ARRIVAL + 20 * 60_000)
+        val late = single("rearm", NOW - 60_000, ARRIVAL + 20 * 60_000, arrivalDelay = 6 * 60_000)
+
+        lifecycle.reconcile(onTime, onTime, NOW)
+        lifecycle.observeUntil(late, NOW, NOW + 60_000)
+        assertEquals(1, runtime.haptics)
+        lifecycle.observeUntil(onTime, NOW + 60_000, NOW + 120_000)
+        assertEquals(1, runtime.haptics)
+        lifecycle.observeUntil(late, NOW + 120_000, NOW + 180_000)
+        assertEquals("a delay that recovers and returns cues again", 2, runtime.haptics)
+    }
+
+    @Test fun aChangeBecomingTightCuesOnceWhileRidingTowardIt() {
+        val runtime = FakeRuntime(allowed = true)
+        val lifecycle = TravelTrackerLifecycle(FakeStore(), runtime)
+        lifecycle.activityResumed()
+        val base = connecting("tightening")
+        val roomyLegs = listOf(
+            base.journey.legs[0].copy(arrival = NOW + 300_000),
+            base.journey.legs[1].copy(departure = NOW + 600_000),
+        )
+        val roomy = base.copy(journey = Journey(roomyLegs))
+        val tightened = base.copy(journey = Journey(listOf(
+            roomyLegs[0].copy(estimatedArrival = NOW + 420_000), roomyLegs[1])))
+
+        lifecycle.reconcile(roomy, roomy, NOW)
+        lifecycle.observeUntil(roomy, NOW, NOW + 60_000)
+        assertEquals(0, runtime.haptics)
+        lifecycle.reconcile(tightened, tightened, NOW + 90_000)
+        assertEquals("the change becoming tight cues on the observation that sees it", 1, runtime.haptics)
+        lifecycle.observeUntil(tightened, NOW + 90_000, NOW + 180_000)
         assertEquals(1, runtime.haptics)
     }
 

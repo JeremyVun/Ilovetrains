@@ -17,10 +17,10 @@ fun distanceMetres(a: Fix, b: Station): Double {
 fun compatible(trip: SavedTrip, modes: Set<String>) = modes.isNotEmpty() && listOf(trip.from, trip.to).all { s -> s.modes.any { it in modes } }
 fun visibleFocus(data: UserData, now: Long, resumeWaitUntil: Long? = null): FocusedJourney? = data.focus?.takeIf { focus ->
     val guard = focus.arrivalGuard
+    val arrival = focus.composed.effectiveArrival
     val expiry = if (guard?.armed == true && guard.basis != ArrivalBasis.Location) {
-        max(focus.journey.effectiveArrival + ArrivalConstants.Expiry,
-            (guard.retainedAt ?: focus.journey.effectiveArrival) + ArrivalConstants.Retention)
-    } else focus.journey.effectiveArrival + ArrivalConstants.Expiry
+        max(arrival + ArrivalConstants.Expiry, (guard.retainedAt ?: arrival) + ArrivalConstants.Retention)
+    } else arrival + ArrivalConstants.Expiry
     val awaitingEvidence = guard?.armed == true && guard.basis != ArrivalBasis.Location &&
         resumeWaitUntil?.let { now < it } == true
     (now <= expiry || awaitingEvidence) &&

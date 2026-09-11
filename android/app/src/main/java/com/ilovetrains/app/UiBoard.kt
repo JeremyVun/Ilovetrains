@@ -117,7 +117,7 @@ private fun BoardMast(board: BoardData?, now: Long, actions: UiActions) {
 @Composable
 fun BoardRow(journey: Journey, board: BoardData?, now: Long, onClick: (() -> Unit)? = null,
              detail: Boolean = false, figureOverride: Figure? = null, axisTravelledAt: Long? = null,
-             axisProgress: Float? = null) {
+             axisProgress: Float? = null, recoveryFrom: Int? = null) {
     if (journey.legs.isEmpty()) return
     val c = LocalTrainColors.current
     val fig = figureOverride ?: figureFor(journey, board, now)
@@ -168,7 +168,7 @@ fun BoardRow(journey: Journey, board: BoardData?, now: Long, onClick: (() -> Uni
                 if (journey.cancelled) Label("Cancelled", Modifier.padding(start = 7.dp), color = c.warning, size = 9)
             }
             JourneyAxis(journey, Modifier.fillMaxWidth().padding(top = 6.dp).alpha(if (journey.cancelled) .3f else 1f),
-                travelledAt = axisTravelledAt, progress = axisProgress)
+                travelledAt = axisTravelledAt, progress = axisProgress, recoveryFrom = recoveryFrom)
             Text(first.headsign.ifBlank { first.to.shortName }, color = c.ink3, fontSize = 13.sp,
                 fontWeight = FontWeight.Light, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 6.dp))

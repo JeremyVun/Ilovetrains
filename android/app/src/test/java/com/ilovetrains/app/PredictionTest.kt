@@ -79,6 +79,24 @@ class PredictionTest {
         assertNull(visibleFocus(data.copy(modes = setOf("ferry"), focus = focus.copy(journey = mixed)), now))
     }
 
+    @Test fun recoveryKeepsTheFocusAliveToItsComposedArrivalAndIsJudgedOnTheFollowedModes() {
+        val trip = SavedTrip("rhodes", rhodes, bondi)
+        val followed = Journey(listOf(
+            Leg("T9", "train", "Town Hall", rhodes, central, now - 600_000, now - 60_000),
+            Leg("T4", "train", "Bondi", central, bondi, now - 90_000, now + 60_000),
+        ))
+        val board = BoardData(rhodes, bondi, listOf(followed), now, source = "live")
+        val recovery = Recovery(0, Journey(listOf(
+            Leg("T4", "train", "Bondi", central, bondi, now + 600_000, now + 1_800_000))), now, RecoverySource(now))
+        val focus = FocusedJourney(trip.id, false, followed, board, recovery = recovery)
+        val data = UserData(trips = listOf(trip), focus = focus, modes = AllModes)
+        val afterFollowedArrival = now + 60_000 + ArrivalConstants.Expiry + 60_000
+
+        assertNotNull(visibleFocus(data, afterFollowedArrival))
+        assertNull(visibleFocus(data.copy(focus = focus.copy(recovery = null)), afterFollowedArrival))
+        assertNull(visibleFocus(data.copy(modes = setOf("ferry")), afterFollowedArrival))
+    }
+
     @Test fun inferenceRequiresBothEndpointCoordinatesEvenWithSpeedEvidence() {
         for (missingOrigin in listOf(false, true)) {
             val origin = if (missingOrigin) Station(rhodes.id, rhodes.name) else rhodes

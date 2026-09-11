@@ -194,6 +194,18 @@ class UiCalibrationTest {
             assertDetailGeometryAndPixels()
             capture("detail-two-changes")
         }
+        frame("home-lost-riding") {
+            compose.runOnIdle { state.value = fixture.lostRidingState }
+            capture("home-lost-riding")
+        }
+        frame("home-lost-dwell") {
+            compose.runOnIdle { state.value = fixture.lostDwellState }
+            capture("home-lost-dwell")
+        }
+        frame("home-lost-none") {
+            compose.runOnIdle { state.value = fixture.lostNoneState }
+            capture("home-lost-none")
+        }
         frame("home-active-pinned") {
             compose.runOnIdle { state.value = fixture.activePinnedState }
             capture("home-active-pinned")
@@ -886,6 +898,24 @@ private class Fixtures {
         selectedTripId = "rhodes-bondi",
         focus = FocusedJourney("rhodes-bondi", false, activeJourney, activeBoard, pinned = true),
     )
+    // Stress delta: the T9 loses nine minutes and the printed T4 connection is gone.
+    private val lostFollowed = Journey(listOf(
+        activeJourney.legs[0].copy(estimatedArrival = activeJourney.legs[1].departure + 2 * 60_000),
+        activeJourney.legs[1],
+    ))
+    private val lostCandidate = Journey(listOf(activeJourney.legs[1].copy(
+        departure = activeJourney.legs[1].arrival, arrival = activeJourney.legs[1].arrival + 10 * 60_000,
+        estimatedDeparture = null, estimatedArrival = null)))
+    private fun lostState(now: Long, recovery: Recovery?): AppState {
+        val board = activeBoard.copy(generatedAt = now, journeys = listOf(lostFollowed))
+        return activePinnedState.copy(now = now, board = board, homeBoard = board,
+            focus = FocusedJourney("rhodes-bondi", false, lostFollowed, board, pinned = true, recovery = recovery))
+    }
+    private val lostRecovery = Recovery(0, lostCandidate, 0, RecoverySource(0))
+    val lostRidingState = lostState(lostFollowed.legs[0].effectiveArrival - 13 * 60_000, lostRecovery)
+    val lostDwellState = lostState(lostCandidate.effectiveDeparture - 6 * 60_000, lostRecovery)
+    val lostNoneState = lostState(lostFollowed.legs[0].effectiveArrival - 13 * 60_000, null)
+
     val activeInferredState = activePinnedState.copy(
         focus = activePinnedState.focus?.copy(pinned = false))
     val completedState = activePinnedState.copy(focusComplete = true)

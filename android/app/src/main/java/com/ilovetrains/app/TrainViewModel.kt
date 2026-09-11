@@ -268,6 +268,7 @@ class TrainViewModel private constructor(
                 }
                 settleFocus(matchingRefresh = match != null || overlay?.canJudgeClock == true)
                 syncPersonal()
+                settleRecovery(current)
             }
         }
     }
@@ -589,7 +590,41 @@ class TrainViewModel private constructor(
             if (match != null) data = data.copy(focus = current.copy(journey = match, board = result, alternatives = null))
             else current.demotedForUnmatchedBoard()?.let { data = data.copy(focus = it) }
             settleFocus(matchingRefresh = match != null); persist(); syncPersonal()
+            settleRecovery(focus)
         }
+    }
+
+    /** One recovery request per refresh, on the focused journey's own tail; never the saved-trip cache. */
+    private suspend fun settleRecovery(subject: FocusedJourney) {
+        if (debugTrackerCaptureMode) return
+        fun owned(): FocusedJourney? = data.focus?.takeIf {
+            it.tripId == subject.tripId && it.reverse == subject.reverse && it.journey.key == subject.journey.key
+        }
+        val focus = owned() ?: return
+        val destination = ends(focus.tripId, focus.reverse)?.second ?: return
+        val plan = recoveryPlan(focus.journey, focus.recovery, destination)
+        val search = plan.search
+        if (search == null) {
+            if (focus.recovery != plan.recovery) {
+                data = data.copy(focus = focus.copy(recovery = plan.recovery)); persist(); syncPersonal()
+            }
+            return
+        }
+        val modes = data.modes.toSet()
+        if (modes.isEmpty()) return
+        val live = try { api.departures(search.from, search.to, modes, search.at, data.maxTransfers) }
+            catch (e: CancellationException) { throw e } catch (_: Exception) { null }
+        val board = live ?: try {
+            initialized.await()
+            planner.plan(search.from, search.to, search.at, modes, 12, data.offlineMaxTransfers)
+        } catch (e: CancellationException) { throw e } catch (_: Exception) { null }
+        val current = owned() ?: return
+        val candidate = board?.let { recoveryCandidate(it.journeys, search.at, modes) }
+        val record = recoveryAfterSearch(plan, candidate, mutable.value.now, RecoverySource(
+            board?.generatedAt ?: mutable.value.now, board == null || board.offline || board.serverStale))
+        if (record == current.recovery) return
+        data = data.copy(focus = current.copy(recovery = record))
+        settleFocus(); persist(); syncPersonal()
     }
     private fun settleFocus(matchingRefresh: Boolean = false) {
         val now = mutable.value.now
@@ -629,8 +664,8 @@ class TrainViewModel private constructor(
         }
         val result = reduceArrival(ArrivalInput(
             identity = identity,
-            departureMs = focus.journey.effectiveDeparture,
-            arrivalMs = focus.journey.effectiveArrival,
+            departureMs = focus.composed.effectiveDeparture,
+            arrivalMs = focus.composed.effectiveArrival,
             nowMs = mutable.value.now,
             destination = ends(focus.tripId, focus.reverse)?.second,
             guard = focus.arrivalGuard,
@@ -639,7 +674,7 @@ class TrainViewModel private constructor(
             monitoring = monitoringOverride ?: arrivalMonitoring,
             permissionPending = arrivalPermissionPending && data.useLocation,
             legacyCompleted = completed,
-            cancelled = focus.journey.cancelled,
+            cancelled = focus.composed.cancelled,
             matchingRefresh = matchingRefresh,
             resumeWaitUntilMs = arrivalResumeWaitUntil,
         ))

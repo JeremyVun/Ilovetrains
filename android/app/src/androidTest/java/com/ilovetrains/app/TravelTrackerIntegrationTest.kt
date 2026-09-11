@@ -314,8 +314,7 @@ class TravelTrackerIntegrationTest {
         grantNotifications()
         launchActivity()
         clearFocus()
-        val now = System.currentTimeMillis()
-        val focus = shortJourney("background", now)
+        val focus = shortJourney("background")
         setFocus(focus)
         assertContains(waitForNotification { text(it).contains("Central") }, "Central", "P21", "P26")
         shell("input keyevent HOME")
@@ -408,7 +407,8 @@ class TravelTrackerIntegrationTest {
     // alert lead, two minutes before its arrival, five seconds after that.
     private fun leadJourney(tripId: String, now: Long): FocusedJourney {
         val focus = fixture("ride", tripId)
-        val first = focus.journey.legs[0].copy(departure = now - 40_000, arrival = now - 10_000)
+        // The change is minutes wide in printed clock terms, so it is never read as lost.
+        val first = focus.journey.legs[0].copy(departure = now - 340_000, arrival = now - 310_000)
         val second = focus.journey.legs[1].copy(departure = now + 15_000, arrival = now + 140_000)
         val journey = focus.journey.copy(legs = listOf(first, second))
         return focus.copy(journey = journey, board = focus.board.copy(generatedAt = now, journeys = listOf(journey)))
@@ -418,8 +418,7 @@ class TravelTrackerIntegrationTest {
         grantNotifications()
         launchActivity()
         clearFocus()
-        val now = System.currentTimeMillis()
-        setFocus(shortJourney("locked", now))
+        setFocus(shortJourney("locked"))
         waitForNotification { text(it).contains("Central") }
         shell("input keyevent HOME")
         shell("input keyevent SLEEP")
@@ -521,6 +520,24 @@ class TravelTrackerIntegrationTest {
         assertTrue("final-leg cancellation did not strike destination ETA", hasStrike(finalCancelled))
     }
 
+    @Test fun aLostConnectionKeepsPlannedWithoutACandidateAndRidesTheRecoveryWithOne() {
+        grantNotifications()
+        launchActivity()
+        clearFocus()
+
+        setFocus(missedFocus("lost-without-candidate"))
+        val broken = waitForNotification { text(it).contains("Planned") }
+        assertContains(broken, "connection unavailable", "Planned", "Kellyville")
+
+        setFocus(recoveredFocus("lost-with-candidate"))
+        val recovered = waitForNotification { text(it).contains("leaves in") }
+        val rendered = text(recovered)
+        assertFalse("a recovery must retire the broken connection: $rendered",
+            rendered.contains("connection unavailable"))
+        assertFalse("a recovered arrival is achievable, not planned: $rendered", rendered.contains("Planned"))
+        assertContains(recovered, "M1 leaves", "P26", "Kellyville")
+    }
+
     @Test fun olderAndroidUsesUsefulOrdinaryNotification() {
         assumeTrue("ordinary fallback needs an API 35 or older verification device", Build.VERSION.SDK_INT < 36)
         grantNotifications()
@@ -561,6 +578,7 @@ class TravelTrackerIntegrationTest {
             "unknown-platform" -> arrayOf("Get off at Kellyville")
             "long-content" -> arrayOf("Bondi Junction", "Platform 21", "Platform 26", "Kellyville")
             "missed-connection" -> arrayOf("connection unavailable", "Planned", "Kellyville")
+            "missed-connection-recovered" -> arrayOf("M1 leaves", "Kellyville")
             "first-leg-cancelled" -> arrayOf("T8 cancelled", "from Mascot", "Kellyville")
             "final-leg-cancelled" -> arrayOf("M1 cancelled", "from Central", "Kellyville", "Cancelled (05:46)")
             else -> error("unknown trackerCase $case")
@@ -671,6 +689,7 @@ class TravelTrackerIntegrationTest {
 
     private fun captureFocus(case: String, fixedReview: Boolean): FocusedJourney = when (case) {
         "missed-connection" -> missedFocus("capture-$case", fixedReview)
+        "missed-connection-recovered" -> recoveredFocus("capture-$case", fixedReview)
         "first-leg-cancelled" -> cancelledFocus("capture-$case", 0, fixedReview)
         "final-leg-cancelled" -> cancelledFocus("capture-$case", 1, fixedReview)
         else -> fixture(case, "capture-$case", fixedReview = fixedReview)
@@ -685,6 +704,7 @@ class TravelTrackerIntegrationTest {
         "unknown-platform" -> arrayOf("Kellyville in", "Get off at Kellyville", "05:46", "Updated 05:39")
         "long-content" -> arrayOf("Bondi Junction in", "P21", "P26", "7 min", "Kellyville", "05:46", "Updated 04:44")
         "missed-connection" -> arrayOf("M1 connection unavailable", "M1 departure 04:41", "04:43 arrival", "Kellyville", "Planned 05:24", "Updated 04:44")
+        "missed-connection-recovered" -> arrayOf("M1 leaves", "P26", "Tallawong", "Kellyville", "Updated 04:44")
         "first-leg-cancelled" -> arrayOf("T8 cancelled", "from Mascot", "Kellyville", "05:46", "Updated 04:44")
         "final-leg-cancelled" -> arrayOf("M1 cancelled", "from Central", "Kellyville", "Cancelled (05:46)", "Updated 04:44")
         else -> error("unknown trackerCase $case")
@@ -946,6 +966,14 @@ class TravelTrackerIntegrationTest {
         return focus.copy(journey = journey, board = focus.board.copy(generatedAt = now, journeys = listOf(journey)))
     }
 
+    private fun recoveredFocus(tripId: String, fixedReview: Boolean = false): FocusedJourney {
+        val missed = missedFocus(tripId, fixedReview)
+        val now = if (fixedReview) reviewNow("ride") else System.currentTimeMillis()
+        val onward = missed.journey.legs[1]
+        val candidate = Journey(listOf(onward.copy(departure = now + 5 * 60_000, arrival = now + 45 * 60_000)))
+        return missed.copy(recovery = Recovery(0, candidate, now, RecoverySource(now)))
+    }
+
     private fun cancelledFocus(tripId: String, legIndex: Int, fixedReview: Boolean = false): FocusedJourney {
         val focus = fixture("ride", tripId, fixedReview = fixedReview)
         val journey = focus.journey.copy(legs = focus.journey.legs.mapIndexed { index, leg ->
@@ -954,12 +982,22 @@ class TravelTrackerIntegrationTest {
         return focus.copy(journey = journey, board = focus.board.copy(journeys = listOf(journey)))
     }
 
-    private fun shortJourney(tripId: String, now: Long): FocusedJourney {
+    private fun shortJourney(tripId: String): FocusedJourney {
         val focus = fixture("ride", tripId)
-        val first = focus.journey.legs[0].copy(departure = now - 4_000, arrival = now + 2_000)
-        val second = focus.journey.legs[1].copy(departure = now + 5_000, arrival = now + 9_000)
+        // A seconds-long change is lost unless it spans a printed clock minute, so start on one.
+        val boundary = sleepToNextMinute(lead = 8_000)
+        val first = focus.journey.legs[0].copy(departure = boundary - 8_000, arrival = boundary - 2_000)
+        val second = focus.journey.legs[1].copy(departure = boundary + 2_000, arrival = boundary + 6_000)
         val journey = focus.journey.copy(legs = listOf(first, second))
-        return focus.copy(journey = journey, board = focus.board.copy(generatedAt = now, journeys = listOf(journey)))
+        return focus.copy(journey = journey,
+            board = focus.board.copy(generatedAt = boundary - 8_000, journeys = listOf(journey)))
+    }
+
+    private fun sleepToNextMinute(lead: Long): Long {
+        var boundary = (System.currentTimeMillis() / 60_000 + 1) * 60_000
+        if (boundary - System.currentTimeMillis() < lead) boundary += 60_000
+        SystemClock.sleep((boundary - lead - System.currentTimeMillis()).coerceAtLeast(0))
+        return boundary
     }
 
     private fun savedTrip(focus: FocusedJourney) = SavedTrip(
@@ -1110,6 +1148,7 @@ class TravelTrackerIntegrationTest {
 
     companion object {
         private const val RelaunchTripId = "tracker-relaunch"
-        private val SpecialCases = setOf("missed-connection", "first-leg-cancelled", "final-leg-cancelled")
+        private val SpecialCases = setOf("missed-connection", "missed-connection-recovered",
+            "first-leg-cancelled", "final-leg-cancelled")
     }
 }

@@ -202,6 +202,7 @@ internal sealed interface AxisElement {
     data class Alight(val index: Int) : AxisElement
     data class Board(val index: Int) : AxisElement
     data class StationLabel(val index: Int) : AxisElement
+    data class ShortStationLabel(val index: Int) : AxisElement
     data object TinyTrain : AxisElement
     data object Progress : AxisElement
 }
@@ -262,8 +263,8 @@ internal fun journeyAxisFrames(
                 pins += index
                 AxisFrame(anchor.coerceIn(capWidth, (safeWidth - size.width).coerceAtLeast(capWidth)), 0, size.width, size.height)
             }
-            is AxisElement.StationLabel -> {
-                labels += index
+            is AxisElement.StationLabel, is AxisElement.ShortStationLabel -> {
+                if (size.width > 0) labels += index
                 AxisFrame(width = size.width.coerceAtMost(safeWidth), height = size.height)
             }
             AxisElement.TinyTrain -> AxisFrame(capWidth, (chipHeight - barHeight) / 2 - size.height * 18 / 44, axisWidth, size.height)
@@ -319,8 +320,12 @@ internal fun journeyAxisFrames(
     val markerBottom = maxOf(chipHeight, pins.maxOfOrNull { frames[it].y + frames[it].height } ?: 0)
     val placed = mutableListOf<AxisFrame>()
     labels.forEach { index ->
-        val element = elements[index] as AxisElement.StationLabel
-        val midpoint = x((journey.legs[element.index].effectiveArrival + journey.legs[element.index + 1].effectiveDeparture) / 2)
+        val change = when (val element = elements[index]) {
+            is AxisElement.StationLabel -> element.index
+            is AxisElement.ShortStationLabel -> element.index
+            else -> return@forEach
+        }
+        val midpoint = x((journey.legs[change].effectiveArrival + journey.legs[change + 1].effectiveDeparture) / 2)
         val frame = frames[index]
         frame.x = (midpoint - frame.width / 2).coerceIn(0, (safeWidth - frame.width).coerceAtLeast(0))
         frame.y = markerBottom + labelTopGap
@@ -334,7 +339,7 @@ internal fun journeyAxisFrames(
 @Composable
 fun JourneyAxis(journey: Journey, modifier: Modifier = Modifier, large: Boolean = false,
                 showCap: Boolean = true, progress: Float? = null, tinyTrain: Boolean = false,
-                travelledAt: Long? = null) {
+                travelledAt: Long? = null, recoveryFrom: Int? = null) {
     if (journey.legs.isEmpty()) return
     val c = LocalTrainColors.current
     val fontScale = LocalDensity.current.fontScale
@@ -359,7 +364,7 @@ fun JourneyAxis(journey: Journey, modifier: Modifier = Modifier, large: Boolean 
             if (index < journey.legs.lastIndex) {
                 val next = journey.legs[index + 1]
                 Box(Modifier.layoutId(AxisElement.Dwell(index)).background(
-                    if (isTightChange(journey, index)) c.warning else c.rule).drawWithContent {
+                    if (isTightChange(journey, index, recoveryFrom)) c.warning else c.rule).drawWithContent {
                     drawContent()
                     val fraction = travelledAt?.let { ((it - leg.effectiveArrival).toFloat() /
                         (next.effectiveDeparture - leg.effectiveArrival).coerceAtLeast(1)).coerceIn(0f, 1f) } ?: 0f
@@ -384,10 +389,10 @@ fun JourneyAxis(journey: Journey, modifier: Modifier = Modifier, large: Boolean 
                     height = if (large) 24.dp else 22.dp, horizontalPadding = 5.dp,
                     dimmed = travelledAt?.let { at -> at >= next.effectiveDeparture } == true)
             }
-            Text((if (leg.to.id == next.from.id) leg.to.shortName else "${leg.to.shortName} → ${next.from.shortName}").uppercase(Locale.ENGLISH),
-                Modifier.layoutId(AxisElement.StationLabel(index)), color = c.ink2, fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold, letterSpacing = .6.sp, textAlign = TextAlign.Center,
-                lineHeight = 13.5.sp, maxLines = 4, overflow = TextOverflow.Clip)
+            StationLabelText(changeLabel(journey, index, recoveryFrom), AxisElement.StationLabel(index), c.ink2)
+            if (recoveryFrom != null && index >= recoveryFrom) {
+                StationLabelText(shortChangeLabel(journey, index, recoveryFrom), AxisElement.ShortStationLabel(index), c.ink2)
+            }
         }
         progress?.let { at ->
             Canvas(Modifier.layoutId(AxisElement.Progress).width(13.dp).height(9.dp)) {
@@ -401,10 +406,16 @@ fun JourneyAxis(journey: Journey, modifier: Modifier = Modifier, large: Boolean 
         val width = constraints.maxWidth.coerceAtLeast(1)
         val elements = measurables.map { it.layoutId as AxisElement }
         val measured = arrayOfNulls<androidx.compose.ui.layout.Placeable>(measurables.size)
+        // The full label is dropped to its short form before it is allowed to wrap.
+        val wideLabels = measurables.indices.filter { elements[it] is AxisElement.StationLabel }
+            .filter { measurables[it].maxIntrinsicWidth(androidx.compose.ui.unit.Constraints.Infinity) > width }
+            .map { (elements[it] as AxisElement.StationLabel).index }.toSet()
         val sizes = measurables.mapIndexed { index, measurable ->
             val element = elements[index]
+            val dropped = element is AxisElement.StationLabel && element.index in wideLabels ||
+                element is AxisElement.ShortStationLabel && element.index !in wideLabels
             if (element == AxisElement.TinyTrain) AxisSize(0, 44.dp.roundToPx())
-            else if (element is AxisElement.Ride || element is AxisElement.Dwell) AxisSize(0, 0)
+            else if (element is AxisElement.Ride || element is AxisElement.Dwell || dropped) AxisSize(0, 0)
             else {
                 val placeable = measurable.measure(androidx.compose.ui.unit.Constraints(maxWidth = width))
                 measured[index] = placeable
@@ -457,3 +468,10 @@ fun ServiceIcon(mode: String, color: Color, modifier: Modifier = Modifier) {
 }
 
 val thinText = TextStyle(fontWeight = FontWeight.Light)
+
+@Composable
+private fun StationLabelText(text: String, id: AxisElement, color: Color) {
+    Text(text.uppercase(Locale.ENGLISH), Modifier.layoutId(id), color = color, fontSize = 10.sp,
+        fontWeight = FontWeight.SemiBold, letterSpacing = .6.sp, textAlign = TextAlign.Center,
+        lineHeight = 13.5.sp, maxLines = 4, overflow = TextOverflow.Clip)
+}

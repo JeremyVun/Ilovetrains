@@ -73,6 +73,7 @@ data class FocusedJourney(
     val pinned: Boolean = true,
     val alternatives: BoardData? = null,
     val arrivalGuard: ArrivalGuard? = null,
+    val recovery: Recovery? = null,
 )
 data class ViewEvent(val tripId: String, val reverse: Boolean, val at: Long)
 data class Ride(val tripId: String, val reverse: Boolean, val departure: Long, val arrival: Long,

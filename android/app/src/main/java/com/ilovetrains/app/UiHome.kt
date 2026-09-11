@@ -34,6 +34,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,7 +46,7 @@ private val DismissRed = Color(0xFFD93025)
 fun HomeScreen(state: AppState, actions: UiActions) {
     val c = LocalTrainColors.current
     val board = state.homeBoard ?: state.board
-    val focusJourney = state.focus?.journey
+    val focusJourney = state.focus?.composed
     val alternatives = state.focus?.alternatives ?: board
     val maxTransfers = state.transferLimit?.maxTransfers
     val retainedJourney = retainedHomeJourney(board, state.now)
@@ -131,12 +132,17 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
     val fig = figureFor(journey, board, state.now)
     val first = journey.legs.first()
     val focus = state.focus
+    val header = focus?.takeIf { cancelledLeadTime == null }
+        ?.let { focusHeader(it, state.now, state.focusComplete, state.arrival) }
+    val late = minutesBetween(journey.departure, journey.effectiveDeparture) > 0
+    val warnFigure = late || header?.status?.late == true
+    val focusState = header?.status
     val focused = focus != null && cancelledLeadTime == null
     val explicitlyPinned = focused && focus?.pinned == true
     val departed = focused && state.now >= journey.effectiveDeparture
     val completed = state.focusComplete || state.arrival?.state == ArrivalState.Arrived
     val overdue = focused && state.now >= journey.effectiveArrival && !completed
-    val directionFigure = if (overdue) {
+    val directionFigure = header?.figure ?: if (overdue) {
         val past = ((state.now - journey.effectiveArrival) / 60_000).toInt()
         Figure(if (state.arrival?.moving == true && past > 0) past.toString() else "—",
             if (state.arrival?.moving == true && past > 0) "min" else "",
@@ -144,8 +150,6 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
     } else if (departed && !completed) {
         directionFigureFor(journey, state.now) ?: fig
     } else fig
-    val late = minutesBetween(journey.departure, journey.effectiveDeparture) > 0
-    val focusState = focus?.let { focusStatus(it, state.now, state.focusComplete, state.arrival) }
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().heightIn(min = if (explicitlyPinned) 44.dp else 22.dp).padding(horizontal = PagePadding), verticalAlignment = Alignment.CenterVertically) {
             val status = when {
@@ -158,12 +162,16 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
             Row(modifier = if (explicitlyPinned) Modifier.heightIn(min = 44.dp)
                 .clickable(role = Role.Button, onClick = actions::unpinJourney) else Modifier,
                 verticalAlignment = Alignment.CenterVertically) {
+                val statusWarns = focusState?.warning == true || journey.cancelled || late && !focused
                 if (explicitlyPinned && status == "Pinned") {
                     Icon(Icons.Filled.PushPin, null, Modifier.size(12.dp), tint = c.ink2)
                     Spacer(Modifier.width(5.dp)); Label("Pinned", color = c.ink2, size = 11)
                 } else {
-                Label(status, color = if (focusState?.warning == true || journey.cancelled || late && !focused) c.warning else c.ink2, size = 11)
-                    if (explicitlyPinned) {
+                Label(status, color = if (statusWarns) c.warning else c.ink2, size = 11)
+                    if (explicitlyPinned && header?.pinWord == false) {
+                        Spacer(Modifier.width(8.dp))
+                        Icon(Icons.Filled.PushPin, null, Modifier.size(12.dp), tint = if (statusWarns) c.warning else c.ink2)
+                    } else if (explicitlyPinned) {
                         Label(" · ", color = c.ink3, size = 11)
                         Icon(Icons.Filled.PushPin, null, Modifier.size(12.dp), tint = c.ink2)
                         Spacer(Modifier.width(4.dp)); Label("Pinned", color = c.ink2, size = 11)
@@ -177,7 +185,7 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
             .testTag("home-journey").padding(horizontal = PagePadding, vertical = 10.dp), verticalAlignment = Alignment.Top) {
             Column(Modifier.width(104.dp)) {
                 Row(verticalAlignment = Alignment.Bottom) {
-                    Text(directionFigure.value, color = if (late) c.warning else c.ink,
+                    Text(directionFigure.value, color = if (warnFigure) c.warning else c.ink,
                         modifier = Modifier.testTag("home-primary-figure"),
                         fontSize = when {
                             wideFigure(directionFigure) -> 50.sp
@@ -203,9 +211,18 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
                     Text(journey.legs.last().to.shortName, color = c.ink2, fontSize = 16.sp, fontWeight = FontWeight.Light,
                         textAlign = TextAlign.End, maxLines = 2, overflow = TextOverflow.Clip)
-                    Text(clockTime(journey.effectiveArrival), color = c.ink2, fontSize = 20.sp,
-                        fontWeight = FontWeight.Light, modifier = Modifier.padding(top = 7.dp))
-                    if (overdue) Label("Last estimate", Modifier.padding(top = 4.dp), color = c.ink3, size = 10)
+                    val clocks = header?.arrival
+                    Row(Modifier.padding(top = 7.dp), verticalAlignment = Alignment.Bottom) {
+                        if (clocks?.struck != null && clocks.shown != null) {
+                            Text(clocks.struck, color = c.ink3, fontSize = 20.sp, fontWeight = FontWeight.Light,
+                                textDecoration = TextDecoration.LineThrough, modifier = Modifier.padding(end = 9.dp))
+                        }
+                        val shown = clocks?.shown ?: clocks?.struck ?: clocks?.planned ?: clockTime(journey.effectiveArrival)
+                        Text(shown, color = c.ink2, fontSize = 20.sp, fontWeight = FontWeight.Light,
+                            textDecoration = if (clocks?.shown == null && clocks?.struck != null) TextDecoration.LineThrough else null)
+                    }
+                    if (clocks?.planned != null) Label("Planned", Modifier.padding(top = 4.dp), color = c.ink3, size = 10)
+                    else if (overdue) Label("Last estimate", Modifier.padding(top = 4.dp), color = c.ink3, size = 10)
                 }
             }
         }
@@ -218,6 +235,7 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
             }
         } else null
         JourneyAxis(journey, Modifier.fillMaxWidth().padding(horizontal = PagePadding), large = true, tinyTrain = true,
+            recoveryFrom = header?.recoveryFrom,
             showCap = !departed, progress = progress?.takeIf { !overdueUnconfirmed || state.arrival?.moving == true },
             travelledAt = progress?.let { journey.effectiveDeparture +
                 ((journey.effectiveArrival - journey.effectiveDeparture) * it).toLong() })
@@ -231,10 +249,10 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
             overdueUnconfirmed && state.arrival?.state == ArrivalState.CheckingArrival ->
                 "Checking arrival at ${journey.legs.last().to.shortName}."
             overdueUnconfirmed -> "Arrival time needs an update."
-            departed -> focusedInstruction(journey, state.now)
+            header != null && departed -> header.instruction
             else -> first.headsign.ifBlank { first.to.shortName }
         }
-        if (cancelledLeadTime != null) {
+        if (cancelledLeadTime != null || header?.warnInstruction == true && departed) {
             Label(instruction, Modifier.padding(horizontal = PagePadding, vertical = 8.dp), color = c.warning, size = 11, maxLines = 2)
         } else {
             Text(instruction, color = if (departed) c.ink else c.ink2, fontSize = 15.sp,
@@ -242,8 +260,9 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
                 maxLines = 2, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(start = PagePadding, end = PagePadding, top = 6.dp, bottom = 8.dp))
         }
-        if (!state.receipt.isNullOrBlank()) {
-            Text(state.receipt, color = c.ink2, fontSize = 15.sp, fontWeight = FontWeight.Light,
+        val receipt = header?.receipt?.takeIf { it.isNotBlank() && departed } ?: state.receipt
+        if (!receipt.isNullOrBlank()) {
+            Text(receipt, color = c.ink2, fontSize = 15.sp, fontWeight = FontWeight.Light,
                 lineHeight = 21.sp, modifier = Modifier.padding(horizontal = PagePadding, vertical = 4.dp))
         }
         if (completed && focused) {
@@ -392,23 +411,3 @@ private fun HomeFooter(actions: UiActions) {
 }
 
 private fun Leg.modeName() = if (mode.equals("ferry", true)) "ferry" else "train"
-private fun focusedInstruction(journey: Journey, now: Long): String {
-    journey.legs.zipWithNext().forEach { (before, after) ->
-        if (now < before.effectiveArrival) {
-            val wait = minutesBetween(before.effectiveArrival, after.effectiveDeparture)
-            return if (wait < 5) "Tight change · $wait min${placeClause(before.toPlatform, before.mode)}"
-                else "Get off at ${before.to.shortName}${placeClause(before.toPlatform, before.mode)}"
-        }
-        if (now < after.effectiveDeparture) {
-            val wait = minutesBetween(now, after.effectiveDeparture).coerceAtLeast(0)
-            return if (wait < 5) "Tight change · $wait min${placeClause(after.fromPlatform, after.mode)}"
-                else "Change at ${after.from.shortName}${placeClause(after.fromPlatform, after.mode)}"
-        }
-    }
-    val last = journey.legs.last()
-    return "Stay on to ${last.to.shortName}"
-}
-private fun placeClause(raw: String?, mode: String): String {
-    val p = platformText(raw, mode, full = true) ?: return ""
-    return " · $p"
-}

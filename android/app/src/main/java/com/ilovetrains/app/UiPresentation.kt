@@ -4,7 +4,7 @@ import java.util.Locale
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-data class FocusStatus(val text: String, val warning: Boolean)
+data class FocusStatus(val text: String, val warning: Boolean, val late: Boolean = false)
 
 fun journeyAllowed(journey: Journey, modes: Set<String>): Boolean =
     modes.isNotEmpty() && journey.legs.isNotEmpty() && journey.legs.all { it.mode.lowercase(Locale.ENGLISH) in modes }
@@ -66,29 +66,42 @@ fun focusAfterRefresh(focus: FocusedJourney, update: FocusedRefresh?, alternativ
 
 fun showAlightingPin(legCount: Int, changeIndex: Int): Boolean = legCount <= 2 || changeIndex == 0
 
-fun isTightChange(journey: Journey, changeIndex: Int): Boolean =
-    !journey.cancelled && changeIndex in 0 until journey.legs.lastIndex &&
-        minutesBetween(journey.legs[changeIndex].effectiveArrival, journey.legs[changeIndex + 1].effectiveDeparture) < 5
+fun isTightChange(journey: Journey, changeIndex: Int, recoveryFrom: Int? = null): Boolean {
+    if (changeIndex !in 0 until journey.legs.lastIndex) return false
+    val printed = recoveryFrom == null || changeIndex < recoveryFrom
+    return connectionState(journey.legs, changeIndex, printed) in setOf(ConnectionState.Tight, ConnectionState.Lost)
+}
+
+fun relevantLeg(journey: Journey, now: Long): Leg? =
+    journey.legs.firstOrNull { now < it.effectiveArrival } ?: journey.legs.lastOrNull()
 
 fun focusStatus(focus: FocusedJourney, now: Long, complete: Boolean, arrival: ArrivalResult? = null): FocusStatus {
-    val journey = focus.journey
+    val journey = focus.composed
     if (complete || arrival?.state == ArrivalState.Arrived) return FocusStatus("Trip over", false)
     if (arrival?.state == ArrivalState.CheckingArrival) return FocusStatus("Checking arrival", false)
     if (arrival?.state == ArrivalState.ArrivalUnconfirmed) return FocusStatus(
         if (arrival.moving) "Arrival uncertain" else "Arrival unconfirmed", arrival.moving)
     if (journey.cancelled) return FocusStatus("Cancelled", true)
-    val active = journey.legs.firstOrNull { now < it.effectiveArrival } ?: journey.legs.lastOrNull()
-    val delay = active?.estimatedDeparture?.let { minutesBetween(active.departure, it) } ?: 0
+    val active = relevantLeg(journey, now)
+    val delay = maxOf(
+        active?.estimatedDeparture?.let { minutesBetween(active.departure, it) } ?: 0,
+        active?.estimatedArrival?.let { minutesBetween(active.arrival, it) } ?: 0,
+    )
     val currentObservation = focus.board.source == "live" && !focus.board.offline && !journey.retained &&
         now - focus.board.generatedAt in 0..90_000
-    if (currentObservation && delay > 0) return FocusStatus("Running late", true)
+    val late = currentObservation && delay > 0
+    if (focus.lostConnectionAhead(now)) {
+        return FocusStatus(if (late) "Late · Connection gone" else "Connection gone", true, late)
+    }
+    if (late) return FocusStatus("Running late", true, true)
     if (focus.pinned && now < journey.effectiveDeparture) return FocusStatus("Pinned", false)
     return FocusStatus("Running", false)
 }
 
 fun savedTripFocusStatus(focus: FocusedJourney, now: Long, complete: Boolean, arrival: ArrivalResult? = null): String {
     val status = focusStatus(focus, now, complete, arrival).text
-    return if (focus.pinned && status != "Pinned") "$status · Pinned" else status
+    val labelled = focus.pinned && status != "Pinned" && !focus.lostConnectionAhead(now)
+    return if (labelled) "$status · Pinned" else status
 }
 
 fun figureToken(figure: Figure): String = figure.value + if (figure.unit == "H") "H" else ""
@@ -163,3 +176,150 @@ fun mergeEarlier(current: List<Journey>, earlier: List<Journey>): List<Journey> 
 
 fun justAddedDistance(metadata: String): String =
     metadata.split(" · ").firstOrNull { it.endsWith(" away") }.orEmpty()
+
+data class FocusArrivalClocks(val shown: String? = null, val struck: String? = null, val planned: String? = null)
+
+data class FocusHeader(
+    val journey: Journey,
+    val recoveryFrom: Int?,
+    val status: FocusStatus,
+    val pinIcon: Boolean,
+    val pinWord: Boolean,
+    val changeLabels: List<String>,
+    val receipt: String,
+    val instruction: String,
+    val warnInstruction: Boolean,
+    val arrival: FocusArrivalClocks,
+    val figure: Figure,
+)
+
+fun changeStationLabel(journey: Journey, changeIndex: Int): String {
+    val leg = journey.legs[changeIndex]
+    val next = journey.legs[changeIndex + 1]
+    return if (leg.to.id == next.from.id) leg.to.shortName else "${leg.to.shortName} → ${next.from.shortName}"
+}
+
+fun changeLabel(journey: Journey, changeIndex: Int, recoveryFrom: Int?): String {
+    val station = changeStationLabel(journey, changeIndex)
+    if (recoveryFrom == null || changeIndex < recoveryFrom) return station
+    val next = journey.legs[changeIndex + 1]
+    val service = next.line.takeIf { it.isNotBlank() }?.let { "$it " }.orEmpty()
+    return "$station · $service${clockTime(next.effectiveDeparture)}"
+}
+
+/** Without the line code the label still names the station and the service it boards. */
+fun shortChangeLabel(journey: Journey, changeIndex: Int, recoveryFrom: Int?): String {
+    if (recoveryFrom == null || changeIndex < recoveryFrom) return changeLabel(journey, changeIndex, recoveryFrom)
+    return "${changeStationLabel(journey, changeIndex)} · ${clockTime(journey.legs[changeIndex + 1].effectiveDeparture)}"
+}
+
+fun focusHeader(focus: FocusedJourney, now: Long, complete: Boolean = false, arrival: ArrivalResult? = null): FocusHeader {
+    val followed = focus.journey
+    val composed = focus.composed
+    val recoveryFrom = focus.recovery?.takeIf { recoveryApplies(followed, it) }?.changeIndex
+    val states = connectionStates(composed, recoveryFrom)
+    val lost = focus.lostConnectionAhead(now)
+    val status = focusStatus(focus, now, complete, arrival)
+    val completed = complete || arrival?.state == ArrivalState.Arrived
+    val departed = now >= composed.effectiveDeparture
+    val overdue = departed && now >= composed.effectiveArrival && !completed
+    val figure = when {
+        overdue -> {
+            val past = ((now - composed.effectiveArrival) / 60_000).toInt()
+            val moving = arrival?.moving == true && past > 0
+            Figure(if (moving) past.toString() else "—", if (moving) "min" else "",
+                if (moving) "Past estimate" else "Last estimate", past = true)
+        }
+        departed && !completed -> directionFigureFor(composed, now) ?: figureFor(composed, focus.board, now)
+        else -> figureFor(composed, focus.board, now)
+    }
+
+    val cancelledIndex = composed.legs.indexOfFirst { it.cancelled }.takeIf { it > 0 }
+    val ridingCancelled = cancelledIndex != null && departed && now < composed.effectiveArrival
+    val risk = states.indices.firstOrNull {
+        states[it] == ConnectionState.Tight && now < composed.legs[it + 1].effectiveDeparture
+    }
+    val followedLost = lostChangeIndex(followed)
+    val instruction = when {
+        ridingCancelled -> composed.legs[cancelledIndex!!].let {
+            "${clockTime(it.effectiveDeparture)} from ${it.from.shortName} cancelled"
+        }
+        lost && recoveryFrom == null && followedLost != null ->
+            "The ${followed.legs[followedLost].line} arrives too late for the " +
+                clockTime(followed.legs[followedLost + 1].effectiveDeparture)
+        risk != null -> composed.legs[risk + 1].let {
+            "Tight change · ${minutesBetween(composed.legs[risk].effectiveArrival, it.effectiveDeparture)} min" +
+                placeClause(it.fromPlatform, it.mode)
+        }
+        else -> focusedInstruction(composed, now, recoveryFrom)
+    }
+
+    val receipt = when {
+        composed.cancelled -> ""
+        !lost -> if (risk != null && shrunkChange(composed, risk, recoveryFrom)) {
+            "Printed change was ${minutesBetween(composed.legs[risk].arrival, composed.legs[risk + 1].departure)} min."
+        } else ""
+        recoveryFrom == null -> "Check the station boards."
+        else -> recoveryReceipt(followed).orEmpty()
+    }
+
+    val arrivalClocks = when {
+        composed.legs.last().cancelled -> FocusArrivalClocks(struck = clockTime(composed.effectiveArrival))
+        lost && recoveryFrom == null -> FocusArrivalClocks(planned = clockTime(followed.effectiveArrival))
+        recoveryFrom != null -> FocusArrivalClocks(
+            shown = clockTime(composed.effectiveArrival), struck = clockTime(followed.effectiveArrival))
+        else -> FocusArrivalClocks(shown = clockTime(composed.effectiveArrival))
+    }
+
+    return FocusHeader(
+        journey = composed,
+        recoveryFrom = recoveryFrom,
+        status = status,
+        pinIcon = focus.pinned,
+        pinWord = focus.pinned && !lost,
+        changeLabels = states.indices.map { changeLabel(composed, it, recoveryFrom) },
+        receipt = receipt,
+        instruction = instruction,
+        warnInstruction = ridingCancelled || (lost && recoveryFrom == null),
+        arrival = arrivalClocks,
+        figure = figure,
+    )
+}
+
+private fun shrunkChange(journey: Journey, changeIndex: Int, recoveryFrom: Int?): Boolean {
+    if (recoveryFrom != null && changeIndex >= recoveryFrom) return false
+    val before = journey.legs[changeIndex]
+    val after = journey.legs[changeIndex + 1]
+    return minutesBetween(before.effectiveArrival, after.effectiveDeparture) <
+        minutesBetween(before.arrival, after.departure)
+}
+
+fun focusedInstruction(journey: Journey, now: Long, recoveryFrom: Int? = null): String {
+    journey.legs.forEachIndexed { index, leg ->
+        if (now < leg.effectiveArrival) {
+            return "Get off at ${leg.to.shortName}${placeClause(leg.toPlatform, leg.mode)}"
+        }
+        val next = journey.legs.getOrNull(index + 1) ?: return@forEachIndexed
+        if (now < next.effectiveDeparture) {
+            val recovered = recoveryFrom != null && index >= recoveryFrom
+            val place = placeClause(next.fromPlatform, next.mode)
+            return if (recovered) "Board the ${clockTime(next.effectiveDeparture)} at ${next.from.shortName}$place"
+            else "Change at ${next.from.shortName}$place"
+        }
+    }
+    val last = journey.legs.last()
+    return "Get off at ${last.to.shortName}${placeClause(last.toPlatform, last.mode)}"
+}
+
+private fun placeClause(raw: String?, mode: String): String {
+    val place = platformText(raw, mode, full = true) ?: return ""
+    return " · $place"
+}
+
+fun recoveryReceipt(followed: Journey): String? {
+    val lost = lostChangeIndex(followed) ?: return null
+    val before = followed.legs[lost]
+    val after = followed.legs[lost + 1]
+    return "The ${before.line} arrives at ${clockTime(before.effectiveArrival)}, " +
+        "but the ${after.line} left at ${clockTime(after.effectiveDeparture)}."
+}
