@@ -21,6 +21,10 @@ import { colourKey } from './lines.js';
    it; short scheduled connections are normal. */
 export const TIGHT_CHANGE_MIN = 5;
 
+/* The connection floor the server itself uses, which a recovery candidate has
+   to clear against the incoming arrival (client-storage.md, Recovery). */
+export const RECOVERY_FLOOR_MIN = 3;
+
 /** The time a leg actually happens at: the estimate when the leg is realtime
     controlled, the timetable otherwise (api.md — `estimated` is null unless
     THAT leg is monitored, so one journey can mix the two). */
@@ -146,14 +150,16 @@ function behind(ms, nowMs) {
 }
 
 /** The window between two legs, and the two platforms it is crossed between. */
-function changeBetween(prev, next, index, nowMs) {
+function changeBetween(prev, next, index, nowMs, recovery = false) {
   const arrMs = effective(prev.arrival);
   const depMs = effective(next.departure);
   const arrScheduled = parseIso((prev.arrival || {}).scheduled);
   const depScheduled = parseIso((next.departure || {}).scheduled);
 
   const minutes = arrMs === null || depMs === null ? null : minutesUntil(depMs, arrMs);
-  const printedMin = arrScheduled === null || depScheduled === null
+  // A recovery pair was never printed together, so only its window decides it
+  // and the shrunk clause has nothing to compare against (ui.md).
+  const printedMin = recovery || arrScheduled === null || depScheduled === null
     ? null : minutesUntil(depScheduled, arrScheduled);
 
   // A cancelled leg either side is not a tight connection, it is a broken one,
@@ -171,11 +177,20 @@ function changeBetween(prev, next, index, nowMs) {
     ? [fromStation, toStation].filter(Boolean).join(' → ')
     : fromStation || toStation;
 
+  const tight = !broken && minutes !== null && (minutes < TIGHT_CHANGE_MIN || shrunk);
+  const lost = !broken && minutes !== null && minutes <= 0;
+  const depTime = depMs === null ? null : clock(depMs);
+
   return {
     index,
     station,
+    // The change the rider now boards a different train at names it and when
+    // it leaves; every other change is its station (ui.md, smart home).
+    label: recovery && depTime ? `${station} · ${lineCode(next)} ${depTime}` : station,
     fromStation,
     toStation,
+    fromCode: lineCode(prev),
+    toCode: lineCode(next),
     fromPlatform: platformNumber(prev.to && prev.to.platform) || null,
     toPlatform: platformNumber(next.from && next.from.platform) || null,
     fromLabel: boardingLabel(prev.to && prev.to.platform, fromMode) || null,
@@ -183,14 +198,46 @@ function changeBetween(prev, next, index, nowMs) {
     fromPlace: modeWords(fromMode).place,
     toPlace: modeWords(toMode).place,
     minutes,
+    // A negative window is never printed (ui.md); the state carries the news.
+    printedMinutes: minutes === null ? null : Math.max(0, minutes),
     printedMin,
-    tight: !broken && minutes !== null && (minutes < TIGHT_CHANGE_MIN || shrunk),
+    tight,
     broken,
+    recovery,
+    state: broken ? 'broken' : lost ? 'lost' : tight ? 'tight' : 'ordinary',
     done: behind(depMs, nowMs),
     arrivalMs: arrMs,
     departureMs: depMs,
     arrTime: arrMs === null ? null : clock(arrMs),
-    depTime: depMs === null ? null : clock(depMs)
+    depTime
+  };
+}
+
+/** Every change of a journey in order. `opts.recoveryFrom` is the change index
+    the recovery legs were spliced in at: it and everything after it is a pair
+    the rider was never shown together. */
+export function changesOf(journey, nowMs, opts = {}) {
+  const legs = legsOf(journey, opts);
+  const from = Number.isInteger(opts.recoveryFrom) ? opts.recoveryFrom : Infinity;
+  const changes = [];
+  for (let i = 1; i < legs.length; i++) {
+    changes.push(changeBetween(legs[i - 1], legs[i], i, nowMs, i - 1 >= from));
+  }
+  return changes;
+}
+
+/** The same journey with another set of legs: what composing a followed
+    journey with a recovery's legs produces (client-storage.md, Recovery). */
+export function withLegs(journey, legs) {
+  const first = legs[0] || {};
+  const last = legs[legs.length - 1] || {};
+  return {
+    ...journey,
+    departure: { ...(journey && journey.departure), ...first.departure },
+    arrival: { ...last.arrival },
+    cancelled: legs.some((item) => item.cancelled === true),
+    legs: legs.length,
+    legDetail: legs
   };
 }
 
@@ -227,12 +274,12 @@ function stepsOf(legs, changes, cancelled, nowMs) {
     const tight = change.tight && !broken;
     steps.push({
       kind: 'change',
-      time: change.minutes === null ? '—' : change.minutes + ' min',
-      station: change.station,
+      time: change.printedMinutes === null ? '—' : change.printedMinutes + ' min',
+      station: change.label,
       off: chip(legs[index], change.fromLabel, legs[index].to, 'alight'),
       on: chip(legs[index + 1], change.toLabel, legs[index + 1].from, 'board'),
       // ui.md: a tight change prints its current window and no other.
-      label: broken ? 'Cancelled' : tight ? change.minutes + ' min change' : 'Board',
+      label: broken ? 'Cancelled' : tight ? change.printedMinutes + ' min change' : 'Board',
       serviceLabel: boardLabel(legs[index + 1]),
       boardingPlace: broken && modeWords(legs[index + 1].line && legs[index + 1].line.mode).place !== 'Wharf'
         ? '' : change.toLabel || '',
@@ -278,8 +325,7 @@ function cancelledSummary(leg) {
     the closing line, and the change windows the promoted row shares. */
 export function journeyDetail(journey, nowMs, opts = {}) {
   const legs = legsOf(journey, opts);
-  const changes = [];
-  for (let i = 1; i < legs.length; i++) changes.push(changeBetween(legs[i - 1], legs[i], i, nowMs));
+  const changes = changesOf(journey, nowMs, opts);
 
   // A journey the API cancels without naming a leg is cancelled in all of
   // them, which is what the struck board row already says.
@@ -301,7 +347,8 @@ export function journeyDetail(journey, nowMs, opts = {}) {
     stale: Boolean(opts.stale),
     from: shortName((first.from && first.from.name) || opts.fromName || ''),
     to: shortName((last.to && last.to.name) || opts.toName || ''),
-    summary: cancelledLeg >= 0 ? cancelledSummary(legs[cancelledLeg]) : summaryOf(changes, arrTime),
+    summary: cancelledLeg >= 0 ? cancelledSummary(legs[cancelledLeg])
+      : opts.receipt || summaryOf(changes, arrTime),
     summaryWarn: cancelledLeg >= 0,
     steps: stepsOf(legs, changes, cancelled, nowMs),
     changes,

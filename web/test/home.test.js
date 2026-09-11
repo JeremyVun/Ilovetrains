@@ -11,7 +11,7 @@ import { fitTripNames, homeHtml, homeModel, nextService, tripIsOver } from '../j
 import { emptyDoc } from '../js/storage.js';
 import { departureMs, departureKey } from '../js/journey.js';
 import {
-  cancelLeg, delayLeg, transferBody, transferJourneys, FERRY_NOW, ferryBody
+  cancelLeg, delayLeg, transferBody, transferJourneys, FERRY_NOW, ferryBody, recoveryRecord
 } from './fixture.js';
 
 const at = (time) => Date.parse(`2026-09-01T${time}:00+10:00`);
@@ -915,10 +915,57 @@ test('every departures request carries the cap except the focus refresh', () => 
   const main = readFileSync(join(import.meta.dirname, '..', 'js', 'main.js'), 'utf8');
   const calls = main.match(/getDepartures\([\s\S]*?\n?\s*\}\);/g);
 
-  assert.equal(calls.length, 5);
-  assert.equal(calls.filter((call) => call.includes('transferLimit:')).length, 4);
+  assert.equal(calls.length, 6);
+  assert.equal(calls.filter((call) => call.includes('transferLimit:')).length, 5);
   const refresh = /async function refreshFollowed\(\) \{([\s\S]*?)\n\}/.exec(main)[1];
   assert.match(refresh, /modes: SUPPORTED_MODES/);
   assert.doesNotMatch(refresh, /transferLimit/);
+  const recovery = /async function refreshRecovery\(\) \{([\s\S]*?)\n\}/.exec(main)[1];
+  assert.match(recovery, /transferLimit: transferLimit\(\)/);
   assert.match(main, /function transferLimit\(\) \{ return maxTransfers\(\) \?\? undefined; \}/);
+});
+
+/* ---- transfer recovery in the header (ui.md, smart home) --------------- */
+
+function lostScreen({ record = recoveryRecord(), time = '09:47' } = {}) {
+  const doc = homeDoc(delayLeg(transferJourneys()[0], 0, 9));
+  doc.focus.by = 'focus';
+  if (record) doc.focus.recovery = record;
+  const model = homeModel(doc, HOME_SELECTION, transferBody({ journeys: [] }), at(time), {});
+  return { model, html: homeHtml(model) };
+}
+
+test('a lost connection keeps the original arrival struck beside the one the rider will make', () => {
+  const { model, html } = lostScreen();
+
+  assert.deepEqual([model.directions.arrTime, model.directions.arrivalStruck], ['10:18', '10:08']);
+  assert.match(html, /<del class="hm-was">10:08<\/del>10:18/);
+  assert.doesNotMatch(html, /hm-estimate">Planned/);
+  assert.match(html, /data-transfer-station[^>]*>TOWN HALL · T4 10:08</i);
+});
+
+test('the lost status is warned in both places, with the pin icon alone beside it', () => {
+  const { model, html } = lostScreen();
+
+  assert.deepEqual([model.status.text, model.status.kind, model.status.late],
+    ['Late · Connection gone', 'lost', true]);
+  assert.equal(html.match(/Late · Connection gone/g).length, 2, 'the top line and the focused row');
+  assert.match(html, /class="answer-kind status-copy status-lost status-late"/);
+  assert.match(html, /class="status-copy status-lost status-late" data-row-status/);
+  assert.equal(html.match(/class="pin-icon"/g).length, 1, 'the icon is the header pin, once');
+  assert.doesNotMatch(html, /Pinned/, 'a recovery journey is never labelled PINNED');
+  assert.match(html, / active-late"/, 'the countdown is painted late with the status');
+});
+
+test('with nothing found the header says so, plans the arrival and offers no rail', () => {
+  const { model, html } = lostScreen({ record: null });
+
+  assert.equal(model.status.text, 'Late · Connection gone');
+  assert.equal(model.directions.instruction, 'The T9 arrives too late for the 09:58');
+  assert.equal(model.directions.receipt, 'Check the station boards.');
+  assert.deepEqual([model.directions.arrTime, model.directions.arrivalStruck], ['10:08', '']);
+  assert.match(html, /<span class="hm-estimate">Planned<\/span>/);
+  assert.match(html, /class="hm-sign note"/, 'the instruction takes the warn idiom');
+  assert.equal(model.following, null);
+  assert.doesNotMatch(html, /data-next-service/);
 });

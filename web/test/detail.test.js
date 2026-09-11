@@ -7,10 +7,11 @@ import { fileURLToPath } from 'node:url';
 
 import { detailHtml } from '../js/detail.js';
 import { journeyDetail } from '../js/journey.js';
+import { composedJourney } from '../js/focus.js';
 import { promotedRow } from '../js/rowmodel.js';
 import {
   TRANSFER_NOW, TRANSFER_DEPARTED_NOW, transferJourneys, delayLeg, cancelLeg,
-  FERRY_NOW, ferryJourneys, mixedJourneys
+  FERRY_NOW, ferryJourneys, mixedJourneys, recoveryRecord
 } from './fixture.js';
 
 const ENDS = { fromName: 'Rhodes Station', toName: 'Bondi Junction Station' };
@@ -167,4 +168,28 @@ test('the detail view writes focus once and never clears it', () => {
   assert.doesNotMatch(action[0], /clearFocus\(/);
   assert.match(action[0], /action === 'board'\) return ctx\.go\('#\/board'\)/);
   assert.match(action[0], /ctx\.go\('#\/'\)/);
+});
+
+test('detail renders the composed journey with the receipt as its summary and no recovery control', () => {
+  const focus = {
+    journey: delayLeg(transferJourneys()[0], 0, 9),
+    recovery: recoveryRecord()
+  };
+  const composed = composedJourney(focus);
+  const receipt = 'The T9 arrives at 10:00, but the T4 left at 09:58.';
+  const model = journeyDetail(composed, TRANSFER_DEPARTED_NOW,
+    { ...ENDS, recoveryFrom: 0, receipt });
+  const html = detailHtml({
+    ...model,
+    row: promotedRow(composed, TRANSFER_DEPARTED_NOW, { ...ENDS, fallbackHeadsign: ENDS.toName }),
+    focused: true, pinned: true,
+    footer: { dot: 'live', text: 'Updated 0s ago' }
+  });
+
+  assert.equal(model.summary, receipt);
+  assert.equal(model.summaryWarn, false);
+  assert.equal(model.steps[1].station, 'Town Hall · T4 10:08');
+  assert.deepEqual(model.steps.map((step) => step.time), ['09:33', '8 min', '10:18']);
+  assert.match(html, /Town Hall · T4 10:08/);
+  assert.doesNotMatch(html, /Pin this train/, 'the recovery control stays in the header');
 });

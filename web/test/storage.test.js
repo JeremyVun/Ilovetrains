@@ -420,3 +420,30 @@ test('focus arrival metadata and bounded recommendation pages round-trip without
   assert.deepEqual(round.cache[key].recommendationPages, pages.slice(0, 2));
   assert.equal(JSON.stringify(round).includes('samples'), false);
 });
+
+test('the recovery record rides with the focus, and a malformed one is dropped', () => {
+  const focus = {
+    tripId: 't1', direction: 'forward', focusedAt: '2026-09-01T09:47:00+10:00', by: 'focus',
+    journey: { legs: 2 },
+    recovery: {
+      changeIndex: 0,
+      journey: { legs: 1 },
+      fetchedAt: '2026-09-01T09:47:00+10:00',
+      source: { generatedAt: '2026-09-01T09:46:30+10:00', degraded: false }
+    }
+  };
+  const kept = parseDoc(serializeDoc({ ...emptyDoc(), focus })).focus;
+  assert.deepEqual(kept.recovery, focus.recovery);
+
+  for (const broken of [
+    { ...focus.recovery, changeIndex: -1 },
+    { ...focus.recovery, changeIndex: 'first' },
+    { ...focus.recovery, journey: null },
+    { ...focus.recovery, fetchedAt: 'whenever' },
+    'recovering'
+  ]) {
+    const doc = parseDoc(serializeDoc({ ...emptyDoc(), focus: { ...focus, recovery: broken } }));
+    assert.equal(doc.focus.recovery, undefined, JSON.stringify(broken));
+    assert.deepEqual(doc.focus.journey, focus.journey, 'the focus survives its record');
+  }
+});

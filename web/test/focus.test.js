@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 import {
   setFocus, visibleFocus, clearFocus, isFocused, focusExpired, matchJourney, refreshFocus,
-  settleRide, settleRefreshedFocus,
+  settleRide, settleRefreshedFocus, composedJourney, recoveryModel, recoveryCandidate,
   directionsModel, focusStatus, inferTravel, arrived, FOCUS_CLEAR_MS
 } from '../js/focus.js';
 import { arrivalMs } from '../js/journey.js';
@@ -13,7 +13,7 @@ import { parseDoc, serializeDoc, emptyDoc, recordLastOpen, removeTrip } from '..
 import { setFlags, setPreferences } from '../js/preferences.js';
 import {
   TRANSFER_NOW, TRANSFER_DEPARTED_NOW, transferBody, transferJourneys, delayLeg, cancelLeg,
-  ferryJourneys, mixedJourneys,
+  ferryJourneys, mixedJourneys, recoveryJourney, recoveryRecord,
   STATIONS, tripBetween
 } from './fixture.js';
 
@@ -178,6 +178,7 @@ test('stale data and a scheduled-only leg never manufacture RUNNING LATE', () =>
 
   const scheduled = delayLeg(transferJourneys()[0], 1, 9);
   scheduled.legDetail[1].departure.estimated = null;
+  scheduled.legDetail[1].arrival.estimated = null;
   assert.equal(focusStatus(scheduled, { activeLeg: 1 }).text, 'Running');
 });
 
@@ -405,4 +406,108 @@ test('a ride recorded from an arrival that moves takes the new one, or is withdr
   const withdrawn = settleRefreshedFocus(recorded, SELECTION, laterBody(7), JUST_AFTER, null);
   assert.deepEqual(withdrawn.rides, [], 'an arrival still ahead is not a completed ride');
   assert.notEqual(directionsModel(withdrawn.focus, JUST_AFTER).phase, 'done', 'and the trip is not over');
+});
+
+/* ---- transfer recovery (client-storage.md, Recovery) -------------------- */
+
+const LOST_NOW = TRANSFER_DEPARTED_NOW;
+const lostDoc = (record = recoveryRecord()) => {
+  const doc = docWithFocus(delayLeg(transferJourneys()[0], 0, 9), LOST_NOW);
+  if (record) doc.focus.recovery = record;
+  return doc;
+};
+const answer = (journeys) => () => ({ journeys, generatedAt: '2026-09-01T09:47:00+10:00' });
+
+test('the composed journey is the followed legs up to the lost change and the recovery after it', () => {
+  const composed = composedJourney(lostDoc().focus);
+
+  assert.deepEqual(composed.legDetail.map((leg) => leg.line.name), ['T9', 'T4']);
+  assert.equal(composed.legDetail[1].departure.scheduled, '2026-09-01T10:08:00+10:00');
+  assert.equal(arrivalMs(composed), Date.parse('2026-09-01T10:18:00+10:00'));
+  const plain = docWithFocus();
+  assert.equal(composedJourney(plain.focus), plain.focus.journey,
+    'without a record the followed journey is the composed one');
+});
+
+test('the focus lives as long as the journey the rider is actually on', () => {
+  const focus = lostDoc().focus;
+  const planned = Date.parse('2026-09-01T10:08:00+10:00') + FOCUS_CLEAR_MS + 1000;
+
+  assert.equal(focusExpired({ ...focus, recovery: undefined }, planned), true);
+  assert.equal(focusExpired(focus, planned), false, 'the recovery still has ten minutes to run');
+  assert.equal(focusExpired(focus, Date.parse('2026-09-01T10:18:00+10:00') + FOCUS_CLEAR_MS + 1000), true);
+});
+
+test('a lost change searches from the change station at the incoming arrival, once', () => {
+  const asked = [];
+  const plan = recoveryModel(lostDoc(null).focus, LOST_NOW, {
+    response: (search) => { asked.push(search); return answer([recoveryJourney()])(); }
+  });
+
+  assert.deepEqual(asked, [{ from: '200070', at: Date.parse('2026-09-01T10:00:36+10:00') }]);
+  assert.equal(plan.anchor, 0);
+  assert.equal(plan.recovery.changeIndex, 0);
+  assert.equal(plan.composedChanges[0].state, 'ordinary');
+  assert.equal(plan.receipt, 'The T9 arrives at 10:00, but the T4 left at 09:58.');
+});
+
+test('a candidate under the connection floor is not a candidate', () => {
+  const arrival = Date.parse('2026-09-01T10:00:36+10:00');
+  const tooSoon = recoveryJourney();
+  tooSoon.legDetail[0].departure = { scheduled: '2026-09-01T10:02:00+10:00', estimated: '2026-09-01T10:02:00+10:00' };
+  const cancelled = cancelLeg(recoveryJourney(), 0);
+
+  assert.equal(recoveryCandidate([tooSoon], arrival), null, 'two minutes is not a connection');
+  assert.equal(recoveryCandidate([cancelled], arrival), null, 'a cancelled candidate is none');
+  assert.equal(recoveryCandidate([tooSoon, recoveryJourney()], arrival).legDetail[0].departure.scheduled,
+    '2026-09-01T10:08:00+10:00');
+});
+
+test('the record is cleared on the first refresh where nothing is lost', () => {
+  const doc = lostDoc();
+  doc.focus.journey.legDetail[0].arrival.estimated = '2026-09-01T09:54:00+10:00';
+  const plan = recoveryModel(doc.focus, LOST_NOW, { response: answer([recoveryJourney()]) });
+
+  assert.equal(plan.recovery, null);
+  assert.equal(plan.search, null, 'nothing lost, nothing searched');
+  assert.equal(plan.composed, doc.focus.journey);
+  assert.equal(plan.receipt, '');
+});
+
+test('pinning another service drops the record with the focus it belonged to', () => {
+  const doc = setFocus(lostDoc(), SELECTION, transferJourneys()[2], LOST_NOW);
+  assert.equal(doc.focus.recovery, undefined);
+  assert.equal(clearFocus(lostDoc()).focus, undefined);
+});
+
+test('the ladder never walks into a train that left, and names the one it boards', () => {
+  const stranded = directionsModel(lostDoc(null).focus.journey, LOST_NOW, {});
+  assert.equal(stranded.instruction, 'The T9 arrives too late for the 09:58');
+  assert.equal(stranded.warn, true);
+  assert.equal(stranded.arrivalPlanned, true);
+  assert.equal(stranded.arrTime, '10:08', 'the planned arrival is still the planned one');
+
+  const stranded2 = directionsModel(lostDoc(null).focus.journey,
+    Date.parse('2026-09-01T10:02:00+10:00'), {});
+  assert.equal(stranded2.activeLeg, 1, 'the rider is waiting on the train that left, not riding it');
+  assert.equal(stranded2.figure, '', 'there is nothing left to count to');
+  assert.equal(stranded2.instruction, 'The T9 arrives too late for the 09:58');
+
+  const dwell = directionsModel(composedJourney(lostDoc().focus),
+    Date.parse('2026-09-01T10:02:00+10:00'), { recoveryFrom: 0 });
+  assert.equal(dwell.instruction, 'Board the 10:08 at Town Hall · Platform 5');
+  assert.equal(dwell.figure, '6');
+  assert.equal(dwell.provenance, 'TO CHANGE');
+});
+
+test('the lost status carries LATE only when the relevant leg is late, and retires on boarding', () => {
+  const composed = composedJourney(lostDoc().focus);
+  assert.equal(focusStatus(composed, { activeLeg: 0, lost: true }).text, 'Late · Connection gone');
+  assert.equal(focusStatus(composed, { activeLeg: 1, lost: true }).text, 'Connection gone');
+  assert.equal(focusStatus(composed, { activeLeg: 0, lost: true, stale: true }).text, 'Connection gone');
+  assert.equal(focusStatus(composed, { activeLeg: 0, lost: false }).text, 'Running late');
+
+  const boarded = recoveryModel(lostDoc().focus, Date.parse('2026-09-01T10:10:00+10:00'), {});
+  assert.equal(boarded.lost, false);
+  assert.equal(boarded.receipt, '');
 });
