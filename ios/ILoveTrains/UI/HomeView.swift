@@ -487,6 +487,7 @@ func focusStatus(_ focus: FocusedJourney, plan: RecoveryPlan, now: Millis, compl
 
 /// The lost word retires once the rider can be on the service that replaced the connection.
 func connectionIsGone(_ plan: RecoveryPlan, now: Millis) -> Bool {
+    if plan.composedStates.contains(.lost) { return true }
     guard plan.followedStates.contains(.lost) else { return false }
     guard let splice = plan.recoveryChangeIndex, plan.composed.legs.indices.contains(splice + 1) else { return true }
     return now < plan.composed.legs[splice + 1].effectiveDeparture
@@ -511,23 +512,26 @@ struct FocusArrivalClocks: Equatable {
 func focusArrivalClocks(_ plan: RecoveryPlan, followed: Journey) -> FocusArrivalClocks {
     let composed = clockTime(plan.composed.effectiveArrival)
     if plan.composed.legs.last?.cancelled == true { return FocusArrivalClocks(struck: composed) }
+    // A journey the rider can no longer complete keeps its own planned time: striking it would
+    // promise an arrival the replacement never offered.
+    if plan.composedStates.contains(.lost) { return FocusArrivalClocks(planned: composed) }
     if plan.recoveryChangeIndex != nil {
         return FocusArrivalClocks(shown: composed, struck: clockTime(followed.effectiveArrival))
     }
-    if plan.composedStates.contains(.lost) { return FocusArrivalClocks(planned: composed) }
     return FocusArrivalClocks(shown: composed)
 }
 
 func focusReceipt(_ focus: FocusedJourney, plan: RecoveryPlan, now: Millis) -> String? {
     let legs = plan.composed.legs
     if plan.composed.cancelled { return nil }
+    if plan.composedStates.contains(.lost) { return "Check the station boards." }
     if let splice = plan.recoveryChangeIndex, connectionIsGone(plan, now: now),
        focus.journey.legs.indices.contains(splice + 1) {
         let incoming = focus.journey.legs[splice], missed = focus.journey.legs[splice + 1]
         return "The \(incoming.line) arrives at \(clockTime(incoming.effectiveArrival)), "
             + "but the \(missed.line) left at \(clockTime(missed.effectiveDeparture))."
     }
-    if plan.composedStates.contains(.lost) { return "Check the station boards." }
+    guard let first = legs.first, now >= first.effectiveDeparture else { return nil }
     guard let tight = plan.composedStates.indices.first(where: {
         plan.composedStates[$0] == .tight && $0 < (plan.recoveryChangeIndex ?? Int.max)
             && now < legs[$0 + 1].effectiveDeparture
@@ -586,7 +590,7 @@ func focusedInstruction(_ plan: RecoveryPlan, now: Millis) -> String {
     if let cancelled = legs.indices.dropFirst().first(where: { legs[$0].cancelled }) {
         return "\(clockTime(legs[cancelled].effectiveDeparture)) from \(legs[cancelled].from.shortName) cancelled"
     }
-    if plan.recoveryChangeIndex == nil, let lost = plan.composedStates.firstIndex(of: .lost) {
+    if let lost = plan.composedStates.firstIndex(of: .lost) {
         return "The \(legs[lost].line) arrives too late for the \(clockTime(legs[lost + 1].effectiveDeparture))"
     }
     for index in legs.indices.dropLast() {
