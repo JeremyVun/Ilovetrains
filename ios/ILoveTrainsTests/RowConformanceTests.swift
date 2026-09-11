@@ -84,6 +84,92 @@ final class RowConformanceTests: XCTestCase {
         }
     }
 
+    private func horizonRow(scheduledMinutes: Int, delayMinutes: Int, cancelled: Bool = false,
+                           estimated: Bool = true) -> (Journey, BoardData, Millis) {
+        let now: Millis = 9_000_000
+        let from = Station(id: "a", name: "A"), to = Station(id: "b", name: "B")
+        let departure = now + Double(scheduledMinutes) * 60_000
+        let journey = Journey(legs: [Leg(line: "T1", mode: "train", headsign: "B", from: from, to: to,
+            departure: departure, arrival: departure + 30 * 60_000,
+            estimatedDeparture: estimated ? departure + Double(delayMinutes) * 60_000 : nil,
+            estimatedArrival: estimated ? departure + Double(30 + delayMinutes) * 60_000 : nil,
+            cancelled: cancelled)])
+        let board = BoardData(from: from, to: to, journeys: [journey], generatedAt: now, source: "live")
+        return (journey, board, now)
+    }
+
+    func testTheLiveHorizonStartsAfterFortyPrintedMinutes() {
+        let (atEdge, edgeBoard, now) = horizonRow(scheduledMinutes: 40, delayMinutes: 0)
+        XCTAssertFalse(beyondLiveHorizon(atEdge, board: edgeBoard, now: now))
+        XCTAssertEqual(figureFor(atEdge, board: edgeBoard, now: now).provenance, "")
+
+        let (beyond, beyondBoard, _) = horizonRow(scheduledMinutes: 41, delayMinutes: 0)
+        XCTAssertTrue(beyondLiveHorizon(beyond, board: beyondBoard, now: now))
+        let figure = figureFor(beyond, board: beyondBoard, now: now)
+        XCTAssertEqual(figure.value, "41")
+        XCTAssertEqual(figure.unit, "min")
+        XCTAssertEqual(figure.provenance, "Scheduled")
+        XCTAssertFalse(figure.past)
+    }
+
+    func testDelaysCancellationsAndEarlyEstimatesIgnoreTheLiveHorizon() {
+        let (late, lateBoard, now) = horizonRow(scheduledMinutes: 41, delayMinutes: 6)
+        XCTAssertFalse(beyondLiveHorizon(late, board: lateBoard, now: now))
+        XCTAssertEqual(figureFor(late, board: lateBoard, now: now).value, "47")
+        XCTAssertEqual(figureFor(late, board: lateBoard, now: now).provenance, "6 min late")
+
+        let (early, earlyBoard, _) = horizonRow(scheduledMinutes: 43, delayMinutes: -2)
+        XCTAssertFalse(beyondLiveHorizon(early, board: earlyBoard, now: now))
+        XCTAssertEqual(figureFor(early, board: earlyBoard, now: now).value, "41")
+        XCTAssertEqual(figureFor(early, board: earlyBoard, now: now).provenance, "")
+
+        let (cancelled, cancelledBoard, _) = horizonRow(scheduledMinutes: 41, delayMinutes: 0, cancelled: true)
+        XCTAssertFalse(beyondLiveHorizon(cancelled, board: cancelledBoard, now: now))
+        XCTAssertEqual(figureFor(cancelled, board: cancelledBoard, now: now).value, "\u{2014}")
+        XCTAssertEqual(figureFor(cancelled, board: cancelledBoard, now: now).provenance, "Cancelled")
+    }
+
+    func testRowsAlreadyScheduledDoNotNeedTheLiveHorizon() {
+        let (journey, board, now) = horizonRow(scheduledMinutes: 41, delayMinutes: 0)
+        var offline = board; offline.offline = true
+        var aged = board; aged.generatedAt = now - 90_001
+        var timetable = board; timetable.source = "schedule"
+        var retained = journey; retained.retained = true
+        for (candidate, source) in [(journey, offline), (journey, aged), (journey, timetable), (retained, board)] {
+            XCTAssertFalse(beyondLiveHorizon(candidate, board: source, now: now))
+            XCTAssertEqual(figureFor(candidate, board: source, now: now).provenance, "Scheduled")
+            XCTAssertEqual(figureFor(candidate, board: source, now: now).value, "41")
+        }
+    }
+
+    // Divergence from web, owner ruling 2026-09-11: see docs/contracts/ios-deviations.md.
+    func testALiveLaterLegLeavesAScheduledFirstDepartureInTheLiveRegister() {
+        let now: Millis = 9_000_000
+        let a = Station(id: "a", name: "A"), b = Station(id: "b", name: "B"), c = Station(id: "c", name: "C")
+        let departure = now + 41 * 60_000
+        let journey = Journey(legs: [
+            Leg(line: "T1", mode: "train", headsign: "B", from: a, to: b,
+                departure: departure, arrival: departure + 20 * 60_000),
+            Leg(line: "T2", mode: "train", headsign: "C", from: b, to: c,
+                departure: departure + 25 * 60_000, arrival: departure + 40 * 60_000,
+                estimatedDeparture: departure + 25 * 60_000, estimatedArrival: departure + 40 * 60_000)
+        ])
+        let board = BoardData(from: a, to: c, journeys: [journey], generatedAt: now, source: "live")
+
+        XCTAssertFalse(beyondLiveHorizon(journey, board: board, now: now))
+        let figure = figureFor(journey, board: board, now: now)
+        XCTAssertEqual(figure.value, "41")
+        XCTAssertEqual(figure.unit, "min")
+        XCTAssertEqual(figure.provenance, "")
+    }
+
+    func testNextServiceFigureIsUnchangedOnBothSidesOfTheLiveHorizon() {
+        let (atEdge, edgeBoard, now) = horizonRow(scheduledMinutes: 40, delayMinutes: 0)
+        let (beyond, beyondBoard, _) = horizonRow(scheduledMinutes: 41, delayMinutes: 0)
+        XCTAssertEqual(nextServiceFigure(atEdge, board: edgeBoard, now: now), "40 min")
+        XCTAssertEqual(nextServiceFigure(beyond, board: beyondBoard, now: now), "41 min")
+    }
+
     func testPlatformLabelsKeepFerrySidesAndRailPrefixes() {
         XCTAssertEqual(platformText("Wharf 4, Side B", mode: "ferry"), "4B")
         XCTAssertEqual(platformText("Wharf 4, Side B", mode: "ferry", full: true), "Wharf 4, Side B")
