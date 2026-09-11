@@ -308,6 +308,23 @@ Defaults taken to keep the item small, each overrulable by the owner:
   precedence is cancellation, missed connection, lead cue, tight change,
   delay; broken (cancelled) never triggers a recovery search.
 
+- 2026-09-11, orchestrator, from the iOS build (tcr-p3 8c7eaf4): the fixture
+  exposed three undocumented iOS divergences from ui.md that the port now
+  corrects, none of them in `ios-deviations.md`: the riding tight-change
+  clause named the alighting platform (ui.md: the boarding place), the final
+  leg said `Stay on to <destination>` (ui.md: `Get off at <destination> ·
+  Platform n`), and a later cancelled leg lacked the `<HH:MM> from <station>
+  cancelled` instruction and struck arrival; the `Printed change was <n> min.`
+  receipt was also missing. Android carries the first two (`UiHome.kt`
+  `focusedInstruction`). These are contract fixes, shown to the owner as
+  before/after frames in the verification wave, not regressions.
+  Contract gaps for closeout: the missed-connection cue fires when a followed
+  change first becomes lost (with or without a candidate), not only on the
+  tracker's `MissedTransfer` stage; the no-candidate comp shows `OFFLINE`
+  beside `LATE`, which the `RUNNING LATE` freshness rule forbids, so the
+  fixture's `fresh` no-candidate case (status with `LATE`, pill `LIVE`) is
+  the spec and an offline no-candidate reads `CONNECTION GONE` alone.
+
 ## Still open
 
 Nothing blocks the build plan. Overrulable defaults are listed under the
