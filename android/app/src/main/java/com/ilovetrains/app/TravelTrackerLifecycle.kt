@@ -25,9 +25,68 @@ internal interface TravelTrackerRuntime {
 // A longer silence than the tracker's own loops means the app was not observing.
 internal const val TravelTrackerObservationGap = 30_000L
 
-private enum class TravelTrackerCueKind { GetOff, Change, MissedTransfer, Cancellation }
+internal enum class TravelTrackerCueKind { GetOff, Change, MissedTransfer, Cancellation, TightChange, Delayed }
 
-private data class TravelTrackerCue(val kind: TravelTrackerCueKind, val legIndex: Int)
+internal data class TravelTrackerCue(val kind: TravelTrackerCueKind, val legIndex: Int)
+
+internal const val TravelTrackerDelayMinutes = 5
+
+// The delay cue is about the whole journey, so it is armed once per generation, not once per leg.
+private const val TravelTrackerJourneyLeg = -1
+
+internal data class TravelTrackerObservation(val arrivalDelay: Int, val changes: List<ConnectionState>)
+
+internal fun trackerObservation(focus: FocusedJourney): TravelTrackerObservation {
+    val composed = focus.composed
+    val last = composed.legs.last()
+    return TravelTrackerObservation(
+        minutesBetween(last.arrival, last.effectiveArrival),
+        connectionStates(composed, focus.recovery?.changeIndex),
+    )
+}
+
+/** Precedence order: cancellation, missed connection, lead cue, tight change, delay. */
+internal fun trackerCues(
+    focus: FocusedJourney,
+    projection: TravelTrackerState,
+    now: Long,
+    previous: TravelTrackerObservation?,
+): List<TravelTrackerCue> {
+    if (previous == null) return emptyList()
+    val legs = focus.composed.legs
+    val current = trackerObservation(focus)
+    return buildList {
+        if (projection.event.kind == TravelTrackerEventKind.Cancellation) {
+            add(TravelTrackerCue(TravelTrackerCueKind.Cancellation, legs.indexOfFirst { it.cancelled }))
+        }
+        if (projection.stage == TravelTrackerStage.MissedTransfer) {
+            add(TravelTrackerCue(TravelTrackerCueKind.MissedTransfer, projection.activeLegIndex))
+        }
+        lostChangeIndex(focus.journey)?.let { lost ->
+            if (previous.changes.getOrNull(lost) != ConnectionState.Lost) {
+                add(TravelTrackerCue(TravelTrackerCueKind.MissedTransfer, lost))
+            }
+        }
+        val active = legs.getOrNull(projection.activeLegIndex)
+        if (active != null && now >= active.effectiveArrival - TravelTrackerAlertLead) when (projection.stage) {
+            TravelTrackerStage.Final -> add(TravelTrackerCue(TravelTrackerCueKind.GetOff, projection.activeLegIndex))
+            TravelTrackerStage.Ride -> if (projection.missedConnection?.fromLegIndex != projection.activeLegIndex) {
+                add(TravelTrackerCue(TravelTrackerCueKind.Change, projection.activeLegIndex))
+            }
+            else -> Unit
+        }
+        val ahead = projection.activeLegIndex.takeIf {
+            projection.stage == TravelTrackerStage.Ride || projection.stage == TravelTrackerStage.Boarding
+        }
+        if (ahead != null && current.changes.getOrNull(ahead) == ConnectionState.Tight &&
+            previous.changes.getOrNull(ahead) != ConnectionState.Tight) {
+            add(TravelTrackerCue(TravelTrackerCueKind.TightChange, ahead))
+        }
+        if (current.arrivalDelay >= TravelTrackerDelayMinutes && previous.arrivalDelay < TravelTrackerDelayMinutes) {
+            add(TravelTrackerCue(TravelTrackerCueKind.Delayed, TravelTrackerJourneyLeg))
+        }
+    }.distinct()
+}
 
 internal class TravelTrackerLifecycle(
     private val store: TravelTrackerSessionStore,
@@ -41,6 +100,7 @@ internal class TravelTrackerLifecycle(
     private var observedRevision: TravelTrackerRevision? = null
     private var observedAt: Long? = null
     private val cued = mutableSetOf<TravelTrackerCue>()
+    private var observation: TravelTrackerObservation? = null
     private var pendingCue = false
 
     fun attachActivity(requestPermission: () -> Unit) {
@@ -188,31 +248,19 @@ internal class TravelTrackerLifecycle(
         if (generation) {
             observedRevision = projection.revision
             cued.clear()
+            observation = null
         }
         val continuing = !generation && observedAt?.let { now - it in 0..TravelTrackerObservationGap } == true
         if (!continuing) pendingCue = false
         observedAt = now
-        val fired = cues(focus, projection, now).filter { cued.add(it) }
+        val current = trackerObservation(focus)
+        if (current.arrivalDelay < TravelTrackerDelayMinutes) {
+            cued.remove(TravelTrackerCue(TravelTrackerCueKind.Delayed, TravelTrackerJourneyLeg))
+        }
+        val fired = trackerCues(focus, projection, now, observation ?: current).filter { cued.add(it) }
+        observation = current
         if (!continuing || !journeyAlerts || fired.isEmpty()) return
         if (foreground) runtime.haptic() else if (notificationsAllowed) pendingCue = true
-    }
-
-    private fun cues(focus: FocusedJourney, projection: TravelTrackerState, now: Long): List<TravelTrackerCue> = buildList {
-        val legs = focus.journey.legs
-        val active = legs.getOrNull(projection.activeLegIndex)
-        if (active != null && now >= active.effectiveArrival - TravelTrackerAlertLead) when (projection.stage) {
-            TravelTrackerStage.Final -> add(TravelTrackerCue(TravelTrackerCueKind.GetOff, projection.activeLegIndex))
-            TravelTrackerStage.Ride -> if (projection.missedConnection?.fromLegIndex != projection.activeLegIndex) {
-                add(TravelTrackerCue(TravelTrackerCueKind.Change, projection.activeLegIndex))
-            }
-            else -> Unit
-        }
-        if (projection.stage == TravelTrackerStage.MissedTransfer) {
-            add(TravelTrackerCue(TravelTrackerCueKind.MissedTransfer, projection.activeLegIndex))
-        }
-        if (projection.event.kind == TravelTrackerEventKind.Cancellation) {
-            add(TravelTrackerCue(TravelTrackerCueKind.Cancellation, legs.indexOfFirst { it.cancelled }))
-        }
     }
 
     private fun requestPermissionOnce() {

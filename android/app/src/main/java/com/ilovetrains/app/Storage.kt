@@ -125,12 +125,24 @@ object Wire {
             it.armed != null || it.retainedAt != null || it.basis != null || it.confirmedAt != null
         }
     }
+    private fun recovery(r: Recovery) = JSONObject().put("changeIndex", r.changeIndex)
+        .put("journey", journey(r.journey)).put("fetchedAt", r.fetchedAt)
+        .put("source", JSONObject().put("generatedAt", r.source.generatedAt).put("degraded", r.source.degraded))
+    private fun recovery(o: JSONObject): Recovery {
+        val source = o.optJSONObject("source")
+        val index = o.getInt("changeIndex")
+        require(index >= 0)
+        return Recovery(index, journey(o.getJSONObject("journey")), requireNotNull(epoch(o, "fetchedAt")),
+            RecoverySource(source?.let { epoch(it, "generatedAt") } ?: 0, source?.optBoolean("degraded") == true))
+    }
     private fun focus(f: FocusedJourney) = JSONObject().put("tripId", f.tripId).put("reverse", f.reverse)
         .put("journey", journey(f.journey)).put("board", board(f.board)).put("pinned", f.pinned)
         .put("alternatives", f.alternatives?.let(::board)).put("arrivalGuard", f.arrivalGuard?.let(::guard))
+        .put("recovery", f.recovery?.let(::recovery))
     private fun focus(o: JSONObject) = FocusedJourney(o.getString("tripId"), o.optBoolean("reverse"), journey(o.getJSONObject("journey")), board(o.getJSONObject("board")), o.optBoolean("pinned", true),
         o.optJSONObject("alternatives")?.let { runCatching { board(it) }.getOrNull() },
-        o.optJSONObject("arrivalGuard")?.let(::guard))
+        o.optJSONObject("arrivalGuard")?.let(::guard),
+        o.optJSONObject("recovery")?.let { runCatching { recovery(it) }.getOrNull() })
     fun user(d: UserData) = JSONObject().put("schemaVersion", 1).put("trips", d.trips.jsonEach(::trip))
         .put("history", d.history.jsonEach { JSONObject().put("tripId", it.tripId).put("reverse", it.reverse).put("at", it.at) })
         .put("rides", d.rides.jsonEach { ride -> JSONObject().put("tripId", ride.tripId).put("reverse", ride.reverse)

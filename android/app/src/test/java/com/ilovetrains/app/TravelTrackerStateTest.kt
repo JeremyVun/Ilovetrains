@@ -223,6 +223,27 @@ class TravelTrackerStateTest {
             25 * MINUTE, 40 * MINUTE, fromPlatform = "3", toPlatform = "4"),
     ))
 
+    @Test fun aPrintedMinuteTieIsLostAndACandidateProjectsTheComposedJourney() {
+        val legs = listOf(
+            Leg("T1", "train", "Change", Station("a", "Start Station"), Station("b", "Change Station"),
+                5 * MINUTE, 15 * MINUTE, fromPlatform = "1", toPlatform = "2"),
+            Leg("M2", "metro", "Finish", Station("b", "Change Station"), Station("c", "Finish Station"),
+                15 * MINUTE + 30_000, 40 * MINUTE, fromPlatform = "3", toPlatform = "4"),
+        )
+        val lost = focus(legs)
+        val broken = requireNotNull(TravelTrackerState.derive(lost, 10 * MINUTE, 1))
+        assertEquals(0, requireNotNull(broken.missedConnection).fromLegIndex)
+        assertTrue(broken.etaText.startsWith("Planned"))
+
+        val candidate = Journey(listOf(legs[1].copy(departure = 25 * MINUTE, arrival = 50 * MINUTE)))
+        val recovered = lost.copy(recovery = Recovery(0, candidate, 10 * MINUTE, RecoverySource(10 * MINUTE)))
+        val projected = requireNotNull(TravelTrackerState.derive(recovered, 10 * MINUTE, 1))
+        assertNull(projected.missedConnection)
+        assertEquals(50 * MINUTE, projected.eta)
+        assertTrue(projected.etaText.startsWith("about"))
+        assertEquals(listOf(5 * MINUTE, 15 * MINUTE, 25 * MINUTE), projected.segments.map { it.start })
+    }
+
     private fun focus(legs: List<Leg>): FocusedJourney {
         val journey = Journey(legs)
         val board = BoardData(legs.first().from, legs.last().to, listOf(journey), 6 * MINUTE, source = "live")

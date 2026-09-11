@@ -33,6 +33,30 @@ class StorageTest {
         assertEquals(pageBody, restored.focus.board.recommendation?.source)
         assertTrue(restored.modes.isEmpty())
     }
+    @Test fun recoveryRecordSurvivesRestartAndAMalformedOneDropsAlone() {
+        val a = Station("a", "A"); val b = Station("b", "B"); val c = Station("c", "C")
+        val followed = Journey(listOf(
+            Leg("T9", "train", "B", a, b, 10_000, 20_000, fromPlatform = "1", toPlatform = "3"),
+            Leg("T4", "train", "C", b, c, 19_000, 40_000, fromPlatform = "5", toPlatform = "2"),
+        ))
+        val board = BoardData(a, c, listOf(followed), 9_000, source = "live")
+        val recovery = Recovery(0, Journey(listOf(Leg("T4", "train", "C", b, c, 70_000, 90_000,
+            fromPlatform = "5", toPlatform = "2"))), 11_000, RecoverySource(9_500, degraded = true))
+        val data = UserData(trips = listOf(SavedTrip("t", a, c)),
+            focus = FocusedJourney("t", false, followed, board, recovery = recovery))
+        val restored = Wire.user(JSONObject(Wire.user(data).toString()))
+        assertEquals(data, restored)
+        assertEquals(recovery, restored.focus?.recovery)
+        assertEquals(listOf("T9", "T4"), restored.focus?.composed?.legs?.map { it.line })
+        assertEquals(90_000L, restored.focus?.composed?.effectiveArrival)
+
+        val wire = Wire.user(data)
+        wire.getJSONObject("focus").getJSONObject("recovery")
+            .put("journey", JSONObject("""{"legDetail":[{"broken":true}]}"""))
+        val survivor = Wire.user(JSONObject(wire.toString()))
+        assertNull(survivor.focus?.recovery)
+        assertEquals(followed, survivor.focus?.journey)
+    }
     @Test fun malformedLegCannotTurnTransferIntoDifferentJourney() {
         val raw = JSONObject("""{"legDetail":[{"line":{"name":"T9","mode":"train"},"headsign":"B","from":{"id":"a","name":"A"},"to":{"id":"b","name":"B"},"departure":{"scheduled":1000},"arrival":{"scheduled":2000}},{"broken":true}]}""")
         assertTrue(runCatching { Wire.journey(raw) }.isFailure)

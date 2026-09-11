@@ -33,7 +33,10 @@ fun DetailScreen(state: AppState, actions: UiActions) {
     }
     val first = journey.legs.first()
     val last = journey.legs.last()
-    val focused = state.focus?.journey?.key == journey.key
+    val focus = state.focus
+    val recoveryFrom = focus?.takeIf { it.composed.key == journey.key && recoveryApplies(it.journey, it.recovery) }
+        ?.recovery?.changeIndex
+    val focused = focus != null && (focus.journey.key == journey.key || focus.composed.key == journey.key)
     val pinned = focused && state.focus?.pinned == true
     val complete = focused && (state.focusComplete || state.arrival?.state == ArrivalState.Arrived)
     val activeProgress = focused && state.now >= journey.effectiveDeparture && !complete
@@ -67,7 +70,9 @@ fun DetailScreen(state: AppState, actions: UiActions) {
             }, Modifier.fillMaxWidth().padding(top = 6.dp), color = c.ink, fontSize = 29.sp,
                 lineHeight = 33.sp, fontWeight = FontWeight.Light, letterSpacing = (-.72).sp, maxLines = 3)
             val cancelled = journey.legs.firstOrNull { it.cancelled }
+            val summary = recoveryFrom?.let { recoveryReceipt(checkNotNull(focus).journey) }
             Text(if (cancelled != null) "The ${clockTime(cancelled.departure)} from ${cancelled.from.shortName} is cancelled."
+                else if (summary != null) summary
                 else if (journey.legs.size == 1) "Direct · arrives ${clockTime(journey.effectiveArrival)}"
                 else "${journey.legs.size - 1} ${if (journey.legs.size == 2) "change" else "changes"} · arrives ${clockTime(journey.effectiveArrival)}",
                 color = if (cancelled != null) c.warning else c.ink2, fontSize = 14.sp, fontWeight = FontWeight.Light,
@@ -78,8 +83,9 @@ fun DetailScreen(state: AppState, actions: UiActions) {
             BoardRow(journey, board, state.now, detail = true,
                 figureOverride = detailFigure,
                 axisTravelledAt = progress?.let { journey.effectiveDeparture + (duration * it).toLong() },
-                axisProgress = progress?.takeIf { !overdue || state.arrival?.moving == true })
-            JourneySteps(journey, state.now, complete)
+                axisProgress = progress?.takeIf { !overdue || state.arrival?.moving == true },
+                recoveryFrom = recoveryFrom)
+            JourneySteps(journey, state.now, complete, recoveryFrom)
             Spacer(Modifier.height(12.dp))
         }
         Column(Modifier.padding(horizontal = PagePadding)) {
@@ -104,20 +110,20 @@ fun DetailScreen(state: AppState, actions: UiActions) {
 }
 
 @Composable
-private fun JourneySteps(journey: Journey, now: Long, finalDone: Boolean) {
+private fun JourneySteps(journey: Journey, now: Long, finalDone: Boolean, recoveryFrom: Int? = null) {
     val c = LocalTrainColors.current
     val first = journey.legs.first()
     DetailStep(clockTime(first.effectiveDeparture), first.from.shortName, first.fromPlatform, first,
         "Board ${first.line} · ${first.headsign}", done = now > first.effectiveDeparture,
         heavyDivider = journey.legs.size > 1)
-    journey.legs.zipWithNext().forEach { (before, after) ->
+    journey.legs.zipWithNext().forEachIndexed { index, (before, after) ->
         val wait = minutesBetween(before.effectiveArrival, after.effectiveDeparture)
         val cancelled = before.cancelled || after.cancelled
-        val station = if (before.to.id == after.from.id) before.to.shortName else "${before.to.shortName} → ${after.from.shortName}"
+        val station = changeLabel(journey, index, recoveryFrom)
         Column(Modifier.fillMaxWidth().padding(horizontal = PagePadding)) {
             Row(Modifier.fillMaxWidth().heightIn(min = 82.dp).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.width(69.dp), horizontalAlignment = Alignment.End) {
-                    Text(if (cancelled) clockTime(after.effectiveDeparture) else "$wait min",
+                    Text(if (cancelled) clockTime(after.effectiveDeparture) else "${wait.coerceAtLeast(0)} min",
                         color = if (wait < 5 || cancelled) c.warning else c.ink2, fontSize = 17.sp,
                         fontWeight = FontWeight.Light, textDecoration = if (cancelled) TextDecoration.LineThrough else null)
                     val label = if (cancelled) "CANCELLED" else "CHANGE"

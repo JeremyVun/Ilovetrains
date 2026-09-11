@@ -94,7 +94,7 @@ data class TravelTrackerState(
 ) {
     companion object {
         fun derive(focus: FocusedJourney, now: Long, generation: Long, arrival: ArrivalResult? = null): TravelTrackerState? {
-            val legs = focus.journey.legs
+            val legs = focus.composed.legs
             if (legs.isEmpty()) return null
             val projectionEnd = legs.maxOf { it.effectiveArrival }
             if (now >= projectionEnd && arrival == null) return null
@@ -103,7 +103,7 @@ data class TravelTrackerState(
             val identity = TravelTrackerIdentity(focus.tripId, focus.reverse, focus.journey.key)
             val revision = TravelTrackerRevision(identity, generation)
             val missedIndex = (0 until legs.lastIndex).firstOrNull {
-                legs[it].effectiveArrival > legs[it + 1].effectiveDeparture
+                connectionState(legs, it) == ConnectionState.Lost
             }
             val missed = missedIndex?.let { trackerMissedConnection(legs, it) }
             val position = trackerPosition(legs, now, missedIndex, projectionEnd)
