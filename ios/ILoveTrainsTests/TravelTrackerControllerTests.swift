@@ -347,7 +347,8 @@ final class TravelTrackerControllerTests: XCTestCase {
         await controller.reconcile(focus: focus, visibleFocus: focus, now: arrival + 600_000 - trackerAlertLead,
                                    recordedComplete: false, background: true)
         await controller.awaitPublications()
-        XCTAssertEqual(driver.alerts.count, 1, "A later estimate does not repeat a cue already given for the leg")
+        XCTAssertEqual(driver.alerts.map(\.title), ["Change services soon", "Connection missed"],
+                       "A later estimate does not repeat the leg's cue, and losing the connection is its own cue")
     }
 
     func testReplacedIdentityStartsANewGenerationWithoutCueing() async {
@@ -466,6 +467,90 @@ final class TravelTrackerControllerTests: XCTestCase {
                                    recordedComplete: false, background: true)
         await controller.awaitPublications()
         XCTAssertEqual(driver.alerts.map(\.title), ["Change services soon"], "A session observed live still cues")
+    }
+
+    func testTheArrivalDelayCuesOnEveryCrossingOfFiveMinutes() async {
+        let now = 1_800_000_000_000.0
+        let driver = TrackerDriver()
+        let controller = TravelTrackerController(store: TrackerStore(), driver: driver, haptics: TrackerHaptics())
+        var focus = trackerFocus(id: "late", now: now, pinned: false)
+        let arrival = focus.journey.legs[1].arrival
+
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+
+        focus.journey.legs[1].estimatedArrival = arrival + 300_000
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now + 1_000, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertEqual(driver.alerts.map(\.title), ["Running late"])
+        XCTAssertEqual(driver.alerts.last?.body,
+                       "The train is now due at \(focus.journey.legs[1].to.shortName) at \(clockTime(arrival + 300_000)).")
+
+        focus.journey.legs[1].estimatedArrival = arrival + 600_000
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now + 2_000, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertEqual(driver.alerts.count, 1, "A delay that grows further is the same lateness")
+
+        focus.journey.legs[1].estimatedArrival = arrival + 60_000
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now + 3_000, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        focus.journey.legs[1].estimatedArrival = arrival + 420_000
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now + 4_000, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertEqual(driver.alerts.map(\.title), ["Running late", "Running late"],
+                       "A delay that recovers and returns is a new fact")
+    }
+
+    func testATightChangeCuesOnceWhenTheWindowFirstShrinks() async {
+        let now = 1_800_000_000_000.0
+        let driver = TrackerDriver()
+        let controller = TravelTrackerController(store: TrackerStore(), driver: driver, haptics: TrackerHaptics())
+        var focus = trackerFocus(id: "tight", now: now, pinned: false)
+        let arrival = focus.journey.legs[0].arrival
+
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+
+        focus.journey.legs[0].estimatedArrival = arrival + 120_000
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now + 1_000, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertEqual(driver.alerts.map(\.title), ["Tight change"])
+        XCTAssertEqual(driver.alerts.last?.body,
+                       "The train is expected at \(focus.journey.legs[0].to.shortName) about 3 minutes before the M1 leaves.")
+
+        focus.journey.legs[0].estimatedArrival = arrival + 180_000
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now + 2_000, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertEqual(driver.alerts.count, 1, "A change that stays tight is one cue")
+    }
+
+    func testTheMissedConnectionCueCarriesTheRecoveryCandidate() async {
+        let now = 1_800_000_000_000.0
+        let driver = TrackerDriver()
+        let controller = TravelTrackerController(store: TrackerStore(), driver: driver, haptics: TrackerHaptics())
+        var focus = trackerFocus(id: "recovered", now: now, pinned: false)
+        let onward = focus.journey.legs[1]
+        var candidate = onward
+        candidate.departure = onward.departure + 900_000
+        candidate.estimatedDeparture = onward.effectiveDeparture + 900_000
+        candidate.arrival = onward.arrival + 900_000
+        candidate.estimatedArrival = onward.effectiveArrival + 900_000
+        focus.recovery = RecoveryRecord(
+            changeIndex: 0, journey: Journey(legs: [candidate]), fetchedAt: now,
+            source: RecoverySource(generatedAt: now, degraded: false)
+        )
+
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertTrue(driver.alerts.isEmpty)
+
+        focus.journey.legs[0].estimatedArrival = onward.effectiveDeparture + 60_000
+        await controller.reconcile(focus: focus, visibleFocus: focus, now: now + 1_000, recordedComplete: false, background: true)
+        await controller.awaitPublications()
+        XCTAssertEqual(driver.alerts.map(\.title), ["Connection missed"])
+        XCTAssertEqual(driver.alerts.last?.body,
+                       "The planned trains no longer connect. Another option is the M1 at "
+                           + "\(clockTime(candidate.effectiveDeparture)) from \(candidate.from.shortName).")
     }
 
     private func waitFor(_ predicate: @escaping () async -> Bool) async {

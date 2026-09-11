@@ -87,6 +87,7 @@ struct BoardRow: View {
     let now: Millis
     var detail = false
     var figureOverride: Figure? = nil
+    var recoveryChangeIndex: Int? = nil
     var action: (() -> Void)? = nil
     @Environment(\.trainColors) private var colors
 
@@ -115,7 +116,7 @@ struct BoardRow: View {
                     Text(clockTime(journey.effectiveArrival)).font(.system(size: 16, weight: .light)).foregroundStyle(colors.ink3).strikethrough(journey.cancelled)
                     if journey.cancelled { TrainLabel(text: "Cancelled", color: colors.warning, size: 9) }
                 }.font(.system(size: 18, weight: .light)).tabular()
-                JourneyAxis(journey: journey).compositingGroup()
+                JourneyAxis(journey: journey, recoveryChangeIndex: recoveryChangeIndex).compositingGroup()
                     .opacity(journey.cancelled ? 0.3 : 1).padding(.top, 6)
                 Text(journey.legs.first?.headsign.nonEmpty ?? journey.legs.first?.to.shortName ?? "")
                     .font(.system(size: 13, weight: .light)).foregroundStyle(colors.ink3).lineLimit(1).padding(.top, 6)

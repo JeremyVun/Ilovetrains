@@ -80,6 +80,40 @@ final class TravelTrackerFlowTests: XCTestCase {
     }
 
     @MainActor
+    func testLostConnectionRecoversWithACandidateAndStaysHonestWithoutOne() {
+        var app = launch(["--tracker-case", "missed-connection-recovered"], domain: UUID().uuidString)
+        assertStatus(app, contains: ["activities=1", "focus=tracker-mascot", "stage=ride"])
+        assertScreen(app, contains: [
+            "CONNECTION GONE",
+            "Get off at Central · Platform 21",
+            "The T8 arrives at 04:49, but the M1 left at 04:48.",
+            "CENTRAL · M1 05:01",
+            "05:46",
+            "05:51",
+        ])
+        app.terminate()
+
+        app = launch(["--tracker-case", "missed-connection"], domain: UUID().uuidString)
+        assertStatus(app, contains: ["activities=1", "focus=tracker-mascot"])
+        assertScreen(app, contains: [
+            "CONNECTION GONE",
+            "THE T8 ARRIVES TOO LATE FOR THE 04:48",
+            "Check the station boards.",
+            "PLANNED",
+            "05:46",
+        ])
+        XCTAssertFalse(app.staticTexts["CENTRAL · M1 05:01"].exists, "No candidate means no replacement service is named")
+        app.terminate()
+    }
+
+    @MainActor
+    private func assertScreen(_ app: XCUIApplication, contains fragments: [String]) {
+        for fragment in fragments {
+            XCTAssertTrue(app.staticTexts[fragment].waitForExistence(timeout: 8), "missing on screen: \(fragment)")
+        }
+    }
+
+    @MainActor
     func testWallClockStaleBoundaryAndForegroundLifecycle() {
         let domain = UUID().uuidString
         var app = launch(["--tracker-debug", "wall-start"], domain: domain)

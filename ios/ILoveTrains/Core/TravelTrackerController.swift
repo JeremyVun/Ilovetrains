@@ -89,11 +89,19 @@ struct TravelTrackerAlert: Equatable, Sendable {
 }
 
 struct TravelTrackerCue: Equatable, Sendable {
-    enum Kind: String, Equatable, Sendable { case getOff, change, missedConnection, cancellation }
+    enum Kind: String, Equatable, Sendable {
+        case getOff, change, missedConnection, cancellation, tightChange, delayed
+    }
 
     var kind: Kind
     var legIndex: Int?
     var alert: TravelTrackerAlert
+}
+
+/// What the previous live observation saw, so a cue fires on a change rather than on a state.
+struct TravelTrackerCueBaseline: Equatable, Sendable {
+    var arrivalDelay: Int
+    var changeStates: [ConnectionState]
 }
 
 protocol TravelTrackerHapticPerforming: Sendable {
@@ -200,6 +208,7 @@ actor TravelTrackerController {
         var attributes: TravelTrackerActivityAttributes
         var content: ActivityContent<TravelTrackerActivityAttributes.ContentState>
         var cues: [TravelTrackerCue]
+        var baseline: TravelTrackerCueBaseline
     }
 
     private struct CueSession: Equatable {
@@ -231,6 +240,7 @@ actor TravelTrackerController {
     private var lastPublishedContent: TravelTrackerActivityAttributes.ContentState?
     private var cueSession: CueSession?
     private var cuedKeys: Set<CueKey> = []
+    private var cueBaseline: TravelTrackerCueBaseline?
     private var lastObservation: Date?
     private var alertsEnabled = true
     private var inBackground = false
@@ -360,11 +370,13 @@ actor TravelTrackerController {
             now: now,
             debugStaticCountdown: debugStaticCountdown
         )
+        let plan = recoveryPlan(focus)
         schedule(DesiredPublication(
             active: active,
             attributes: attributes,
             content: ActivityContent(state: contentState, staleDate: contentState.staleDate),
-            cues: TravelTrackerCue.pending(state: state, focus: focus, now: now)
+            cues: TravelTrackerCue.pending(state: state, focus: focus, now: now, previous: cueBaseline),
+            baseline: trackerCueBaseline(plan)
         ))
         return state
     }
@@ -571,9 +583,11 @@ actor TravelTrackerController {
             cuedKeys = []
         }
         lastObservation = observedAt
+        // A delay crossing five minutes is its own once-per-crossing rule, so it never joins the fired keys.
         let fresh = desired.cues.filter {
-            cuedKeys.insert(CueKey(kind: $0.kind, legIndex: $0.legIndex)).inserted
+            $0.kind == .delayed || cuedKeys.insert(CueKey(kind: $0.kind, legIndex: $0.legIndex)).inserted
         }
+        cueBaseline = desired.baseline
         guard !newSession, !gap else { return nil }
         return fresh.min { $0.kind.priority < $1.kind.priority }
     }
@@ -581,6 +595,7 @@ actor TravelTrackerController {
     private func forgetCues() {
         cueSession = nil
         cuedKeys = []
+        cueBaseline = nil
         lastObservation = nil
     }
 
@@ -667,18 +682,41 @@ private extension TravelTrackerSystemActivityState {
 
 let trackerObservationGap: TimeInterval = 30
 
+let trackerDelayCueMinutes = 5
+
 extension TravelTrackerCue.Kind {
     var priority: Int {
         switch self {
         case .cancellation: 0
         case .missedConnection: 1
         case .getOff, .change: 2
+        case .tightChange: 3
+        case .delayed: 4
         }
     }
 }
 
+func trackerArrivalDelay(_ journey: Journey) -> Int {
+    guard let last = journey.legs.last, last.estimatedArrival != nil else { return 0 }
+    return minutesBetween(last.arrival, last.effectiveArrival)
+}
+
+func trackerCueBaseline(_ plan: RecoveryPlan) -> TravelTrackerCueBaseline {
+    TravelTrackerCueBaseline(arrivalDelay: trackerArrivalDelay(plan.composed), changeStates: plan.composedStates)
+}
+
+private func trackerService(_ leg: Leg) -> String {
+    "the " + (leg.line.isEmpty ? trackerVehicle(leg.mode).lowercased() : leg.line)
+}
+
 extension TravelTrackerCue {
-    static func pending(state: TravelTrackerState, focus: FocusedJourney, now: Millis) -> [TravelTrackerCue] {
+    static func pending(
+        state: TravelTrackerState,
+        focus: FocusedJourney,
+        now: Millis,
+        previous: TravelTrackerCueBaseline? = nil
+    ) -> [TravelTrackerCue] {
+        let plan = recoveryPlan(focus)
         var cues: [TravelTrackerCue] = []
         if state.event.kind == .cancellation {
             cues.append(TravelTrackerCue(
@@ -687,14 +725,10 @@ extension TravelTrackerCue {
                 alert: TravelTrackerAlert(title: "Service cancelled", body: "The planned service has been cancelled.")
             ))
         }
-        if state.stage == .missedTransfer {
-            cues.append(TravelTrackerCue(
-                kind: .missedConnection,
-                legIndex: state.activeLegIndex,
-                alert: TravelTrackerAlert(title: "Connection missed", body: "The planned connection has been missed.")
-            ))
-        }
-        let legs = focus.journey.legs
+        if let missed = missedConnectionCue(state: state, plan: plan, previous: previous) { cues.append(missed) }
+        if let tight = tightChangeCue(state: state, plan: plan, previous: previous) { cues.append(tight) }
+        if let delayed = delayedCue(plan: plan, previous: previous) { cues.append(delayed) }
+        let legs = plan.composed.legs
         guard let lead = state.alertLead, now >= lead, legs.indices.contains(state.activeLegIndex) else { return cues }
         let station = legs[state.activeLegIndex].to.shortName
         switch state.stage {
@@ -725,6 +759,70 @@ extension TravelTrackerCue {
         }
         return cues
     }
+
+    private static func missedConnectionCue(
+        state: TravelTrackerState,
+        plan: RecoveryPlan,
+        previous: TravelTrackerCueBaseline?
+    ) -> TravelTrackerCue? {
+        let observed = plan.followedStates.firstIndex(of: .lost).flatMap { index -> Int? in
+            guard let previous else { return nil }
+            let wasLost = previous.changeStates.indices.contains(index) && previous.changeStates[index] == .lost
+            return wasLost ? nil : index
+        }
+        guard let index = state.stage == .missedTransfer ? state.activeLegIndex : observed else { return nil }
+        let legs = plan.composed.legs
+        let candidate = plan.recoveryChangeIndex == index && legs.indices.contains(index + 1) ? legs[index + 1] : nil
+        let body = candidate.map {
+            "The planned trains no longer connect. Another option is \(trackerService($0)) at "
+                + "\(clockTime($0.effectiveDeparture)) from \($0.from.shortName)."
+        } ?? "The planned connection has been missed."
+        return TravelTrackerCue(
+            kind: .missedConnection,
+            legIndex: index,
+            alert: TravelTrackerAlert(title: "Connection missed", body: body)
+        )
+    }
+
+    private static func tightChangeCue(
+        state: TravelTrackerState,
+        plan: RecoveryPlan,
+        previous: TravelTrackerCueBaseline?
+    ) -> TravelTrackerCue? {
+        let index = state.activeLegIndex
+        guard state.stage == .ride, let previous,
+              plan.composedStates.indices.contains(index), plan.composedStates[index] == .tight,
+              !(previous.changeStates.indices.contains(index) && previous.changeStates[index] == .tight)
+        else { return nil }
+        let legs = plan.composed.legs
+        let next = legs[index + 1]
+        return TravelTrackerCue(
+            kind: .tightChange,
+            legIndex: index,
+            alert: TravelTrackerAlert(
+                title: "Tight change",
+                body: "The train is expected at \(legs[index].to.shortName) about "
+                    + "\(connectionWindow(legs[index], next)) minutes before \(trackerService(next)) leaves."
+            )
+        )
+    }
+
+    private static func delayedCue(
+        plan: RecoveryPlan,
+        previous: TravelTrackerCueBaseline?
+    ) -> TravelTrackerCue? {
+        guard let previous, let last = plan.composed.legs.last,
+              trackerArrivalDelay(plan.composed) >= trackerDelayCueMinutes,
+              previous.arrivalDelay < trackerDelayCueMinutes else { return nil }
+        return TravelTrackerCue(
+            kind: .delayed,
+            legIndex: nil,
+            alert: TravelTrackerAlert(
+                title: "Running late",
+                body: "The train is now due at \(last.to.shortName) at \(clockTime(last.effectiveArrival))."
+            )
+        )
+    }
 }
 
 enum TravelTrackerActivityContentMapper {
@@ -746,7 +844,7 @@ enum TravelTrackerActivityContentMapper {
         now: Millis,
         debugStaticCountdown: String? = nil
     ) -> TravelTrackerActivityAttributes.ContentState {
-        let legs = focus.journey.legs
+        let legs = focus.composedJourney.legs
         let freshBoundary = state.freshUntil ?? 0
         let staleAt = min(state.nextBoundary, freshBoundary)
         var content = TravelTrackerActivityAttributes.ContentState(

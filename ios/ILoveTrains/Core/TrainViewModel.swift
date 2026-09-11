@@ -27,6 +27,7 @@ final class TrainViewModel: ObservableObject {
     private var boardTask: Task<Void, Never>?
     private var supplementTask: Task<TransitAPI.DeparturePage, Never>?
     private var focusTask: Task<Void, Never>?
+    private var recoveryTask: Task<Void, Never>?
     private var focusRefreshGeneration = 0
     private var focusRefreshPending = false
     private var historyTask: Task<Void, Never>?
@@ -307,7 +308,7 @@ final class TrainViewModel: ObservableObject {
     private func suspend() {
         keepalive.stop()
         active = false; loop?.cancel(); loop = nil
-        boardTask?.cancel(); supplementTask?.cancel(); supplementTask = nil; focusTask?.cancel(); historyTask?.cancel(); earlierTask?.cancel(); earlierTask = nil
+        boardTask?.cancel(); supplementTask?.cancel(); supplementTask = nil; focusTask?.cancel(); recoveryTask?.cancel(); historyTask?.cancel(); earlierTask?.cancel(); earlierTask = nil
         realtimeTask?.cancel(); realtimeTask = nil
         clearArrivalMonitoring()
         generation += 1; sharedGeneration += 1; state.refreshing = false; state.distanceMetres = nil
@@ -663,7 +664,7 @@ final class TrainViewModel: ObservableObject {
     private func refreshFocus() {
         guard let focus = data.focus else { return }
         // A phone that cannot ask has no refresh to wait for.
-        guard canNetwork else { settleFocus(); return }
+        guard canNetwork else { settleFocus(); recover(focus); return }
         focusTask?.cancel()
         focusRefreshGeneration += 1
         let refreshRequest = focusRefreshGeneration
@@ -683,7 +684,46 @@ final class TrainViewModel: ObservableObject {
                 current.board = result; current.alternatives = nil; current.journey = match; data.focus = current
             } else if let demoted = current.demotedForUnmatchedBoard() { data.focus = demoted }
             settleFocus(matchingRefresh: matched); persist(); syncPersonal()
+            recover(focus)
         }
+    }
+
+    private func recover(_ subject: FocusedJourney) {
+        recoveryTask?.cancel()
+        recoveryTask = Task { await recoverFocus(subject) }
+    }
+
+    /// The lost connection's own tail: one request per refresh on the recovery pair, never spliced into the focus.
+    private func recoverFocus(_ subject: FocusedJourney) async {
+        guard sameFocus(subject), let focus = data.focus else { return }
+        let plan = recoveryPlan(focus)
+        guard let search = plan.search, let destination = focus.journey.legs.last?.to else {
+            guard var current = data.focus, current.recovery != nil else { return }
+            current.recovery = nil; data.focus = current
+            settleFocus(); persist(); syncPersonal()
+            return
+        }
+        var board: BoardData?
+        if canNetwork {
+            board = try? await api.departures(from: search.from, to: destination, modes: allModes, at: search.at)
+        }
+        if board == nil {
+            try? await bootstrap?.value
+            board = try? await planner.plan(from: search.from, to: destination, at: search.at,
+                                            modes: data.modes, limit: 12, maxTransfers: data.offlineTransferBound)
+        }
+        guard !Task.isCancelled, sameFocus(subject), var current = data.focus else { return }
+        let record = recoveryRecord(
+            plan: plan,
+            held: current.recovery,
+            journeys: board?.journeys ?? [],
+            modes: data.modes,
+            fetchedAt: state.now,
+            source: board.map { RecoverySource(generatedAt: $0.generatedAt, degraded: $0.serverStale || $0.offline) }
+        )
+        guard current.recovery != record else { return }
+        current.recovery = record; data.focus = current
+        settleFocus(); persist(); syncPersonal()
     }
     private func settleFocus(
         sample: ArrivalSample? = nil,
@@ -701,7 +741,7 @@ final class TrainViewModel: ObservableObject {
         let result = reduceArrival(ArrivalInput(
             identity: arrivalIdentity(focus),
             departureMs: focus.journey.effectiveDeparture,
-            arrivalMs: focus.journey.effectiveArrival,
+            arrivalMs: focus.composedJourney.effectiveArrival,
             nowMs: state.now,
             destination: ends(id: focus.tripId, reverse: focus.reverse)?.1,
             guard: focus.arrivalGuard,
@@ -1171,7 +1211,7 @@ final class TrainViewModel: ObservableObject {
 }
 
 func settledRides(_ rides: [Ride], focus: FocusedJourney, arrived: Bool, ends: (Station, Station)? = nil) -> [Ride] {
-    let arrival = focus.journey.effectiveArrival
+    let arrival = focus.composedJourney.effectiveArrival
     guard let index = rides.firstIndex(where: { $0.tripId == focus.tripId && $0.reverse == focus.reverse && $0.departure == focus.journey.departure }) else {
         guard arrived else { return rides }
         // A refreshed journey carries wire stations, so the endpoints come from the saved trip.
@@ -1306,7 +1346,7 @@ private extension TrainViewModel {
         if name == "transfer" { now = trackerFixtureTime(hour: 4, minute: 52) }
         if name == "final" { now = trackerFixtureTime(hour: 5, minute: 39) }
         if name == "tight-transfer" { onwardDeparture = trackerFixtureTime(hour: 4, minute: 53) }
-        if name == "missed-connection" { onwardDeparture = trackerFixtureTime(hour: 4, minute: 48) }
+        if name.hasPrefix("missed-connection") { onwardDeparture = trackerFixtureTime(hour: 4, minute: 48) }
         if name == "long-content" {
             central.name = "International Airport Station"
             kellyville.name = "Bondi Junction Station"
@@ -1334,8 +1374,22 @@ private extension TrainViewModel {
             source: "live", offline: offline
         )
         let trip = SavedTrip(id: "tracker-mascot", from: mascot, to: kellyville, createdAt: now, lines: ["T8", "M1"])
-        data = UserData(trips: [trip], lastTripId: trip.id,
-                        focus: FocusedJourney(tripId: trip.id, reverse: false, journey: journey, board: board, pinned: false))
+        var focus = FocusedJourney(tripId: trip.id, reverse: false, journey: journey, board: board, pinned: false)
+        if name == "missed-connection-recovered" {
+            let replacementDeparture = trackerFixtureTime(hour: 5, minute: 1)
+            let replacementArrival = trackerFixtureTime(hour: 5, minute: 51)
+            let replacement = Leg(
+                line: "M1", mode: "metro", headsign: "Tallawong",
+                from: central, to: kellyville, departure: replacementDeparture, arrival: replacementArrival,
+                estimatedDeparture: replacementDeparture, estimatedArrival: replacementArrival,
+                fromPlatform: "26", toPlatform: "2"
+            )
+            focus.recovery = RecoveryRecord(
+                changeIndex: 0, journey: Journey(legs: [replacement]), fetchedAt: now,
+                source: RecoverySource(generatedAt: now, degraded: false)
+            )
+        }
+        data = UserData(trips: [trip], lastTripId: trip.id, focus: focus)
         state.now = now
         state.trips = [trip]
         state.selectedTripId = trip.id
@@ -1343,7 +1397,7 @@ private extension TrainViewModel {
         state.homeBoard = board
         state.screen = .home
         state.ready = true
-        trackerDebugCountdown = TravelTrackerState.derive(focus: data.focus!, now: now, generation: 1)?.headline.emphasis ?? ""
+        trackerDebugCountdown = TravelTrackerState.derive(focus: focus, now: now, generation: 1)?.headline.emphasis ?? ""
         seeded = true
         syncPersonal()
         return true
@@ -1367,7 +1421,7 @@ private extension TrainViewModel {
         let name = arguments[index + 1]
         guard let url = Bundle.main.url(forResource: "calibration", withExtension: "json"),
               let bytes = try? Data(contentsOf: url), let catalogue = try? JSONSerialization.jsonObject(with: bytes) as? [String: Any] else { return false }
-        let key = name.contains("ferry") ? "ferry" : name.contains("two-change") ? "threeLeg" : name.contains("commute") || name.contains("detail") || name.contains("active") || name.contains("inferred") || name.contains("pinned") ? "transfer" : "central"
+        let key = name.contains("ferry") ? "ferry" : name.contains("two-change") ? "threeLeg" : name.contains("commute") || name.contains("detail") || name.contains("active") || name.contains("inferred") || name.contains("pinned") || name.contains("lost") ? "transfer" : "central"
         guard let entry = catalogue[key] as? [String: Any], let body = entry["body"] as? [String: Any],
               let bodyData = try? JSONSerialization.data(withJSONObject: body), var board = try? TransitWire.board(bodyData), let now = entry["now"] as? Double else { return false }
         state.now = now
@@ -1454,6 +1508,30 @@ private extension TrainViewModel {
                 identity: arrivalIdentity(data.focus!), departureMs: journey.effectiveDeparture,
                 arrivalMs: journey.effectiveArrival, nowMs: state.now, guard: metadata
             ))
+        }
+        if name.contains("lost"), var journey = board.journeys.first, journey.legs.count > 1 {
+            journey.legs[0].estimatedArrival = trackerFixtureTime(hour: 10, minute: 0)
+            state.now = name.contains("dwell") ? trackerFixtureTime(hour: 10, minute: 2) : trackerFixtureTime(hour: 9, minute: 47)
+            board.generatedAt = state.now
+            board.journeys = [journey]
+            var focus = FocusedJourney(tripId: trip.id, reverse: false, journey: journey, board: board, pinned: true)
+            if !name.contains("none") {
+                let onward = journey.legs[1]
+                let departure = trackerFixtureTime(hour: 10, minute: 8)
+                let arrival = trackerFixtureTime(hour: 10, minute: 18)
+                let candidate = Leg(
+                    line: onward.line, mode: onward.mode, headsign: onward.headsign,
+                    from: onward.from, to: onward.to, departure: departure, arrival: arrival,
+                    estimatedDeparture: departure, estimatedArrival: arrival,
+                    fromPlatform: onward.fromPlatform, toPlatform: onward.toPlatform
+                )
+                focus.recovery = RecoveryRecord(
+                    changeIndex: 0, journey: Journey(legs: [candidate]), fetchedAt: state.now,
+                    source: RecoverySource(generatedAt: state.now, degraded: false)
+                )
+            }
+            data.focus = focus
+            state.board = board; state.homeBoard = board
         }
         if let stationsURL = Bundle.main.url(forResource: "stations", withExtension: "json"), let raw = try? Data(contentsOf: stationsURL), let stations = try? JSONSerialization.jsonObject(with: raw) as? [[String: Any]] {
             state.stations = stations.compactMap { try? TransitWire.station($0) }
