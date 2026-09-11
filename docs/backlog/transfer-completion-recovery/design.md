@@ -371,6 +371,21 @@ Defaults taken to keep the item small, each overrulable by the owner:
   candidate's estimates stay live; the candidate's first leg must board at
   the change stop.
 
+- 2026-09-11, orchestrator, fix wave landed (tcr-fix-web a71798a, tcr-fix-
+  android 7e1671c, tcr-fix-ios f03cee6): every review defect fixed with the
+  review probes kept as permanent regressions (`web/test/recovery-review.
+  test.js` and `web/test/tcr-review-stack.sh`, Android
+  `TransferRecoveryGuardTest`, iOS `TcrReviewProbeTests` and
+  `StrandedRecoveryTests`). The record gained a persisted `anchor` (the
+  composed change its tail was last searched from); the fixture gained
+  `candidate-change-lost-no-candidate`. Full gates on the pre-fix
+  integration were green; two pre-existing reds outside the item: a
+  test-side data race in `internal/analytics` under `go test -race`, and
+  the iOS tracker shooter failing every second run on one simulator
+  (`xcrun simctl erase` clears it; closeout adds the trap to
+  `tools/README.md`). Before/after frames of the corrected native
+  behaviours are in `/tmp/tcr-evidence/*-composite.png`.
+
 ## Still open
 
 Owner verdict on the no-candidate axis (both legs with touching chips, as built, or the ridden leg alone, as the comp): see the build log. Nothing blocks the build plan. Overrulable defaults are listed under the
