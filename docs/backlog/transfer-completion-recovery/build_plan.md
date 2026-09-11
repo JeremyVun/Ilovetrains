@@ -138,4 +138,4 @@ Owns: `ios/ILoveTrains/Core/TravelTrackerState.swift`,
 - Fable review agent over the three client diffs (owner grant 2026-09-07).
 - Move the accepted frames from `comps/` to `assets/comps/latest/` as the
   exemplars for the new states; then closeout via the `backlog-item` close
-  stage. Done marker: `[ ] phase 4 done`.
+  stage. Done marker: `[x] phase 4 done` (2026-09-11: full gates green on the integrated sources twice, before and after the Fable review's fix wave; review probes kept as regressions; evidence composites in `/tmp/tcr-evidence/`; comps move to `assets/comps/latest/` at closeout).
