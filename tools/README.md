@@ -122,7 +122,10 @@
 - `shoot-travel-tracker-ios.sh` — capture the app's real ActivityKit surfaces
   on an explicitly owned, booted simulator. Create it fresh for the run: a
   simulator reused across earlier drives reported the tracker idle and failed
-  the capture and cold-tap tests that pass on a new device.
+  the capture and cold-tap tests that pass on a new device. On one simulator
+  every second consecutive run launches unseeded (`tracker driver status is
+  missing`); `xcrun simctl shutdown`, `erase` and `boot` before each run
+  clears it.
   Set `ILOVETRAINS_SIMULATOR_ID`,
   `ILOVETRAINS_IOS_BUILD_DIR` and an empty `OUT`, then pass `402x874` (Island)
   or `390x844`. `SURFACES=notification-center,compact,expanded` is the default;
@@ -380,9 +383,9 @@ on someone's behalf.
 `PLAYTEST_BIN` overrides the Playtest command, which is otherwise `playtest`
 on `PATH`.
 
-## web/test/tcr-review-stack.sh
+## web/test/recovery-stack.sh
 
-`bash web/test/tcr-review-stack.sh` from the repository root boots the stub and
+`bash web/test/recovery-stack.sh` from the repository root boots the stub and
 the server on free ports and drives three refresh cycles of a lost change in
 headless Chromium (the Playwright under `~/projects/playtest`), failing unless
 the recovery pair is requested exactly once per refresh. It is the only

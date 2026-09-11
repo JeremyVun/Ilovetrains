@@ -2,9 +2,9 @@
    request per refresh, every refresh, while a change is lost.
 
    Run from the repository root with the fixture stub and the server already
-   up (web/test/tcr-review-stack.sh does that and calls this):
+   up (web/test/recovery-stack.sh does that and calls this):
 
-     SERVER_PORT=8431 node web/test/tcr-review-stack-probe.mjs
+     SERVER_PORT=8431 node web/test/recovery-stack-probe.mjs
 
    The stub must answer Town Hall → Bondi Junction so the recovery request is
    a 200; the probe seeds a followed journey with a lost change at real clock

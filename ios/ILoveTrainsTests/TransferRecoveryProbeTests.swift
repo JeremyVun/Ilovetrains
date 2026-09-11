@@ -2,12 +2,8 @@ import Foundation
 import XCTest
 @testable import ILoveTrains
 
-/// Adversarial probes for transfer completion and recovery
-/// (docs/backlog/transfer-completion-recovery). Each test names the invariant it
-/// attacks; a failing probe is a finding, not a broken test. Times are the shared
-/// fixture's (tools/fixtures/conformance/transfer-recovery.json).
 @MainActor
-final class TcrReviewProbeTests: XCTestCase {
+final class TransferRecoveryProbeTests: XCTestCase {
     private let rhodes = Station(id: "213820", name: "Rhodes Station")
     private let townHall = Station(id: "200070", name: "Town Hall Station")
     private let central = Station(id: "200060", name: "Central Station")

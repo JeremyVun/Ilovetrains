@@ -1,6 +1,6 @@
 process.env.TZ = 'Australia/Sydney';
 
-/* The review wave's adversarial probes for transfer completion and recovery,
+/* Adversarial probes for transfer completion and recovery,
    kept as regressions. Each test names the invariant it attacks; the fixes for
    the findings they caught are in focus.js, storage.js and main.js. */
 
@@ -239,7 +239,7 @@ test('the ride recorded at the end of a recovered journey is the followed journe
 
 const BASE = '36d9ad7';
 async function baseModules() {
-  const dir = mkdtempSync(path.join(tmpdir(), 'tcr-review-base-'));
+  const dir = mkdtempSync(path.join(tmpdir(), 'recovery-base-'));
   const root = execFileSync('git', ['rev-parse', '--show-toplevel'],
     { cwd: path.dirname(new URL(import.meta.url).pathname), encoding: 'utf8' }).trim();
   execFileSync('sh', ['-c', `git archive ${BASE} web/js | tar -x -C ${dir}`], { cwd: root });

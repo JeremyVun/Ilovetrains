@@ -695,7 +695,8 @@ latest estimate on every refresh. The tracker cues when it observes, live:
 
 - get off: on the last leg (`Final`), `now ≥ effectiveArrival − lead`;
 - change: on a leg followed by another (`Ride`), `now ≥ effectiveArrival − lead`;
-- missed connection: the transition into `MissedTransfer`;
+- missed connection: a followed change first becoming lost, with or without a
+  recovery candidate, or the transition into `MissedTransfer`;
 - cancelled: a `Cancellation` event kind appearing;
 - tight change: the next change's state first becoming tight while the rider
   is riding toward it;
@@ -750,7 +751,10 @@ recovery candidate, `The planned trains no longer connect. Another option is
 `Running late` / `The train is now due at <destination> at <HH:MM>.`;
 `Tight change` / `The train is expected at <station> about <n> minutes before
 <service> leaves.`
-`<service>` is the line code with its article, such as `the T4`.
+`<service>` is the line code with its article, such as `the T4`. These titles
+and bodies are the iOS Live Activity alert; Android has no per-cue text, its
+ongoing notification states the next event from the tracker's composed
+projection ([android-deviations.md](android-deviations.md)).
 
 `preferences.journeyAlerts` (default on) governs every cue. Off means no
 haptic, no re-alert and silent Live Activity updates, exactly as before the

@@ -77,6 +77,11 @@ iOS implementation requested on 2026-09-07.
 - User state uses atomic app-private files excluded from iCloud backup. iOS
   and the web have separate local trip lists; no account or sync is introduced.
 
+While a focused journey is `RUNNING LATE`, iOS paints the departure clock and
+the `TO CHANGE` / `TO GO` label in the warning colour as well as the figure and
+status; web keeps them neutral. Because late is granted on an arrival delay,
+this shows whenever the ridden leg loses time en route.
+
 ## Foreground arrival evidence
 
 While a stored focus is under way, the existing foreground location owner can

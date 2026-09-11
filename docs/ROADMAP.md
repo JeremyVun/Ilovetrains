@@ -43,6 +43,9 @@ geometric. Observations waiting on an owner ruling:
 - The reverse-direction home frame carries no view-based receipt, because only
   a persisted ride supports a reverse receipt. Does a view-based one exist at
   all?
+- A lost connection with no recovery candidate draws both legs with the two
+  platform chips touching (`home-390x844-lost-none.png`); the comps round drew
+  the ridden leg alone. Which axis does the owner want?
 
 ## Routing that just works
 - Tune the server transfer floor (`MIN_CONNECTION_TIME`) from real
@@ -50,10 +53,6 @@ geometric. Observations waiting on an owner ruling:
   take.
 - Disruption and trackwork awareness surfaced on saved trips and in the
   header.
-- [Transfer completion and recovery](backlog/transfer-completion-recovery/design.md):
-  apply arrival evidence guards to transfers, consider a tighter buffer, and
-  recover when delays make the onward connection unworkable. Final-arrival
-  guards do not cover transfer timing or recovery; both need design.
 - Handle replacement stop patterns and platform changes across web, Android
   and iOS: [replacement trips](backlog/realtime-replacements/design.md).
 - Consider locally routing added services without a static timetable trip;
@@ -101,6 +100,12 @@ the last and make the ports mechanical. Still to build:
   where `shoot-states.js` seeds API-shaped documents.
 - **Parity tool**: per-platform pixel regression against its own golden,
   cross-platform diff of a debug layout dump, and a side-by-side sheet.
+
+- Verification debt: `internal/analytics` has a test-side data race under
+  `go test -race`; the `tracker-*` rows of `tools/visual-regression.js` have
+  no committed Android or iOS baselines; nine `tools/shoot-states.js` states
+  fail their invariants on main (`home-over`, `home-arrived`, `past-register`
+  and siblings); the older playtest baseline transcript is garbled.
 
 ## Native Android and iOS
 Both apps exist (`android/`, `ios/`) and lag the web by one round. Remaining:

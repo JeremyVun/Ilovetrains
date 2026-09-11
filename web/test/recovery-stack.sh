@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Boots the fixture stub (with Town Hall → Bondi Junction answered) and the
-# server, then runs web/test/tcr-review-stack-probe.mjs against them.
+# server, then runs web/test/recovery-stack-probe.mjs against them.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-WORK="$(mktemp -d /tmp/tcr-review-stack-XXXXXX)"
+WORK="$(mktemp -d /tmp/recovery-stack-XXXXXX)"
 cd "$ROOT"
 go build -o "$WORK/tfnsw-stub" ./tools/tfnsw-stub
 go build -o "$WORK/server" ./cmd/server
@@ -30,4 +30,4 @@ trap 'kill $STUB_PID $SERVER_PID 2>/dev/null || true' EXIT
 for _ in $(seq 1 60); do curl -fsS "http://127.0.0.1:$SERVER_PORT/healthz" >/dev/null 2>&1 && break; sleep 0.5; done
 curl -fsS "http://127.0.0.1:$SERVER_PORT/healthz" >/dev/null
 echo "stub $STUB_PORT server $SERVER_PORT"
-SERVER_PORT="$SERVER_PORT" node web/test/tcr-review-stack-probe.mjs
+SERVER_PORT="$SERVER_PORT" node web/test/recovery-stack-probe.mjs

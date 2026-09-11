@@ -26,8 +26,10 @@ journey. The missing-location captures drive the real controller's guarded
 arrival state; the overdue target's marker remains illustrative. Arrival
 thresholds live in the [storage contract](../../../../docs/contracts/client-storage.md#final-arrival-decision).
 
-Evidence-based transfer completion and missed-connection recovery are deferred
-to their [own item](../../../../docs/backlog/transfer-completion-recovery/design.md).
+Lost connections and their recovery are time-only and live in the
+[storage contract](../../../../docs/contracts/client-storage.md#recovery); the
+exemplars are `home-390x844-lost-riding.png`, `-lost-dwell.png` and
+`-lost-none.png` beside this folder.
 
 The separate [eight-car cab reference](cab/README.md) incorporates the owner's
 later door/count correction. It supersedes the six-car cab shown in the
