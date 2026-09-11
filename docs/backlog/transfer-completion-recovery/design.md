@@ -351,6 +351,26 @@ Defaults taken to keep the item small, each overrulable by the owner:
   iOS Live Activity; on Android the recovery is carried by the composed
   projection in the notification. Closeout must say so in ui.md.
 
+- 2026-09-11, orchestrator, from the Fable review (tcr-review 7d3bd7d,
+  report `/tmp/tcr-review-report.md`): seven defects go to the fix wave with
+  the review's probes as acceptance tests. Two contract gaps ruled by the
+  orchestrator on web's reading, overrulable by the owner: (F6) when the
+  candidate's own change becomes lost and the search from that change finds
+  nothing, every client shows the no-candidate composition anchored at that
+  change (the composed journey up to it, `The <line> arrives too late for
+  the <HH:MM>`, `Check the station boards.`, `Planned` under the original
+  time), never a struck arrival beside a time the rider cannot make; a
+  fixture case is added for it. (F9) the ride recorded at the end is the
+  followed journey's own record, as web and Android do; iOS aligns. Also
+  ruled from the contract's existing words: a held candidate is re-matched
+  by key and kept while its change is tight (the tight-change instruction
+  shows), and re-picked only when the record is cleared or its change is
+  lost; while a record is held, the refresh searches from the record's own
+  anchor, so the tail cannot oscillate; the recovery request is made on
+  every refresh while recovering, re-matching the held journey, so the
+  candidate's estimates stay live; the candidate's first leg must board at
+  the change stop.
+
 ## Still open
 
 Owner verdict on the no-candidate axis (both legs with touching chips, as built, or the ridden leg alone, as the comp): see the build log. Nothing blocks the build plan. Overrulable defaults are listed under the
