@@ -65,7 +65,19 @@ register.
 
 ## Phase 2 — Android
 
-- [ ] Done
+- [x] Done (2026-09-11, Opus 5 on `lls-android`, merged 3d4c5cf).
+  `UiCommon.kt` gains `LIVE_HORIZON_MIN = 40`, `rowStale` (the 90 s
+  staleness expression `figureFor` and `BoardRow` had duplicated) and
+  `beyondLiveHorizon(journey, board, now)`: first-leg `estimatedDeparture`
+  non-null, not cancelled, `source == "live"`, not stale, printed delay 0,
+  `mins > 40`. `figureFor` labels it `Scheduled` below the untouched
+  `late > 0` branch; `BoardRow.figureColor` maps it to `ink2`. New
+  `LiveHorizonTest` (7 tests: both edges, late, early, cancelled, five
+  already-scheduled source states, mixed-leg, `nextServiceFigure` format).
+  Mixed-leg divergence recorded in `android-deviations.md`. Gate:
+  `tools/build-android.sh --unit` exit 0, 155 tests, 0 failures; flipping
+  `>` to `>=` failed `LiveHorizonTest` and the fixture's `live at horizon`
+  case, then restored.
 - Own: `android/app/src/main/java/com/ilovetrains/app/UiCommon.kt`,
   `UiBoard.kt`, `UiPresentation.kt` if it reads `journey.realtime` for a
   row, their unit tests, and `docs/contracts/android-deviations.md`.
@@ -84,7 +96,19 @@ register.
 
 ## Phase 3 — iOS
 
-- [ ] Done
+- [x] Done (2026-09-11, Opus 5 on `lls-ios`, merged 132ebc2). `Common.swift`
+  gains `liveHorizonMinutes = 40`, `staleRow` and `beyondLiveHorizon`, the
+  same predicate as Android; `figureFor` folds it into a
+  `scheduledRegister` flag below `late > 0`; `BoardRow.figureColor` maps it
+  to `ink2`. Five new `RowConformanceTests` cases (edges, exceptions,
+  already-scheduled states, mixed-leg, `nextServiceFigure` "40 min" vs
+  "41 min"). Mixed-leg divergence recorded in `ios-deviations.md`. Gate:
+  `tools/build-ios.sh --unit` on an agent-owned simulator (created and
+  deleted), exit 0, 189 tests, 0 failures; the `>=` flip failed 3
+  assertions including the fixture's `live at horizon` case, then restored.
+  Trap: `build-ios.sh` auto-selects the last booted iPhone, which is a
+  peer's device while several are booted; always pass
+  `ILOVETRAINS_SIMULATOR_ID`.
 - Own: `ios/ILoveTrains/UI/Common.swift`, `ios/ILoveTrains/UI/BoardView.swift`,
   their unit tests, and `docs/contracts/ios-deviations.md`.
 - Record the same mixed-leg divergence in `ios-deviations.md` and pin it

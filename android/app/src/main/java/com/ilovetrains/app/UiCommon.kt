@@ -160,10 +160,8 @@ const val LIVE_HORIZON_MIN = 40
 fun rowStale(journey: Journey, board: BoardData?, now: Long): Boolean =
     board == null || board.offline || journey.retained || now - board.generatedAt > 90_000
 
-// Past the accuracy tracker's 40 minute lead bucket one live prediction in eight
-// moves, so an undelayed estimate out there is a timetable time the feed has not
-// yet contradicted (owner ruling, 2026-09-11). The first leg's estimate is what
-// the rider acts on; journey.realtime would also count a later leg's arrival.
+// Past the accuracy tracker's 40 minute bucket one live prediction in eight moves
+// (owner ruling 2026-09-11); journey.realtime would also count a later leg's arrival.
 fun beyondLiveHorizon(journey: Journey, board: BoardData?, now: Long): Boolean {
     if (journey.legs.firstOrNull()?.estimatedDeparture == null) return false
     if (journey.cancelled || board?.source != "live" || rowStale(journey, board, now)) return false
