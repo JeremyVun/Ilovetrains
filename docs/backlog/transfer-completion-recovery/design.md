@@ -338,6 +338,19 @@ Defaults taken to keep the item small, each overrulable by the owner:
   `mascot-next-focus-source-handoff`, `reverse-real-platforms`); they are
   pre-existing and out of this item's scope.
 
+- 2026-09-11, orchestrator, from the Android build (tcr-p2 b47701a): Android
+  corrected the same undocumented divergences as iOS (tight-change boarding
+  platform, final-leg `Get off at`, later-cancelled-leg instruction and
+  struck arrival, `Printed change` receipt) plus: the shrunk clause now
+  applies on Android, detail clamps a negative window to `0 min`, the saved
+  row drops `· Pinned` beside a lost connection, and two instrumented
+  fixtures whose changes were seconds wide were corrected (real fixture
+  bugs the printed-minute rule exposed). Android has no per-cue alert
+  title/body (recorded in android-deviations.md: the notification states the
+  next event from the tracker state), so the ui.md alert strings bind the
+  iOS Live Activity; on Android the recovery is carried by the composed
+  projection in the notification. Closeout must say so in ui.md.
+
 ## Still open
 
 Owner verdict on the no-candidate axis (both legs with touching chips, as built, or the ridden leg alone, as the comp): see the build log. Nothing blocks the build plan. Overrulable defaults are listed under the
