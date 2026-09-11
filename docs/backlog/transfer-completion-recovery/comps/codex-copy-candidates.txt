@@ -1,0 +1,31 @@
+A. THE ONWARD CLAUSE
+
+THEN - Plain sequence
+AND THEN - Explicitly connects the next leg
+AFTER THAT - Makes the separation clearest
+NEXT - Matches the compact rail labels
+THEN T4 - Names the train that follows
+
+B. THE CHANGE LABEL WITH A TIME
+
+TOWN HALL · BOARD 10:08 - Makes the boarding time explicit
+TOWN HALL · BOARD AT 10:08 - Fuller instruction; exactly 26 characters
+TOWN HALL · T4 10:08 - Identifies the service by line and time
+TOWN HALL · NEXT T4 10:08 - Explicitly names the next service
+TOWN HALL · DEPARTS 10:08 - Distinguishes departure from arrival
+
+C. THE MARK WHERE THE MISSED TRAIN LEFT
+
+09:58 LEFT - Identifies the departure and says what happened
+T4 LEFT - Names the train; the notch supplies the time
+T4 DEPARTED - More formal, still explicit
+09:58 T4 - Identifies the exact service; the notch conveys departure
+09:58 TRAIN - Names the service by time; the notch conveys departure
+
+D. THE STATUS LINE CARRYING BOTH FACTS
+
+LATE · CONNECTION MISSED - Both facts; 24 characters
+LATE · CONNECTION GONE - Both facts; 22 characters
+RUNNING LATE · T4 LEFT - Keeps the existing status; the notch identifies which T4
+9 MIN LATE · 09:58 LEFT - Gives the delay and identifies the lost departure
+CONNECTION MISSED - Drops lateness because the missed connection changes what you do next
