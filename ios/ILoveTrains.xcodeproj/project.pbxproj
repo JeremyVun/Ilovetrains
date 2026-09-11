@@ -80,6 +80,7 @@
 		F8B9C4FD545A87CB9729155D0AAB3CBD /* Recommendation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1E87CB180734B1D9CCAB6F84233B8E5 /* Recommendation.swift */; };
 		FADB90A354DF178FFE18A6877E0A2C8A /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35E3A23F73BA713FB58E3DC8C85530FD /* Theme.swift */; };
 		FF43D933ABC78301C1168B59925B8064 /* TransferRecoveryConformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46578F1DC272EEEA8609AEA162660E3 /* TransferRecoveryConformanceTests.swift */; };
+		7C2E9A41B5D34F0A9E1C6B2D8F0A3E51 /* TcrReviewProbeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C2E9A41B5D34F0A9E1C6B2D8F0A3E52 /* TcrReviewProbeTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -165,6 +166,7 @@
 		A2F5F22DABC25D1F05F6331CE5B43F04 /* rows.json */ = {isa = PBXFileReference; includeInIndex = 1; path = rows.json; sourceTree = "<group>"; };
 		A3C532432A95BA36B45AF3F58AD2ACAF /* OfflineRouterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OfflineRouterTests.swift; sourceTree = "<group>"; };
 		A46578F1DC272EEEA8609AEA162660E3 /* TransferRecoveryConformanceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TransferRecoveryConformanceTests.swift; sourceTree = "<group>"; };
+		7C2E9A41B5D34F0A9E1C6B2D8F0A3E52 /* TcrReviewProbeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TcrReviewProbeTests.swift; sourceTree = "<group>"; };
 		A6A720BFD7C1239778644EE2178B6FEB /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		ADB57A1275F528512FD95448695EACF5 /* TinyTrainVisualTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TinyTrainVisualTests.swift; sourceTree = "<group>"; };
 		B44BF92FAAA2B17835E4F60301FBDD10 /* ILoveTrainsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ILoveTrainsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -372,6 +374,7 @@
 				B65D5B406C38389CFCC21B39AE37CE19 /* TinyTrainTests.swift */,
 				7AEBA39E8C2D5FD403BC3C7AABEA233B /* TransferLimitRequestTests.swift */,
 				A46578F1DC272EEEA8609AEA162660E3 /* TransferRecoveryConformanceTests.swift */,
+				7C2E9A41B5D34F0A9E1C6B2D8F0A3E52 /* TcrReviewProbeTests.swift */,
 				9F2A8DC581FC4364AB5FE5758C6FAC83 /* TravelTrackerControllerTests.swift */,
 				699ACA26851BAAB8413B1A886413B88A /* TravelTrackerStateTests.swift */,
 			);
@@ -566,6 +569,7 @@
 				A0DCD63379E49EDAF3DDAA5AAE1F7BC8 /* TinyTrainTests.swift in Sources */,
 				1F15035C8BFDEF1FCE57211E7F429675 /* TransferLimitRequestTests.swift in Sources */,
 				FF43D933ABC78301C1168B59925B8064 /* TransferRecoveryConformanceTests.swift in Sources */,
+				7C2E9A41B5D34F0A9E1C6B2D8F0A3E51 /* TcrReviewProbeTests.swift in Sources */,
 				56C2E9441EE97CD6580B4C21604F540D /* TravelTrackerControllerTests.swift in Sources */,
 				41F141FE8F838AAACC6D222A95FC917C /* TravelTrackerStateTests.swift in Sources */,
 			);
