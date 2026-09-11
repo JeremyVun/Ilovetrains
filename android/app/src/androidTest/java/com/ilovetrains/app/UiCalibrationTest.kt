@@ -166,6 +166,12 @@ class UiCalibrationTest {
             compose.runOnIdle { state.value = fixture.delayedState }
             capture("board-delayed")
         }
+        frame("board-horizon") {
+            compose.runOnIdle { state.value = fixture.horizonState }
+            assertEquals(listOf("", "Scheduled", "6 min late", "", "Cancelled"),
+                fixture.horizonBoard.journeys.map { figureFor(it, fixture.horizonBoard, fixture.horizonNow).provenance })
+            capture("board-horizon")
+        }
         frame("detail-cancelled") {
             compose.runOnIdle { state.value = fixture.cancelledState }
             capture("detail-cancelled")
@@ -829,6 +835,25 @@ private class Fixtures {
         timetableStatus = "5 Sep – 4 Oct 2026", version = "1.0.0", appearance = Appearance.System,
     )
     val feedbackDraftState = settingsState.copy(feedbackDraft = "The platform marker overlaps the line")
+
+    // Stress delta: five fresh live rows either side of the 40 minute horizon. A row key is its
+    // line plus scheduled departure, so the cancelled row sits further out to stay distinct.
+    private fun horizonJourney(index: Int, scheduledMinutes: Int, estimateMinutes: Int,
+                               cancelled: Boolean = false): Journey {
+        val journey = centralBoard.journeys[index]
+        val shift = centralNow + scheduledMinutes * 60_000 - journey.departure
+        val estimate = (estimateMinutes - scheduledMinutes) * 60_000
+        return Journey(journey.legs.map { leg -> leg.copy(
+            departure = leg.departure + shift, arrival = leg.arrival + shift,
+            estimatedDeparture = leg.departure + shift + estimate,
+            estimatedArrival = leg.arrival + shift + estimate,
+            cancelled = cancelled) })
+    }
+    val horizonNow = centralNow
+    val horizonBoard = centralBoard.copy(generatedAt = centralNow, journeys = listOf(
+        horizonJourney(0, 40, 40), horizonJourney(1, 41, 41), horizonJourney(2, 41, 47),
+        horizonJourney(3, 43, 41), horizonJourney(4, 44, 44, cancelled = true)))
+    val horizonState = state(horizonNow, horizonBoard).copy(screen = Screen.Board)
 
     // Stress delta: the real first Central service runs six minutes late.
     private val delayedJourney = centralBoard.journeys.first().let { journey ->
