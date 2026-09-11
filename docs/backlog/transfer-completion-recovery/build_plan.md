@@ -101,7 +101,7 @@ Owns: `web/js/journey.js`, `focus.js`, `home.js`, `journeybar.js`,
   states `home-lost-riding`, `home-lost-dwell`, `home-lost-none` at 390 and
   412 both schemes match the binding frames within the existing tolerance;
   `tools/playtest-regressions.sh` with a new recorded case for the lost
-  flow; visual regression on home/detail. Done marker: `[ ] phase 1 done`.
+  flow; visual regression on home/detail. Done marker: `[x] phase 1 done` (2026-09-11, tcr-p1 f70b80c; visual regression and the playtest case recorded in the phase 4 wave).
 
 ## Phase 2 — Android (parallel with 3)
 
@@ -116,7 +116,7 @@ Owns: `android/app/src/main/java/com/ilovetrains/app/` —
 - Gate: `tools/build-android.sh --unit` with conformance cases; the
   instrumented tracker test for the lost flow with and without a candidate;
   `tools/shoot-android.sh` frames for the three lost states; visual
-  regression. Done marker: `[ ] phase 2 done`.
+  regression. Done marker: `[x] phase 2 done` (2026-09-11, tcr-p2 b47701a; visual regression in the phase 4 wave).
 
 ## Phase 3 — iOS (parallel with 2)
 
@@ -128,7 +128,7 @@ Owns: `ios/ILoveTrains/Core/TravelTrackerState.swift`,
   composed journey; alert configuration for the two new cues.
 - Gate: `tools/build-ios.sh --unit`; `--ui` tracker flow test for lost with
   and without candidate; `tools/shoot-ios.sh` frames; visual regression.
-  Done marker: `[ ] phase 3 done`.
+  Done marker: `[x] phase 3 done` (2026-09-11, tcr-p3 8c7eaf4; visual regression in the phase 4 wave).
 
 ## Phase 4 — verification wave and closeout prep
 
