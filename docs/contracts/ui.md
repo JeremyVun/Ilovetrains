@@ -145,9 +145,12 @@ When the flag is off, the trip line remains unchanged and does no animation work
   one fix without prompting. It never prompts on open, the fix is not
   persisted, and it never leaves the device.
 - When a journey is focused, that line is its status instead: `RUNNING`,
-  `RUNNING LATE`, `CANCELLED` or `TRIP OVER`. The same string appears in the
+  `RUNNING LATE`, `CONNECTION GONE`, `LATE · CONNECTION GONE`, `CANCELLED` or
+  `TRIP OVER`. The same string appears in the
   focused saved-trip row. An explicitly pinned service adds a pin icon and
-  `PINNED` in the header, and `PINNED` in the row. Before departure, an ordinary
+  `PINNED` in the header, and `PINNED` in the row; beside a lost connection it
+  adds the pin icon alone, without the word, and a recovery journey is never
+  labelled `PINNED`. Before departure, an ordinary
   `RUNNING` status is replaced by `PINNED`; late, cancelled and completed
   statuses retain their words. Inferred travel never gets a pin indicator.
   A cancellation replacement is not labelled as the pinned service.
@@ -156,8 +159,10 @@ When the flag is off, the trip line remains unchanged and does no animation work
   identical height with and without the icon; the trip grid starts 14px below
   the status band.
 - `RUNNING LATE` requires all three of: fresh data, neither stale nor offline;
-  a realtime estimated departure on the relevant leg; and a positive difference
-  between the printed clock minutes of that estimate and its schedule. The
+  a realtime estimate on the relevant leg's departure or arrival; and a
+  positive difference between the printed clock minutes of that estimate and
+  its schedule. Either side grants it, so a train that leaves on time and
+  loses minutes on the way is late. The
   relevant leg is leg 0 before departure and while riding it, and leg *i+1*
   while dwelling before or riding it. `CANCELLED` and `TRIP OVER` outrank late.
   A degraded server response still within the freshness window retains this
@@ -191,6 +196,46 @@ When the flag is off, the trip line remains unchanged and does no animation work
   departure, and becomes `Tight change · <n> min · Platform <n>` only once the
   journey is under way, with the receipt `Printed change was <n> min.` when the
   window has shrunk below what was printed.
+- The state of the change after leg *i* comes from printed clock minutes of
+  effective times, `w = floor(dep(i+1)) − floor(arr(i))`, so it agrees with the
+  two clock times printed beside it: `w ≥ 5` ordinary, `0 < w < 5` or a window
+  shrunk below its printed one tight, `w ≤ 0` lost. A cancelled leg either side
+  is broken, never tight or lost. A negative window is never printed. A
+  recovery change — the pair a candidate makes with the leg it follows — was
+  never printed together, so only `w` decides it and the shrunk clause does not
+  apply.
+- A lost change puts the focus into recovery: the client searches from the
+  change station for a candidate and renders the composed journey, the followed
+  legs up to the change then the candidate's legs. The search, the candidate
+  rule, the persisted record and the clearing rules are in
+  [client-storage.md](client-storage.md#recovery). Recovery is time only: no
+  client uses a location fix in any part of it.
+- While the lost change is ahead of the rider the status is `CONNECTION GONE`
+  in the warning colour, prefixed `LATE · ` whenever `RUNNING LATE` is granted
+  as well. It retires once the candidate's first leg departs, leaving an
+  ordinary ride. `CANCELLED` and `TRIP OVER` outrank it. The focused saved-trip
+  row carries the same string.
+- With a candidate, the arrival clock keeps the original effective arrival
+  struck beside the composed arrival, in the arrival clock's own size. The
+  change carries the label `<STATION> · <LINE> <HH:MM>`, naming the service the
+  rider now boards; a label wider than its track drops the line code before
+  wrapping, and the station name is never ellipsised. The instruction while
+  riding is unchanged, `Get off at <station> · <place> <n>`; at the change it is
+  `Board the <HH:MM> at <station> · <place> <n>`. The receipt is
+  `The <line> arrives at <HH:MM>, but the <line> left at <HH:MM>.`, naming the
+  incoming service and the departure it missed. A change of the composed
+  journey that is itself tight keeps the tight-change paint and instruction,
+  and the recovery receipt stands.
+- With no candidate — web offline, or nothing found — the status is the same,
+  the instruction is `The <line> arrives too late for the <HH:MM>` in the warn
+  idiom, the receipt is `Check the station boards.`, the destination arrival
+  reads `Planned` under the original time, there is no next-service rail, and
+  the dead connection's chips are drawn as today. No client invents an
+  alternative.
+- The axis draws a lost change with no dwell width, its two chips free to
+  touch, while there is no candidate, and the composed journey's true dwell
+  once there is one. A candidate hours away draws its true wait: the axis is a
+  time axis and is not special-cased for this. Chips clamp as today.
 - Before departure, a 44px rail below the main answer and above the heavy rule
   shows the earliest catchable distinct service: countdown, departure time, arrival time and
   a detail chevron. Its label uses the first leg's mode: `Next train`,
@@ -207,9 +252,12 @@ When the flag is off, the trip line remains unchanged and does no animation work
   Opening its detail never pins it; the detail action performs the pin.
   The detail's first paint retains the tapped rail's response and freshness;
   an older cache must not replace that source during navigation.
-- The header may fetch live data only for the selected trip. Saved-trip rows
+- The header may fetch live data only for the selected trip, and, while the
+  focused journey is recovering, its recovery pair as the one permitted extra
+  request per refresh. Saved-trip rows
   use device-held facts such as line identity, distance and last ride; opening
-  home must not fan out one upstream request per saved trip.
+  home must not fan out one upstream request per saved trip. The rule guards
+  that fan-out, not the followed journey's own tail.
 - An inferred journey puts one line between the heavy rule and `MY TRIPS`:
   `Going somewhere else?` at the left in the offer-paragraph type, `CHANGE` at
   the right in the offer-button idiom, a hairline below it, 49px tall with a
@@ -534,6 +582,11 @@ When the flag is off, the trip line remains unchanged and does no animation work
   its step reads `CANCELLED`, dims, and strikes its time and station. Only the
   transfer warning uses the warning colour; the journey's arrival figure does
   not.
+- With a recovery candidate, detail renders the composed journey — the ridden
+  legs, then the recovery legs — with the same `<STATION> · <LINE> <HH:MM>`
+  change label as the header and the recovery receipt as its summary line. It
+  carries no recovery control, extending the 2026-09-03 ruling on cancelled
+  legs.
 - The screen closes with a heavy rule and the tail — effective arrival time,
   destination and arrival platform — or `JOURNEY CANCELLED` in the warning
   colour with the time struck. Freshness appears at the top right beside the
@@ -624,17 +677,25 @@ latest estimate on every refresh. The tracker cues when it observes, live:
 - get off: on the last leg (`Final`), `now ≥ effectiveArrival − lead`;
 - change: on a leg followed by another (`Ride`), `now ≥ effectiveArrival − lead`;
 - missed connection: the transition into `MissedTransfer`;
-- cancelled: a `Cancellation` event kind appearing.
+- cancelled: a `Cancellation` event kind appearing;
+- tight change: the next change's state first becoming tight while the rider
+  is riding toward it;
+- delayed: the composed journey's destination arrival first reaching a delay of
+  5 printed clock minutes against its scheduled arrival.
 
 Departure (entering `Boarding`, `Ride` or `Final`), entering `Transfer` and
 completion never cue. A leg shorter than the lead is inside its lead from the
 moment it is ridden and cues then. The change cue is skipped on a leg whose
 connection is already known missed; that leg gets the missed-connection cue
-instead. The four cues are independent: when more than one becomes new in the
+instead. The six cues are independent: when more than one becomes new in the
 same observation, one buzz is delivered and the alert carries the cancellation,
-else the missed connection, else the lead cue.
+else the missed connection, else the lead cue, else the tight change, else the
+delay.
 
-Each cue fires once per leg per identity generation. The first observation of
+Each cue fires once per leg per identity generation. The delayed cue is the one
+exception: it fires once per identity generation, an estimate that grows the
+delay further does not cue again, and an estimate that recovers below five
+minutes and crosses it again does. The first observation of
 a generation, and any observation more than 30 s after the previous one (the
 app was not observing: suspended, or backgrounded without a surface), records
 the baseline and does not cue, so a launch, restore or resume already past a
@@ -663,8 +724,14 @@ tracker surface: no notification permission on Android, or no Live Activity
 on iOS, means no background cue, and no new permission prompt is introduced.
 Alert copy: `Get off soon` / `Get off at <station> in about 2 minutes.`;
 `Change services soon` / `Get off at <station> in about 2 minutes to change to <service>.`;
-`Connection missed` / `The planned connection has been missed.`;
-`Service cancelled` / `The planned service has been cancelled.`
+`Connection missed` / `The planned connection has been missed.`, and, with a
+recovery candidate, `The planned trains no longer connect. Another option is
+<service> at <HH:MM> from <station>.`;
+`Service cancelled` / `The planned service has been cancelled.`;
+`Running late` / `The train is now due at <destination> at <HH:MM>.`;
+`Tight change` / `The train is expected at <station> about <n> minutes before
+<service> leaves.`
+`<service>` is the line code with its article, such as `the T4`.
 
 `preferences.journeyAlerts` (default on) governs every cue. Off means no
 haptic, no re-alert and silent Live Activity updates, exactly as before the

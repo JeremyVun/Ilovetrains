@@ -72,7 +72,7 @@ Dir.glob(File.join(ios, 'ILoveTrains/Resources', '*')).sort.each do |path|
   app.resources_build_phase.add_file_reference(ref)
 end
 fixtures = project.main_group.new_group('Conformance', '../tools/fixtures/conformance')
-%w[calibration.json prediction.json rows.json travel-tracker.json commute-feedback.json].each do |name|
+%w[calibration.json prediction.json rows.json travel-tracker.json commute-feedback.json transfer-recovery.json].each do |name|
   ref = fixtures.new_file(name)
   tests.resources_build_phase.add_file_reference(ref)
   app.resources_build_phase.add_file_reference(ref) if name == 'calibration.json'
