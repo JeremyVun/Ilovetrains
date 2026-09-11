@@ -325,9 +325,22 @@ Defaults taken to keep the item small, each overrulable by the owner:
   fixture's `fresh` no-candidate case (status with `LATE`, pill `LIVE`) is
   the spec and an offline no-candidate reads `CONNECTION GONE` alone.
 
+- 2026-09-11, orchestrator, from the web build (tcr-p1 f70b80c): the
+  no-candidate axis. The contract (from the round 2 words "dead connection
+  chips drawn as today") draws both legs with the `3` and `5` chips touching
+  at the change; the binding frame `comps/d1-time-390x844-lost-none.png`
+  drew only the ridden leg with a single `3` chip. Web and iOS both follow
+  the contract; the owner picks from the two frames at verification. The
+  shoot-states sweep has 7 invariant failures and 2 aborts that reproduce
+  identically at the base commit 36d9ad7 (`mascot-stale-before`,
+  `home-over`, `home-five-trips`, `home-arrived`, `past-register`,
+  `past-register-scrolled`, `focus-returns-home`,
+  `mascot-next-focus-source-handoff`, `reverse-real-platforms`); they are
+  pre-existing and out of this item's scope.
+
 ## Still open
 
-Nothing blocks the build plan. Overrulable defaults are listed under the
+Owner verdict on the no-candidate axis (both legs with touching chips, as built, or the ridden leg alone, as the comp): see the build log. Nothing blocks the build plan. Overrulable defaults are listed under the
 round 2 verdict; alert copy for the two new cues (`Delayed`, `Tight change`)
 was drafted by Codex on 2026-09-11 (see "Alert copy candidates" under Copy); the build uses the bold defaults until the owner verdicts.
 
