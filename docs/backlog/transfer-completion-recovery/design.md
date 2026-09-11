@@ -296,6 +296,18 @@ Defaults taken to keep the item small, each overrulable by the owner:
   Journey-alert cue identity `(kind, legIndex)` uses composed-journey leg
   indices; a replaced recovery record is a new tail and may cue again.
 
+- 2026-09-11, phase 0 agent, decisions the frames implied and the plan did
+  not state, all overrulable: the status is `CONNECTION GONE` with the
+  `LATE · ` prefix only while `RUNNING LATE` is also granted (the dwell frame
+  prints `CONNECTION GONE` alone because the candidate is on time); a
+  recovery change was never printed together, so only `w` decides it and the
+  shrunk clause does not apply; a tight change of the composed journey keeps
+  the tight-change instruction while the status stays lost; the candidate
+  floor `w ≥ 3` is inclusive; the receipt retires with the status when the
+  candidate is boarded, the struck arrival and change label stay; six-cue
+  precedence is cancellation, missed connection, lead cue, tight change,
+  delay; broken (cancelled) never triggers a recovery search.
+
 ## Still open
 
 Nothing blocks the build plan. Overrulable defaults are listed under the

@@ -83,7 +83,7 @@ Owns: `docs/contracts/ui.md`, `client-storage.md`, `native-data.md`,
 - Codex drafts alert copy for `Delayed`, `Tight change` and the extended
   missed-connection body; record candidates in design.md for the owner.
 - Gate: fixture loads in all three test suites (empty test stubs are fine);
-  `go test ./...` untouched. Done marker: `[ ] phase 0 done`.
+  `go test ./...` untouched. Done marker: `[x] phase 0 done` (2026-09-11, merged 6e05be3; fixture `tools/fixtures/conformance/transfer-recovery.json`, 20 cases).
 
 ## Phase 1 — web (reference)
 
