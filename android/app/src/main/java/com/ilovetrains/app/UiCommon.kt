@@ -155,9 +155,25 @@ fun minutesBetween(from: Long, to: Long): Int = ((to / 60_000) - (from / 60_000)
 
 data class Figure(val value: String, val unit: String = "", val provenance: String = "", val past: Boolean = false)
 
+const val LIVE_HORIZON_MIN = 40
+
+fun rowStale(journey: Journey, board: BoardData?, now: Long): Boolean =
+    board == null || board.offline || journey.retained || now - board.generatedAt > 90_000
+
+// Past the accuracy tracker's 40 minute lead bucket one live prediction in eight
+// moves, so an undelayed estimate out there is a timetable time the feed has not
+// yet contradicted (owner ruling, 2026-09-11). The first leg's estimate is what
+// the rider acts on; journey.realtime would also count a later leg's arrival.
+fun beyondLiveHorizon(journey: Journey, board: BoardData?, now: Long): Boolean {
+    if (journey.legs.firstOrNull()?.estimatedDeparture == null) return false
+    if (journey.cancelled || board?.source != "live" || rowStale(journey, board, now)) return false
+    val mins = minutesBetween(now, journey.effectiveDeparture)
+    return mins > LIVE_HORIZON_MIN && minutesBetween(journey.departure, journey.effectiveDeparture) == 0
+}
+
 fun figureFor(journey: Journey, board: BoardData?, now: Long): Figure {
     val departure = journey.effectiveDeparture
-    val stale = board == null || board.offline || journey.retained || now - board.generatedAt > 90_000
+    val stale = rowStale(journey, board, now)
     val mins = minutesBetween(now, departure)
     if (journey.cancelled) return Figure("—", provenance = "Cancelled", past = mins < 0)
     if (mins < 0) {
@@ -169,7 +185,7 @@ fun figureFor(journey: Journey, board: BoardData?, now: Long): Figure {
     val late = minutesBetween(journey.departure, journey.effectiveDeparture)
     val provenance = when {
         late > 0 -> "$late min late"
-        !liveRealtime -> "Scheduled"
+        !liveRealtime || beyondLiveHorizon(journey, board, now) -> "Scheduled"
         mins == 0 -> "Departing"
         else -> ""
     }
