@@ -287,6 +287,15 @@ Defaults taken to keep the item small, each overrulable by the owner:
   hiding the header. Web caches the recovery response in memory beside the
   focus body, not in the saved-trip cache, whose keys are saved pairs only.
 
+- 2026-09-11, orchestrator, from the native seam surveys: the Android and
+  iOS trackers today decide a missed transfer by a strict millisecond compare
+  (`effectiveArrival > effectiveDeparture`, `TravelTrackerState.derive`), while
+  their copy layer already uses printed minutes. The shared seam's
+  printed-minute rule (`w ≤ 0` lost) replaces the millisecond compare in both
+  trackers, so a change printed `09:59 → 09:59` is lost on every client.
+  Journey-alert cue identity `(kind, legIndex)` uses composed-journey leg
+  indices; a replaced recovery record is a new tail and may cue again.
+
 ## Still open
 
 Nothing blocks the build plan. Overrulable defaults are listed under the
