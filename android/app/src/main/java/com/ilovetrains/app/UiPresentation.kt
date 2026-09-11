@@ -213,6 +213,10 @@ fun shortChangeLabel(journey: Journey, changeIndex: Int, recoveryFrom: Int?): St
     return "${changeStationLabel(journey, changeIndex)} · ${clockTime(journey.legs[changeIndex + 1].effectiveDeparture)}"
 }
 
+/** Before departure the home figure stays the displayed board's; the focus header's figure is the riding one. */
+fun homeHeaderFigure(header: FocusHeader?, departed: Boolean, board: Figure): Figure =
+    header?.figure?.takeIf { departed } ?: board
+
 fun focusHeader(focus: FocusedJourney, now: Long, complete: Boolean = false, arrival: ArrivalResult? = null): FocusHeader {
     val followed = focus.journey
     val composed = focus.composed
@@ -239,14 +243,14 @@ fun focusHeader(focus: FocusedJourney, now: Long, complete: Boolean = false, arr
     val risk = states.indices.firstOrNull {
         states[it] == ConnectionState.Tight && now < composed.legs[it + 1].effectiveDeparture
     }
-    val followedLost = lostChangeIndex(followed)
+    val stranded = states.indexOfFirst { it == ConnectionState.Lost }.takeIf { it >= 0 }
     val instruction = when {
         ridingCancelled -> composed.legs[cancelledIndex!!].let {
             "${clockTime(it.effectiveDeparture)} from ${it.from.shortName} cancelled"
         }
-        lost && recoveryFrom == null && followedLost != null ->
-            "The ${followed.legs[followedLost].line} arrives too late for the " +
-                clockTime(followed.legs[followedLost + 1].effectiveDeparture)
+        lost && stranded != null ->
+            "The ${composed.legs[stranded].line} arrives too late for the " +
+                clockTime(composed.legs[stranded + 1].effectiveDeparture)
         risk != null -> composed.legs[risk + 1].let {
             "Tight change · ${minutesBetween(composed.legs[risk].effectiveArrival, it.effectiveDeparture)} min" +
                 placeClause(it.fromPlatform, it.mode)
@@ -259,13 +263,13 @@ fun focusHeader(focus: FocusedJourney, now: Long, complete: Boolean = false, arr
         !lost -> if (risk != null && shrunkChange(composed, risk, recoveryFrom)) {
             "Printed change was ${minutesBetween(composed.legs[risk].arrival, composed.legs[risk + 1].departure)} min."
         } else ""
-        recoveryFrom == null -> "Check the station boards."
+        stranded != null -> "Check the station boards."
         else -> recoveryReceipt(followed).orEmpty()
     }
 
     val arrivalClocks = when {
         composed.legs.last().cancelled -> FocusArrivalClocks(struck = clockTime(composed.effectiveArrival))
-        lost && recoveryFrom == null -> FocusArrivalClocks(planned = clockTime(followed.effectiveArrival))
+        lost && stranded != null -> FocusArrivalClocks(planned = clockTime(followed.effectiveArrival))
         recoveryFrom != null -> FocusArrivalClocks(
             shown = clockTime(composed.effectiveArrival), struck = clockTime(followed.effectiveArrival))
         else -> FocusArrivalClocks(shown = clockTime(composed.effectiveArrival))
@@ -280,7 +284,7 @@ fun focusHeader(focus: FocusedJourney, now: Long, complete: Boolean = false, arr
         changeLabels = states.indices.map { changeLabel(composed, it, recoveryFrom) },
         receipt = receipt,
         instruction = instruction,
-        warnInstruction = ridingCancelled || (lost && recoveryFrom == null),
+        warnInstruction = ridingCancelled || (lost && stranded != null),
         arrival = arrivalClocks,
         figure = figure,
     )

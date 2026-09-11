@@ -8,12 +8,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Adversarial probes for transfer completion and recovery
- * (docs/backlog/transfer-completion-recovery). Each test names the invariant it
- * attacks; a failing probe is a finding, not a broken test. Times are the shared
- * fixture's (tools/fixtures/conformance/transfer-recovery.json).
+ * Guards for transfer completion and recovery, from the review probes that found
+ * them. Each test names the invariant it attacks. Times are the shared fixture's
+ * (tools/fixtures/conformance/transfer-recovery.json).
  */
-class TcrReviewProbeTest {
+class TransferRecoveryGuardTest {
     private val rhodes = Station("213820", "Rhodes Station")
     private val townHall = Station("200070", "Town Hall Station")
     private val central = Station("200060", "Central Station")
@@ -29,6 +28,12 @@ class TcrReviewProbeTest {
         Leg("T4", "train", "Bondi Junction", from, bondi, departure, arrival,
             estimatedDeparture = estimatedDeparture, fromPlatform = "5", toPlatform = "1")
 
+    private val viaCentral = Journey(listOf(
+        Leg("T1", "train", "Central", townHall, central, T("10:05"), T("10:08"),
+            estimatedArrival = T("10:14"), fromPlatform = "5", toPlatform = "18"),
+        t4At(T("10:11"), T("10:24"), from = central).copy(fromPlatform = "20"),
+    ))
+
     private val heldTenPastEight = Recovery(0, Journey(listOf(t4At(T("10:08"), T("10:18")))), NOW, RecoverySource(NOW))
 
     private fun focusOf(recovery: Recovery?, journey: Journey = followed) = FocusedJourney(
@@ -36,11 +41,11 @@ class TcrReviewProbeTest {
         BoardData(rhodes, bondi, listOf(journey), NOW, source = "live"), pinned = false, recovery = recovery,
     )
 
-    /** The two lines of TrainViewModel.settleRecovery that choose the record from a board. */
+    /** The three lines of TrainViewModel.settleRecovery that choose the record from a board. */
     private fun settle(focus: FocusedJourney, boards: (RecoverySearch) -> List<Journey>): Recovery? {
         val plan = recoveryPlan(focus.journey, focus.recovery, bondi)
         val search = plan.search ?: return plan.recovery
-        val candidate = recoveryCandidate(boards(search), search.at, AllModes)
+        val candidate = recoveryChoice(plan, boards(search), AllModes)
         return recoveryAfterSearch(plan, candidate, NOW, RecoverySource(NOW))
     }
 
@@ -65,11 +70,6 @@ class TcrReviewProbeTest {
     }
 
     @Test fun aMovedAnchorRecordIsStableAcrossTheRefreshesThatFollowIt() {
-        val viaCentral = Journey(listOf(
-            Leg("T1", "train", "Central", townHall, central, T("10:05"), T("10:08"),
-                estimatedArrival = T("10:14"), fromPlatform = "5", toPlatform = "18"),
-            t4At(T("10:11"), T("10:24"), from = central).copy(fromPlatform = "20"),
-        ))
         val fromCentral = Journey(listOf(t4At(T("10:19"), T("10:32"), from = central).copy(fromPlatform = "20")))
         val boards: (RecoverySearch) -> List<Journey> = { search ->
             when (search.from.id) {
@@ -92,20 +92,50 @@ class TcrReviewProbeTest {
         }
     }
 
+    @Test fun aMovedAnchorRecordRefreshesItsTailFromTheChangeItRepaired() {
+        val fromCentral = Journey(listOf(t4At(T("10:19"), T("10:32"), from = central).copy(fromPlatform = "20")))
+        val running = Journey(listOf(fromCentral.legs.single().copy(estimatedDeparture = T("10:22"))))
+        var boarded: List<Journey> = listOf(fromCentral)
+        val boards: (RecoverySearch) -> List<Journey> = { search ->
+            when (search.from.id) {
+                townHall.id -> listOf(viaCentral)
+                central.id -> boarded
+                else -> emptyList()
+            }
+        }
+        val focus = focusOf(Recovery(0, viaCentral, NOW, RecoverySource(NOW)))
+        val first = requireNotNull(settle(focus, boards))
+        boarded = listOf(running)
+        val second = requireNotNull(settle(focus.copy(recovery = first), boards))
+        assertEquals("the tail was not re-matched from the change the record repaired",
+            T("10:22"), second.journey.legs.last().effectiveDeparture)
+        assertEquals("the carried leg was searched again instead of kept",
+            first.journey.legs.first(), second.journey.legs.first())
+    }
+
     // Invariant 8 (ruling): the candidate's own change is lost and nothing is found from the later change.
 
     @Test fun theCandidatesOwnChangeLostWithNothingFromTheLaterChangeReadsAsLost() {
-        val viaCentral = Journey(listOf(
-            Leg("T1", "train", "Central", townHall, central, T("10:05"), T("10:08"),
-                estimatedArrival = T("10:14"), fromPlatform = "5", toPlatform = "18"),
-            t4At(T("10:11"), T("10:24"), from = central).copy(fromPlatform = "20"),
-        ))
         val held = Recovery(0, viaCentral, NOW, RecoverySource(NOW))
         val record = settle(focusOf(held)) { emptyList() }
         val header = focusHeader(focusOf(record), NOW)
         assertEquals("Check the station boards.", header.receipt)
         assertEquals("The T1 arrives too late for the 10:11", header.instruction)
         assertNotNull("the arrival the rider cannot make is shown as achievable", header.arrival.planned)
+    }
+
+    @Test fun theStrandedCompositionKeepsTheDeadTailAndPromisesOnlyThePlannedArrival() {
+        val held = Recovery(0, viaCentral, NOW, RecoverySource(NOW))
+        val record = requireNotNull(settle(focusOf(held)) { emptyList() })
+        assertEquals("the dead tail was dropped from the composition",
+            listOf("T1" to T("10:05"), "T4" to T("10:11")), outline(record.journey))
+        val header = focusHeader(focusOf(record), NOW)
+        assertEquals(listOf("T9" to T("09:24"), "T1" to T("10:05"), "T4" to T("10:11")), outline(header.journey))
+        assertEquals("Late · Connection gone", header.status.text)
+        assertEquals("The T1 arrives too late for the 10:11", header.instruction)
+        assertTrue("the stranded instruction is not in the warn idiom", header.warnInstruction)
+        assertEquals("Check the station boards.", header.receipt)
+        assertEquals(FocusArrivalClocks(planned = clockTime(followed.effectiveArrival)), header.arrival)
     }
 
     // Invariant 6: a recovery change is judged by its window alone.
@@ -134,6 +164,12 @@ class TcrReviewProbeTest {
         val stray = heldTenPastEight.copy(changeIndex = 3)
         assertEquals(followed, focusOf(stray).composed)
         assertNull(recoveryPlan(followed, stray, bondi).recovery)
+    }
+
+    @Test fun aCandidateThatDoesNotBoardAtTheChangeStationIsNotPicked() {
+        val elsewhere = Journey(listOf(t4At(T("10:08"), T("10:18"), from = central)))
+        assertNull("a journey from another station was offered as the connection",
+            settle(focusOf(null)) { listOf(elsewhere) })
     }
 
     @Test fun aRecordWhoseFirstLegDoesNotBoardAtTheChangeStationIsNotComposed() {
