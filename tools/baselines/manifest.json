@@ -5,8 +5,8 @@
     "device": "Google Chrome 152.0.7977.84, 390x844 css @2x"
   },
   "ios": {
-    "commit": "52d1d57",
-    "date": "2026-09-10",
+    "commit": "f619995",
+    "date": "2026-09-11",
     "device": "haptics-ios 1206x2622px, content size large",
     "simulator": "haptics-ios",
     "tracker": {
