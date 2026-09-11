@@ -492,6 +492,23 @@ async function states() {
   cancel(cancelled[0]);
   cancel(cancelled[3]);
 
+  /* Both sides of the 40 minute live horizon on one board (ui.md, scheduled
+     register): 40 on time, 41 on time, 41 late by six, an estimate two minutes
+     early whose countdown is still 41, and 41 cancelled. */
+  const horizon = (() => {
+    const journeys = [
+      journey('23:25', '23:54', '12', 'T1', 'Penrith via Parramatta', true),
+      journey('23:26', '23:55', '8', 'T1', 'Penrith via Parramatta', true),
+      journey('23:26', '23:55', '7', 'BMT', 'Mount Victoria via Parramatta', true),
+      journey('23:28', '23:57', '13', 'T1', 'Penrith via Parramatta', true),
+      journey('23:26', '23:55', '12', 'T1', 'Penrith via Parramatta', true)
+    ];
+    delay(journeys[2], 6);
+    delay(journeys[3], -2);
+    cancel(journeys[4]);
+    return journeys;
+  })();
+
   const scheduled = baseJourneys().map((j) => {
     j.departure.estimated = null;
     j.arrival.estimated = null;
@@ -1307,6 +1324,9 @@ async function states() {
     }),
     board('late-night', departuresBody({ journeys: lateNight })),
     board('delayed', departuresBody({ journeys: delayed })),
+    board('board-horizon', departuresBody({ journeys: horizon }), {
+      expect: { copy: ['SCHEDULED', '6 MIN LATE', 'CANCELLED'] }
+    }),
     board('cancelled', departuresBody({ journeys: cancelled })),
     board('scheduled-only', departuresBody({ journeys: scheduled })),
 
