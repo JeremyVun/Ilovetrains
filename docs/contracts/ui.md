@@ -523,6 +523,17 @@ When the flag is off, the trip line remains unchanged and does no animation work
   Native boards retain departed rows and the last header answer under the
   [native retention rules](native-data.md#cached-boards-and-departed-services).
 - Scheduled-only numerals are visually quieter and labelled `SCHEDULED`.
+- `SCHEDULED` also means "live estimate beyond the 40 minute horizon with no
+  delay". A future board row with a first-leg departure estimate whose printed
+  delay is exactly zero and whose countdown exceeds 40 printed minutes (41 is
+  beyond, 40 is not) takes the `SCHEDULED` label and the scheduled register.
+  Nothing numeric changes: figure, departure and arrival clocks are what the
+  estimate gave. Delays (`n MIN LATE`, struck time, warning colour),
+  cancellations and estimates earlier than schedule show at any lead; stale,
+  offline and retained rows are already scheduled. The edge is the server
+  accuracy tracker's own lead bucket edge, beyond which one prediction in
+  eight moves by more than a printed minute; the smart header and the
+  next-service rail never take the label (owner ruling, 2026-09-11).
 - Delays show both the scheduled and effective time, and paint the figure and
   the effective departure in the warning colour. Cancellation remains
   visible and a cancelled lead names the next train rather than disappearing:
