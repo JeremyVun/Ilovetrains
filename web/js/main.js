@@ -11,7 +11,7 @@ import { boardModel, promotedRow } from './rowmodel.js';
 import { journeyDetail, journeyKey, departureKey, legsOf, arrivalMs, departureMs } from './journey.js';
 import {
   focusOf, visibleFocus, setFocus, clearFocus, isFocused, focusExpired, matchJourney,
-  applyFocusSnapshot, applyArrivalResult,
+  applyFocusSnapshot, applyArrivalResult, composedJourney, recoveryModel, recoveryOf,
   directionsModel, inferTravel, journeyCancelled, TRAVEL_LATE_MS
 } from './focus.js';
 import * as Board from './board.js';
@@ -131,6 +131,7 @@ state.arrivalWindow = null;
 state.arrivalResumeWaitUntil = null;
 state.arrivalPermissionPending = false;
 state.focusRefreshPending = null;
+state.recovery = null;
 
 const analyticsEnabled = isEnabled({
   hostname: location.hostname,
@@ -177,6 +178,7 @@ const timers = { tick: null, refresh: null, view: null };
 let inflight = null;
 let pastInflight = null;
 let focusInflight = null;
+let recoveryInflight = null;
 let recommendationInflight = null;
 let requestGeneration = 0;
 let preserveSelection = false;
@@ -833,7 +835,7 @@ function settleArrival({ sample = null, monitoring = false, matchingRefresh = fa
   const decision = reduceArrival({
     identity: identityOfFocus(focus),
     departureMs: departureMs(focus.journey),
-    arrivalMs: arrivalMs(focus.journey),
+    arrivalMs: arrivalMs(composedJourney(focus)),
     nowMs: now(),
     destination: leg(trip, focus.direction).to.location || null,
     guard: focus.arrivalGuard,
@@ -1013,6 +1015,7 @@ function renderHome() {
     loadedAt: state.loadedAt,
     arrivalDecision: state.arrivalDecision,
     leave: leaveDistance(),
+    recoveryResponse: focusRecoveryResponse(),
     stripVariant: activeVariant('strip-placement')
   });
   lastHome = home;
@@ -1342,14 +1345,22 @@ function detailModel() {
   const board = isFocused(state.doc, state.journey)
     ? modelForSource(focusSource()) : handoff ? modelForSource(handoff) : currentModel();
   const focused = isFocused(state.doc, state.journey);
+  const focus = focusOf(state.doc);
+  const trip = focused && findTrip(state.doc, focus.tripId);
+  // Detail shows the journey the rider can still make, and the receipt is its
+  // summary line; the recovery control stays in the header (ui.md).
+  const recovery = trip ? recoveryPlan(focus, trip) : null;
+  const journey = recovery && recovery.lostChange ? recovery.composed : state.journey;
   const opts = {
     stale: board.stale, fromName: ends.from.name, toName: ends.to.name,
-    arrivalDecision: focused ? state.arrivalDecision : null
+    arrivalDecision: focused ? state.arrivalDecision : null,
+    ...(recovery && recovery.lostChange
+      ? { recoveryFrom: recovery.recoveryFrom, receipt: recovery.receipt } : {})
   };
-  const model = journeyDetail(state.journey, now(), opts);
+  const model = journeyDetail(journey, now(), opts);
   return {
     ...model,
-    row: detailRow(model, opts),
+    row: detailRow(journey, model, opts),
     focused,
     pinned: isFocused(state.doc, state.journey) && focusOf(state.doc)?.by !== 'inferred',
     footer: handoff ? { ...board.footer, text: handoff.freshness || board.footer.text } : board.footer
@@ -1359,11 +1370,11 @@ function detailModel() {
 /* Once the journey has left, its promoted row counts to the next thing the
    rider does, not to a departure that has already happened: the figure and
    provenance become the smart header's (ui.md, journey detail). */
-function detailRow(model, opts) {
-  const row = promotedRow(state.journey, now(), { ...opts, fallbackHeadsign: opts.toName });
+function detailRow(journey, model, opts) {
+  const row = promotedRow(journey, now(), { ...opts, fallbackHeadsign: opts.toName });
   // A cancelled journey keeps the board's dash and its CANCELLED word.
   if (!model.departed || model.cancelled) return row;
-  const directions = directionsModel(state.journey, now(), opts);
+  const directions = directionsModel(journey, now(), opts);
   return {
     ...row,
     figure: directions.figure,
@@ -1394,6 +1405,9 @@ function unpinService() {
   ctx.update(released);
   if (focusInflight) focusInflight.abort();
   focusInflight = null;
+  if (recoveryInflight) recoveryInflight.abort();
+  recoveryInflight = null;
+  state.recovery = null;
   stopArrivalMonitoring();
   state.focusBody = null;
   state.focusIdentity = null;
@@ -1421,8 +1435,81 @@ function detailAction(action) {
     state.headerKind = null;
     stopArrivalMonitoring();
     state.arrivalDecision = null;
+    state.recovery = null;
     ctx.update(setFocus(state.doc, state.selection, state.journey, now()));
     return ctx.go('#/');
+  }
+}
+
+/* The recovery pair is the one extra request a refresh may make (ui.md), and
+   its answer is held here beside the focused board: the saved-trip cache keys
+   are saved pairs, and this pair is not one. */
+function recoverySearchKey(search, toId) {
+  return `${search.from}:${toId}:${Math.floor((search.at || 0) / 60_000)}`;
+}
+
+function recoveryResponse(toId) {
+  return (search) => state.recovery && state.recovery.key === recoverySearchKey(search, toId)
+    ? state.recovery : null;
+}
+
+function focusRecoveryResponse() {
+  const focus = focusOf(state.doc);
+  const trip = focus && findTrip(state.doc, focus.tripId);
+  return trip ? recoveryResponse(leg(trip, focus.direction).to.id) : null;
+}
+
+function recoveryPlan(focus, trip) {
+  return recoveryModel(focus, now(), {
+    response: recoveryResponse(leg(trip, focus.direction).to.id),
+    allowed: (journey) => journeyAllowed(journey, enabledModes(), maxTransfers())
+  });
+}
+
+function storeRecovery(record) {
+  const focus = focusOf(state.doc);
+  if (!focus) return;
+  if (JSON.stringify(recoveryOf(focus) || null) === JSON.stringify(record || null)) return;
+  const next = { ...state.doc, focus: { ...focus } };
+  if (record) next.focus.recovery = record;
+  else delete next.focus.recovery;
+  ctx.update(next);
+}
+
+async function refreshRecovery() {
+  const focus = focusOf(state.doc);
+  const trip = focus && findTrip(state.doc, focus.tripId);
+  if (!focus || !trip || document.hidden) return;
+  const plan = recoveryPlan(focus, trip);
+  if (!plan.search) {
+    if (recoveryInflight) recoveryInflight.abort();
+    recoveryInflight = null;
+    state.recovery = null;
+    storeRecovery(null);
+    return;
+  }
+  storeRecovery(plan.recovery);
+  const ends = leg(trip, focus.direction);
+  const key = recoverySearchKey(plan.search, ends.to.id);
+  if (state.recovery?.key === key || !plan.search.from || plan.search.at === null) return;
+  if (recoveryInflight) recoveryInflight.abort();
+  const controller = new AbortController();
+  recoveryInflight = controller;
+  const identity = identityOfFocus(focus);
+  try {
+    const { body, serverStale } = await getDepartures(plan.search.from, ends.to.id, {
+      limit: LIMIT, modes: SUPPORTED_MODES, transferLimit: transferLimit(),
+      at: plan.search.at, signal: controller.signal
+    });
+    const current = focusOf(state.doc);
+    if (controller.signal.aborted || !current || identityOfFocus(current) !== identity) return;
+    state.recovery = { key, journeys: body.journeys, generatedAt: body.generatedAt, degraded: serverStale };
+    storeRecovery(recoveryPlan(current, trip).recovery);
+    renderCurrent();
+  } catch (_) {
+    // Nothing found is not the same as nothing running: the held record stands.
+  } finally {
+    if (recoveryInflight === controller) recoveryInflight = null;
   }
 }
 
@@ -1440,7 +1527,7 @@ async function refreshFollowed() {
   focusInflight = controller;
   state.focusRefreshPending = identity;
   const departure = departureMs(focus.journey);
-  if (now() >= (arrivalMs(focus.journey) ?? Infinity)
+  if (now() >= (arrivalMs(composedJourney(focus)) ?? Infinity)
       && !Number.isFinite(state.arrivalResumeWaitUntil)) {
     state.arrivalResumeWaitUntil = now() + ARRIVAL_RESUME_WAIT_MS;
   }
@@ -1481,6 +1568,7 @@ async function refreshFollowed() {
   } finally {
     clearTimeout(timeout);
     if (focusInflight === controller) focusInflight = null;
+    void refreshRecovery();
   }
 }
 
@@ -1742,7 +1830,7 @@ document.addEventListener('visibilitychange', () => {
   }
   const focus = focusOf(state.doc);
   if (focus?.arrivalGuard?.armed && !focus.arrivalGuard.basis
-      && now() >= (arrivalMs(focus.journey) ?? Infinity)) {
+      && now() >= (arrivalMs(composedJourney(focus)) ?? Infinity)) {
     state.arrivalResumeWaitUntil = now() + ARRIVAL_RESUME_WAIT_MS;
   }
   startTimers(state.view === 'board');

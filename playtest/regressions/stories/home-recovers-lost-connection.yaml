@@ -1,0 +1,25 @@
+description: |
+  Home shows the recovery when the connection is gone. The followed T9 is nine
+  minutes late into Town Hall, so the T4 it was going to meet has left, and the
+  header draws the journey the rider can still make instead. It carries no
+  console_errors budget: this focus has departed, so both of its refresh
+  requests ask for a fixture-era window the API refuses (tools/README.md,
+  playtest-regressions.sh).
+app:
+  storage_state: ../state/rhodes-bondi-lost-change.json
+  clock:
+    time: "2026-09-01T09:47:00+10:00"
+    timezone: Australia/Sydney
+story: |
+  You are on the T9 out of Rhodes, following it in the app, and it is running
+  late enough into Town Hall that the T4 you meant to change to has already
+  left. Open the app and read what its first screen tells you to do now,
+  without opening anything else.
+success:
+  - element_exists: "[data-focus-status].status-lost"
+  - element_exists: ".hm-sign:has-text(\"Get off at Town Hall · Platform 3\")"
+  - element_exists: "[data-transfer-station]:has-text(\"Town Hall · T4 10:08\")"
+  - element_exists: ".hm-e.to del.hm-was:has-text(\"10:08\")"
+  - element_exists: ".hm-e.to .hm-t:has-text(\"10:18\")"
+  - element_exists: ".hm-rec:has-text(\"The T9 arrives at 10:00, but the T4 left at 09:58.\")"
+  - element_exists: "[data-row-status].status-lost"

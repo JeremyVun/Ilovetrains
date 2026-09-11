@@ -211,7 +211,7 @@ function history(tripId = TRIP.id) {
 }
 
 function doc({ trips = [TRIP], body = null, fetchedAt = NOW_ISO, hist = history(), focus = null,
-  telemetry = null } = {}) {
+  recovery = null, telemetry = null } = {}) {
   const d = {
     schemaVersion: 1,
     trips,
@@ -228,6 +228,7 @@ function doc({ trips = [TRIP], body = null, fetchedAt = NOW_ISO, hist = history(
       tripId: trips[0].id, direction: 'forward',
       focusedAt: fetchedAt, journey: focus
     };
+    if (recovery) d.focus.recovery = recovery;
   }
   if (telemetry) d.telemetry = telemetry;
   return d;
@@ -239,7 +240,7 @@ async function states() {
   const fx = await import(pathToFileURL(path.join(ROOT, 'web/test/fixture.js')).href);
   const {
     departuresBody, baseJourneys, journey, delay, cancel,
-    transferBody, transferJourneys, delayLeg, cancelLeg, threeLegJourney,
+    transferBody, transferJourneys, delayLeg, cancelLeg, threeLegJourney, recoveryRecord,
     TRANSFER_NOW, TRANSFER_DEPARTED_NOW,
     FERRY_NOW, ferryBody, ferryJourneys, mixedBody, mixedJourneys,
     balmainEastBody, cockatooBalmainBody
@@ -382,7 +383,8 @@ async function states() {
       body,
       hist: opts.hist || [],
       fetchedAt: opts.generatedAt || TRANSFER_AT,
-      focus: opts.focus || null
+      focus: opts.focus || null,
+      recovery: opts.recovery || null
     });
     // A saved trip prints its line badges from whatever board it has on the
     // device, so a multi-trip home needs more than the selected trip's.
@@ -436,6 +438,16 @@ async function states() {
   const lateSecond = () => { const j = transferJourneys(); delayLeg(j[0], 1, 1); return j; };
   const lateFirst = () => { const j = transferJourneys(); delayLeg(j[0], 0, 1); return j; };
   const staleLate = () => { const j = transferJourneys(); delayLeg(j[0], 1, 9); return j; };
+  /* Left Rhodes on time, nine minutes late into Town Hall, and the 09:58 T4 is
+     gone: the connection the rider recovers onto is the 10:08, which this
+     corridor's board does not carry, so it comes from the same declared helper
+     the unit tests use. */
+  const lostConnection = () => {
+    const j = transferJourneys();
+    const arrival = j[0].legDetail[0].arrival;
+    arrival.estimated = new Date(Date.parse(arrival.scheduled) + 9 * 60_000).toISOString();
+    return j;
+  };
   const cancelledLead = () => { const j = transferJourneys(); cancelLeg(j[0], 0); return j; };
   const scheduledOnly = () => {
     const j = transferJourneys();
@@ -1043,6 +1055,48 @@ async function states() {
       generatedAt: '2026-09-01T09:33:00+10:00',
       focus: lateFirst()[0],
       expect: { status: 'Running late · Pinned' }
+    }),
+    /* The connection is gone. Riding, the header counts to the change it must
+       still make, strikes the arrival it lost, and the axis carries the
+       recovery's own train and time (ui.md, smart home). */
+    home('home-lost-riding', lostConnection(), {
+      trips: [TRIP_TRANSFER, TRIP],
+      cache: { '200060-215020': departuresBody() },
+      now: Date.parse('2026-09-01T09:47:00+10:00'),
+      generatedAt: '2026-09-01T09:47:00+10:00',
+      focus: lostConnection()[0],
+      recovery: recoveryRecord(Date.parse('2026-09-01T09:47:00+10:00')),
+      expect: {
+        status: 'Late · Connection gone', pinned: true, marker: true, next: null,
+        transferStation: 'Town Hall · T4 10:08'
+      }
+    }),
+    // At the change, the countdown and the instruction are the recovery's own
+    // first leg, and the candidate is on time, so the status drops LATE.
+    home('home-lost-dwell', lostConnection(), {
+      trips: [TRIP_TRANSFER, TRIP],
+      cache: { '200060-215020': departuresBody() },
+      now: Date.parse('2026-09-01T10:02:00+10:00'),
+      generatedAt: '2026-09-01T10:02:00+10:00',
+      focus: lostConnection()[0],
+      recovery: recoveryRecord(Date.parse('2026-09-01T10:02:00+10:00')),
+      expect: {
+        status: 'Connection gone', pinned: true, marker: true, next: null,
+        transferStation: 'Town Hall · T4 10:08'
+      }
+    }),
+    // Nothing found: the lost state is shown honestly, the destination arrival
+    // is the planned one, and no alternative is invented.
+    home('home-lost-none', lostConnection(), {
+      trips: [TRIP_TRANSFER, TRIP],
+      cache: { '200060-215020': departuresBody() },
+      now: Date.parse('2026-09-01T09:47:00+10:00'),
+      generatedAt: '2026-09-01T09:47:00+10:00',
+      focus: lostConnection()[0],
+      expect: {
+        status: 'Late · Connection gone', pinned: true, marker: true, next: null,
+        transferStation: 'Town Hall'
+      }
     }),
     // A four-hour-old snapshot carrying a stored nine-minute delay still says
     // RUNNING: a stale delta is not evidence of lateness.

@@ -284,3 +284,24 @@ test('a destination redirect matches the first departure across changed connecti
   redirected.legDetail[0].departure.scheduled = '2026-09-01T09:39:00+10:00';
   assert.notEqual(departureKey(redirected), departureKey(original));
 });
+
+test('a lost change prints no negative window and a recovery pair has no printed one', () => {
+  const lost = delayLeg(transferJourneys()[0], 0, 9);
+  const m = detail(lost, TRANSFER_DEPARTED_NOW);
+  assert.equal(m.changes[0].state, 'lost');
+  assert.equal(m.changes[0].minutes, -2, 'the model keeps the signed window');
+  assert.deepEqual(m.steps.map((s) => s.time), ['09:33', '0 min', '10:08']);
+  assert.equal(m.steps[1].label, '0 min change');
+
+  const recovery = detail(lost, TRANSFER_DEPARTED_NOW, { recoveryFrom: 0 }).changes[0];
+  assert.equal(recovery.printedMin, null, 'a pair never printed together cannot have shrunk');
+  assert.equal(recovery.state, 'lost');
+  assert.equal(recovery.label, 'Town Hall · T4 09:58');
+});
+
+test('a change label names the service the rider now boards, and only a recovery one does', () => {
+  const journey = transferJourneys()[0];
+  assert.equal(detail(journey).changes[0].label, 'Town Hall');
+  assert.equal(detail(journey, TRANSFER_NOW, { recoveryFrom: 0 }).changes[0].label, 'Town Hall · T4 09:58');
+  assert.equal(detail(journey, TRANSFER_NOW, { recoveryFrom: 1 }).changes[0].label, 'Town Hall');
+});

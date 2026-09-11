@@ -68,6 +68,12 @@ function changeAt(opts, index) {
   return Array.isArray(opts.changes) ? opts.changes[index] || null : null;
 }
 
+/* The line code is what a change label gives up first: the station name is
+   never ellipsised and the departure time is why the label exists (ui.md). */
+function shortLabel(change) {
+  return change.depTime ? `${change.station} · ${change.depTime}` : change.station;
+}
+
 function ferryTransferHtml(label, chip, role, stop) {
   return `<span class="sy-pv" data-ferry-location="${esc(label)}" data-role="${role}" data-stop="${esc(stop)}">${esc(chip)}</span>`;
 }
@@ -98,8 +104,9 @@ export function journeyBarHtml(spec, opts = {}) {
       html += `<span class="sy-g0${tight ? ' warn' : ''}" data-seg data-transfer-gap="${index}"${tight ? ' data-tight-gap="true"' : ''} style="left:${dwellStart}%;width:${dwellEnd - dwellStart}%"></span>`;
       const next = spec.legs[index + 1];
       const completed = completedTransfers.has(index) ? ' completed' : '';
+      const label = change && (change.label || change.station);
       const station = opts.stations && change && change.station
-        ? `<span class="sy-pstn${travelling ? ' travelling' : ''}" data-transfer-station data-transfer-index="${index}" data-midpoint="${(dwellStart + dwellEnd) / 2}" style="left:${(dwellStart + dwellEnd) / 2}%">${esc(change.station)}</span>` : '';
+        ? `<span class="sy-pstn${travelling ? ' travelling' : ''}" data-transfer-station data-transfer-index="${index}" data-midpoint="${(dwellStart + dwellEnd) / 2}"${label === change.station ? '' : ` data-transfer-label-short="${esc(shortLabel(change))}"`} style="left:${(dwellStart + dwellEnd) / 2}%">${esc(label)}</span>` : '';
       const ferryTransfer = leg.mode === 'ferry' || next.mode === 'ferry';
       const locationsKnown = ferryTransfer
         ? leg.toLabel || next.fromLabel || station
@@ -220,9 +227,12 @@ export function clampJourneyBars(root = document) {
     const deviceBounds = device.getBoundingClientRect();
     const placed = [];
     bar.querySelectorAll('[data-transfer-station]').forEach((label) => {
-      label.style.maxWidth = `${deviceBounds.width}px`;
+      label.style.maxWidth = 'none';
       label.style.left = `${label.dataset.midpoint}%`;
       label.style.top = '';
+      const short = label.dataset.transferLabelShort;
+      if (short && label.getBoundingClientRect().width > deviceBounds.width) label.textContent = short;
+      label.style.maxWidth = `${deviceBounds.width}px`;
       let rect = label.getBoundingClientRect();
       const shift = Math.max(deviceBounds.left - rect.left, Math.min(0, deviceBounds.right - rect.right));
       if (shift) label.style.left = `${rect.left + rect.width / 2 - bounds.left + shift}px`;

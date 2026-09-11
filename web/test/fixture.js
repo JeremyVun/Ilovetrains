@@ -136,6 +136,42 @@ export function transferBody(overrides = {}) {
   };
 }
 
+/* The connection a lost change is recovered onto: the next T4 out of Town
+   Hall. The captured corridor board has no such single-leg journey, so this is
+   a declared synthetic delta, matching the recovery search's own answer. */
+export function recoveryJourney() {
+  const legDetail = [{
+    line: { name: 'T4', mode: 'train' },
+    headsign: 'Bondi Junction',
+    from: { id: '200070', name: 'Town Hall Station', platform: 'Platform 5' },
+    to: { id: '202210', name: 'Bondi Junction Station', platform: 'Platform 1' },
+    departure: times('10:08:00', true),
+    arrival: times('10:18:00', true),
+    cancelled: false
+  }];
+  return {
+    departure: { ...legDetail[0].departure, platform: 'Platform 5' },
+    arrival: { ...legDetail[0].arrival },
+    line: legDetail[0].line,
+    destinationHeadsign: 'Bondi Junction',
+    stopsAway: null,
+    cancelled: false,
+    legs: 1,
+    legDetail
+  };
+}
+
+/** The record the client persists beside the focus once that connection is
+    the one the rider can still make (client-storage.md, Recovery). */
+export function recoveryRecord(atMs = TRANSFER_DEPARTED_NOW, changeIndex = 0) {
+  return {
+    changeIndex,
+    journey: recoveryJourney(),
+    fetchedAt: new Date(atMs).toISOString(),
+    source: { generatedAt: new Date(atMs).toISOString(), degraded: false }
+  };
+}
+
 /** Push one leg's realtime estimate `minutes` past its timetable, and the
     journey's own departure with it when it is the first leg. */
 export function delayLeg(journey, index, minutes) {

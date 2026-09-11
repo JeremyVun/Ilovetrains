@@ -54,6 +54,25 @@ function stopOf(stop) {
   return out;
 }
 
+/* The recovery record is a sibling of the focused journey, not part of it: a
+   malformed one is dropped and the focus survives (client-storage.md). */
+function normalizeRecovery(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  if (!Number.isInteger(value.changeIndex) || value.changeIndex < 0) return null;
+  if (!value.journey || typeof value.journey !== 'object' || Array.isArray(value.journey)) return null;
+  if (typeof value.fetchedAt !== 'string' || !Number.isFinite(Date.parse(value.fetchedAt))) return null;
+  const source = value.source && typeof value.source === 'object' ? value.source : {};
+  return {
+    changeIndex: value.changeIndex,
+    journey: value.journey,
+    fetchedAt: value.fetchedAt,
+    source: {
+      generatedAt: typeof source.generatedAt === 'string' ? source.generatedAt : null,
+      degraded: source.degraded === true
+    }
+  };
+}
+
 function recommendationPagesOf(value) {
   if (!Array.isArray(value)) return [];
   return value.filter((page) => page && Number.isFinite(page.at)
@@ -159,6 +178,8 @@ export function parseDoc(raw) {
     };
     const arrivalGuard = normalizeArrivalGuard(f.arrivalGuard);
     if (arrivalGuard) doc.focus.arrivalGuard = arrivalGuard;
+    const recovery = normalizeRecovery(f.recovery);
+    if (recovery) doc.focus.recovery = recovery;
   }
   if (v.locationAsk && typeof v.locationAsk.declinedAt === 'string') {
     doc.locationAsk = { declinedAt: v.locationAsk.declinedAt };

@@ -454,8 +454,11 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
 .answer-line:has(button) { display: flex; align-items: center; overflow: visible; }
 button.pin-status { height: 44px; margin: -15px 0; }
 .pin-icon { width: 12px; height: 12px; fill: currentColor; flex: none; }
+/* Without its word the icon has no separator to stand off, and the status line
+   is a flex row, so the space is its own. */
+.pin-alone { margin-left: .55em; }
 .pin-separator { margin: 0 .4em; color: var(--ink-3); }
-.answer-kind.status-late, .answer-kind.status-exception { color: var(--warn); }
+.answer-kind.status-late, .answer-kind.status-exception, .answer-kind.status-lost { color: var(--warn); }
 .answer-kind.status-uncertain { color: var(--ink-2); }
 .status-copy { white-space: nowrap; }
 .status-late-word { margin-left: .42em; }
@@ -494,6 +497,11 @@ button.pin-status { height: 44px; margin: -15px 0; }
 .hm-t { margin-top: 3px; line-height: 1.1; white-space: nowrap; }
 .hm-e.from .hm-t { font-size: var(--dept); font-weight: 400; letter-spacing: -.01em; color: var(--ink); }
 .hm-e.to .hm-t { margin-top: 7px; font-size: var(--arrt); font-weight: 300; color: var(--ink-2); }
+/* The arrival the rider planned on, kept beside the one they will make. */
+.hm-was {
+  margin-right: 7px; color: var(--ink-3);
+  text-decoration: line-through; text-decoration-thickness: 1.5px;
+}
 .hm-estimate {
   display: block; margin-top: 4px; font-size: 9px; font-weight: 600;
   letter-spacing: .12em; line-height: 1; text-transform: uppercase; color: var(--ink-3);
@@ -619,7 +627,8 @@ button.pin-status { height: 44px; margin: -15px 0; }
 .tripr.focused .hm-sub b { color: var(--ink); }
 .tripr.shown:not(.focused) .hm-sub b { color: var(--ink-2); }
 .tripr.focused .hm-sub b.status-late,
-.tripr.focused .hm-sub b.status-exception { color: var(--warn); }
+.tripr.focused .hm-sub b.status-exception,
+.tripr.focused .hm-sub b.status-lost { color: var(--warn); }
 .tripr.focused .hm-sub b.status-uncertain { color: var(--ink-2); }
 .hm-end {
   flex: none; padding: 14px 0 6px; white-space: nowrap; font-size: 10px;

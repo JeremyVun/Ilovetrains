@@ -12,7 +12,8 @@
 
 import { clock, minutesUntil, countdownFigure } from './time.js';
 import {
-  boardingLabel, journeyDetail, journeyKey, legsOf, arrivalMs, departureMs, effective, modeWords
+  boardingLabel, changesOf, journeyDetail, journeyKey, legsOf, arrivalMs, departureMs, effective,
+  modeWords, withLegs, RECOVERY_FLOOR_MIN
 } from './journey.js';
 import { shortName } from './dom.js';
 import { distanceKm } from './stations.js';
@@ -108,7 +109,7 @@ export function inferTravel(doc, nowMs, fix) {
     comes from the saved trip. */
 export function arrived(focus, destination, fix, nowMs) {
   if (!focus || !destination || !fix) return false;
-  const arrival = arrivalMs(focus.journey);
+  const arrival = arrivalMs(composedJourney(focus));
   if (arrival === null || nowMs < arrival - ARRIVED_EARLY_MS) return false;
   const km = distanceKm(fix, destination.location);
   return km !== null && km <= ARRIVED_KM;
@@ -131,7 +132,9 @@ export function isFocused(doc, journey) {
 export function focusExpired(focus, nowMs, resumeWaitUntilMs = null) {
   if (!focus) return false;
   if (Number.isFinite(resumeWaitUntilMs) && nowMs < resumeWaitUntilMs) return false;
-  const arrival = arrivalMs(focus.journey);
+  // The journey the rider is on is the composed one, so it decides when the
+  // focus is over (client-storage.md, Recovery).
+  const arrival = arrivalMs(composedJourney(focus));
   const base = arrival === null ? Date.parse(focus.focusedAt) : arrival;
   const guard = focus.arrivalGuard;
   if (guard?.armed && !guard.basis && arrival !== null) {
@@ -180,6 +183,120 @@ export function applyFocusSnapshot(doc, selection, body) {
   return match ? { ...doc, focus: { ...focus, journey: match } } : doc;
 }
 
+export function recoveryOf(focus) {
+  const record = focus && focus.recovery;
+  return record && record.journey && Number.isInteger(record.changeIndex)
+    && record.changeIndex >= 0 ? record : null;
+}
+
+/** The journey the rider can still make: the followed legs up to the lost
+    change, then the recovery's own (client-storage.md, Recovery). Everything
+    the header, the axis and detail draw is this journey. */
+export function composedJourney(focus) {
+  if (!focus) return null;
+  const record = recoveryOf(focus);
+  if (!record) return focus.journey;
+  const legs = legsOf(focus.journey).slice(0, record.changeIndex + 1)
+    .concat(legsOf(record.journey));
+  return legs.length ? withLegs(focus.journey, legs) : focus.journey;
+}
+
+/** The earliest journey that leaves the incoming arrival a window the server
+    would itself call a connection, every leg enabled and none cancelled. */
+export function recoveryCandidate(journeys, arrivalMs, opts = {}) {
+  const allowed = opts.allowed || (() => true);
+  const qualifies = (journey) => {
+    const departure = departureMs(journey);
+    if (departure === null || arrivalMs === null) return false;
+    if (minutesUntil(departure, arrivalMs) < RECOVERY_FLOOR_MIN) return false;
+    return !journeyCancelled(journey) && allowed(journey);
+  };
+  return (Array.isArray(journeys) ? journeys : []).filter(qualifies)
+    .sort((a, b) => departureMs(a) - departureMs(b))[0] || null;
+}
+
+/**
+ * The whole recovery seam for one refresh, in the contract's order
+ * (client-storage.md, Recovery): the followed journey's connection states, the
+ * anchor, the one search it allows, the candidate that search offers, and the
+ * composed journey everything else renders.
+ *
+ * `opts.response(search)` answers with the board already held for that search,
+ * or nothing; without one the record on disk stands, which is what web offline
+ * looks like.
+ */
+export function recoveryModel(focus, nowMs, opts = {}) {
+  const followed = focus ? focus.journey : null;
+  const followedChanges = changesOf(followed, nowMs, opts);
+  const held = recoveryOf(focus);
+  const compose = (record) => {
+    const journey = composedJourney(record ? { ...focus, recovery: record } : { ...focus, recovery: null });
+    return {
+      journey,
+      recoveryFrom: record ? record.changeIndex : null,
+      changes: changesOf(journey, nowMs, { ...opts, recoveryFrom: record ? record.changeIndex : Infinity })
+    };
+  };
+
+  const lostIndex = followedChanges.findIndex((change) => change.state === 'lost');
+  let current = compose(held);
+  if (lostIndex < 0) {
+    return {
+      followedChanges, recovery: null, changeIndex: null, anchor: null, search: null,
+      candidate: null, composed: followed, composedChanges: followedChanges, recoveryFrom: null,
+      lostChange: null, receipt: '', lost: false, retired: false
+    };
+  }
+
+  const composedLost = current.changes.findIndex((change) => change.state === 'lost');
+  const anchor = composedLost >= 0 ? composedLost : held ? held.changeIndex : lostIndex;
+  const legs = legsOf(current.journey);
+  const anchorLeg = legs[anchor] || {};
+  const search = { from: (anchorLeg.to && anchorLeg.to.id) || null, at: effective(anchorLeg.arrival) };
+  /* A record whose composition still connects is only refreshed — re-matched
+     leg by leg like the focus itself — so a periodic search cannot swap the
+     train the rider was already told to board. A lost change replaces it. */
+  const replacing = composedLost >= 0 || !held;
+  const response = typeof opts.response === 'function' ? opts.response(search) : null;
+  const candidate = !response ? null
+    : replacing ? recoveryCandidate(response.journeys, search.at, { allowed: opts.allowed })
+      : matchJourney(response.journeys, held.journey);
+
+  let record = held;
+  if (candidate) {
+    const changeIndex = held ? Math.min(anchor, held.changeIndex) : anchor;
+    record = {
+      changeIndex,
+      journey: withLegs(candidate, legs.slice(changeIndex + 1, anchor + 1).concat(legsOf(candidate))),
+      fetchedAt: new Date(nowMs).toISOString(),
+      source: { generatedAt: response.generatedAt || null, degraded: response.degraded === true }
+    };
+    current = compose(record);
+  }
+
+  const boarded = record ? effective(legsOf(current.journey)[record.changeIndex + 1]?.departure) : null;
+  const retired = boarded !== null && nowMs >= boarded;
+  const gone = current.changes.find((change) => change.state === 'lost') || null;
+  const lostChange = followedChanges[lostIndex];
+  return {
+    followedChanges,
+    recovery: record,
+    changeIndex: record ? record.changeIndex : null,
+    anchor,
+    search,
+    candidate,
+    composed: current.journey,
+    composedChanges: current.changes,
+    recoveryFrom: current.recoveryFrom,
+    lostChange,
+    receipt: gone ? 'Check the station boards.' : retired ? ''
+      : `The ${lostChange.fromCode} arrives at ${lostChange.arrTime}, `
+        + `but the ${lostChange.toCode} left at ${lostChange.depTime}.`,
+    lost: Boolean(gone) || !retired,
+    retired
+  };
+}
+
 /**
  * Called on every successful refresh: expire the focus if the journey is long
  * over, otherwise refresh its snapshot from the new data when this board is
@@ -195,7 +312,7 @@ export function refreshFocus(doc, selection, body, nowMs) {
 export function settleRide(doc, nowMs, fix = null) {
   const focus = focusOf(doc);
   const trip = focus && findTrip(doc, focus.tripId);
-  const arrival = focus ? arrivalMs(focus.journey) : null;
+  const arrival = focus ? arrivalMs(composedJourney(focus)) : null;
   if (!focus || !trip || arrival === null) return doc;
   const selection = { tripId: focus.tripId, direction: focus.direction };
   const ends = leg(trip, focus.direction);
@@ -216,11 +333,19 @@ export function journeyCancelled(journey) {
     || legsOf(journey).some((item) => item.cancelled === true)));
 }
 
-function departureDelayMinutes(item) {
-  const scheduled = Date.parse(((item || {}).departure || {}).scheduled || '');
-  const estimated = Date.parse(((item || {}).departure || {}).estimated || '');
+function delayMinutes(times) {
+  const scheduled = Date.parse((times || {}).scheduled || '');
+  const estimated = Date.parse((times || {}).estimated || '');
   if (!Number.isFinite(scheduled) || !Number.isFinite(estimated)) return null;
   return Math.floor(estimated / 60000) - Math.floor(scheduled / 60000);
+}
+
+/* Either end of the leg grants lateness, so a train that leaves on time and
+   loses minutes on the way is late (ui.md, smart home). */
+function legDelayMinutes(item) {
+  const values = [delayMinutes((item || {}).departure), delayMinutes((item || {}).arrival)]
+    .filter((value) => value !== null);
+  return values.length ? Math.max(...values) : null;
 }
 
 /* The one status the header's top line and the focused saved row share.
@@ -236,8 +361,12 @@ export function focusStatus(journey, opts = {}) {
   if (opts.over) return state('Trip over', 'complete', false, -1, 0);
   if (journeyCancelled(journey)) return state('Cancelled', 'exception', false, -1, 0);
   const leg = Number.isInteger(opts.activeLeg) && opts.activeLeg >= 0 ? opts.activeLeg : 0;
-  const delay = departureDelayMinutes(legsOf(journey)[leg]);
-  return !opts.stale && delay !== null && delay > 0
+  const delay = legDelayMinutes(legsOf(journey)[leg]);
+  const late = !opts.stale && delay !== null && delay > 0;
+  if (opts.lost) {
+    return state(late ? 'Late · Connection gone' : 'Connection gone', 'lost', late, leg, late ? delay : 0);
+  }
+  return late
     ? state('Running late', 'late', true, leg, delay)
     : state('Running', 'ordinary', false, leg, delay || 0);
 }
@@ -274,8 +403,11 @@ export function directionsModel(value, nowMs, opts = {}) {
     change.departureMs !== null && nowMs >= change.departureMs ? index : -1).filter((index) => index >= 0);
   // Computed before the phase branches: a change still ahead is at risk while
   // the rider is waiting for the train too, not only once aboard.
-  const risk = changes.find((change) => change.tight
+  const risk = changes.find((change) => change.state === 'tight'
     && (change.departureMs === null || nowMs < change.departureMs));
+  // A lost change nothing was found for: the ladder stops here rather than
+  // walking into a train that left (ui.md, smart home).
+  const gone = changes.find((change) => change.state === 'lost') || null;
 
   /* The leg that left fine is not the leg that was cancelled: once under way,
      the header names the cancelled leg instead of offering a next train. */
@@ -302,6 +434,8 @@ export function directionsModel(value, nowMs, opts = {}) {
     tight: Boolean(risk),
     provenanceWarn: false,
     receipt: opts.receipt || '',
+    arrivalStruck: opts.struckArrival || '',
+    arrivalPlanned: Boolean(gone),
     changes
   };
 
@@ -393,8 +527,15 @@ export function directionsModel(value, nowMs, opts = {}) {
     if (next && next.departureMs !== null && nowMs < next.departureMs) {
       model.figure = countdownFigure(minutesUntil(next.departureMs, nowMs));
       model.provenance = 'TO CHANGE';
-      model.instruction = `Change at ${next.toStation}`
-        + (next.toLabel ? ` · ${next.toLabel}` : '');
+      model.instruction = next.recovery
+        ? `Board the ${next.depTime} at ${next.toStation}`
+          + (next.toLabel ? ` · ${next.toLabel}` : '')
+        : `Change at ${next.toStation}` + (next.toLabel ? ` · ${next.toLabel}` : '');
+      model.activeLeg = next.index;
+      phase = 'dwell';
+      break;
+    }
+    if (next && next.state === 'lost') {
       model.activeLeg = next.index;
       phase = 'dwell';
       break;
@@ -409,6 +550,11 @@ export function directionsModel(value, nowMs, opts = {}) {
     if (risk.printedMin !== null && risk.minutes < risk.printedMin) {
       model.receipt = `Printed change was ${risk.printedMin} min.`;
     }
+  }
+  if (gone) {
+    model.warn = true;
+    model.tight = false;
+    model.instruction = `The ${gone.fromCode} arrives too late for the ${gone.depTime}`;
   }
   if (ridingCancelled) {
     const lost = legs[cancelledIndex];

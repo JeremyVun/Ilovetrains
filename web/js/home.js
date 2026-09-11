@@ -3,9 +3,9 @@
 
 import { esc, figureHtml, shortName, fitStationNames } from './dom.js';
 import {
-  visibleFocus, directionsModel, focusStatus, journeyCancelled
+  visibleFocus, directionsModel, focusStatus, journeyCancelled, composedJourney, recoveryModel
 } from './focus.js';
-import { arrivalMs, departureMs, departureKey, journeyKey, journeyDetail, legsOf, modeWords } from './journey.js';
+import { arrivalMs, departureMs, departureKey, journeyKey, legsOf, modeWords } from './journey.js';
 import { colourKey, lineFill } from './lines.js';
 import { clock, countdownFigure, minutesUntil } from './time.js';
 import { journeyDeviceHtml, clampJourneyBars, chipInk } from './journeybar.js';
@@ -57,7 +57,7 @@ function alternativeService(value, lead, nowMs) {
 
 export function tripIsOver(focus, nowMs) {
   if (!focus) return false;
-  const arrival = arrivalMs(focus.journey);
+  const arrival = arrivalMs(composedJourney(focus));
   return arrival !== null && nowMs > arrival;
 }
 
@@ -156,7 +156,14 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
   const cancelledTime = replacement ? clock(focusDep)
     : !activeFocus && liveLead && journeyCancelled(liveLead) && nextRunning && nextRunning !== liveLead
       && departureMs(liveLead) !== null ? clock(departureMs(liveLead)) : '';
-  const journey = activeFocus ? replacement || activeFocus.journey
+  /* Recovery is derived, never stored by the renderer: the record on the focus
+     and the response held for this refresh compose the journey every part of
+     the header then reads (client-storage.md, Recovery). */
+  const recovery = activeFocus ? recoveryModel(activeFocus, nowMs, {
+    response: opts.recoveryResponse,
+    allowed: (item) => journeyAllowed(item, enabledModes, maxTransfers)
+  }) : null;
+  const journey = activeFocus ? replacement || recovery.composed
     : opts.recommendation?.journey || nextRunning || liveLead
       || (!body ? cachedJourney(doc, trip, selection.direction, enabledModes) : null);
   const firstJourneyLeg = legsOf(journey)[0] || {};
@@ -191,6 +198,7 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
   const over = Boolean(activeFocus) && ('arrivalDecision' in opts
     ? opts.arrivalDecision?.state === 'arrived'
     : tripIsOver(activeFocus, nowMs) || Boolean(opts.arrived));
+  const recovering = Boolean(recovery && recovery.lostChange && !replacement);
   const directions = journey ? directionsModel(journey, nowMs, {
     stale: displayStale,
     fromName: selectedEnds.from.name,
@@ -199,7 +207,9 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     arrived: over,
     arrivalDecision: opts.arrivalDecision,
     cancelledTime,
-    receipt
+    recoveryFrom: recovering ? recovery.recoveryFrom : null,
+    struckArrival: recovering && recovery.recovery ? clock(arrivalMs(activeFocus.journey)) : '',
+    receipt: recovering ? recovery.receipt : receipt
   }) : {
     journey: null,
     from: shortName(selectedEnds.from.name),
@@ -212,7 +222,7 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
           : body ? maxTransfers === 0 ? 'No direct services found'
             : modeSubset ? 'No journeys with these services' : 'No services in the next few hours'
             : 'Getting the next trains…',
-    progress: { at: 0, phase: 'pre' }, showBoardingPlatform: true, receipt: '',
+    progress: { at: 0, phase: 'pre' }, showBoardingPlatform: true, receipt: '', changes: [],
     settingsAction: !enabledModes.length || Boolean(body && modeSubset && !opts.offline && !opts.stale),
     allServicesOff: !enabledModes.length
   };
@@ -233,10 +243,11 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
   });
   // A board still in the post is not offline; the pill rests until it answers.
   const waiting = !activeFocus && (!enabledModes.length || (!body && !opts.offline));
-  const status = activeFocus ? focusStatus(activeFocus.journey, {
+  const status = activeFocus ? focusStatus(replacement ? activeFocus.journey : journey, {
     activeLeg: directions.activeLeg,
     stale: displayStale,
     over,
+    lost: recovering && recovery.lost,
     arrivalState: opts.arrivalDecision?.state,
     moving: opts.arrivalDecision?.moving
   }) : null;
@@ -271,9 +282,9 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     status,
     pinned: Boolean(activeFocus && activeFocus.by !== 'inferred' && !replacement),
     following,
-    changes: journey ? journeyDetail(journey, nowMs).changes.map((change) => ({
+    changes: (directions.changes || []).map((change) => ({
       ...change, tight: change.tight && !journeyCancelled(journey)
-    })) : [],
+    })),
     top: status ? null : topLine(shortName(selectedEnds.from.name),
       distanceKm(opts.fix, selectedEnds.from.location),
       modeWords(firstJourneyLeg.line && firstJourneyLeg.line.mode).vehicle),
@@ -323,7 +334,7 @@ export function homeHtml(model) {
       <span class="hm-fig"><span class="hm-n">${figureHtml(d.figure, 'hm-u')}</span><span class="hm-st${d.warn || d.provenanceWarn ? ' warn' : ''}">${esc(provenance || '')}</span></span>
       <span class="hm-ends">
         <span class="hm-e from"><span class="hm-stn" data-fit-box data-fit-name="${esc(d.from)}">${esc(d.from)}</span><span class="hm-t">${esc(d.depTime)}</span></span>
-        <span class="hm-e to"><span class="hm-stn" data-fit-box data-fit-name="${esc(d.to)}">${esc(d.to)}</span><span class="hm-t">${esc(d.arrTime)}</span>${d.lastEstimate ? '<span class="hm-estimate">Last estimate</span>' : ''}</span>
+        <span class="hm-e to"><span class="hm-stn" data-fit-box data-fit-name="${esc(d.to)}">${esc(d.to)}</span><span class="hm-t">${d.arrivalStruck ? `<del class="hm-was">${esc(d.arrivalStruck)}</del>` : ''}${esc(d.arrTime)}</span>${d.lastEstimate ? '<span class="hm-estimate">Last estimate</span>' : d.arrivalPlanned ? '<span class="hm-estimate">Planned</span>' : ''}</span>
       </span>
       ${device.html}
       <span class="hm-sign${d.warn ? ' note' : d.act ? ' hm-act' : ''}">${d.allServicesOff
@@ -360,16 +371,21 @@ function nextServiceHtml(next) {
   </button>`;
 }
 
-function pinHtml(icon = true) {
+function pinHtml(icon = true, word = true) {
   const tag = icon ? 'button' : 'span';
   const action = icon ? ' data-act="unpin" aria-label="Unpin this service" title="Unpin this service"' : '';
-  return `<${tag}${action} class="pin-status" data-pinned>${icon ? '<svg class="pin-icon" aria-hidden="true" viewBox="0 0 16 16"><path d="M5 1h6v1l-1 1v3l3 3v1H9v5H7v-5H3V9l3-3V3L5 2z"/></svg>' : ''}Pinned</${tag}>`;
+  return `<${tag}${action} class="pin-status${word ? '' : ' pin-alone'}" data-pinned>${icon ? '<svg class="pin-icon" aria-hidden="true" viewBox="0 0 16 16"><path d="M5 1h6v1l-1 1v3l3 3v1H9v5H7v-5H3V9l3-3V3L5 2z"/></svg>' : ''}${word ? 'Pinned' : ''}</${tag}>`;
 }
 
 function selectedStatusHtml(model, icon = false) {
   const status = model.status;
   const onlyPin = model.pinned && model.directions.phase === 'pre' && status.kind === 'ordinary';
   if (onlyPin) return pinHtml(icon);
+  // Beside a lost connection an explicit pin is the icon alone, and the saved
+  // row carries the status only (ui.md, smart home).
+  if (status.kind === 'lost') {
+    return statusHtml(status) + (model.pinned && icon ? pinHtml(true, false) : '');
+  }
   return statusHtml(status) + (model.pinned ? `<span class="pin-separator"> · </span>${pinHtml(icon)}` : '');
 }
 
@@ -393,7 +409,7 @@ function statusClass(status) {
 
 /* The late word is its own span so the treatment can space and colour it. */
 function statusHtml(status) {
-  return status.late
+  return status.kind === 'late'
     ? '<span class="status-inner">Running <span class="status-late-word">late</span></span>'
     : esc(status.text);
 }
