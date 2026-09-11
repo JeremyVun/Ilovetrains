@@ -332,14 +332,27 @@ followed pair and the same exact-match online/local-overlay ownership rules as
 foreground refresh.
 
 Tracker stages and line progress derive from effective wall-clock times. They
-do not establish observed boarding, alighting or vehicle position. If an incoming
-leg's effective arrival is later than the onward departure, the tracker shows
-the broken connection and never advances into riding that onward leg. The
+do not establish observed boarding, alighting or vehicle position. The
+missed-transfer predicate is the shared printed-minute rule,
+`floor(dep(i+1)) − floor(arr(i)) ≤ 0`, which is the lost state
+[ui.md](ui.md#smart-home) defines, and not a millisecond comparison, so a change
+printed `09:59 → 09:59` is lost on every client. On a lost connection the
+tracker never advances into riding the onward leg it names. The
 destination clock becomes `Planned HH:mm`, rather than an achievable arrival
 estimate. A delayed earlier leg remains visible even if its arrival moves beyond
 the last leg's unchanged arrival. Cancellation retains the chosen service and
 does not select a replacement; only cancellation of the final leg strikes its
 arrival time.
+
+The tracker projects the composed journey
+([client-storage.md](client-storage.md#recovery)): the ridden legs to the lost
+change, then the recovery legs. The broken-connection layout and
+`Planned HH:mm` apply only while there is no candidate; with one, the tracker
+advances into the recovery legs and carries the composed arrival. Offline
+recovery uses the local planner at the same anchor, under the same candidate
+rule, and still plans no second route of its own. Journey-alert cue identity is
+`(kind, legIndex)` over composed-journey leg indices; a replaced recovery record
+is a new tail, whose legs may cue again.
 
 ## Sydney Trains service dates
 

@@ -382,7 +382,8 @@ The document may contain an optional `focus` field for a pinned or inferred serv
   "direction": "forward",
   "focusedAt": "2026-09-01T09:07:00+10:00",
   "by": "focus",
-  "journey": { "…": "verbatim snapshot of the focused journey object" }
+  "journey": { "…": "verbatim snapshot of the focused journey object" },
+  "recovery": { "…": "optional; see Recovery below" }
 }
 ```
 
@@ -429,6 +430,62 @@ The document may contain an optional `focus` field for a pinned or inferred serv
   refresh, not during a render. An expired focus stops being drawn
   immediately either way; rendering never touches storage, because the client
   paints once with the real clock before anything can pin it.
+
+### Recovery
+
+A lost change — the connection states are in
+[ui.md](ui.md#smart-home) — puts the focus into recovery. Recovery is decided
+from the clock alone: no client uses a location fix to detect the loss, to
+anchor the search, or to claim the rider alighted or boarded.
+
+```json
+"recovery": {
+  "changeIndex": 0,
+  "journey": { "…": "verbatim snapshot of the candidate journey" },
+  "fetchedAt": "2026-09-15T10:00:00+10:00",
+  "source": { "generatedAt": "2026-09-15T09:59:30+10:00", "degraded": false }
+}
+```
+
+- The record is a sibling of `journey` on the focus and is never spliced into
+  it. At most one exists; a new anchor replaces it. It is cleared with the
+  focus, on unpin or replacement, and on the first refresh where no change is
+  lost. A malformed record is dropped and the focus survives it; nothing here
+  may crash a client.
+- `changeIndex` is a change index of the composed journey below.
+- `journey` is re-matched on every refresh by the ordered `(line.name,
+  departure.scheduled)` pairs of its service legs, exactly like
+  `focus.journey`, and carries its own source freshness in `source`. Unmatched
+  (departed) keeps the last snapshot with that freshness.
+- The search runs at the anchor: from `legs[changeIndex].to.id` to the followed
+  journey's destination, with `at` the incoming leg's effective arrival, under
+  the followed journey's mode allow-list and transfer cap. Online it is one
+  `GET /api/v1/departures` on that pair. Android and iOS offline use the local
+  planner with the same anchor; web offline has no candidate.
+- The candidate is the earliest journey whose first leg's effective departure
+  leaves a printed-minute window `w ≥ 3` against that arrival — the server's
+  own connection floor — with every leg enabled and none cancelled. No
+  qualifying journey means no candidate, never an invented one.
+- The composed journey is the followed legs `0..changeIndex` followed by the
+  candidate's legs. It is what the header, the axis, journey detail and the
+  native trackers render. It is re-evaluated on every refresh: the recovery
+  clears once the original connection is catchable again, and when a change of
+  the composed journey after the anchor is itself lost, that refresh's one
+  recovery request searches from the later change and replaces the record.
+- Focus expiry and the final-arrival decision below use the composed journey's
+  effective arrival. The focus identity stays the followed journey's
+  (`tripId:direction:journeyKey(focus.journey)`), so recovery never resets the
+  arrival-guard sample window nor restarts the followed request.
+- The displayed-focus predicate — the mode allow-list and the transfer cap —
+  is evaluated on the followed journey alone. The candidate was searched under
+  the same allow-list and cap; the composed journey may exceed the cap and is
+  still shown.
+- The recovery response is held in memory beside the focus body and persisted
+  only as this record. It never enters the saved-trip cache, whose keys are
+  saved pairs, and the native equivalents follow the same rule.
+
+`tools/fixtures/conformance/transfer-recovery.json` is the shared case set for
+these rules and their presentation.
 
 ### Travel mode
 
