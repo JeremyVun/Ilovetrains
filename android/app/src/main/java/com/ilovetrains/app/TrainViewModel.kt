@@ -266,9 +266,10 @@ class TrainViewModel private constructor(
                     data = data.copy(focus = updated)
                     persist()
                 }
-                settleFocus(matchingRefresh = match != null || overlay?.canJudgeClock == true)
+                val matched = match != null || overlay?.canJudgeClock == true
+                settleFocus(matchingRefresh = matched)
                 syncPersonal()
-                settleRecovery(current)
+                settleRecovery(current, matched)
             }
         }
     }
@@ -590,12 +591,12 @@ class TrainViewModel private constructor(
             if (match != null) data = data.copy(focus = current.copy(journey = match, board = result, alternatives = null))
             else current.demotedForUnmatchedBoard()?.let { data = data.copy(focus = it) }
             settleFocus(matchingRefresh = match != null); persist(); syncPersonal()
-            settleRecovery(focus)
+            settleRecovery(focus, match != null)
         }
     }
 
     /** One recovery request per refresh, on the focused journey's own tail; never the saved-trip cache. */
-    private suspend fun settleRecovery(subject: FocusedJourney) {
+    private suspend fun settleRecovery(subject: FocusedJourney, matchingRefresh: Boolean) {
         if (debugTrackerCaptureMode) return
         fun owned(): FocusedJourney? = data.focus?.takeIf {
             it.tripId == subject.tripId && it.reverse == subject.reverse && it.journey.key == subject.journey.key
@@ -619,12 +620,12 @@ class TrainViewModel private constructor(
             planner.plan(search.from, search.to, search.at, modes, 12, data.offlineMaxTransfers)
         } catch (e: CancellationException) { throw e } catch (_: Exception) { null }
         val current = owned() ?: return
-        val candidate = board?.let { recoveryCandidate(it.journeys, search.at, modes) }
+        val candidate = board?.let { recoveryChoice(plan, it.journeys, modes) }
         val record = recoveryAfterSearch(plan, candidate, mutable.value.now, RecoverySource(
             board?.generatedAt ?: mutable.value.now, board == null || board.offline || board.serverStale))
         if (record == current.recovery) return
         data = data.copy(focus = current.copy(recovery = record))
-        settleFocus(); persist(); syncPersonal()
+        settleFocus(matchingRefresh = matchingRefresh); persist(); syncPersonal()
     }
     private fun settleFocus(matchingRefresh: Boolean = false) {
         val now = mutable.value.now

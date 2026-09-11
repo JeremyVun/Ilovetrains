@@ -67,6 +67,18 @@ class UiPresentationTest {
         assertEquals("2H", nextServiceFigure(journey.copy(retained = true), board, now))
     }
 
+    @Test fun theHomeFigureBeforeDepartureReadsTheDisplayedBoardNotTheFocusHeaders() {
+        val now = 1_000_000L
+        val journey = Journey(listOf(Leg("T1", "train", "Beta", a, b, now + 600_000, now + 1_200_000,
+            estimatedDeparture = now + 600_000)))
+        val shown = BoardData(a, b, listOf(journey), now, source = "live")
+        val header = focusHeader(FocusedJourney("trip", false, journey, shown.copy(generatedAt = now - 600_000)), now)
+        val figure = figureFor(journey, shown, now)
+        assertNotEquals(header.figure, figure)
+        assertEquals(figure, homeHeaderFigure(header, departed = false, board = figure))
+        assertEquals(header.figure, homeHeaderFigure(header, departed = true, board = figure))
+    }
+
     @Test fun shownLeadEvidenceKeepsTheExactObservationAndItsSource() {
         val now = 6_000_000L
         val scheduled = Journey(listOf(Leg("T1", "train", "Beta", a, b, now + 60_000, now + 300_000)))

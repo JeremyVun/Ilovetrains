@@ -75,9 +75,7 @@ internal fun trackerCues(
             }
             else -> Unit
         }
-        val ahead = projection.activeLegIndex.takeIf {
-            projection.stage == TravelTrackerStage.Ride || projection.stage == TravelTrackerStage.Boarding
-        }
+        val ahead = projection.activeLegIndex.takeIf { projection.stage == TravelTrackerStage.Ride }
         if (ahead != null && current.changes.getOrNull(ahead) == ConnectionState.Tight &&
             previous.changes.getOrNull(ahead) != ConnectionState.Tight) {
             add(TravelTrackerCue(TravelTrackerCueKind.TightChange, ahead))

@@ -142,7 +142,7 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
     val departed = focused && state.now >= journey.effectiveDeparture
     val completed = state.focusComplete || state.arrival?.state == ArrivalState.Arrived
     val overdue = focused && state.now >= journey.effectiveArrival && !completed
-    val directionFigure = header?.figure ?: if (overdue) {
+    val boardFigure = if (overdue) {
         val past = ((state.now - journey.effectiveArrival) / 60_000).toInt()
         Figure(if (state.arrival?.moving == true && past > 0) past.toString() else "—",
             if (state.arrival?.moving == true && past > 0) "min" else "",
@@ -150,6 +150,7 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
     } else if (departed && !completed) {
         directionFigureFor(journey, state.now) ?: fig
     } else fig
+    val directionFigure = homeHeaderFigure(header, departed, boardFigure)
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().heightIn(min = if (explicitlyPinned) 44.dp else 22.dp).padding(horizontal = PagePadding), verticalAlignment = Alignment.CenterVertically) {
             val status = when {

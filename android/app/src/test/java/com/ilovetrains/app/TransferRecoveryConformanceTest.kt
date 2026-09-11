@@ -57,7 +57,7 @@ class TransferRecoveryConformanceTest {
             assertEquals("$name search", optString(expected, "search"), requested)
 
             val search = named(searches, requested)
-            val candidate = search?.let { recoveryCandidate(searchJourneys(it), plan.search!!.at, AllModes) }
+            val candidate = search?.let { recoveryChoice(plan, searchJourneys(it), AllModes) }
             assertEquals("$name candidate", optInt(expected, "candidate"),
                 candidate?.let { chosen -> searchJourneys(search).indexOfFirst { it == chosen } })
 
