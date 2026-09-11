@@ -154,6 +154,11 @@ Read `feed_prediction_scored[lead.error]` for how a countdown at a given lead
 held up, and `tripplanner_leg_reconciled[mode.outcome]` for how often the
 board's source agreed with the feed. Both are counts of scored predictions and
 served legs, weighted by how often busy pairs are fetched, not by riders.
+The clients' 40 minute live horizon
+([ui.md](ui.md#past-stale-and-exceptional-data)) sits on this counter's
+`20-40m` / `40-90m` bucket edge (`leadBounds` in `internal/native/accuracy.go`)
+so the two sides of that rule stay separately measurable; move the edge and
+the rule loses its evidence.
 
 ## Reading the counters
 
