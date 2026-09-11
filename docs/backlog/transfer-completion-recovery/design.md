@@ -149,6 +149,33 @@ All user-facing strings (status word, instruction, receipt, rail label) are
 drafted through Codex `gpt-6-astra` and verdicted by the owner; candidates
 appear first in the comps round.
 
+### Alert copy candidates (Codex gpt-6-astra, 2026-09-11, owner verdict pending)
+
+Build default in bold; the owner may overrule and the string is changed in
+the contract and the clients. Placeholders are filled from the composed
+journey. Codex wrote `platform` in lower case; the clients print `Platform n`
+as everywhere else.
+
+Delayed cue (title / body):
+- **`Running late` / `The train is now due at <destination> at <HH:MM>.`**
+  (title changed from Codex's `Delayed` so the alert uses the same word as
+  the `RUNNING LATE` status; body is Codex candidate 1 verbatim)
+- `Delayed` / `The train is expected to reach <destination> about <n> minutes late.`
+- `Delayed` / `Arrival at <destination> is now expected at <HH:MM>, about <n> minutes late.`
+
+Tight change cue (title / body):
+- **`Tight change` / `The train is expected at <station> about <n> minutes before <service> leaves.`**
+- `Tight change` / `The estimated change time at <station> is now about <n> minutes.`
+- `Tight change` / `The estimated gap between trains at <station> is now about <n> minutes. The connecting train leaves from platform <platform>.`
+
+Missed connection body with a candidate (title stays `Connection missed`;
+without a candidate the shipped body is unchanged):
+- **`The planned trains no longer connect. Another option is <service> at <HH:MM> from <station>.`**
+- `The train is too late for the planned connection. Another train on <service> is due to leave <station> at <HH:MM> from platform <platform>.`
+- `The planned trains no longer connect. The replacement connection is <service> at <HH:MM> from platform <platform> at <station>.`
+
+`<service>` is the line code with its article, `the T4`.
+
 ## Comps
 
 Round 1 (2026-09-10): workshop and verdict recorded below when the round
@@ -251,7 +278,7 @@ Defaults taken to keep the item small, each overrulable by the owner:
 
 Nothing blocks the build plan. Overrulable defaults are listed under the
 round 2 verdict; alert copy for the two new cues (`Delayed`, `Tight change`)
-is drafted by Codex during the build and verdicted by the owner.
+was drafted by Codex on 2026-09-11 (see "Alert copy candidates" under Copy); the build uses the bold defaults until the owner verdicts.
 
 ## Verification cases
 
