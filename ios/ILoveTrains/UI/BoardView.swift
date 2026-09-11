@@ -94,7 +94,7 @@ struct BoardRow: View {
     var body: some View {
         let fig = figureOverride ?? figureFor(journey, board: board, now: now)
         let late = minutesBetween(journey.departure, journey.effectiveDeparture) > 0
-        let stale = board == nil || board?.offline == true || journey.retained == true || now - (board?.generatedAt ?? 0) > 90_000
+        let stale = staleRow(journey, board: board, now: now)
         let content = HStack(spacing: 14) {
             VStack(alignment: .trailing, spacing: 4) {
                 HStack(alignment: .lastTextBaseline, spacing: 2) {
@@ -139,7 +139,7 @@ struct BoardRow: View {
     private func figureColor(_ figure: Figure, late: Bool, stale: Bool) -> Color {
         if journey.cancelled || figure.past { return colors.ink3 }
         if late { return colors.warning }
-        if stale || !journey.realtime { return colors.ink2 }
+        if stale || !journey.realtime || beyondLiveHorizon(journey, board: board, now: now) { return colors.ink2 }
         return colors.ink
     }
 

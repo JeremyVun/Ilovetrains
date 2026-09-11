@@ -178,9 +178,23 @@ func figureUsesCompactType(_ figure: Figure) -> Bool {
     (figure.value + (figure.unit == "H" ? "H" : "")).count >= 3
 }
 
+let liveHorizonMinutes = 40
+
+func staleRow(_ journey: Journey, board: BoardData?, now: Millis) -> Bool {
+    board == nil || board?.offline == true || journey.retained == true || now - (board?.generatedAt ?? 0) > 90_000
+}
+
+// The feed's estimates stop earning the live register past the accuracy tracker's 40 minute bucket edge.
+func beyondLiveHorizon(_ journey: Journey, board: BoardData?, now: Millis) -> Bool {
+    guard journey.legs.first?.estimatedDeparture != nil, !journey.cancelled else { return false }
+    guard let board, board.source == "live", !staleRow(journey, board: board, now: now) else { return false }
+    guard minutesBetween(journey.departure, journey.effectiveDeparture) == 0 else { return false }
+    return minutesBetween(now, journey.effectiveDeparture) > liveHorizonMinutes
+}
+
 func figureFor(_ journey: Journey, board: BoardData?, now: Millis) -> Figure {
     let departure = journey.effectiveDeparture
-    let stale = board == nil || board?.offline == true || journey.retained == true || now - (board?.generatedAt ?? 0) > 90_000
+    let stale = staleRow(journey, board: board, now: now)
     let minutes = minutesBetween(now, departure)
     if journey.cancelled { return Figure(value: "—", provenance: "Cancelled", past: minutes < 0) }
     if minutes < 0 {
@@ -190,8 +204,9 @@ func figureFor(_ journey: Journey, board: BoardData?, now: Millis) -> Figure {
             : Figure(value: "\(elapsed)", unit: "min", provenance: "Ago", past: true)
     }
     let liveRealtime = !stale && board?.source == "live" && journey.realtime
+    let scheduledRegister = !liveRealtime || beyondLiveHorizon(journey, board: board, now: now)
     let late = minutesBetween(journey.departure, journey.effectiveDeparture)
-    let provenance = late > 0 ? "\(late) min late" : (!liveRealtime ? "Scheduled" : (minutes == 0 ? "Departing" : ""))
+    let provenance = late > 0 ? "\(late) min late" : (scheduledRegister ? "Scheduled" : (minutes == 0 ? "Departing" : ""))
     if minutes == 0 { return Figure(value: "Now", provenance: provenance) }
     if minutes > 99 { return Figure(value: "\(Int((Double(minutes) / 60).rounded()))", unit: "H", provenance: provenance) }
     return Figure(value: "\(minutes)", unit: "min", provenance: provenance)

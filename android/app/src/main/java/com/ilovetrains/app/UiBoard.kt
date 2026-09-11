@@ -123,12 +123,12 @@ fun BoardRow(journey: Journey, board: BoardData?, now: Long, onClick: (() -> Uni
     val fig = figureOverride ?: figureFor(journey, board, now)
     val first = journey.legs.first()
     val late = minutesBetween(journey.departure, journey.effectiveDeparture) > 0
-    val stale = board == null || board.offline || journey.retained || now - board.generatedAt > 90_000
+    val stale = rowStale(journey, board, now)
     val figureColor = when {
         journey.cancelled || fig.past -> c.ink3
         late && !fig.past -> c.warning
         stale -> c.ink2
-        !journey.realtime -> c.ink2
+        !journey.realtime || beyondLiveHorizon(journey, board, now) -> c.ink2
         else -> c.ink
     }
     val clickable = if (onClick == null) Modifier else Modifier.clickable(role = Role.Button, onClick = onClick)

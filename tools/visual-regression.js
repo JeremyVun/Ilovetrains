@@ -77,6 +77,7 @@ const SCREENS = [
   ['board-412', 'short-on-time', null, null],
   ['board-412-end', 'short-on-time-scrolled', null, null],
   ['board-delayed', 'delayed', 'board-delayed', 'board-delayed'],
+  ['board-horizon', 'board-horizon', 'board-horizon', 'board-horizon'],
   ['board-cancelled', 'cancelled', null, null],
   ['board-past', 'past-register-scrolled', null, null],
   ['board-long-names', 'long-names', null, null],

@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { boardModel, rowLines, STALE_MS } from '../js/rowmodel.js';
+import { boardModel, rowLines, STALE_MS, LIVE_HORIZON_MIN } from '../js/rowmodel.js';
 import { boardHtml, emptyCopy, resultRowHtml } from '../js/board.js';
 import { departureKey, journeyKey } from '../js/journey.js';
 import { NOW, departuresBody, baseJourneys, journey, delay, cancel } from './fixture.js';
@@ -209,13 +209,12 @@ test('past 99 minutes the figure is rounded hours, not three digits', () => {
     ['3H', '4H', '4H', '4H', '4H', '4H']);
 });
 
-/* The rounding rule and the "MIN" vocabulary disagree for a service that is
-   both hours away AND under realtime control — "3H / MIN". The owner ruled the
-   provenance slot unchanged (2026-09-01 B), noting such a service will
-   virtually always be SCHEDULED, which is what the fixture's own late-night
-   board shows. Pinned here so the next reader knows it is a decision, not a
-   miss. */
-test('a far-future service keeps the provenance its data earns', () => {
+/* A monitored service hours away once kept an empty provenance (owner ruling
+   2026-09-01 B). Since 2026-09-11 an on-time estimate beyond the 40 minute
+   horizon reads SCHEDULED: past the accuracy tracker's bucket edge one live
+   prediction in eight moves, so the register says timetable until the feed
+   contradicts it. */
+test('a far-future service reads scheduled whether or not it is monitored', () => {
   const t = new Date(NOW + 187 * 60000).toISOString();
   const unmonitored = { departure: { scheduled: t, estimated: null, platform: '1' }, arrival: {}, line: { name: 'T1' }, legs: 1 };
   const monitored = { departure: { scheduled: t, estimated: t, platform: '1' }, arrival: {}, line: { name: 'T1' }, legs: 1 };
@@ -227,7 +226,51 @@ test('a far-future service keeps the provenance its data earns', () => {
 
   const b = boardModel({ generatedAt: gen, journeys: [monitored] }, NOW).rows[0];
   assert.equal(b.figure, '3H');
-  assert.equal(b.provenance, '');
+  assert.equal(b.provenance, 'SCHEDULED');
+  assert.equal(b.scheduledOnly, true);
+});
+
+test('beyond the 40 minute horizon an on-time estimate reads scheduled; delays, early estimates and cancellations do not', () => {
+  const gen = new Date(NOW).toISOString();
+  const at = (schedMins, estMins, extra = {}) => ({
+    departure: {
+      scheduled: new Date(NOW + schedMins * 60000).toISOString(),
+      estimated: estMins === null ? null : new Date(NOW + estMins * 60000).toISOString(),
+      platform: '1',
+    },
+    arrival: {}, line: { name: 'T1' }, legs: 1, ...extra,
+  });
+  const row = (j) => boardModel({ generatedAt: gen, journeys: [j] }, NOW).rows[0];
+
+  assert.equal(LIVE_HORIZON_MIN, 40);
+
+  const atHorizon = row(at(40, 40));
+  assert.deepEqual([atHorizon.figure, atHorizon.provenance, atHorizon.kind, atHorizon.scheduledOnly],
+    ['40', '', 'live', false]);
+
+  const beyond = row(at(41, 41));
+  assert.deepEqual([beyond.figure, beyond.provenance, beyond.kind, beyond.scheduledOnly],
+    ['41', 'SCHEDULED', 'sched', true]);
+  assert.equal(beyond.provenanceWarn, false);
+  assert.equal(beyond.schedTime, null);
+  assert.equal(beyond.depTime, row(at(41, null)).depTime);
+
+  const late = row(at(41, 47));
+  assert.deepEqual([late.figure, late.provenance, late.kind, late.provenanceWarn],
+    ['47', '6 MIN LATE', 'late', true]);
+  assert.equal(late.schedTime, row(at(41, null)).depTime);
+
+  const early = row(at(43, 41));
+  assert.deepEqual([early.figure, early.provenance, early.kind, early.scheduledOnly],
+    ['41', '', 'live', false]);
+
+  const cancelled = row(at(41, 41, { cancelled: true }));
+  assert.deepEqual([cancelled.figure, cancelled.provenance, cancelled.kind],
+    ['—', 'CANCELLED', 'cx']);
+
+  // A stale board is already scheduled; the horizon adds nothing to it.
+  const stale = boardModel({ generatedAt: gen, journeys: [at(41, 41)] }, NOW + STALE_MS + 1).rows[0];
+  assert.equal(stale.provenance, 'SCHEDULED');
 });
 
 test('unknown platform and empty headsign still fill their lines', () => {

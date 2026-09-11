@@ -62,6 +62,14 @@ iOS implementation requested on 2026-09-07.
   Timetable generation time and realtime observation time are never renewed
   merely by loading a cache. A focused service's alternatives retain their own
   source evidence, independently of its cancellation or delay update.
+- The 40 minute live horizon in [ui.md](ui.md#past-stale-and-exceptional-data)
+  reads the first leg's departure estimate, while the rest of the row's live
+  register reads `journey.realtime`, which is true for an estimate on any leg.
+  A journey whose first leg has only a timetable departure but whose later leg
+  carries an estimate therefore keeps the live register on iOS, where the web
+  reference labels it `SCHEDULED`; the departure the rider acts on is
+  timetable-only in both. Owner ruling 2026-09-11: keep the divergence rather
+  than change what `journey.realtime` means.
 - Anonymous analytics remain disabled for native v1, as on Android. User-written
   feedback still sends only after tapping Send feedback. Drafts live in memory
   across navigation and clear after a successful submission. The success banner

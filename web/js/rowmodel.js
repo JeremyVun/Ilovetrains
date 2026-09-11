@@ -81,6 +81,11 @@ export function boardModel(body, nowMs, opts = {}) {
     that — the unit changes so the figure stays one glance wide. */
 export const CANCELLED_FIGURE = '—';
 
+/* The server's accuracy tracker buckets leads at 40 minutes (accuracy.go
+   leadBounds): beyond it one live prediction in eight moves, inside it the
+   live register is honest (owner ruling 2026-09-11). */
+export const LIVE_HORIZON_MIN = 40;
+
 function figureFor(cancelled, mins) {
   if (cancelled) return CANCELLED_FIGURE;
   return countdownFigure(mins);
@@ -114,6 +119,11 @@ function journeyRow(journey, nowMs, stale, opts) {
     ? Math.floor(estimated / 60000) - Math.floor(scheduled / 60000)
     : 0;
 
+  // An on-time estimate this far out is a timetable time the feed has not yet
+  // contradicted; a delay or cancellation at any lead still shows.
+  const beyondHorizon = realtime && !stale && !past && !cancelled
+    && delayMin === 0 && mins > LIVE_HORIZON_MIN;
+
   const arrival = journey.arrival || {};
   const arrivalMs = past && !actual
     ? parseIso(arrival.scheduled)
@@ -126,7 +136,7 @@ function journeyRow(journey, nowMs, stale, opts) {
   else if (past && !actual) { kind = 'sched'; provenance = 'AGO'; }
   else if (delayMin > 0) { kind = 'late'; provenance = past ? 'AGO' : delayMin + ' MIN LATE'; }
   else if (past) { kind = 'live'; provenance = 'AGO'; }
-  else if (!realtime || stale) { kind = 'sched'; provenance = 'SCHEDULED'; }
+  else if (!realtime || stale || beyondHorizon) { kind = 'sched'; provenance = 'SCHEDULED'; }
   // "Now" is not a count of minutes, so the slot under it names what is
   // happening instead of its unit (docs/contracts/ui.md).
   else { kind = 'live'; provenance = mins <= 0 ? 'DEPARTING' : ''; }
@@ -159,7 +169,7 @@ function journeyRow(journey, nowMs, stale, opts) {
     past,
     actual,
     pastKind: past ? (actual ? 'actual' : 'timetable') : null,
-    scheduledOnly: !realtime || (past && !actual),
+    scheduledOnly: !realtime || (past && !actual) || beyondHorizon,
     delayMin,
     mins,
     kind,
