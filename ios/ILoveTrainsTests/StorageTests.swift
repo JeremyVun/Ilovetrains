@@ -216,6 +216,28 @@ final class StorageTests: XCTestCase {
         let encoded = try JSONEncoder().encode(source)
         XCTAssertEqual(try JSONDecoder().decode(UserData.self, from: encoded).focus?.recovery?.journey, candidate)
 
+        let via = Station(id: "d", name: "D")
+        let movedTail = Journey(legs: [
+            Leg(line: "T1", mode: "train", headsign: "D", from: change, to: via, departure: 900_000, arrival: 1_500_000),
+            Leg(line: "T4", mode: "train", headsign: "C", from: via, to: to, departure: 1_800_000, arrival: 2_400_000)
+        ])
+        var movedSource = source
+        movedSource.focus?.recovery = RecoveryRecord(
+            changeIndex: 0, journey: movedTail, fetchedAt: 1,
+            source: RecoverySource(generatedAt: 1, degraded: false), anchor: 1)
+        let movedEncoded = try JSONEncoder().encode(movedSource)
+        XCTAssertEqual(try JSONDecoder().decode(UserData.self, from: movedEncoded).focus?.recovery?.anchor, 1)
+
+        var moved = try XCTUnwrap(JSONSerialization.jsonObject(with: movedEncoded) as? [String: Any])
+        var movedFocus = try XCTUnwrap(moved["focus"] as? [String: Any])
+        var movedRecovery = try XCTUnwrap(movedFocus["recovery"] as? [String: Any])
+        movedRecovery["anchor"] = nil
+        movedFocus["recovery"] = movedRecovery
+        moved["focus"] = movedFocus
+        let beforeAnchorExisted = try JSONDecoder().decode(
+            UserData.self, from: JSONSerialization.data(withJSONObject: moved))
+        XCTAssertEqual(beforeAnchorExisted.focus?.recovery?.anchor, 0)
+
         var raw = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
         var focus = try XCTUnwrap(raw["focus"] as? [String: Any])
         var recovery = try XCTUnwrap(focus["recovery"] as? [String: Any])

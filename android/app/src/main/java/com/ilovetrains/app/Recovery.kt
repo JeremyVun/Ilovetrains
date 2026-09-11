@@ -9,9 +9,13 @@ data class Recovery(
     val journey: Journey,
     val fetchedAt: Long,
     val source: RecoverySource,
-    /** Legs of [journey] kept from an earlier search; only the legs after them are searched again. */
-    val carried: Int = 0,
+    /** The composed change this tail was searched from; [changeIndex] until a later search moved it. */
+    val anchor: Int = changeIndex,
 )
+
+/** A record written before `anchor` existed, or carrying one its own legs cannot reach, searches from its change. */
+val Recovery.searchAnchor: Int
+    get() = if (anchor > changeIndex && anchor <= changeIndex + journey.legs.lastIndex) anchor else changeIndex
 
 data class RecoverySearch(val from: Station, val to: Station, val at: Long)
 
@@ -63,7 +67,7 @@ fun recoveryPlan(followed: Journey, held: Recovery?, destination: Station): Reco
     val composed = composedJourney(followed, record)
     val composedLost = connectionStates(composed, record?.changeIndex)
         .indexOfFirst { it == ConnectionState.Lost }.takeIf { it >= 0 }
-    val anchor = composedLost ?: record?.let { it.changeIndex + it.carried } ?: followedLost
+    val anchor = composedLost ?: record?.searchAnchor ?: followedLost
     if (anchor !in 0 until composed.legs.lastIndex) return RecoveryPlan(composed, record, null, null)
     val leg = composed.legs[anchor]
     return RecoveryPlan(composed, record, anchor,
@@ -82,7 +86,7 @@ fun recoveryChoice(plan: RecoveryPlan, journeys: List<Journey>, modes: Set<Strin
     val search = plan.search ?: return null
     val held = plan.recovery
     if (held == null || plan.stranded) return recoveryCandidate(journeys, search, modes)
-    val tail = Journey(held.journey.legs.drop(held.carried)).key
+    val tail = Journey(held.journey.legs.drop(held.searchAnchor - held.changeIndex)).key
     return journeys.firstOrNull { it.key == tail }
 }
 
@@ -93,8 +97,10 @@ fun recoveryAfterSearch(plan: RecoveryPlan, candidate: Journey?, fetchedAt: Long
     val changeIndex = minOf(anchor, held?.changeIndex ?: anchor)
     val journey = Journey(plan.composed.legs.subList(changeIndex + 1, anchor + 1) + candidate.legs)
     // A refresh that re-matched the same trains settles nothing, so the record keeps the time it was fetched.
-    if (held != null && held.changeIndex == changeIndex && held.journey == journey) return held
-    return Recovery(changeIndex, journey, fetchedAt, source, anchor - changeIndex)
+    if (held != null && held.changeIndex == changeIndex && held.searchAnchor == anchor && held.journey == journey) {
+        return held
+    }
+    return Recovery(changeIndex, journey, fetchedAt, source, anchor)
 }
 
 /** The rider boards the recovery service at this instant; before it, the lost word stands. */

@@ -19,12 +19,29 @@ struct RecoveryRecord: Codable, Equatable, Sendable {
     var journey: Journey
     var fetchedAt: Millis
     var source: RecoverySource
+    /// The composed change this tail was searched from; `changeIndex` until a later search moved it.
+    var anchor: Int
 
-    init(changeIndex: Int, journey: Journey, fetchedAt: Millis, source: RecoverySource) {
+    init(changeIndex: Int, journey: Journey, fetchedAt: Millis, source: RecoverySource, anchor: Int? = nil) {
         self.changeIndex = changeIndex
         self.journey = journey
         self.fetchedAt = fetchedAt
         self.source = source
+        self.anchor = anchor ?? changeIndex
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        changeIndex = try container.decode(Int.self, forKey: .changeIndex)
+        journey = try container.decode(Journey.self, forKey: .journey)
+        fetchedAt = try container.decode(Millis.self, forKey: .fetchedAt)
+        source = try container.decode(RecoverySource.self, forKey: .source)
+        anchor = (try? container.decode(Int.self, forKey: .anchor)) ?? changeIndex
+    }
+
+    /// A record written before `anchor` existed, or carrying one its own legs cannot reach, searches from its change.
+    var searchAnchor: Int {
+        anchor > changeIndex && anchor <= changeIndex + journey.legs.count - 1 ? anchor : changeIndex
     }
 }
 
@@ -97,9 +114,8 @@ func recoveryPlan(_ focus: FocusedJourney) -> RecoveryPlan {
     let composedLegs = held.map { Array(followed.prefix($0.changeIndex + 1)) + $0.journey.legs } ?? followed
     let composed = Journey(legs: composedLegs, retained: focus.journey.retained)
     let composedStates = connectionStates(composedLegs, recoveryFrom: held?.changeIndex)
-    // A held record's newest tail boards at the last change: searching there re-matches that tail
-    // instead of re-running the original search, which would offer the tail it already replaced.
-    let anchor = composedStates.firstIndex(of: .lost) ?? held.map { _ in composedStates.count - 1 }
+    // The record's own anchor, so a held tail is re-matched from where it was searched and cannot oscillate.
+    let anchor = composedStates.firstIndex(of: .lost) ?? held.map { $0.searchAnchor }
     let search = anchor.map { anchor in
         RecoverySearch(
             anchor: anchor,
@@ -142,7 +158,8 @@ func recoveryRecord(
         changeIndex: search.spliceIndex,
         journey: Journey(legs: carried + candidate.legs),
         fetchedAt: fetchedAt,
-        source: source ?? standing?.source ?? RecoverySource(generatedAt: fetchedAt, degraded: true)
+        source: source ?? standing?.source ?? RecoverySource(generatedAt: fetchedAt, degraded: true),
+        anchor: search.anchor
     )
 }
 

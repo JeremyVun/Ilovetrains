@@ -14,7 +14,7 @@ final class TransferRecoveryConformanceTests: XCTestCase {
         XCTAssertTrue((root["notes"] as! String).contains("printed clock minutes"))
         XCTAssertGreaterThanOrEqual(((root["base"] as! [String: Any])["legs"] as! [Any]).count, 2)
         let cases = root["cases"] as! [[String: Any]]
-        XCTAssertEqual(cases.count, 20)
+        XCTAssertEqual(cases.count, 21)
         for item in cases {
             let name = item["name"] as! String
             XCTAssertNotNil(item["now"] as? NSNumber, name)

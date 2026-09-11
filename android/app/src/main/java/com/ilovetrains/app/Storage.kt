@@ -126,14 +126,15 @@ object Wire {
         }
     }
     private fun recovery(r: Recovery) = JSONObject().put("changeIndex", r.changeIndex)
-        .put("journey", journey(r.journey)).put("fetchedAt", r.fetchedAt)
+        .put("anchor", r.anchor).put("journey", journey(r.journey)).put("fetchedAt", r.fetchedAt)
         .put("source", JSONObject().put("generatedAt", r.source.generatedAt).put("degraded", r.source.degraded))
     private fun recovery(o: JSONObject): Recovery {
         val source = o.optJSONObject("source")
         val index = o.getInt("changeIndex")
         require(index >= 0)
         return Recovery(index, journey(o.getJSONObject("journey")), requireNotNull(epoch(o, "fetchedAt")),
-            RecoverySource(source?.let { epoch(it, "generatedAt") } ?: 0, source?.optBoolean("degraded") == true))
+            RecoverySource(source?.let { epoch(it, "generatedAt") } ?: 0, source?.optBoolean("degraded") == true),
+            o.optInt("anchor", index))
     }
     private fun focus(f: FocusedJourney) = JSONObject().put("tripId", f.tripId).put("reverse", f.reverse)
         .put("journey", journey(f.journey)).put("board", board(f.board)).put("pinned", f.pinned)

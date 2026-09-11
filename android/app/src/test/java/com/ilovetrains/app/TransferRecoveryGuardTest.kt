@@ -135,7 +135,8 @@ class TransferRecoveryGuardTest {
         assertEquals("The T1 arrives too late for the 10:11", header.instruction)
         assertTrue("the stranded instruction is not in the warn idiom", header.warnInstruction)
         assertEquals("Check the station boards.", header.receipt)
-        assertEquals(FocusArrivalClocks(planned = clockTime(followed.effectiveArrival)), header.arrival)
+        assertEquals(FocusArrivalClocks(planned = clockTime(composedJourney(followed, record).effectiveArrival)),
+            header.arrival)
     }
 
     // Invariant 6: a recovery change is judged by its window alone.

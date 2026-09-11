@@ -161,7 +161,7 @@ final class StrandedRecoveryTests: XCTestCase {
             viaCentral.legs[0],
             Leg(line: "T4", mode: "train", headsign: "Bondi Junction", from: central, to: bondi,
                 departure: Self.t("10:19"), arrival: Self.t("10:32"), fromPlatform: "20", toPlatform: "1"),
-        ]), fetchedAt: now, source: RecoverySource(generatedAt: now, degraded: false))
+        ]), fetchedAt: now, source: RecoverySource(generatedAt: now, degraded: false), anchor: 1)
         let plan = recoveryPlan(focus(repaired))
         XCTAssertEqual(plan.composedStates, [.ordinary, .ordinary])
         XCTAssertEqual(plan.search?.anchor, 1)

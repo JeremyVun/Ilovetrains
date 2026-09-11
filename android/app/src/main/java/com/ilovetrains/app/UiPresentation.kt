@@ -269,7 +269,7 @@ fun focusHeader(focus: FocusedJourney, now: Long, complete: Boolean = false, arr
 
     val arrivalClocks = when {
         composed.legs.last().cancelled -> FocusArrivalClocks(struck = clockTime(composed.effectiveArrival))
-        lost && stranded != null -> FocusArrivalClocks(planned = clockTime(followed.effectiveArrival))
+        lost && stranded != null -> FocusArrivalClocks(planned = clockTime(composed.effectiveArrival))
         recoveryFrom != null -> FocusArrivalClocks(
             shown = clockTime(composed.effectiveArrival), struck = clockTime(followed.effectiveArrival))
         else -> FocusArrivalClocks(shown = clockTime(composed.effectiveArrival))

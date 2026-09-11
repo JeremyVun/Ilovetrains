@@ -50,6 +50,17 @@ class StorageTest {
         assertEquals(listOf("T9", "T4"), restored.focus?.composed?.legs?.map { it.line })
         assertEquals(90_000L, restored.focus?.composed?.effectiveArrival)
 
+        val d = Station("d", "D")
+        val movedAnchor = recovery.copy(journey = Journey(listOf(
+            Leg("T1", "train", "D", b, d, 30_000, 50_000, fromPlatform = "5", toPlatform = "1"),
+            Leg("T4", "train", "C", d, c, 70_000, 90_000, fromPlatform = "2", toPlatform = "2"))), anchor = 1)
+        val moved = data.copy(focus = data.focus!!.copy(recovery = movedAnchor))
+        assertEquals(movedAnchor, Wire.user(JSONObject(Wire.user(moved).toString())).focus?.recovery)
+
+        val beforeAnchorExisted = Wire.user(moved)
+        beforeAnchorExisted.getJSONObject("focus").getJSONObject("recovery").remove("anchor")
+        assertEquals(0, Wire.user(JSONObject(beforeAnchorExisted.toString())).focus?.recovery?.anchor)
+
         val wire = Wire.user(data)
         wire.getJSONObject("focus").getJSONObject("recovery")
             .put("journey", JSONObject("""{"legDetail":[{"broken":true}]}"""))
