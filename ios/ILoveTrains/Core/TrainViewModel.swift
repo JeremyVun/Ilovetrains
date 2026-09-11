@@ -1468,6 +1468,11 @@ private extension TrainViewModel {
             board = retainedOfflineBoard(board)
             board.homeJourneyKey = board.journeys.first?.key
         }
+        if name.contains("horizon") {
+            let seed = horizonCalibrationBoard()
+            state.now = seed.now
+            board = seed.board
+        }
         let trip = SavedTrip(id: "calibration-trip", from: board.from, to: board.to, createdAt: now,
                             lines: board.journeys.first.map(orderedLineCodes) ?? [])
         data.trips = [trip]; data.appearance = name.contains("light") ? .light : .dark
@@ -1581,5 +1586,40 @@ private extension TrainViewModel {
         if name.contains("just-added") { state.tripMetadata[trip.id] = "Never ridden · 480 m away" }
         return true
     }
+}
+
+// No captured board holds rows on both sides of the 40 minute live horizon, so this one is declared.
+func horizonCalibrationBoard() -> (board: BoardData, now: Millis) {
+    var components = DateComponents()
+    components.calendar = sydneyCalendar
+    components.timeZone = sydneyZone
+    components.year = 2026
+    components.month = 9
+    components.day = 1
+    components.hour = 9
+    components.minute = 4
+    let now = components.date!.timeIntervalSince1970 * 1_000
+    let central = Station(id: "200060", name: "Central Station", modes: ["train"])
+    let strathfield = Station(id: "202120", name: "Strathfield Station", modes: ["train"])
+    func service(_ line: String, _ headsign: String, platform: String, minutes: Int,
+                 delay: Int = 0, cancelled: Bool = false) -> Journey {
+        let departure = now + Double(minutes) * 60_000
+        let arrival = departure + 13 * 60_000
+        return Journey(legs: [Leg(
+            line: line, mode: "train", headsign: headsign, from: central, to: strathfield,
+            departure: departure, arrival: arrival,
+            estimatedDeparture: departure + Double(delay) * 60_000,
+            estimatedArrival: arrival + Double(delay) * 60_000,
+            fromPlatform: platform, cancelled: cancelled
+        )])
+    }
+    let journeys = [
+        service("T2", "Leppington via Granville", platform: "Platform 17", minutes: 40),
+        service("T1", "Penrith via Parramatta", platform: "Platform 18", minutes: 41),
+        service("T9", "Hornsby via Strathfield", platform: "Platform 16", minutes: 41, delay: 6),
+        service("T1", "Emu Plains via Parramatta", platform: "Platform 18", minutes: 43, delay: -2),
+        service("T2", "Leppington via Granville", platform: "Platform 17", minutes: 41, cancelled: true)
+    ]
+    return (BoardData(from: central, to: strathfield, journeys: journeys, generatedAt: now, source: "live"), now)
 }
 #endif

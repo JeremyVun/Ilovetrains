@@ -163,6 +163,14 @@ final class RowConformanceTests: XCTestCase {
         XCTAssertEqual(figure.provenance, "")
     }
 
+    func testTheHorizonCalibrationBoardHoldsBothSidesOfTheLiveHorizon() {
+        let seed = horizonCalibrationBoard()
+        let figures = seed.board.journeys.map { figureFor($0, board: seed.board, now: seed.now) }
+        XCTAssertEqual(figures.map(\.provenance), ["", "Scheduled", "6 min late", "", "Cancelled"])
+        XCTAssertEqual(figures.map(\.value), ["40", "41", "47", "41", "\u{2014}"])
+        XCTAssertEqual(Set(seed.board.journeys.map(\.id)).count, seed.board.journeys.count)
+    }
+
     func testNextServiceFigureIsUnchangedOnBothSidesOfTheLiveHorizon() {
         let (atEdge, edgeBoard, now) = horizonRow(scheduledMinutes: 40, delayMinutes: 0)
         let (beyond, beyondBoard, _) = horizonRow(scheduledMinutes: 41, delayMinutes: 0)
