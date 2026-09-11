@@ -274,6 +274,19 @@ Defaults taken to keep the item small, each overrulable by the owner:
   legs) with the same change label and the receipt as its summary line, and
   no recovery control.
 
+## Build log
+
+- 2026-09-11, orchestrator, from the web seam survey: while a recovery
+  record exists, focus expiry and the final-arrival decision use the
+  composed journey's effective arrival, and the focus identity stays the
+  original journey's (`tripId:direction:journeyKey(focus.journey)`), so the
+  arrival-guard window and the followed request are not reset by recovery.
+  The displayed-focus predicate (modes, transfer cap) is evaluated on the
+  followed journey only; the candidate was already searched under the same
+  allow-list and cap, and the composed journey may exceed the cap without
+  hiding the header. Web caches the recovery response in memory beside the
+  focus body, not in the saved-trip cache, whose keys are saved pairs only.
+
 ## Still open
 
 Nothing blocks the build plan. Overrulable defaults are listed under the
