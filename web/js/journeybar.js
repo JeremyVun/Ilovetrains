@@ -71,7 +71,7 @@ function changeAt(opts, index) {
 /* The line code is what a change label gives up first: the station name is
    never ellipsised and the departure time is why the label exists (ui.md). */
 function shortLabel(change) {
-  return change.depTime ? `${change.station} ${change.depTime}` : change.station;
+  return change.depTime ? `${change.station} · ${change.depTime}` : change.station;
 }
 
 function ferryTransferHtml(label, chip, role, stop) {

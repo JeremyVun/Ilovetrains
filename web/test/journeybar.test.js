@@ -229,7 +229,7 @@ test('a recovery change labels its station with the service and time, and carrie
   const changes = [{ station: 'Town Hall', label: 'Town Hall · T4 10:08', depTime: '10:08', tight: false }];
   const html = journeyBarHtml(spec, { caps: true, stations: true, changes });
 
-  assert.match(html, /data-transfer-station[^>]*data-transfer-label-short="Town Hall 10:08"[^>]*>Town Hall · T4 10:08</);
+  assert.match(html, /data-transfer-station[^>]*data-transfer-label-short="Town Hall · 10:08"[^>]*>Town Hall · T4 10:08</);
   assert.match(css, /\.sy-pstn \{|\.sy-bar > \.sy-pstn \{/);
   const plain = journeyBarHtml(spec, { caps: true, stations: true, changes: [{ station: 'Town Hall', tight: false }] });
   assert.doesNotMatch(plain, /data-transfer-label-short/);
