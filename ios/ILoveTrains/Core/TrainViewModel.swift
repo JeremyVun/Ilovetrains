@@ -704,8 +704,10 @@ final class TrainViewModel: ObservableObject {
             return
         }
         var board: BoardData?
+        let transferLimit = data.requestTransferLimit
         if canNetwork {
-            board = try? await api.departures(from: search.from, to: destination, modes: allModes, at: search.at)
+            board = try? await api.departures(from: search.from, to: destination, modes: allModes,
+                                              at: search.at, transferLimit: transferLimit)
         }
         if board == nil {
             try? await bootstrap?.value
@@ -719,7 +721,8 @@ final class TrainViewModel: ObservableObject {
             journeys: board?.journeys ?? [],
             modes: data.modes,
             fetchedAt: state.now,
-            source: board.map { RecoverySource(generatedAt: $0.generatedAt, degraded: $0.serverStale || $0.offline) }
+            source: board.map { RecoverySource(generatedAt: $0.generatedAt, degraded: $0.serverStale || $0.offline) },
+            transferLimit: transferLimit
         )
         guard current.recovery != record else { return }
         current.recovery = record; data.focus = current
@@ -1211,7 +1214,8 @@ final class TrainViewModel: ObservableObject {
 }
 
 func settledRides(_ rides: [Ride], focus: FocusedJourney, arrived: Bool, ends: (Station, Station)? = nil) -> [Ride] {
-    let arrival = focus.composedJourney.effectiveArrival
+    // The ride keeps the followed journey's own record; the composed arrival only decides when it is over.
+    let arrival = focus.journey.effectiveArrival
     guard let index = rides.firstIndex(where: { $0.tripId == focus.tripId && $0.reverse == focus.reverse && $0.departure == focus.journey.departure }) else {
         guard arrived else { return rides }
         // A refreshed journey carries wire stations, so the endpoints come from the saved trip.

@@ -65,28 +65,41 @@ func connectionStates(_ legs: [Leg], recoveryFrom changeIndex: Int? = nil) -> [C
     }
 }
 
-func recoveryCandidate(_ journeys: [Journey], arrival: Millis, modes: Set<String>) -> Journey? {
+func recoveryCandidate(
+    _ journeys: [Journey],
+    arrival: Millis,
+    modes: Set<String>,
+    transferLimit: Int? = nil,
+    boardingAt stop: String? = nil
+) -> Journey? {
     journeys
-        .filter { qualifiesAsRecovery($0, arrival: arrival, modes: modes) }
+        .filter { qualifiesAsRecovery($0, arrival: arrival, modes: modes, transferLimit: transferLimit, stop: stop) }
         .min { $0.effectiveDeparture < $1.effectiveDeparture }
 }
 
-private func qualifiesAsRecovery(_ journey: Journey, arrival: Millis, modes: Set<String>) -> Bool {
-    !journey.legs.isEmpty && !journey.cancelled && journeyAllowed(journey, modes: modes)
-        && minutesBetween(arrival, journey.effectiveDeparture) >= recoveryConnectionFloor
+private func qualifiesAsRecovery(
+    _ journey: Journey, arrival: Millis, modes: Set<String>, transferLimit: Int?, stop: String?
+) -> Bool {
+    guard let boarding = journey.legs.first, !journey.cancelled, journeyAllowed(journey, modes: modes),
+          stop.map({ boarding.from.id == $0 }) ?? true,
+          transferLimit.map({ journey.legs.count - 1 <= $0 }) ?? true else { return false }
+    return minutesBetween(arrival, journey.effectiveDeparture) >= recoveryConnectionFloor
 }
 
 func recoveryPlan(_ focus: FocusedJourney) -> RecoveryPlan {
     let followed = focus.journey.legs
     let followedStates = connectionStates(followed)
-    let held = focus.recovery.flatMap { record in
-        followedStates.indices.contains(record.changeIndex) && followedStates[record.changeIndex] == .lost
-            && !record.journey.legs.isEmpty ? record : nil
+    let held = focus.recovery.flatMap { record -> RecoveryRecord? in
+        guard followedStates.indices.contains(record.changeIndex), followedStates[record.changeIndex] == .lost,
+              record.journey.legs.first?.from.id == followed[record.changeIndex].to.id else { return nil }
+        return record
     }
     let composedLegs = held.map { Array(followed.prefix($0.changeIndex + 1)) + $0.journey.legs } ?? followed
     let composed = Journey(legs: composedLegs, retained: focus.journey.retained)
     let composedStates = connectionStates(composedLegs, recoveryFrom: held?.changeIndex)
-    let anchor = composedStates.firstIndex(of: .lost) ?? held?.changeIndex
+    // A held record's newest tail boards at the last change: searching there re-matches that tail
+    // instead of re-running the original search, which would offer the tail it already replaced.
+    let anchor = composedStates.firstIndex(of: .lost) ?? held.map { _ in composedStates.count - 1 }
     let search = anchor.map { anchor in
         RecoverySearch(
             anchor: anchor,
@@ -111,23 +124,25 @@ func recoveryRecord(
     journeys: [Journey],
     modes: Set<String>,
     fetchedAt: Millis,
-    source: RecoverySource?
+    source: RecoverySource?,
+    transferLimit: Int? = nil
 ) -> RecoveryRecord? {
     guard let search = plan.search else { return nil }
     let legs = plan.composed.legs
-    let heldTail = legs.count > search.anchor + 1
-        ? Journey(legs: Array(legs[(search.anchor + 1)...])).key : nil
-    let matched = journeys.first { $0.key == heldTail }
-        .flatMap { recoveryCandidate([$0], arrival: search.at, modes: modes) }
-    guard let candidate = matched ?? recoveryCandidate(journeys, arrival: search.at, modes: modes) else {
-        return held
-    }
+    let standing = plan.recoveryChangeIndex == nil ? nil : held
+    let tail = Journey(legs: Array(legs[(search.anchor + 1)...])).key
+    // The rider was already told this train: while its own change still connects it is re-matched, never swapped.
+    let candidate: Journey? = standing == nil || plan.composedStates.contains(.lost)
+        ? recoveryCandidate(journeys, arrival: search.at, modes: modes,
+                            transferLimit: transferLimit, boardingAt: search.from.id)
+        : journeys.first { $0.key == tail && $0.legs.first?.from.id == search.from.id }
+    guard let candidate else { return standing }
     let carried = Array(legs[(search.spliceIndex + 1)..<(search.anchor + 1)])
     return RecoveryRecord(
         changeIndex: search.spliceIndex,
         journey: Journey(legs: carried + candidate.legs),
         fetchedAt: fetchedAt,
-        source: source ?? held?.source ?? RecoverySource(generatedAt: fetchedAt, degraded: true)
+        source: source ?? standing?.source ?? RecoverySource(generatedAt: fetchedAt, degraded: true)
     )
 }
 
