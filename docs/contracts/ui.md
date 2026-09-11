@@ -232,6 +232,13 @@ When the flag is off, the trip line remains unchanged and does no animation work
   reads `Planned` under the original time, there is no next-service rail, and
   the dead connection's chips are drawn as today. No client invents an
   alternative.
+- When the candidate's own change becomes lost and the search from that change
+  finds nothing, every client shows that same no-candidate reading at the
+  later change: the composed journey stands, the instruction names the leg
+  arriving there and the departure it missed, the receipt is `Check the station
+  boards.` and the arrival reads `Planned` under the time the composition was
+  planned to make. No client strikes an arrival beside a time the rider cannot
+  make.
 - The axis draws a lost change with no dwell width, its two chips free to
   touch, while there is no candidate, and the composed journey's true dwell
   once there is one. A candidate hours away draws its true wait: the axis is a
@@ -254,7 +261,8 @@ When the flag is off, the trip line remains unchanged and does no animation work
   an older cache must not replace that source during navigation.
 - The header may fetch live data only for the selected trip, and, while the
   focused journey is recovering, its recovery pair as the one permitted extra
-  request per refresh. Saved-trip rows
+  request per refresh. It makes that request on every refresh while the change
+  is lost, so the candidate's own times are as live as the followed journey's. Saved-trip rows
   use device-held facts such as line identity, distance and last ride; opening
   home must not fan out one upstream request per saved trip. The rule guards
   that fan-out, not the followed journey's own tail.

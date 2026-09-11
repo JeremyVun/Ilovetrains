@@ -185,8 +185,21 @@ export function applyFocusSnapshot(doc, selection, body) {
 
 export function recoveryOf(focus) {
   const record = focus && focus.recovery;
-  return record && record.journey && Number.isInteger(record.changeIndex)
-    && record.changeIndex >= 0 ? record : null;
+  if (!record || !record.journey || !Number.isInteger(record.changeIndex) || record.changeIndex < 0) return null;
+  const followed = legsOf(focus.journey);
+  const change = followed[record.changeIndex];
+  const boards = legsOf(record.journey)[0];
+  if (record.changeIndex > followed.length - 2 || !change || !boards) return null;
+  return (change.to || {}).id === (boards.from || {}).id ? record : null;
+}
+
+/** The change the record's own tail was searched from: its `changeIndex` until
+    the candidate's own change was lost and a later search moved it. */
+function recoveryAnchorOf(record) {
+  const carried = legsOf(record.journey).length - 1;
+  return Number.isInteger(record.anchor)
+    && record.anchor > record.changeIndex && record.anchor <= record.changeIndex + carried
+    ? record.anchor : record.changeIndex;
 }
 
 /** The journey the rider can still make: the followed legs up to the lost
@@ -201,13 +214,15 @@ export function composedJourney(focus) {
   return legs.length ? withLegs(focus.journey, legs) : focus.journey;
 }
 
-/** The earliest journey that leaves the incoming arrival a window the server
-    would itself call a connection, every leg enabled and none cancelled. */
+/** The earliest journey that boards at the change stop and leaves the incoming
+    arrival a window the server would itself call a connection, every leg
+    enabled and none cancelled. */
 export function recoveryCandidate(journeys, arrivalMs, opts = {}) {
   const allowed = opts.allowed || (() => true);
   const qualifies = (journey) => {
     const departure = departureMs(journey);
     if (departure === null || arrivalMs === null) return false;
+    if (opts.from && (legsOf(journey)[0].from || {}).id !== opts.from) return false;
     if (minutesUntil(departure, arrivalMs) < RECOVERY_FLOOR_MIN) return false;
     return !journeyCancelled(journey) && allowed(journey);
   };
@@ -249,24 +264,28 @@ export function recoveryModel(focus, nowMs, opts = {}) {
   }
 
   const composedLost = current.changes.findIndex((change) => change.state === 'lost');
-  const anchor = composedLost >= 0 ? composedLost : held ? held.changeIndex : lostIndex;
+  const anchor = composedLost >= 0 ? composedLost : held ? recoveryAnchorOf(held) : lostIndex;
   const legs = legsOf(current.journey);
   const anchorLeg = legs[anchor] || {};
   const search = { from: (anchorLeg.to && anchorLeg.to.id) || null, at: effective(anchorLeg.arrival) };
-  /* A record whose composition still connects is only refreshed — re-matched
-     leg by leg like the focus itself — so a periodic search cannot swap the
-     train the rider was already told to board. A lost change replaces it. */
+  /* A record whose composition still connects is only refreshed — its own tail
+     re-matched by key from its own anchor, like the focus itself — so a
+     periodic search cannot swap the train the rider was already told to board.
+     A lost change replaces it. */
   const replacing = composedLost >= 0 || !held;
   const response = typeof opts.response === 'function' ? opts.response(search) : null;
+  const heldTail = held && !replacing
+    ? withLegs(held.journey, legsOf(held.journey).slice(anchor - held.changeIndex)) : null;
   const candidate = !response ? null
-    : replacing ? recoveryCandidate(response.journeys, search.at, { allowed: opts.allowed })
-      : matchJourney(response.journeys, held.journey);
+    : replacing ? recoveryCandidate(response.journeys, search.at, { allowed: opts.allowed, from: search.from })
+      : matchJourney(response.journeys, heldTail);
 
   let record = held;
   if (candidate) {
     const changeIndex = held ? Math.min(anchor, held.changeIndex) : anchor;
     record = {
       changeIndex,
+      anchor,
       journey: withLegs(candidate, legs.slice(changeIndex + 1, anchor + 1).concat(legsOf(candidate))),
       fetchedAt: new Date(nowMs).toISOString(),
       source: { generatedAt: response.generatedAt || null, degraded: response.degraded === true }

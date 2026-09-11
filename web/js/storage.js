@@ -1,5 +1,6 @@
 import { SUPPORTED_MODES, flagsOf, normalizeModes, preferencesOf } from './preferences.js';
 import { normalizeArrivalGuard } from './arrival.js';
+import { legsOf } from './journey.js';
 
 /* localStorage document per docs/contracts/client-storage.md.
    Everything above the load/save pair is pure: document in, new document out.
@@ -56,14 +57,18 @@ function stopOf(stop) {
 
 /* The recovery record is a sibling of the focused journey, not part of it: a
    malformed one is dropped and the focus survives (client-storage.md). */
-function normalizeRecovery(value) {
+function normalizeRecovery(value, journey) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  if (!Number.isInteger(value.changeIndex) || value.changeIndex < 0) return null;
   if (!value.journey || typeof value.journey !== 'object' || Array.isArray(value.journey)) return null;
+  const lastChange = legsOf(journey).length - 2;
+  if (!Number.isInteger(value.changeIndex) || value.changeIndex < 0 || value.changeIndex > lastChange) return null;
   if (typeof value.fetchedAt !== 'string' || !Number.isFinite(Date.parse(value.fetchedAt))) return null;
   const source = value.source && typeof value.source === 'object' ? value.source : {};
+  const deepest = value.changeIndex + legsOf(value.journey).length - 1;
   return {
     changeIndex: value.changeIndex,
+    anchor: Number.isInteger(value.anchor) && value.anchor > value.changeIndex && value.anchor <= deepest
+      ? value.anchor : value.changeIndex,
     journey: value.journey,
     fetchedAt: value.fetchedAt,
     source: {
@@ -178,7 +183,7 @@ export function parseDoc(raw) {
     };
     const arrivalGuard = normalizeArrivalGuard(f.arrivalGuard);
     if (arrivalGuard) doc.focus.arrivalGuard = arrivalGuard;
-    const recovery = normalizeRecovery(f.recovery);
+    const recovery = normalizeRecovery(f.recovery, f.journey);
     if (recovery) doc.focus.recovery = recovery;
   }
   if (v.locationAsk && typeof v.locationAsk.declinedAt === 'string') {

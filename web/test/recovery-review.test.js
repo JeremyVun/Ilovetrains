@@ -1,8 +1,8 @@
 process.env.TZ = 'Australia/Sydney';
 
-/* Adversarial probes for transfer completion and recovery (docs/backlog/
-   transfer-completion-recovery). Each test names the invariant it attacks.
-   A failing probe is a finding, not a broken test. */
+/* The review wave's adversarial probes for transfer completion and recovery,
+   kept as regressions. Each test names the invariant it attacks; the fixes for
+   the findings they caught are in focus.js, storage.js and main.js. */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -100,15 +100,21 @@ const outline = (journey) => legsOf(journey).map((leg) => [leg.line.name, leg.de
 // ---------------------------------------------------------------------------
 // Invariant 2: the recovery record cannot corrupt the focus.
 
-test('probe inv2: a changeIndex past the last change is malformed and never composes extra legs', () => {
+test('a changeIndex past the last change is malformed and never composes extra legs', () => {
   const doc = lostDoc(recoveryRecord(LOST_NOW, 3));
   const kept = parseDoc(serializeDoc(doc)).focus;
   const composed = composedJourney(kept);
   assert.equal(legsOf(composed).length, 2,
     'a record whose changeIndex is past the last change was appended after the whole followed journey');
+  assert.equal(legsOf(composedJourney(doc.focus)).length, 2, 'the model composed it before storage could drop it');
+
+  const lastLeg = recoveryRecord(LOST_NOW, 1);
+  lastLeg.journey.legDetail[0].from = { id: '202210', name: 'Bondi Junction Station', platform: 'Platform 1' };
+  assert.equal(legsOf(composedJourney(lostDoc(lastLeg).focus)).length, 2,
+    'the last leg ends the journey, so it is no change to recover at');
 });
 
-test('probe inv2: a record whose first leg does not board at the change station is not composed', () => {
+test('a record whose first leg does not board at the change station is not composed', () => {
   const stray = recoveryRecord(LOST_NOW);
   stray.journey.legDetail[0].from = { id: '200060', name: 'Central Station', platform: 'Platform 20' };
   const doc = lostDoc(stray);
@@ -118,7 +124,7 @@ test('probe inv2: a record whose first leg does not board at the change station 
     'the composed journey changes at Town Hall but boards at Central');
 });
 
-test('probe inv2: a moved-anchor record is stable across the refreshes that follow it', () => {
+test('a moved-anchor record is stable across the refreshes that follow it', () => {
   const value = caseOf('candidate-change-lost');
   const boards = value.searches;
   const townHall = boards.find((board) => board.id === 'town-hall-1000');
@@ -141,7 +147,7 @@ test('probe inv2: a moved-anchor record is stable across the refreshes that foll
   }
 });
 
-test('probe inv2 (observation): a moved-anchor record is still re-matched so its estimates refresh', () => {
+test('a moved-anchor record is still re-matched so its estimates refresh', () => {
   const value = caseOf('candidate-change-lost');
   const townHall = value.searches.find((board) => board.id === 'town-hall-1000');
   const held = {
@@ -154,7 +160,7 @@ test('probe inv2 (observation): a moved-anchor record is still re-matched so its
   assert.notEqual(second.candidate, null, 'the record held after the anchor moved was never matched again');
 });
 
-test('probe inv2/8: a held candidate whose own window shrinks to tight is kept, not swapped for a later train', () => {
+test('a held candidate whose own window shrinks to tight is kept, not swapped for a later train', () => {
   const value = caseOf('lost-riding');
   const search = value.searches[0];
   const held = {
@@ -180,7 +186,7 @@ test('probe inv2/8: a held candidate whose own window shrinks to tight is kept, 
 // ---------------------------------------------------------------------------
 // Invariant 8: cross-client agreement on a case the fixture does not carry.
 
-test('probe inv8 (ruling): the candidate\'s own change lost with nothing found from the later change', () => {
+test('the candidate\'s own change lost with nothing found from the later change reads as lost', () => {
   const value = caseOf('candidate-change-lost');
   const townHall = value.searches.find((board) => board.id === 'town-hall-1000');
   const held = {
@@ -198,7 +204,7 @@ test('probe inv8 (ruling): the candidate\'s own change lost with nothing found f
 // ---------------------------------------------------------------------------
 // Invariant 6: the shrunk clause does not apply to a recovery change.
 
-test('probe inv6: a recovery change whose estimate lands earlier than its timetable is judged by w alone', () => {
+test('a recovery change whose estimate lands earlier than its timetable is judged by w alone', () => {
   const value = caseOf('lost-riding');
   const search = value.searches[0];
   const early = journeyOf(search.journeys[0].legs);
@@ -217,7 +223,7 @@ test('probe inv6: a recovery change whose estimate lands earlier than its timeta
 // ---------------------------------------------------------------------------
 // Invariant 3: identity and ride recording follow the followed journey.
 
-test('probe inv3: the ride recorded at the end of a recovered journey is the followed journey\'s', () => {
+test('the ride recorded at the end of a recovered journey is the followed journey\'s', () => {
   const doc = lostDoc();
   const settled = settleRide(doc, at('10:19:00'));
   const ride = (settled.rides || []).at(-1);
@@ -267,7 +273,7 @@ function scenarios() {
   ].map(([name, doc, now, opts]) => [name, doc, body, now, opts]);
 }
 
-test('probe inv1: the home header is byte-identical to the base commit on every non-lost journey', async () => {
+test('the home header is byte-identical to the base commit on every non-lost journey', async () => {
   const base = await baseModules();
   const differences = [];
   for (const [name, doc, body, now, opts] of scenarios()) {
@@ -278,7 +284,7 @@ test('probe inv1: the home header is byte-identical to the base commit on every 
   assert.deepEqual(differences, ['riding, arrival-only delay (documented exception)']);
 });
 
-test('probe inv1: journey detail steps and summary are unchanged on every non-lost journey', async () => {
+test('journey detail steps and summary are unchanged on every non-lost journey', async () => {
   const base = await baseModules();
   const shape = (model) => ({
     summary: model.summary,
@@ -290,7 +296,7 @@ test('probe inv1: journey detail steps and summary are unchanged on every non-lo
   }
 });
 
-test('probe inv1: the recovery seam is inert without a lost change', () => {
+test('the recovery seam is inert without a lost change', () => {
   for (const [name, doc, , now] of scenarios()) {
     const plan = recoveryModel(doc.focus, now, { response: () => ({ journeys: [recoveryJourney()] }) });
     assert.equal(plan.search, null, `${name}: searched`);

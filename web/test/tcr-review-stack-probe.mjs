@@ -1,5 +1,5 @@
-/* Real-stack probe for docs/backlog/transfer-completion-recovery, invariant 4:
-   one recovery request per refresh while a change is lost.
+/* Real-stack regression for transfer recovery, invariant 4: one recovery
+   request per refresh, every refresh, while a change is lost.
 
    Run from the repository root with the fixture stub and the server already
    up (web/test/tcr-review-stack.sh does that and calls this):
@@ -100,10 +100,18 @@ for (let cycle = 1; cycle <= 3; cycle++) {
 }
 
 const recovery = departures.filter((url) => new URL(url).searchParams.get('from') === '200070');
-console.log(JSON.stringify({
+const report = {
   cycles,
   followedRequests: departures.filter((url) => new URL(url).searchParams.get('from') === '213820').length,
   recoveryRequests: recovery.length,
   recoveryQueries: recovery.map((url) => new URL(url).search)
-}, null, 1));
+};
+console.log(JSON.stringify(report, null, 1));
 await browser.close();
+
+const wrong = cycles.filter((cycle) => cycle.requestsFrom.filter((from) => from === '200070').length !== 1);
+if (wrong.length) {
+  console.error(`FAIL: three refreshes made ${recovery.length} recovery requests, one per refresh expected`);
+  process.exit(1);
+}
+console.log('PASS: one recovery request per refresh');

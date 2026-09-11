@@ -422,12 +422,14 @@ test('focus arrival metadata and bounded recommendation pages round-trip without
 });
 
 test('the recovery record rides with the focus, and a malformed one is dropped', () => {
+  const legOf = (from, to) => ({ from: { id: from }, to: { id: to } });
   const focus = {
     tripId: 't1', direction: 'forward', focusedAt: '2026-09-01T09:47:00+10:00', by: 'focus',
-    journey: { legs: 2 },
+    journey: { legs: 2, legDetail: [legOf('213820', '200070'), legOf('200070', '202210')] },
     recovery: {
       changeIndex: 0,
-      journey: { legs: 1 },
+      anchor: 0,
+      journey: { legs: 1, legDetail: [legOf('200070', '202210')] },
       fetchedAt: '2026-09-01T09:47:00+10:00',
       source: { generatedAt: '2026-09-01T09:46:30+10:00', degraded: false }
     }
@@ -435,8 +437,17 @@ test('the recovery record rides with the focus, and a malformed one is dropped',
   const kept = parseDoc(serializeDoc({ ...emptyDoc(), focus })).focus;
   assert.deepEqual(kept.recovery, focus.recovery);
 
+  const movedAnchor = {
+    ...focus.recovery,
+    anchor: 1,
+    journey: { legs: 2, legDetail: [legOf('200070', '200060'), legOf('200060', '202210')] }
+  };
+  const moved = parseDoc(serializeDoc({ ...emptyDoc(), focus: { ...focus, recovery: movedAnchor } })).focus;
+  assert.equal(moved.recovery.anchor, 1, 'the anchor the tail was searched from survives the round trip');
+
   for (const broken of [
     { ...focus.recovery, changeIndex: -1 },
+    { ...focus.recovery, changeIndex: 1 },
     { ...focus.recovery, changeIndex: 'first' },
     { ...focus.recovery, journey: null },
     { ...focus.recovery, fetchedAt: 'whenever' },

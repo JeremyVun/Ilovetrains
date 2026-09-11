@@ -1491,7 +1491,10 @@ async function refreshRecovery() {
   storeRecovery(plan.recovery);
   const ends = leg(trip, focus.direction);
   const key = recoverySearchKey(plan.search, ends.to.id);
-  if (state.recovery?.key === key || !plan.search.from || plan.search.at === null) return;
+  if (!plan.search.from || plan.search.at === null) return;
+  /* Every refresh asks again while the change is lost, so the candidate's own
+     estimates stay as live as the followed journey's; the abort keeps that to
+     one request in flight per refresh (client-storage.md, Recovery). */
   if (recoveryInflight) recoveryInflight.abort();
   const controller = new AbortController();
   recoveryInflight = controller;

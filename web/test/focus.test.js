@@ -463,6 +463,17 @@ test('a candidate under the connection floor is not a candidate', () => {
     '2026-09-01T10:08:00+10:00');
 });
 
+test('a candidate that does not board at the change station is skipped', () => {
+  const arrival = Date.parse('2026-09-01T10:00:36+10:00');
+  const elsewhere = recoveryJourney();
+  elsewhere.legDetail[0].from = { id: '200060', name: 'Central Station', platform: 'Platform 20' };
+
+  assert.equal(recoveryCandidate([elsewhere], arrival, { from: '200070' }), null,
+    'a journey out of Central is no connection at Town Hall');
+  assert.equal(recoveryCandidate([elsewhere, recoveryJourney()], arrival, { from: '200070' })
+    .legDetail[0].from.id, '200070');
+});
+
 test('the record is cleared on the first refresh where nothing is lost', () => {
   const doc = lostDoc();
   doc.focus.journey.legDetail[0].arrival.estimated = '2026-09-01T09:54:00+10:00';

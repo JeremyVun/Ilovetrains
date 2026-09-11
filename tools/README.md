@@ -380,6 +380,14 @@ on someone's behalf.
 `PLAYTEST_BIN` overrides the Playtest command, which is otherwise `playtest`
 on `PATH`.
 
+## web/test/tcr-review-stack.sh
+
+`bash web/test/tcr-review-stack.sh` from the repository root boots the stub and
+the server on free ports and drives three refresh cycles of a lost change in
+headless Chromium (the Playwright under `~/projects/playtest`), failing unless
+the recovery pair is requested exactly once per refresh. It is the only
+real-stack exercise of the web recovery fetch; `npm test` does not run it.
+
 ## comps/
 
 A round is a directory of HTML plus a one-line shoot, not a copied `shoot.js`:

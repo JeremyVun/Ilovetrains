@@ -1008,6 +1008,130 @@
       }
     },
     {
+      "name": "candidate-change-lost-no-candidate",
+      "now": 1789429620000,
+      "fresh": true,
+      "by": "inferred",
+      "estimates": [
+        {
+          "leg": 0,
+          "arrival": 1789430400000
+        }
+      ],
+      "searches": [
+        {
+          "id": "town-hall-1000",
+          "from": "200070",
+          "at": 1789430400000,
+          "journeys": [
+            {
+              "legs": [
+                {
+                  "line": "T1",
+                  "mode": "train",
+                  "headsign": "Central",
+                  "from": {
+                    "id": "200070",
+                    "name": "Town Hall Station",
+                    "platform": "5"
+                  },
+                  "to": {
+                    "id": "200060",
+                    "name": "Central Station",
+                    "platform": "18"
+                  },
+                  "departure": {
+                    "scheduled": 1789430700000,
+                    "estimated": 1789430700000
+                  },
+                  "arrival": {
+                    "scheduled": 1789430880000,
+                    "estimated": 1789431240000
+                  },
+                  "cancelled": false
+                },
+                {
+                  "line": "T4",
+                  "mode": "train",
+                  "headsign": "Bondi Junction",
+                  "from": {
+                    "id": "200060",
+                    "name": "Central Station",
+                    "platform": "20"
+                  },
+                  "to": {
+                    "id": "202210",
+                    "name": "Bondi Junction Station",
+                    "platform": "1"
+                  },
+                  "departure": {
+                    "scheduled": 1789431060000,
+                    "estimated": 1789431060000
+                  },
+                  "arrival": {
+                    "scheduled": 1789431840000,
+                    "estimated": 1789431840000
+                  },
+                  "cancelled": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "central-1014",
+          "from": "200060",
+          "at": 1789431240000,
+          "journeys": []
+        }
+      ],
+      "heldRecovery": {
+        "changeIndex": 0,
+        "search": "town-hall-1000",
+        "journey": 0
+      },
+      "expected": {
+        "followedChanges": [
+          "lost"
+        ],
+        "composedChanges": [
+          "ordinary",
+          "lost"
+        ],
+        "recoveryAnchor": 1,
+        "search": "central-1014",
+        "candidate": null,
+        "composed": [
+          {
+            "line": "T9",
+            "scheduledDeparture": 1789428240000
+          },
+          {
+            "line": "T1",
+            "scheduledDeparture": 1789430700000
+          },
+          {
+            "line": "T4",
+            "scheduledDeparture": 1789431060000
+          }
+        ],
+        "status": "LATE · CONNECTION GONE",
+        "pinIcon": false,
+        "changeLabels": [
+          "TOWN HALL · T1 10:05",
+          "CENTRAL · T4 10:11"
+        ],
+        "receipt": "Check the station boards.",
+        "instruction": "The T1 arrives too late for the 10:11",
+        "arrival": {
+          "planned": "10:24"
+        },
+        "figure": "13",
+        "provenance": "TO CHANGE",
+        "alert": null
+      }
+    },
+    {
       "name": "two-change-second-lost",
       "now": 1789429620000,
       "fresh": true,
