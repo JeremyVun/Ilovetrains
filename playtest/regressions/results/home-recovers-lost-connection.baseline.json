@@ -1,0 +1,66 @@
+{
+  "accepted_at": "2026-09-11T10:48:04.092Z",
+  "run_id": "2026-09-11T1047-12d8",
+  "run_dir": "/var/folders/2w/krx53_8d0wz9bnc02rvllb8w0000gn/T/ilovetrains-playtest-runs/2026-09-11T1047-12d8/home-recovers-lost-connection",
+  "healed_from_run_id": null,
+  "pins": {
+    "harness_version": "0.1.0",
+    "step_schema_version": 8,
+    "snapshot_format": "a11y-text-v6",
+    "settle": {
+      "name": "settle-v1",
+      "dom_quiet_ms": 500,
+      "net_quiet_ms": 500,
+      "max_ms": 10000
+    },
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "driver": "web",
+    "actor_model": "claude-gpt-5.6-terra",
+    "grader_model": "claude-gpt-5.6-terra",
+    "gateway": "http://127.0.0.1:8900",
+    "headed": false,
+    "vision": false
+  },
+  "story_hash": "70bf4bda170c261b",
+  "base_url": "http://127.0.0.1:8460",
+  "verdicts": [
+    {
+      "spec": "element_exists: [data-focus-status].status-lost",
+      "pass": true,
+      "detail": "element present"
+    },
+    {
+      "spec": "element_exists: .hm-sign:has-text(\"Get off at Town Hall · Platform 3\")",
+      "pass": true,
+      "detail": "element present"
+    },
+    {
+      "spec": "element_exists: [data-transfer-station]:has-text(\"Town Hall · T4 10:08\")",
+      "pass": true,
+      "detail": "element present"
+    },
+    {
+      "spec": "element_exists: .hm-e.to del.hm-was:has-text(\"10:08\")",
+      "pass": true,
+      "detail": "element present"
+    },
+    {
+      "spec": "element_exists: .hm-e.to .hm-t:has-text(\"10:18\")",
+      "pass": true,
+      "detail": "element present"
+    },
+    {
+      "spec": "element_exists: .hm-rec:has-text(\"The T9 arrives at 10:00, but the T4 left at 09:58.\")",
+      "pass": true,
+      "detail": "element present"
+    },
+    {
+      "spec": "element_exists: [data-row-status].status-lost",
+      "pass": true,
+      "detail": "element present"
+    }
+  ]
+}

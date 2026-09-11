@@ -352,6 +352,15 @@ path only replays if the browser reads the same instant every run. The
 server's clock stays real; the client clamps data age at zero, so the header
 reads "Live" rather than an age that changes per run.
 
+That real server clock also bounds what a case can reach. Any request the
+client sends with `at` — the focused-journey refresh once its train has left,
+and the recovery search from a lost change — asks for a window in the fixture
+era, which the API refuses with `at must be within the last 24 hours`. A case
+whose focus has already departed therefore keeps reading its journey from the
+seeded snapshot, shows `Offline` instead of `Live`, and logs one console error
+per refused request, so it cannot assert `console_errors: 0`. Only a case whose
+focus has not yet departed refreshes that journey from the stub.
+
 Recording is explicit and separate:
 
 ```sh
