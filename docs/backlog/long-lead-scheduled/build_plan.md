@@ -119,7 +119,51 @@ register.
 
 ## Phase 4 — Verification on final sources
 
-- [ ] Done
+- [x] Done (2026-09-11). One Opus 5 agent per platform, forked from
+  f619995 after the orchestrator registered a shared `board-horizon` screen
+  in `tools/visual-regression.js` so no two agents edited the same table
+  line. Each platform now has a `board-horizon` calibration state (web
+  `tools/shoot-states.js`, Android `UiCalibrationTest`, iOS
+  `horizonCalibrationBoard()` behind DEBUG) seeding one fresh live board:
+  40 on time, 41 on time, 41 late by 6, scheduled 43 with estimate 41,
+  cancelled (Android's cancelled row sits at 44 because a row key is
+  line + scheduled minute). Each asserts the five labels before shooting.
+  Before/after frames from the pre-feature commit 575c35b and the feature
+  are in `evidence/`; on every platform the diff is confined to the second
+  row's numeral colour and its `SCHEDULED` label.
+- Visual regression per platform on f619995 sources: web 8 DIFF, of which
+  `board-two-change` (the transfer fixture's 48-minute on-time row) is the
+  feature and accepted, and seven Settings frames were a pre-existing
+  version-string change owned by the peer item; Android moved no existing
+  frame (a before/after sweep of all 39 canonical frames on the same
+  emulator differed only in the known setup keyboard-inset flake); iOS 31
+  same, no DIFF. Home and smart header frames were `same` everywhere.
+  Baselines added: `board-horizon` on all three platforms. The Android one
+  was shot on AVD `Location_Review`; the other Android baselines came from
+  a peer's AVD and differ from it by anti-aliasing rims, so a full Android
+  matrix on either device reports those rims until one device owns all.
+- Main moved during the wave: the transfer-completion-recovery item merged
+  (192c423, 1bd4330). Its edits to `UiCommon.kt`, `Common.swift`,
+  `UiBoard.kt`, `BoardView.swift`, `ui.md`, `shoot-states.js` and
+  `visual-regression.js` were journey-axis and alert work and auto-merged;
+  `manifest.json` conflicted three times and was resolved by keeping the
+  peer's device blocks.
+- Full gates on the merged main (0e40ea0): `go test ./...` ok;
+  `(cd web && npm test)` 495 pass 0 fail; `tools/playtest-regressions.sh`
+  exit 0, 2 cases pass; `tools/build-android.sh` exit 0 (unit 174 tests
+  0 failures); `tools/build-ios.sh --test` exit 65 on the first attempt
+  with one failure in the peer's `ControllerTests.
+  testKeepaliveStopsWhenTheSessionEndsInTheBackground` under memory
+  pressure, then exit 0 on retry (213 unit, 19 UI tests, 0 failures);
+  `tools/visual-regression.js --platform web` 47 same exit 0;
+  `--platform ios --screens board-horizon,board,board-delayed,home,detail`
+  6 same exit 0. Android connected tests ran in the Android verification
+  wave (61 tests, one timing flake per run, each green alone), not again on
+  the merged tree. Trap: three platform gates in parallel on this Mac were
+  killed for memory; run them one at a time.
+- Open for the owner at closeout: 18 Android and 20 iOS `tracker-*`
+  baselines exist on disk but were never force-added (blanket `*.png`
+  ignore), so the tracker lane reports NEW/MISSING on every run.
 - Evidence: on each platform, a before/after frame of a board with a
   41-minute on-time row and a 41-minute late row. Check the stub route
   anchors (`tools/README.md`) for a board that already holds such rows; if
