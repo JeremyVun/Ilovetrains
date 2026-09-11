@@ -193,6 +193,41 @@ final class StorageTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(Journey.self, from: JSONEncoder().encode(journey)), journey)
     }
 
+    func testAMalformedRecoveryRecordIsDroppedAndTheFocusSurvives() throws {
+        let from = Station(id: "a", name: "A")
+        let change = Station(id: "b", name: "B")
+        let to = Station(id: "c", name: "C")
+        let journey = Journey(legs: [
+            Leg(line: "T1", mode: "train", headsign: "B", from: from, to: change, departure: 0, arrival: 600_000),
+            Leg(line: "T4", mode: "train", headsign: "C", from: change, to: to, departure: 540_000, arrival: 1_200_000)
+        ])
+        let candidate = Journey(legs: [
+            Leg(line: "T4", mode: "train", headsign: "C", from: change, to: to, departure: 900_000, arrival: 1_500_000)
+        ])
+        let board = BoardData(from: from, to: to, journeys: [journey], generatedAt: 1)
+        let source = UserData(
+            trips: [SavedTrip(id: "trip", from: from, to: to)],
+            focus: FocusedJourney(
+                tripId: "trip", reverse: false, journey: journey, board: board,
+                recovery: RecoveryRecord(changeIndex: 0, journey: candidate, fetchedAt: 1,
+                                         source: RecoverySource(generatedAt: 1, degraded: false))
+            )
+        )
+        let encoded = try JSONEncoder().encode(source)
+        XCTAssertEqual(try JSONDecoder().decode(UserData.self, from: encoded).focus?.recovery?.journey, candidate)
+
+        var raw = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        var focus = try XCTUnwrap(raw["focus"] as? [String: Any])
+        var recovery = try XCTUnwrap(focus["recovery"] as? [String: Any])
+        recovery["journey"] = ["legs": []]
+        focus["recovery"] = recovery
+        raw["focus"] = focus
+
+        let recovered = try JSONDecoder().decode(UserData.self, from: JSONSerialization.data(withJSONObject: raw))
+        XCTAssertEqual(recovered.focus?.journey, journey)
+        XCTAssertNil(recovered.focus?.recovery)
+    }
+
     func testTripCapUsesLatestHistoryThenCreationInsteadOfLegacyLastViewed() {
         let from = Station(id: "a", name: "A")
         let trips = (0..<11).map { SavedTrip(

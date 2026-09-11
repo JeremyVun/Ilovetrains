@@ -108,18 +108,17 @@ struct TravelTrackerState: Equatable, Sendable {
         arrivalState: ArrivalState? = nil,
         arrivalMoving: Bool = false
     ) -> TravelTrackerState? {
-        let legs = focus.journey.legs
+        let plan = recoveryPlan(focus)
+        let legs = plan.composed.legs
         guard !legs.isEmpty else { return nil }
         let projectionEnd = legs.map(\.effectiveArrival).max()!
         let unresolved = arrivalState == .checkingArrival || arrivalState == .arrivalUnconfirmed
-        let cancellationPending = arrivalState == .travelling && focus.journey.cancelled
+        let cancellationPending = arrivalState == .travelling && plan.composed.cancelled
         guard now < projectionEnd || unresolved || cancellationPending else { return nil }
 
         let identity = TravelTrackerIdentity(tripId: focus.tripId, reverse: focus.reverse, serviceKey: focus.journey.key)
         let revision = TravelTrackerRevision(identity: identity, generation: generation)
-        let missedIndex = legs.indices.dropLast().first {
-            legs[$0].effectiveArrival > legs[$0 + 1].effectiveDeparture
-        }
+        let missedIndex = plan.composedStates.firstIndex(of: .lost)
         let missed = missedIndex.map { trackerMissedConnection(legs, index: $0) }
         let position = trackerPosition(legs, now: now, missedIndex: missedIndex, projectionEnd: projectionEnd)
         let last = legs[legs.count - 1]
@@ -188,7 +187,7 @@ struct TravelTrackerState: Equatable, Sendable {
             progress: unresolved ? min(0.98, trackerProgress(legs, now: now, projectionEnd: projectionEnd)) : trackerProgress(legs, now: now, projectionEnd: projectionEnd),
             freshness: source.0,
             provenance: trackerProvenance(focus, freshness: source.0),
-            retained: focus.journey.retained == true,
+            retained: plan.composed.retained == true,
             cancelled: cancelledLeg != nil,
             arrivalCancelled: last.cancelled,
             nextBoundary: position.boundary,

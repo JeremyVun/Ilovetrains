@@ -235,6 +235,15 @@ func arrivalInstruction(_ arrival: ArrivalResult?, destination: String) -> Strin
     }
 }
 
+/// A recovery change names the service the rider now boards; the station name is never ellipsised.
+func axisChangeLabel(_ journey: Journey, index: Int, recoveryChangeIndex: Int?, withLine: Bool = true) -> String {
+    let leg = journey.legs[index], next = journey.legs[index + 1]
+    let station = leg.to.id == next.from.id ? leg.to.shortName : "\(leg.to.shortName) → \(next.from.shortName)"
+    guard recoveryChangeIndex.map({ index >= $0 }) ?? false else { return station.uppercased() }
+    let service = withLine && !next.line.isEmpty ? "\(next.line) " : ""
+    return "\(station) · \(service)\(clockTime(next.effectiveDeparture))".uppercased()
+}
+
 struct JourneyAxis: View {
     let journey: Journey
     var large = false
@@ -242,6 +251,7 @@ struct JourneyAxis: View {
     var progress: Double? = nil
     var showProgressMarker = true
     var tinyTrain: Bool? = nil
+    var recoveryChangeIndex: Int? = nil
     @State private var trainEnabled = false
     @Environment(\.trainColors) private var colors
 
@@ -261,7 +271,7 @@ struct JourneyAxis: View {
                         .fill(lineColor(leg.line, mode: leg.mode, colors: colors, fill: true))
                         .layoutValue(key: AxisItemKey.self, value: .ride(index))
                     if index < journey.legs.count - 1 {
-                        Rectangle().fill(!journey.cancelled && minutesBetween(leg.effectiveArrival, journey.legs[index + 1].effectiveDeparture) < 5 ? colors.warning : colors.rule)
+                        Rectangle().fill(changeState(index) == .tight ? colors.warning : colors.rule)
                             .layoutValue(key: AxisItemKey.self, value: .dwell(index))
                     }
                 }
@@ -284,11 +294,11 @@ struct JourneyAxis: View {
                         pin(next, platform: platform)
                             .layoutValue(key: AxisItemKey.self, value: .board(index))
                     }
-                    Text((leg.to.id == next.from.id ? leg.to.shortName : "\(leg.to.shortName) → \(next.from.shortName)").uppercased())
-                        .font(.system(size: 10, weight: .semibold)).tracking(0.6)
-                        .foregroundStyle(colors.ink2).multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .layoutValue(key: AxisItemKey.self, value: .station(index))
+                    ViewThatFits(in: .horizontal) {
+                        stationLabel(axisChangeLabel(journey, index: index, recoveryChangeIndex: recoveryChangeIndex))
+                        stationLabel(axisChangeLabel(journey, index: index, recoveryChangeIndex: recoveryChangeIndex, withLine: false))
+                    }
+                    .layoutValue(key: AxisItemKey.self, value: .station(index))
                     if completedTransfer(index) {
                         if journey.legs.count <= 2 || index == 0,
                            transferPlatformText(leg.toPlatform, mode: leg.mode) != nil {
@@ -319,6 +329,18 @@ struct JourneyAxis: View {
         let duration = max(1, journey.effectiveArrival - journey.effectiveDeparture)
         let inferred = journey.effectiveDeparture + progress * duration
         return inferred >= journey.legs[index + 1].effectiveDeparture
+    }
+
+    private func changeState(_ index: Int) -> ConnectionState {
+        connectionState(journey.legs[index], journey.legs[index + 1],
+                        recovery: recoveryChangeIndex.map { index >= $0 } ?? false)
+    }
+
+    private func stationLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 10, weight: .semibold)).tracking(0.6)
+            .foregroundStyle(colors.ink2).multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func pin(_ leg: Leg, platform: String) -> some View {

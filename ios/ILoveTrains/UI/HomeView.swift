@@ -148,14 +148,34 @@ private struct SmartHeader: View {
     private var focus: FocusedJourney? { model.state.focus }
     private var focused: Bool { focus != nil && cancelledLeadTime == nil }
     private var pinned: Bool { focused && focus?.pinned == true }
+    private var plan: RecoveryPlan? { focused ? focus.map(recoveryPlan) : nil }
+    // The header renders the composed journey; the focus keeps the followed one as its identity.
+    private var rendered: Journey { plan?.composed ?? journey }
     private var departed: Bool { focused && model.state.now >= journey.effectiveDeparture }
     private var arrival: ArrivalResult? { focused ? model.state.arrival : nil }
-    private var complete: Bool { focused ? model.state.focusComplete : model.state.now >= journey.effectiveArrival }
+    private var complete: Bool { focused ? model.state.focusComplete : model.state.now >= rendered.effectiveArrival }
     private var late: Bool {
-        focused ? focusJourneyIsLate(journey, board: board, now: model.state.now)
+        focused ? focusJourneyIsLate(rendered, board: board, now: model.state.now)
             : minutesBetween(journey.departure, journey.effectiveDeparture) > 0
     }
-    private var statusWarning: Bool { status == "Cancelled" || status == "Running late" }
+    private var statusPresentation: FocusStatusPresentation? {
+        guard focused, let focus, arrival?.state != .checkingArrival,
+              arrival?.state != .arrivalUnconfirmed else { return nil }
+        return focusStatusPresentation(focus, now: model.state.now, complete: complete)
+    }
+    private var statusWarning: Bool {
+        statusPresentation?.warning ?? (status == "Cancelled" || status == "Running late")
+    }
+    private var instructionWarns: Bool {
+        if cancelledLeadTime != nil { return true }
+        guard let plan, departed, !complete else { return false }
+        return plan.composed.cancelled
+            || (plan.recoveryChangeIndex == nil && plan.composedStates.contains(.lost))
+    }
+    private var receipt: String? {
+        guard let focus, let plan, focused else { return model.state.receipt }
+        return focusReceipt(focus, plan: plan, now: model.state.now) ?? model.state.receipt
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -165,7 +185,11 @@ private struct SmartHeader: View {
                         HStack(spacing: 5) {
                             if status == "Pinned" { Image(systemName: "pin.fill").font(.system(size: 12)) }
                             TrainLabel(text: status, color: statusWarning ? colors.warning : colors.ink2, size: 11)
-                            if status != "Pinned" { Text("·").foregroundStyle(colors.ink3); Image(systemName: "pin.fill").font(.system(size: 12)); TrainLabel(text: "Pinned", color: colors.ink2, size: 11) }
+                            if statusPresentation?.pinWord == false {
+                                Image(systemName: "pin.fill").font(.system(size: 12)).foregroundStyle(colors.warning)
+                            } else if status != "Pinned" {
+                                Text("·").foregroundStyle(colors.ink3); Image(systemName: "pin.fill").font(.system(size: 12)); TrainLabel(text: "Pinned", color: colors.ink2, size: 11)
+                            }
                         }.frame(minHeight: 44)
                     }.buttonStyle(.plain).accessibilityIdentifier("unpin-home")
                 } else {
@@ -187,24 +211,25 @@ private struct SmartHeader: View {
                     }
                 }.frame(width: 104, alignment: .leading)
                 HStack(alignment: .top, spacing: 8) {
-                    endpoint(first.from.shortName, clockTime(journey.effectiveDeparture), arrival: false)
-                    endpoint(journey.legs.last?.to.shortName ?? "", clockTime(journey.effectiveArrival), arrival: true)
+                    endpoint(first.from.shortName, clockTime(rendered.effectiveDeparture), arrival: false)
+                    arrivalEndpoint
                 }
             }.padding(.horizontal, pagePadding).padding(.vertical, 10)
             }.buttonStyle(.plain).accessibilityIdentifier("open-recommended-journey")
 
             JourneyAxis(
-                journey: journey,
+                journey: rendered,
                 large: true,
                 showCap: !departed,
                 progress: axisProgress,
                 showProgressMarker: showProgressMarker,
-                tinyTrain: model.state.tinyTrain
+                tinyTrain: model.state.tinyTrain,
+                recoveryChangeIndex: plan?.recoveryChangeIndex
             )
                 .padding(.horizontal, pagePadding)
 
             Group {
-                if cancelledLeadTime != nil {
+                if instructionWarns {
                     TrainLabel(text: instruction, color: colors.warning, size: 11, lines: 2)
                 } else {
                     Text(instruction).font(.system(size: 15, weight: departed ? .regular : .light))
@@ -212,7 +237,7 @@ private struct SmartHeader: View {
                 }
             }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, pagePadding).padding(.vertical, 8)
 
-            if let receipt = model.state.receipt, !receipt.isEmpty {
+            if let receipt, !receipt.isEmpty {
                 Text(receipt).font(.system(size: 15, weight: .light)).foregroundStyle(colors.ink2)
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, pagePadding).padding(.vertical, 4)
             }
@@ -250,7 +275,7 @@ private struct SmartHeader: View {
         if cancelledLeadTime != nil && focus != nil { return "Cancelled" }
         if arrival?.state == .checkingArrival { return "Checking arrival" }
         if arrival?.state == .arrivalUnconfirmed { return arrival?.moving == true ? "Arrival uncertain" : "Arrival unconfirmed" }
-        if focused, let focus { return focusStatus(focus, now: model.state.now, complete: complete) }
+        if let statusPresentation { return statusPresentation.text }
         if let retained = retainedHeaderStatus(board: board, journey: journey, hasFocus: focus != nil, now: model.state.now) {
             return retained
         }
@@ -260,25 +285,25 @@ private struct SmartHeader: View {
     }
 
     private var displayFigure: Figure {
-        if let figure = arrivalFigure(arrival, journey: journey, now: model.state.now) { return figure }
+        if let figure = arrivalFigure(arrival, journey: rendered, now: model.state.now) { return figure }
         if departed && !complete {
-            return directionFigureFor(journey, now: model.state.now) ?? figureFor(journey, board: board, now: model.state.now)
+            return directionFigureFor(rendered, now: model.state.now) ?? figureFor(rendered, board: board, now: model.state.now)
         }
-        return figureFor(journey, board: board, now: model.state.now)
+        return figureFor(rendered, board: board, now: model.state.now)
     }
 
     private var instruction: String {
         if let cancelledLeadTime { return "\(clockTime(cancelledLeadTime)) cancelled · next \(genericModeName(first.mode))" }
-        if let instruction = arrivalInstruction(arrival, destination: journey.legs.last?.to.shortName ?? "destination") {
+        if let instruction = arrivalInstruction(arrival, destination: rendered.legs.last?.to.shortName ?? "destination") {
             return instruction
         }
         if complete, arrival?.basis == .estimate {
-            return journey.legs.last?.estimatedArrival == nil
+            return rendered.legs.last?.estimatedArrival == nil
                 ? "The scheduled trip has ended. The return trip is ready."
                 : "The last arrival estimate has passed. The return trip is ready."
         }
         if complete { return "The journey has finished" }
-        if departed { return focusedInstruction(journey, now: model.state.now) }
+        if departed, let plan { return focusedInstruction(plan, now: model.state.now) }
         return first.headsign.isEmpty ? first.to.shortName : first.headsign
     }
 
@@ -298,19 +323,38 @@ private struct SmartHeader: View {
 
     private var axisProgress: Double? {
         guard departed, !complete else { return nil }
-        let duration = max(1, journey.effectiveArrival - journey.effectiveDeparture)
+        let duration = max(1, rendered.effectiveArrival - rendered.effectiveDeparture)
         if arrival?.state == .checkingArrival || arrival?.state == .arrivalUnconfirmed {
-            if model.state.now >= journey.effectiveArrival { return 0.98 }
+            if model.state.now >= rendered.effectiveArrival { return 0.98 }
             let flooredNow = floor(model.state.now / 60_000) * 60_000
-            return min(0.999, max(0, (flooredNow - journey.effectiveDeparture) / duration))
+            return min(0.999, max(0, (flooredNow - rendered.effectiveDeparture) / duration))
         }
-        return (model.state.now - journey.effectiveDeparture) / duration
+        return (model.state.now - rendered.effectiveDeparture) / duration
     }
 
     private var showProgressMarker: Bool {
-        guard let arrival, model.state.now >= journey.effectiveArrival,
+        guard let arrival, model.state.now >= rendered.effectiveArrival,
               arrival.state == .checkingArrival || arrival.state == .arrivalUnconfirmed else { return true }
         return arrival.moving
+    }
+
+    private var arrivalEndpoint: some View {
+        let clocks = plan.map { focusArrivalClocks($0, followed: journey) }
+            ?? FocusArrivalClocks(shown: clockTime(journey.effectiveArrival))
+        return VStack(alignment: .trailing, spacing: 7) {
+            Text(rendered.legs.last?.to.shortName ?? "").font(.system(size: 16, weight: .light))
+                .foregroundStyle(colors.ink2).lineLimit(2).minimumScaleFactor(0.72)
+            HStack(alignment: .firstTextBaseline, spacing: 7) {
+                if let struck = clocks.struck, clocks.shown != nil {
+                    Text(struck).font(.system(size: 15, weight: .light)).foregroundStyle(colors.ink3)
+                        .strikethrough().tabular()
+                }
+                Text(clocks.shown ?? clocks.struck ?? clocks.planned ?? "—")
+                    .font(.system(size: 20, weight: .light)).foregroundStyle(colors.ink2)
+                    .strikethrough(clocks.shown == nil && clocks.struck != nil).tabular()
+            }
+            if clocks.planned != nil { TrainLabel(text: "Planned", color: colors.ink3) }
+        }.frame(maxWidth: .infinity, alignment: .trailing)
     }
 
     private func endpoint(_ station: String, _ time: String, arrival: Bool) -> some View {
@@ -401,25 +445,96 @@ private struct SavedTripRow: View {
     }
 }
 
-func savedTripFocusStatus(_ focus: FocusedJourney, now: Millis, complete: Bool) -> String {
-    let status = focusStatus(focus, now: now, complete: complete)
-    return focus.pinned && status != "Pinned" ? "\(status) · Pinned" : status
+struct FocusStatusPresentation: Equatable {
+    var text: String
+    var pinIcon: Bool
+    var pinWord: Bool
+    var warning: Bool
 }
 
+func focusStatusPresentation(_ focus: FocusedJourney, now: Millis, complete: Bool) -> FocusStatusPresentation {
+    let text = focusStatus(focus, now: now, complete: complete)
+    let lost = text.contains(connectionGoneWord)
+    return FocusStatusPresentation(
+        text: text,
+        pinIcon: focus.pinned,
+        pinWord: focus.pinned && !lost,
+        warning: lost || text == "Cancelled" || text == "Running late"
+    )
+}
+
+func savedTripFocusStatus(_ focus: FocusedJourney, now: Millis, complete: Bool) -> String {
+    let presentation = focusStatusPresentation(focus, now: now, complete: complete)
+    return presentation.pinWord && presentation.text != "Pinned"
+        ? "\(presentation.text) · Pinned" : presentation.text
+}
+
+let connectionGoneWord = "Connection gone"
+
 func focusStatus(_ focus: FocusedJourney, now: Millis, complete: Bool) -> String {
+    focusStatus(focus, plan: recoveryPlan(focus), now: now, complete: complete)
+}
+
+func focusStatus(_ focus: FocusedJourney, plan: RecoveryPlan, now: Millis, complete: Bool) -> String {
     if complete { return "Trip over" }
-    if focus.journey.cancelled { return "Cancelled" }
-    if focusJourneyIsLate(focus.journey, board: focus.board, now: now) { return "Running late" }
+    if plan.composed.cancelled { return "Cancelled" }
+    let late = focusJourneyIsLate(plan.composed, board: focus.board, now: now)
+    if connectionIsGone(plan, now: now) { return late ? "Late · \(connectionGoneWord)" : connectionGoneWord }
+    if late { return "Running late" }
     if focus.pinned, now < focus.journey.effectiveDeparture { return "Pinned" }
     return "Running"
+}
+
+/// The lost word retires once the rider can be on the service that replaced the connection.
+func connectionIsGone(_ plan: RecoveryPlan, now: Millis) -> Bool {
+    guard plan.followedStates.contains(.lost) else { return false }
+    guard let splice = plan.recoveryChangeIndex, plan.composed.legs.indices.contains(splice + 1) else { return true }
+    return now < plan.composed.legs[splice + 1].effectiveDeparture
 }
 
 func focusJourneyIsLate(_ journey: Journey, board: BoardData, now: Millis) -> Bool {
     guard board.source == "live", !board.offline, journey.retained != true,
           (0...90_000).contains(now - board.generatedAt) else { return false }
     let leg = journey.legs.first { now < $0.effectiveArrival } ?? journey.legs.last
-    guard let leg, leg.estimatedDeparture != nil else { return false }
-    return minutesBetween(leg.departure, leg.effectiveDeparture) > 0
+    guard let leg, leg.estimatedDeparture != nil || leg.estimatedArrival != nil else { return false }
+    let departure = leg.estimatedDeparture == nil ? 0 : minutesBetween(leg.departure, leg.effectiveDeparture)
+    let arrival = leg.estimatedArrival == nil ? 0 : minutesBetween(leg.arrival, leg.effectiveArrival)
+    return max(departure, arrival) > 0
+}
+
+struct FocusArrivalClocks: Equatable {
+    var shown: String?
+    var struck: String?
+    var planned: String?
+}
+
+func focusArrivalClocks(_ plan: RecoveryPlan, followed: Journey) -> FocusArrivalClocks {
+    let composed = clockTime(plan.composed.effectiveArrival)
+    if plan.composed.legs.last?.cancelled == true { return FocusArrivalClocks(struck: composed) }
+    if plan.recoveryChangeIndex != nil {
+        return FocusArrivalClocks(shown: composed, struck: clockTime(followed.effectiveArrival))
+    }
+    if plan.composedStates.contains(.lost) { return FocusArrivalClocks(planned: composed) }
+    return FocusArrivalClocks(shown: composed)
+}
+
+func focusReceipt(_ focus: FocusedJourney, plan: RecoveryPlan, now: Millis) -> String? {
+    let legs = plan.composed.legs
+    if plan.composed.cancelled { return nil }
+    if let splice = plan.recoveryChangeIndex, connectionIsGone(plan, now: now),
+       focus.journey.legs.indices.contains(splice + 1) {
+        let incoming = focus.journey.legs[splice], missed = focus.journey.legs[splice + 1]
+        return "The \(incoming.line) arrives at \(clockTime(incoming.effectiveArrival)), "
+            + "but the \(missed.line) left at \(clockTime(missed.effectiveDeparture))."
+    }
+    if plan.composedStates.contains(.lost) { return "Check the station boards." }
+    guard let tight = plan.composedStates.indices.first(where: {
+        plan.composedStates[$0] == .tight && $0 < (plan.recoveryChangeIndex ?? Int.max)
+            && now < legs[$0 + 1].effectiveDeparture
+    }) else { return nil }
+    let printed = minutesBetween(legs[tight].arrival, legs[tight + 1].departure)
+    guard connectionWindow(legs[tight], legs[tight + 1]) < printed else { return nil }
+    return "Printed change was \(printed) min."
 }
 
 private struct HomeFooter: View {
@@ -466,20 +581,37 @@ func distanceText(_ metres: Int) -> String {
     if metres < 10_000 { return String(format: "%.1f km", Double(metres) / 1_000) }
     return "\(Int((Double(metres) / 1_000).rounded())) km"
 }
-private func focusedInstruction(_ journey: Journey, now: Millis) -> String {
-    for (before, after) in zip(journey.legs, journey.legs.dropFirst()) {
+func focusedInstruction(_ plan: RecoveryPlan, now: Millis) -> String {
+    let legs = plan.composed.legs
+    if let cancelled = legs.indices.dropFirst().first(where: { legs[$0].cancelled }) {
+        return "\(clockTime(legs[cancelled].effectiveDeparture)) from \(legs[cancelled].from.shortName) cancelled"
+    }
+    if plan.recoveryChangeIndex == nil, let lost = plan.composedStates.firstIndex(of: .lost) {
+        return "The \(legs[lost].line) arrives too late for the \(clockTime(legs[lost + 1].effectiveDeparture))"
+    }
+    for index in legs.indices.dropLast() {
+        let before = legs[index], after = legs[index + 1]
+        let tight = plan.composedStates[index] == .tight
         if now < before.effectiveArrival {
-            let wait = minutesBetween(before.effectiveArrival, after.effectiveDeparture)
-            return wait < 5 ? "Tight change · \(wait) min\(placeClause(before.toPlatform, mode: before.mode))"
+            return tight
+                ? "Tight change · \(connectionWindow(before, after)) min\(placeClause(after.fromPlatform, mode: after.mode))"
                 : "Get off at \(before.to.shortName)\(placeClause(before.toPlatform, mode: before.mode))"
         }
         if now < after.effectiveDeparture {
-            let wait = max(0, minutesBetween(now, after.effectiveDeparture))
-            return wait < 5 ? "Tight change · \(wait) min\(placeClause(after.fromPlatform, mode: after.mode))"
-                : "Change at \(after.from.shortName)\(placeClause(after.fromPlatform, mode: after.mode))"
+            if tight {
+                let wait = max(0, minutesBetween(now, after.effectiveDeparture))
+                return "Tight change · \(wait) min\(placeClause(after.fromPlatform, mode: after.mode))"
+            }
+            let verb = plan.recoveryChangeIndex.map { index >= $0 } ?? false
+                ? "Board the \(clockTime(after.effectiveDeparture)) at \(after.from.shortName)"
+                : "Change at \(after.from.shortName)"
+            return verb + placeClause(after.fromPlatform, mode: after.mode)
         }
     }
-    return "Stay on to \(journey.legs.last?.to.shortName ?? "destination")"
+    guard let last = legs.last, now < last.effectiveArrival else {
+        return "Stay on to \(legs.last?.to.shortName ?? "destination")"
+    }
+    return "Get off at \(last.to.shortName)\(placeClause(last.toPlatform, mode: last.mode))"
 }
 private func placeClause(_ raw: String?, mode: String) -> String {
     platformText(raw, mode: mode, full: true).map { " · \($0)" } ?? ""

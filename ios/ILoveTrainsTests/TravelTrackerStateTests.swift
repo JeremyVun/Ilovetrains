@@ -287,6 +287,43 @@ final class TravelTrackerStateTests: XCTestCase {
         var result = value; result.departure = departure; result.arrival = arrival; return result
     }
 
+    func testAChangePrintedInTheSameMinuteIsLostAndTheRecoveryTailIsProjected() throws {
+        let hub = Station(id: "hub", name: "Hub Station")
+        let start = Station(id: "start", name: "Start Station")
+        let end = Station(id: "end", name: "Final Station")
+        let legs = [
+            Leg(line: "T1", mode: "train", headsign: "Hub", from: start, to: hub,
+                departure: 0, arrival: 10 * minute, estimatedArrival: 10 * minute + 10_000,
+                fromPlatform: "1", toPlatform: "2"),
+            Leg(line: "T4", mode: "train", headsign: "Final", from: hub, to: end,
+                departure: 10 * minute, arrival: 20 * minute, estimatedDeparture: 10 * minute + 40_000,
+                fromPlatform: "5", toPlatform: "6")
+        ]
+        let stranded = try XCTUnwrap(TravelTrackerState.derive(focus: makeFocus(legs), now: 5 * minute, generation: 1))
+        XCTAssertNotNil(stranded.missedConnection, "A change printed in the same minute is lost")
+        XCTAssertEqual(stranded.etaText, "Planned 10:20")
+
+        var recovered = makeFocus(legs)
+        let candidate = Leg(line: "T4", mode: "train", headsign: "Final", from: hub, to: end,
+                            departure: 18 * minute, arrival: 28 * minute, fromPlatform: "5", toPlatform: "6")
+        recovered.recovery = RecoveryRecord(
+            changeIndex: 0, journey: Journey(legs: [candidate]), fetchedAt: 5 * minute,
+            source: RecoverySource(generatedAt: 5 * minute, degraded: false)
+        )
+        let projected = try XCTUnwrap(TravelTrackerState.derive(focus: recovered, now: 5 * minute, generation: 1))
+        XCTAssertNil(projected.missedConnection, "A candidate replaces the broken connection")
+        XCTAssertEqual(projected.stage, .ride)
+        XCTAssertEqual(projected.eta, 28 * minute)
+        XCTAssertEqual(projected.etaText, "about 10:28")
+        XCTAssertEqual(projected.segments.map { Int(($0.end - $0.start) / minute) }, [10, 7, 10])
+        XCTAssertEqual(projected.revision.identity.serviceKey, recovered.journey.key,
+                       "Recovery never changes the followed journey's identity")
+
+        let boarded = try XCTUnwrap(TravelTrackerState.derive(focus: recovered, now: 19 * minute, generation: 1))
+        XCTAssertEqual(boarded.stage, .final)
+        XCTAssertEqual(boarded.activeLegIndex, 1)
+    }
+
     private func fixture() throws -> [String: Any] {
         let url = try XCTUnwrap(Bundle(for: TravelTrackerStateTests.self).url(forResource: "travel-tracker", withExtension: "json"))
         return try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])

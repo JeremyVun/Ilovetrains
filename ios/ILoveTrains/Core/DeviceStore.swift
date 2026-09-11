@@ -45,6 +45,7 @@ struct FocusedJourney: Codable, Equatable, Sendable {
     var pinned: Bool
     var alternatives: BoardData?
     var arrivalGuard: ArrivalGuard?
+    var recovery: RecoveryRecord?
 
     init(
         tripId: String,
@@ -53,7 +54,8 @@ struct FocusedJourney: Codable, Equatable, Sendable {
         board: BoardData,
         pinned: Bool = true,
         alternatives: BoardData? = nil,
-        arrivalGuard: ArrivalGuard? = nil
+        arrivalGuard: ArrivalGuard? = nil,
+        recovery: RecoveryRecord? = nil
     ) {
         self.tripId = tripId
         self.reverse = reverse
@@ -62,9 +64,12 @@ struct FocusedJourney: Codable, Equatable, Sendable {
         self.pinned = pinned
         self.alternatives = alternatives
         self.arrivalGuard = arrivalGuard
+        self.recovery = recovery
     }
 
-    private enum CodingKeys: String, CodingKey { case tripId, reverse, journey, board, pinned, alternatives, arrivalGuard }
+    private enum CodingKeys: String, CodingKey {
+        case tripId, reverse, journey, board, pinned, alternatives, arrivalGuard, recovery
+    }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -75,6 +80,7 @@ struct FocusedJourney: Codable, Equatable, Sendable {
         pinned = (try? container.decodeIfPresent(Bool.self, forKey: .pinned)) ?? true
         alternatives = try? container.decodeIfPresent(BoardData.self, forKey: .alternatives)
         arrivalGuard = try? container.decodeIfPresent(ArrivalGuard.self, forKey: .arrivalGuard)
+        recovery = try? container.decodeIfPresent(RecoveryRecord.self, forKey: .recovery)
     }
 }
 

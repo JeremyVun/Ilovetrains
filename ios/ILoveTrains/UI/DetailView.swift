@@ -5,9 +5,15 @@ struct DetailView: View {
     @Environment(\.trainColors) private var colors
 
     var body: some View {
-        if let journey = model.state.detail, let first = journey.legs.first, let last = journey.legs.last {
+        if let journey = model.state.detail, let first = journey.legs.first {
             let focused = model.state.focus?.journey.key == journey.key
             let pinned = focused && model.state.focus?.pinned == true
+            let plan = focused ? model.state.focus.map(recoveryPlan) : nil
+            let shown = plan?.composed ?? journey
+            let last = shown.legs[shown.legs.count - 1]
+            let receipt = plan.flatMap { plan in
+                model.state.focus.flatMap { focusReceipt($0, plan: plan, now: model.state.now) }
+            }
             VStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack {
@@ -19,7 +25,7 @@ struct DetailView: View {
                     TrainLabel(text: "Journey").padding(.top, 2)
                     (Text(first.from.shortName) + Text(" → ").foregroundColor(colors.ink3) + Text(last.to.shortName))
                         .font(.system(size: 29, weight: .light)).tracking(-0.72).lineLimit(3).minimumScaleFactor(0.75).padding(.top, 6)
-                    Text(summary(journey)).font(.system(size: 14, weight: .light)).foregroundStyle(journey.cancelled ? colors.warning : colors.ink2)
+                    Text(receipt ?? summary(shown)).font(.system(size: 14, weight: .light)).foregroundStyle(shown.cancelled ? colors.warning : colors.ink2)
                         .padding(.top, 7).padding(.bottom, 18)
                     TrainRule(heavy: true)
                 }
@@ -29,10 +35,11 @@ struct DetailView: View {
                 GeometryReader { geometry in
                     ScrollView {
                         LazyVStack(spacing: 0) {
-                            BoardRow(journey: journey, board: model.state.board, now: model.state.now, detail: true,
-                                     figureOverride: !journey.cancelled
-                                        ? arrivalFigure(focused ? model.state.arrival : nil, journey: journey, now: model.state.now)
-                                            ?? directionFigureFor(journey, now: model.state.now) : nil)
+                            BoardRow(journey: shown, board: model.state.board, now: model.state.now, detail: true,
+                                     figureOverride: !shown.cancelled
+                                        ? arrivalFigure(focused ? model.state.arrival : nil, journey: shown, now: model.state.now)
+                                            ?? directionFigureFor(shown, now: model.state.now) : nil,
+                                     recoveryChangeIndex: plan?.recoveryChangeIndex)
                             if let instruction = arrivalInstruction(
                                 focused ? model.state.arrival : nil,
                                 destination: last.to.shortName
@@ -41,7 +48,7 @@ struct DetailView: View {
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(.horizontal, pagePadding).padding(.vertical, 10)
                             }
-                            JourneySteps(journey: journey, now: model.state.now, arrival: focused ? model.state.arrival : nil)
+                            JourneySteps(journey: shown, now: model.state.now, arrival: focused ? model.state.arrival : nil)
                             Spacer().frame(height: 12)
                         }
                     }
@@ -51,7 +58,7 @@ struct DetailView: View {
                 VStack(spacing: 0) {
                     TrainRule(heavy: true)
                     HStack(spacing: 10) {
-                        Text(clockTime(journey.effectiveArrival)).font(.system(size: 19, weight: .light)).foregroundStyle(last.cancelled ? colors.ink3 : colors.ink).strikethrough(last.cancelled).tabular()
+                        Text(clockTime(shown.effectiveArrival)).font(.system(size: 19, weight: .light)).foregroundStyle(last.cancelled ? colors.ink3 : colors.ink).strikethrough(last.cancelled).tabular()
                         Text(last.to.shortName).font(.system(size: 14, weight: .light)).foregroundStyle(colors.ink2).lineLimit(1)
                         Spacer()
                         TrainLabel(text: last.cancelled ? "Journey cancelled"
@@ -64,7 +71,7 @@ struct DetailView: View {
                 .padding(.horizontal, pagePadding)
                 .fixedSize(horizontal: false, vertical: true)
                 .layoutPriority(1)
-                if pinned || (!focused && !journey.cancelled) {
+                if pinned || (!focused && !shown.cancelled) {
                     ActionRail(text: pinned ? "Unpin this \(genericModeName(first.mode))" : "Pin this \(genericModeName(first.mode))", minHeight: 66) {
                         if pinned { model.unpinJourney() } else { model.pinJourney(journey) }
                     }
