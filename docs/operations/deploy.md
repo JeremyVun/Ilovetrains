@@ -176,6 +176,20 @@ read-only container probe verified the actual environment key `prod` and a true
 `tiny_train` evaluation (`FALLTHROUGH`). No `.env` files were read or credentials
 printed; the probe used the container's existing process environment.
 
+Version `1.7.0` (source `ec1193e1ea3c`, service worker `v64`) deployed on
+2026-09-12 in job `1519948963f5ff6208b39b369e0e0cf3`. Image digest:
+`sha256:ab8186316e44837fa97b8d6c400f94b4b4546bc569d07161f9dbbffeb9188cd4`.
+It carries transfer completion and recovery and the 40 minute live horizon.
+`/healthz`, `/js/version.js` and `/sw.js` answer 1.7.0 / `v64`; all 35 shell
+paths (`/index.html` is a 301 to `/`) and the downloads page match the release
+bytes; `measure-open.js` meets the experience bar on the production origin
+(warm open: worker controlling, live data 460 ms, 8 rows). The signed Android
+1.7.0/code 7 APK is published at `/downloads/`; its SHA-256 is
+`6f664661169c7fb93be4c2c87814621f2e2845f8a994520e4a9afa723a31b915`. iOS
+1.7.0 (7) was uploaded to internal TestFlight from
+`ios/releases/TestFlight-1.7.0-7.xcarchive`; processing was not confirmed
+because this Mac has no App Store Connect API key.
+
 Version `1.6.0` (source `54e4bc1`, service worker `v58`) deployed on 2026-09-10
 in job `a28bc847eeef7a4988471d6603794424`. Image digest:
 `sha256:4586c54a6d1ff791ea6239dc404e92ce1d59805da95c96255e54ae05df83876b`.

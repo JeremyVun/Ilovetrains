@@ -879,7 +879,11 @@ against `overflow: hidden` and reports the unreachable pixels at 412x732.
 paint and live data, in ms — from a cold open and then a warm, worker-served
 one. It also requires a successful API response and fresh, non-offline data, so
 cached rows plus a failed request cannot pass the bar. It exits non-zero if the
-bar is missed. `make-icons.sh` regenerates the web, iOS and Android icon entry
+bar is missed. It drives `screenshot.js` on the default `CDP_PORT` 9333; a
+Chromium another drive left on that port makes the cold run report a
+controlling worker with no rows and the warm run fail the bar for no
+production reason, so give it a private `CDP_PORT` when anything else may be
+shooting. `make-icons.sh` regenerates the web, iOS and Android icon entry
 points from `assets/brand/sleepers.svg` and its locked opaque 1024px master.
 Web sizes render through Chromium at their promised dimensions; the PWA
 maskable and Android foreground outputs retain the established 62% safe scale.

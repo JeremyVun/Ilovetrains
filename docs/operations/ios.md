@@ -83,16 +83,17 @@ and [registered-device signing](https://developer.apple.com/documentation/xcode/
 The paid individual membership for Yee Vun (`perch.admin@gmail.com`), team
 `8QYAPRZLHG`, renews on 2027-04-14. The owner accepted the updated Developer
 Program agreement on 2026-09-08 and signed into Xcode with this account.
-Xcode 26.4 successfully archived version 1.6.0 (6), signing both the app and
-Live Activity extension. TestFlight requires an active paid membership.
+Xcode 26.4 successfully archived versions 1.6.0 (6) and 1.7.0 (7), signing
+both the app and Live Activity extension. TestFlight requires an active paid membership.
 
 The App Store Connect record is [ilovetrains, Apple ID 6809801045](https://appstoreconnect.apple.com/apps/6809801045/testflight).
 Both explicit identifiers are registered on the paid team. The record uses
 English (Australia), SKU `ilovetrains-ios`, and Full Access.
-The latest internal-only upload succeeded on 2026-09-10 at 01:33 AEST from
-source `54e4bc1`, using `ios/releases/TestFlight-1.6.0-6.xcarchive`. All 57
-release input hashes and both signatures were verified; Apple accepted the
-package for processing. A successful upload alone does not mean the build is installable:
+The latest internal-only upload succeeded on 2026-09-12 at 14:23 AEST from
+source `ec1193e`, using `ios/releases/TestFlight-1.7.0-7.xcarchive`, through
+the Apple account signed into Xcode (no API key on this Mac); Apple accepted
+the package for processing. The previous upload, 1.6.0 (6) from `54e4bc1`,
+verified all 57 release input hashes and both signatures. A successful upload alone does not mean the build is installable:
 verify TestFlight processing and group assignment before announcing availability.
 Processing and group assignment for build 6 have not been confirmed. The internal
 group and owner invitation were left pending by the initial setup; verify them
