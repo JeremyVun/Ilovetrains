@@ -40,6 +40,11 @@
   Serve `web/` on a private loopback server first. Provider evidence passes
   through callbacks; the checker never assigns a final arrival state. Synthetic
   networking sends no real API, feedback or analytics request.
+- `check-habit-learning.mjs` — own private server and synthetic responses;
+  `node tools/check-habit-learning.mjs --out /tmp/habit-check` drives learned
+  Home selection, conservative fallback, receipt evidence, reload and one-tap
+  correction at both phone sizes/schemes. Shared cases declare their intended
+  selections independently; no personal data or API credentials are used.
 - `check-shell-upgrade.js --previous-ref <commit>` — install that committed web
   shell in a private Chromium profile, replace it with the working tree shell,
   then reload offline with Direct only and incompatible cached journeys. It

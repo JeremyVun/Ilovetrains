@@ -32,8 +32,13 @@ class WebConformanceTest {
                 assertEquals(case.getString("name"), expectedWithoutLocation?.getString("tripId"), withoutLocation?.tripId)
                 assertEquals(case.getString("name"), expectedWithoutLocation?.let { it.getString("direction") == "reverse" }, withoutLocation?.reverse)
                 assertEquals(case.getString("name"), expected.stringOrNull("home"), automaticHome(data)?.id)
-                expected.getJSONArray("scores").readEach { score ->
-                    assertEquals(case.getString("name"), score.getDouble("value"), historyScore(data.history, score.getString("tripId"), score.getBoolean("reverse"), now), 1e-12)
+                val scores = expected.getJSONArray("scores")
+                for (scoreIndex in 0 until scores.length()) {
+                    val score = scores.getJSONObject(scoreIndex)
+                    val evidence = historyEvidence(data.history, score.getString("tripId"), score.getBoolean("reverse"), now)
+                    assertEquals(case.getString("name"), score.getDouble("value"), evidence.score, 1e-12)
+                    assertEquals(case.getString("name"), score.getInt("days"), evidence.days)
+                    assertEquals(case.getString("name"), score.getInt("receiptDays"), evidence.receiptDays)
                 }
             }
         } finally { TimeZone.setDefault(previous) }

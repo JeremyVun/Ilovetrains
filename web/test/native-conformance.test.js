@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { locate, scoreCandidate, automaticHomeOf } from '../js/predict.js';
+import { locate, scoreCandidate, historyEvidence, automaticHomeOf } from '../js/predict.js';
 import { boardModel } from '../js/rowmodel.js';
 
 process.env.TZ = 'Australia/Sydney';
@@ -14,6 +14,9 @@ for (const value of cases) {
     assert.deepEqual(selection, value.expected.selection);
     assert.equal(automaticHomeOf(value.doc)?.station?.id || null, value.expected.home);
     for (const score of value.expected.scores) {
+      const evidence = historyEvidence(value.doc.history, score.tripId, score.reverse ? 'reverse' : 'forward', now);
+      assert.equal(evidence.days, score.days);
+      assert.equal(evidence.receiptDays, score.receiptDays);
       assert.equal(scoreCandidate(value.doc.history, score.tripId, score.reverse ? 'reverse' : 'forward', now), score.value);
     }
   });

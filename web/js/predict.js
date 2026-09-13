@@ -2,7 +2,7 @@
    Pure and deterministic given (storage document, now). Any change to the
    formula must update that contract in the same change.
 
-     score = Σ over history events matching (trip, direction):
+     score = Σ over local dates of the strongest matching view:
                dayTypeMatch × hourProximity × recencyDecay
      dayTypeMatch: 1.0 same day-type (weekday/weekend) as now, else 0.2
      hourProximity: 1.0 if |eventHour − nowHour| ≤ 1 (mod 24), 0.5 if ≤ 2, else 0
@@ -18,6 +18,8 @@ import { distanceKm, here } from './stations.js';
 export { distanceKm };
 
 const DAY_MS = 86_400_000;
+export const HABIT_DAYS_NEEDED = 2;
+export const HABIT_SCORE_MARGIN = 0.25;
 
 /* Fewer votes than this is not a habit, only a week that happened. */
 export const HOME_VOTES_NEEDED = 3;
@@ -48,15 +50,39 @@ export function scoreEvent(eventMs, nowMs) {
   return dayTypeMatch(eventMs, nowMs) * hourProximity(eventMs, nowMs) * recencyDecay(eventMs, nowMs);
 }
 
-export function scoreCandidate(history, tripId, direction, nowMs) {
-  let total = 0;
+export function historyEvidence(history, tripId, direction, nowMs) {
+  const daily = new Map();
+  const receiptDays = new Set();
   for (const e of history) {
     if (e.tripId !== tripId || e.direction !== direction) continue;
     const t = Date.parse(e.t);
-    if (Number.isNaN(t)) continue;
-    total += scoreEvent(t, nowMs);
+    if (!Number.isFinite(t) || t > nowMs) continue;
+    const score = scoreEvent(t, nowMs);
+    if (score <= 0) continue;
+    const date = new Date(t);
+    const day = date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate();
+    daily.set(day, Math.max(daily.get(day) || 0, score));
+    if (dayTypeMatch(t, nowMs) === 1) receiptDays.add(day);
   }
-  return total;
+  const score = [...daily.keys()].sort((a, b) => a - b).reduce((sum, day) => sum + daily.get(day), 0);
+  return { score, days: daily.size, receiptDays: receiptDays.size };
+}
+
+export function scoreCandidate(history, tripId, direction, nowMs) {
+  return historyEvidence(history, tripId, direction, nowMs).score;
+}
+
+function habitWinner(candidates) {
+  const ranked = [...candidates].sort((a, b) => b.score - a.score);
+  const best = ranked[0];
+  return best && best.days >= HABIT_DAYS_NEEDED
+    && best.score - (ranked[1]?.score || 0) >= HABIT_SCORE_MARGIN ? best : null;
+}
+
+function locationWinner(candidates) {
+  const best = Math.max(...candidates.map(candidate => candidate.factor));
+  const leaders = candidates.filter(candidate => candidate.factor === best);
+  return leaders.length === 1 ? leaders[0] : null;
 }
 
 export function locationFactor(fix, origin) {
@@ -77,12 +103,16 @@ export function scoreAll(doc, nowMs, opts = {}) {
   for (const trip of doc.trips) {
     for (const direction of DIRECTIONS) {
       const origin = direction === 'reverse' ? trip.to : trip.from;
-      const baseScore = scoreCandidate(doc.history, trip.id, direction, nowMs);
+      const evidence = historyEvidence(doc.history, trip.id, direction, nowMs);
+      const baseScore = evidence.score;
+      const factor = locationFactor(fix, origin);
       out.push({
         tripId: trip.id,
         direction,
         baseScore,
-        score: (baseScore + PREDICT_FLOOR) * locationFactor(fix, origin),
+        days: evidence.days,
+        factor,
+        score: (baseScore + PREDICT_FLOOR) * factor,
         distanceKm: distanceKm(fix, origin && origin.location)
       });
     }
@@ -92,17 +122,16 @@ export function scoreAll(doc, nowMs, opts = {}) {
 
 /**
  * @returns {{tripId: string, direction: string}|null} null only when no trips
- * are saved. Tie or all-zero falls back to lastViewed, then the first saved
+ * are saved. Uncertain history falls back to location, lastViewed, then the first saved
  * trip forward.
  */
 export function predict(doc, nowMs, opts = {}) {
   if (!doc.trips.length) return null;
 
   const candidates = scoreAll(doc, nowMs, opts);
-  const best = candidates.reduce((a, c) => (c.score > a ? c.score : a), 0);
-  const leaders = candidates.filter((c) => c.score === best);
-  if (best > 0 && leaders.length === 1) {
-    return { tripId: leaders[0].tripId, direction: leaders[0].direction };
+  const winner = habitWinner(candidates) || locationWinner(candidates);
+  if (winner) {
+    return { tripId: winner.tripId, direction: winner.direction };
   }
 
   const last = doc.lastViewed;
@@ -156,11 +185,13 @@ function fromHere(doc, station, nowMs) {
       const ends = direction === 'reverse'
         ? { from: trip.to, to: trip.from } : { from: trip.from, to: trip.to };
       if (ends.from.id !== station.id) continue;
+      const evidence = historyEvidence(doc.history, trip.id, direction, nowMs);
       out.push({
         tripId: trip.id,
         direction,
         to: ends.to,
-        score: scoreCandidate(doc.history, trip.id, direction, nowMs)
+        score: evidence.score,
+        days: evidence.days
       });
     }
   }
@@ -188,9 +219,8 @@ export function locate(doc, nowMs, opts = {}) {
   const candidates = fromHere(doc, spot.station, nowMs);
 
   if (candidates.length) {
-    const best = candidates.reduce((top, candidate) => Math.max(top, candidate.score), 0);
-    const leaders = candidates.filter((candidate) => candidate.score === best);
-    if (best > 0 && leaders.length === 1) return chosen(leaders[0], 'usual');
+    const winner = habitWinner(candidates);
+    if (winner) return chosen(winner, 'usual');
     const homeward = away && candidates.find((candidate) => candidate.to.id === home.station.id);
     if (homeward) return chosen(homeward, 'home');
     const last = doc.lastViewed;

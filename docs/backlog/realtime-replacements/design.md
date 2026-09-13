@@ -1,6 +1,7 @@
 # Realtime replacement trips across web, Android and iOS
 
-Stage: ready for build. Execution: [build_plan.md](build_plan.md).
+Stage: ready for build. Owner reaffirmed on 2026-09-13 that TfNSW replacement
+patterns must be accurately reflected to avoid incorrect travel advice. Execution: [build_plan.md](build_plan.md).
 
 ## Scope
 

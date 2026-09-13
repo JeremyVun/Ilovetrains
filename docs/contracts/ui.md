@@ -306,12 +306,12 @@ When the flag is off, the trip line remains unchanged and does no animation work
   move home; the votes re-infer it silently.
 - The view-history receipt appears only when all of: the shown trip was
   predicted rather than tapped or focused; at least two trips are saved; there
-  is no location fix; and the shown (trip, direction) has at least three
-  history events the predictor itself counts — same day type as now and within
-  two hours of this hour. `You check this trip most weekday mornings.` further
-  requires now to be a weekday before 12:00 and those events to fall on at
-  least three distinct days; otherwise the receipt reads `You often check this
-  trip around now.`. Failing the evidence, the header carries no receipt.
+  is no location fix; and the shown (trip, direction) has qualifying history
+  on at least three distinct local dates — same day type as now and within
+  two hours of this hour. Repeated checks on one date count once; future
+  events never count. `You check this trip most weekday mornings.` further
+  requires now to be a weekday before 12:00; otherwise the receipt reads
+  `You often check this trip around now.`. Failing the evidence, the header carries no receipt.
 - Copy about the train is always safe. Copy about the person requires evidence
   supplied by their action or persisted ride record. App opens are looks, not
   rides: a receipt drawn from view history says the user checks a trip

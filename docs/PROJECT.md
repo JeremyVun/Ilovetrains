@@ -45,7 +45,9 @@ Three rules govern how the header earns that trust:
    trip the user last looked at, or the first saved trip) and says nothing
    it cannot back. Being smart is about gathering better signals — user
    actions, focus and completed rides, geolocation, time of day, day of
-   week, search history — not about guessing harder from weak ones.
+   week, search history — not about guessing harder from weak ones. Repeated
+   checks contribute once per trip direction per day; history needs support
+   across days and a clear lead before it changes the answer.
 2. **Every leap comes with a receipt.** A short line explains why this
    answer was chosen, in proportion to the size of the leap the app made.
    Standing at Rhodes and being shown the Rhodes trip explains itself and

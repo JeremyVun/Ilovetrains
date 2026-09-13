@@ -61,20 +61,39 @@ func automaticHome(data: UserData) -> Station? {
     return winner?.last?.station ?? data.trips.first?.from
 }
 
-func historyScore(events: [ViewEvent], tripId: String, reverse: Bool, now: Millis) -> Double {
+struct HistoryEvidence {
+    var score: Double
+    var days: Int
+    var receiptDays: Int
+}
+private let habitDaysNeeded = 2
+private let habitScoreMargin = 0.25
+
+func historyEvidence(events: [ViewEvent], tripId: String, reverse: Bool, now: Millis) -> HistoryEvidence {
     let current = sydneyCalendar.dateComponents([.weekday, .hour], from: epochDate(now))
-    return events.lazy
-        .filter { $0.tripId == tripId && $0.reverse == reverse }
-        .reduce(0) { total, event in
-            let date = sydneyCalendar.dateComponents([.weekday, .hour], from: epochDate(event.at))
-            let hourDistance = min(abs((current.hour ?? 0) - (date.hour ?? 0)), 24 - abs((current.hour ?? 0) - (date.hour ?? 0)))
-            let hourWeight: Double = hourDistance <= 1 ? 1 : hourDistance <= 2 ? 0.5 : 0
-            let currentWeekend = (current.weekday == 1 || current.weekday == 7)
-            let eventWeekend = (date.weekday == 1 || date.weekday == 7)
-            let dayWeight: Double = currentWeekend == eventWeekend ? 1 : 0.2
-            let age = max(0, (now - event.at) / 86_400_000)
-            return total + hourWeight * dayWeight * pow(0.97, age)
+    var daily: [Date: Double] = [:]
+    var receiptDays = Set<Date>()
+    for event in events where event.tripId == tripId && event.reverse == reverse && event.at.isFinite && event.at <= now {
+        let date = sydneyCalendar.dateComponents([.weekday, .hour], from: epochDate(event.at))
+        let hourDistance = min(abs((current.hour ?? 0) - (date.hour ?? 0)), 24 - abs((current.hour ?? 0) - (date.hour ?? 0)))
+        let hourWeight: Double = hourDistance <= 1 ? 1 : hourDistance <= 2 ? 0.5 : 0
+        let currentWeekend = (current.weekday == 1 || current.weekday == 7)
+        let eventWeekend = (date.weekday == 1 || date.weekday == 7)
+        let dayWeight: Double = currentWeekend == eventWeekend ? 1 : 0.2
+        let age = max(0, (now - event.at) / 86_400_000)
+        let score = hourWeight * dayWeight * pow(0.97, age)
+        if score > 0 {
+            let day = sydneyCalendar.startOfDay(for: epochDate(event.at))
+            daily[day] = max(daily[day] ?? 0, score)
+            if dayWeight == 1 { receiptDays.insert(day) }
         }
+    }
+    let score = daily.keys.sorted().reduce(0) { $0 + (daily[$1] ?? 0) }
+    return HistoryEvidence(score: score, days: daily.count, receiptDays: receiptDays.count)
+}
+
+func historyScore(events: [ViewEvent], tripId: String, reverse: Bool, now: Millis) -> Double {
+    historyEvidence(events: events, tripId: tripId, reverse: reverse, now: now).score
 }
 
 func stationHere(data: UserData, stations: [Station], fix: Fix?, now: Millis) -> Station? {
@@ -119,28 +138,35 @@ func predict(data: UserData, stations: [Station], fix: Fix?, now: Millis) -> Sel
             let origin = reverse ? trip.to : trip.from
             let metres = currentFix ? distanceMetres(fix!, origin) : .infinity
             let factor: Double = !metres.isFinite ? 1 : metres <= 2_000 ? 2.5 : metres <= 10_000 ? 1 : 0.3
-            let base = historyScore(events: data.history, tripId: trip.id, reverse: reverse, now: now)
+            let evidence = historyEvidence(events: data.history, tripId: trip.id, reverse: reverse, now: now)
             return PredictionCandidate(
                 trip: trip,
                 reverse: reverse,
-                score: here == nil ? (base + 0.01) * factor : base
+                score: here == nil ? (evidence.score + 0.01) * factor : evidence.score,
+                days: evidence.days,
+                factor: factor
             )
         }
     }
     let local = candidates.filter { $0.from.id == here?.id }
     let pool = local.isEmpty ? candidates : local
-    let best = pool.map(\.score).max() ?? 0
-    let leaders = pool.filter { $0.score == best }
+    let ranked = pool.sorted { $0.score > $1.score }
+    let lead = ranked[0]
+    let runnerScore = ranked.count > 1 ? ranked[1].score : 0
+    let habit = lead.days >= habitDaysNeeded && lead.score - runnerScore >= habitScoreMargin ? lead : nil
+    let locationLeaders = pool.filter { $0.factor == pool.map(\.factor).max() }
+    let location = here == nil && locationLeaders.count == 1 ? locationLeaders.first : nil
+    let winner = habit ?? location
     let home = data.home ?? automaticHome(data: data)
     let homeward = !local.isEmpty && here?.id != home?.id
         ? local.first(where: { $0.to.id == home?.id })
         : nil
-    let selected = (best > 0 && leaders.count == 1 ? leaders.first : nil)
+    let selected = winner
         ?? homeward
         ?? pool.first(where: { $0.trip.id == data.lastTripId && $0.reverse == data.lastReverse })
         ?? pool[0]
     let receipt: String?
-    if selected == homeward, !(best > 0 && leaders.count == 1) {
+    if selected == homeward, winner == nil {
         let votes = data.votes.filter { $0.station.id == home?.id }.count
         receipt = votes >= 3
             ? "Your days usually start at \(home?.shortName ?? "")."
@@ -224,6 +250,8 @@ private struct PredictionCandidate: Equatable {
     var trip: SavedTrip
     var reverse: Bool
     var score: Double
+    var days: Int
+    var factor: Double
     var from: Station { reverse ? trip.to : trip.from }
     var to: Station { reverse ? trip.from : trip.to }
 }
@@ -238,18 +266,10 @@ private func epochDate(_ time: Millis) -> Date {
 
 private func historyReceipt(_ history: [ViewEvent], tripId: String, reverse: Bool, now: Millis) -> String? {
     let current = sydneyCalendar.dateComponents([.weekday, .hour], from: epochDate(now))
-    let matches = history.filter { event in
-        guard event.tripId == tripId, event.reverse == reverse else { return false }
-        let date = sydneyCalendar.dateComponents([.weekday, .hour, .year, .month, .day], from: epochDate(event.at))
-        let sameDayType = (current.weekday == 1 || current.weekday == 7) == (date.weekday == 1 || date.weekday == 7)
-        let difference = abs((current.hour ?? 0) - (date.hour ?? 0))
-        return sameDayType && min(difference, 24 - difference) <= 2
-    }
-    guard matches.count >= 3 else { return nil }
+    guard historyEvidence(events: history, tripId: tripId, reverse: reverse, now: now).receiptDays >= 3 else { return nil }
     let weekday = current.weekday != 1 && current.weekday != 7
     let morning = (current.hour ?? 0) < 12
-    let days = Set(matches.map { sydneyCalendar.startOfDay(for: epochDate($0.at)) })
-    return weekday && morning && days.count >= 3
+    return weekday && morning
         ? "You check this trip most weekday mornings."
         : "You often check this trip around now."
 }

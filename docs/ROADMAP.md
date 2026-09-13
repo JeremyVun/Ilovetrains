@@ -48,6 +48,10 @@ geometric. Observations waiting on an owner ruling:
   the ridden leg alone. Which axis does the owner want?
 
 ## Routing that just works
+- Investigate slow native offline searches across the captured Sunday metro
+  gap. On 13 September 2026, iOS's existing Sunday integration case took 46s;
+  the live-date offline UI drive remained at “Opening timetable” beyond 25s.
+  Check whether the 30s refresh can keep cancelling an unfinished search.
 - Tune the server transfer floor (`MIN_CONNECTION_TIME`) from real
   connections rather than defaults; never show a trip the user would not
   take.

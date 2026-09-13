@@ -1,6 +1,7 @@
 // Regenerate shared prediction cases from the web reference: node tools/export-android-conformance.mjs.
 import { writeFileSync, mkdirSync } from 'node:fs';
-import { predict, locate, scoreCandidate, automaticHomeOf } from '../web/js/predict.js';
+import assert from 'node:assert/strict';
+import { predict, locate, scoreCandidate, historyEvidence, automaticHomeOf } from '../web/js/predict.js';
 import { readFileSync } from 'node:fs';
 import { boardModel } from '../web/js/rowmodel.js';
 import { NOW, departuresBody, TRANSFER_NOW, TRANSFER_DEPARTED_NOW, transferBody,
@@ -16,7 +17,24 @@ const trips = [{ id: 'a', from: rhodes, to: central, createdAt: '2026-09-01T00:0
 const now = '2026-09-07T08:00:00+10:00';
 const history = ['2026-09-02T08:00:00+10:00', '2026-09-03T09:00:00+10:00', '2026-09-04T07:00:00+10:00'].map(t => ({ tripId: 'b', direction: 'forward', t }));
 const base = { schemaVersion: 1, trips, history: [], rides: [], homeVotes: [], preferences: { useLocation: true }, lastViewed: null };
+const view = (tripId, t, direction = 'forward') => ({ tripId, direction, t });
+const repeated = Array.from({ length: 12 }, (_, minute) => view('b', `2026-09-04T08:${String(minute).padStart(2, '0')}:00+10:00`));
+const routine = ['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04'].map(day => view('a', `${day}T08:00:00+10:00`));
+const closeScores = ['2026-09-02', '2026-09-03'].flatMap(day => [view('a', `${day}T08:00:00+10:00`), view('b', `${day}T08:01:00+10:00`)]);
+const habitCases = [
+  { name: 'one day of repeated checks cannot outweigh four commute days', history: [...routine, ...repeated], lastViewed: { tripId: 'b', direction: 'forward' }, wanted: ['a', false] },
+  { name: 'one day alone cannot override the last viewed trip', history: repeated, lastViewed: { tripId: 'a', direction: 'reverse' }, wanted: ['a', true] },
+  { name: 'a tiny recency lead retains the last viewed trip', history: closeScores, lastViewed: { tripId: 'a', direction: 'forward' }, wanted: ['a', false] },
+  { name: 'two independent days can establish a clear habit', history: history.slice(0, 2), wanted: ['b', false] },
+  { name: 'repeated checks do not beat a local homeward fallback', history: repeated, fix: rhodes.location, homeVotes: ['2026-09-02', '2026-09-03', '2026-09-04'].map(day => ({ day, station: central })), wanted: ['a', false] },
+  { name: 'established local history still outranks homeward fallback', history, fix: rhodes.location, homeVotes: ['2026-09-02', '2026-09-03', '2026-09-04'].map(day => ({ day, station: central })), wanted: ['b', false] },
+  { name: 'future views cannot establish a habit', history: ['2026-09-08', '2026-09-09'].map(day => view('b', `${day}T08:00:00+10:00`)), wanted: ['a', false] },
+  { name: 'expired weak history cannot override a recent explicit choice', history: ['2025-09-02', '2025-09-03'].map(day => view('b', `${day}T08:00:00+10:00`)), wanted: ['a', false] },
+  { name: 'forward and reverse evidence stays separate', history: [view('b', '2026-09-03T08:00:00+10:00'), view('b', '2026-09-04T08:00:00+10:00', 'reverse')], wanted: ['a', false] },
+  { name: 'DST repeated hour is still one local date', now: '2026-04-12T02:45:00+10:00', history: [view('b', '2026-04-05T02:30:00+11:00'), view('b', '2026-04-05T02:30:00+10:00')], wanted: ['a', false] },
+].map(({ history, lastViewed = null, homeVotes = [], ...rest }) => ({ ...rest, fix: rest.fix || null, doc: { ...base, history, lastViewed, homeVotes } }));
 const cases = [
+  ...habitCases,
   { name: 'empty history chooses first saved trip', doc: base, fix: null },
   { name: 'tied scores retain explicit reverse', doc: { ...base, lastViewed: { tripId: 'b', direction: 'reverse' } }, fix: null },
   { name: 'matching commute hours beat fallback', doc: { ...base, history }, fix: null },
@@ -29,11 +47,12 @@ const cases = [
 const out = cases.map(value => {
   const time = Date.parse(value.now || now);
   const answer = locate(value.doc, time, { stations, fix: value.fix });
+  if (value.wanted) assert.deepEqual([answer.tripId, answer.direction === 'reverse'], value.wanted, value.name);
   return { ...value, now: value.now || now, stations, expected: {
     selection: answer.kind === 'trip' ? { tripId: answer.tripId, reverse: answer.direction === 'reverse' } : null,
     noLocation: predict(value.doc, time),
     home: automaticHomeOf(value.doc)?.station?.id || null,
-    scores: trips.flatMap(t => ['forward', 'reverse'].map(direction => ({ tripId: t.id, reverse: direction === 'reverse', value: scoreCandidate(value.doc.history, t.id, direction, time) })))
+    scores: trips.flatMap(t => ['forward', 'reverse'].map(direction => ({ tripId: t.id, reverse: direction === 'reverse', value: scoreCandidate(value.doc.history, t.id, direction, time), days: historyEvidence(value.doc.history, t.id, direction, time).days, receiptDays: historyEvidence(value.doc.history, t.id, direction, time).receiptDays })))
   } };
 });
 mkdirSync(new URL('./fixtures/conformance/', import.meta.url), { recursive: true });

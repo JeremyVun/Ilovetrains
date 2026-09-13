@@ -29,16 +29,29 @@ fun visibleFocus(data: UserData, now: Long, resumeWaitUntil: Long? = null): Focu
 }
 fun automaticHome(data: UserData): Station? = data.votes.groupBy { it.station.id }.values
     .filter { it.size >= 3 }.maxWithOrNull(compareBy<List<HomeVote>> { it.size }.thenBy { it.last().day })?.last()?.station ?: data.trips.firstOrNull()?.from
-fun historyScore(events: List<ViewEvent>, tripId: String, reverse: Boolean, now: Long): Double {
+data class HistoryEvidence(val score: Double, val days: Int, val receiptDays: Int)
+private const val HABIT_DAYS_NEEDED = 2
+private const val HABIT_SCORE_MARGIN = .25
+fun historyEvidence(events: List<ViewEvent>, tripId: String, reverse: Boolean, now: Long): HistoryEvidence {
     val current = Instant.ofEpochMilli(now).atZone(Sydney)
-    return events.filter { it.tripId == tripId && it.reverse == reverse }.sumOf {
+    val daily = sortedMapOf<java.time.LocalDate, Double>()
+    val receiptDays = mutableSetOf<java.time.LocalDate>()
+    events.filter { it.tripId == tripId && it.reverse == reverse && it.at <= now }.forEach {
         val event = Instant.ofEpochMilli(it.at).atZone(Sydney)
         val delta = abs(current.hour - event.hour).let { d -> min(d, 24 - d) }
         val hour = when { delta <= 1 -> 1.0; delta <= 2 -> .5; else -> 0.0 }
         val day = if ((current.dayOfWeek.value >= 6) == (event.dayOfWeek.value >= 6)) 1.0 else .2
-        hour * day * .97.pow(max(0.0, (now - it.at) / 86_400_000.0))
+        val score = hour * day * .97.pow(max(0.0, (now - it.at) / 86_400_000.0))
+        if (score > 0) {
+            val date = event.toLocalDate()
+            daily[date] = max(daily[date] ?: 0.0, score)
+            if (day == 1.0) receiptDays.add(date)
+        }
     }
+    return HistoryEvidence(daily.values.sum(), daily.size, receiptDays.size)
 }
+fun historyScore(events: List<ViewEvent>, tripId: String, reverse: Boolean, now: Long): Double =
+    historyEvidence(events, tripId, reverse, now).score
 fun stationHere(data: UserData, stations: List<Station>, fix: Fix?, now: Long): Station? {
     if (!data.useLocation || fix == null || now - fix.at !in 0..300_000) return null
     val saved = data.trips.flatMap { listOf(it.from, it.to) }.map { s -> stations.find { it.id == s.id } ?: s }.distinctBy { it.id }
@@ -52,31 +65,34 @@ fun predict(data: UserData, stations: List<Station>, fix: Fix?, now: Long): Sele
     if (trips.isEmpty()) return null
     val hasCurrentFix = data.useLocation && fix != null && now - fix.at in 0..300_000
     val here = stationHere(data, stations, fix, now)
-    data class Candidate(val trip: SavedTrip, val reverse: Boolean, val score: Double) { val from get() = if (reverse) trip.to else trip.from; val to get() = if (reverse) trip.from else trip.to }
+    data class Candidate(val trip: SavedTrip, val reverse: Boolean, val score: Double, val days: Int, val factor: Double) { val from get() = if (reverse) trip.to else trip.from; val to get() = if (reverse) trip.from else trip.to }
     val candidates = trips.flatMap { trip -> listOf(false, true).map { reverse ->
         val origin = if (reverse) trip.to else trip.from
         val metres = if (data.useLocation && fix != null && now - fix.at in 0..300_000) distanceMetres(fix, origin) else Double.POSITIVE_INFINITY
         val factor = when { !metres.isFinite() -> 1.0; metres <= 2000 -> 2.5; metres <= 10_000 -> 1.0; else -> .3 }
-        Candidate(trip, reverse, historyScore(data.history, trip.id, reverse, now).let { if (here != null) it else (it + .01) * factor })
+        val evidence = historyEvidence(data.history, trip.id, reverse, now)
+        Candidate(trip, reverse, if (here != null) evidence.score else (evidence.score + .01) * factor, evidence.days, factor)
     } }
     val local = candidates.filter { it.from.id == here?.id }
     val pool = local.ifEmpty { candidates }
-    val best = pool.maxOf { it.score }; val leaders = pool.filter { it.score == best }
+    val ranked = pool.sortedByDescending { it.score }
+    val habit = ranked.first().takeIf { it.days >= HABIT_DAYS_NEEDED &&
+        it.score - (ranked.getOrNull(1)?.score ?: 0.0) >= HABIT_SCORE_MARGIN }
+    val location = if (here == null) pool.filter { it.factor == pool.maxOf { c -> c.factor } }.singleOrNull() else null
+    val winner = habit ?: location
     val home = data.home ?: automaticHome(data)
     val homeward = if (local.isNotEmpty() && here?.id != home?.id) local.find { it.to.id == home?.id } else null
-    val selected = if (best > 0 && leaders.size == 1) leaders.first() else homeward
+    val selected = winner ?: homeward
         ?: pool.find { it.trip.id == data.lastTripId && it.reverse == data.lastReverse } ?: pool.first()
-    val receipt = if (selected == homeward && !(best > 0 && leaders.size == 1)) {
+    val receipt = if (selected == homeward && winner == null) {
         if (data.votes.count { it.station.id == home?.id } >= 3) "Your days usually start at ${home?.shortName}." else "You usually travel from ${home?.shortName}."
     } else if (here == null && !hasCurrentFix && trips.size >= 2) historyReceipt(data.history, selected.trip.id, selected.reverse, now) else null
     return Selection(selected.trip.id, selected.reverse, receipt)
 }
 fun historyReceipt(history: List<ViewEvent>, id: String, reverse: Boolean, now: Long): String? {
     val zone = Sydney; val n = Instant.ofEpochMilli(now).atZone(zone)
-    val events = history.filter { it.tripId == id && it.reverse == reverse }.map { Instant.ofEpochMilli(it.at).atZone(zone) }
-        .filter { (it.dayOfWeek.value >= 6) == (n.dayOfWeek.value >= 6) && abs(it.hour - n.hour).let { d -> min(d, 24 - d) } <= 2 }
-    if (events.size < 3) return null
-    return if (n.dayOfWeek.value < 6 && n.hour < 12 && events.map { it.toLocalDate() }.distinct().size >= 3) "You check this trip most weekday mornings." else "You often check this trip around now."
+    if (historyEvidence(history, id, reverse, now).receiptDays < 3) return null
+    return if (n.dayOfWeek.value < 6 && n.hour < 12) "You check this trip most weekday mornings." else "You often check this trip around now."
 }
 fun inferredFocus(data: UserData, fix: Fix, now: Long): FocusedJourney? {
     if (!data.useLocation || data.focus != null || now - fix.at !in 0..300_000) return null

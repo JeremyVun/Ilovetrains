@@ -795,7 +795,7 @@ candidates = every (trip, direction) whose origin is here, reverse included
 if candidates:
   score each by today's base history score (day type, hour, recency; no
     location term and no floor)
-  best > 0 and unique → that one, leap "usual"
+  confident history winner → that one, leap "usual"
   else if here ≠ home and a candidate ends at home → that one, leap "home"
   else → lastViewed among them, else the first, leap "usual"
 else if here ≠ home → {pair: here → home}
@@ -803,7 +803,7 @@ else if trips → today's formula below
 else → setup with From = here
 ```
 
-Real history from where the user is outranks the home rule: a freelancer with a
+An established history winner from where the user is outranks the home rule: a freelancer with a
 record of going A → B from client A is not shown the way home instead. There
 is no clock rule anywhere in this.
 
@@ -821,14 +821,15 @@ origin gives the normal first-trip home fallback. Accuracy, coordinates, lookup
 status and nearby choices remain transient device state. The confidence and
 recovery rules live in [ui.md](ui.md#setup-and-station-search).
 
-### The no-`here` branch: today's formula, unchanged
+### History scoring and confidence
 
 With no fix, no station index, or more than 2 km from every station, the
 predictor answers as it always has. Score every (trip, direction) candidate:
 
 ```
-score = Σ over history events e matching (trip, direction):
-          dayTypeMatch(e) × hourProximity(e) × recencyDecay(e)
+score = Σ over local calendar dates d:
+          max(dayTypeMatch(e) × hourProximity(e) × recencyDecay(e))
+          for views e on d matching (trip, direction)
 
 dayTypeMatch: 1.0 if same day-type (weekday/weekend) as now, else 0.2
 hourProximity: 1.0 if |eventHour − nowHour| ≤ 1 (mod 24),
@@ -836,8 +837,25 @@ hourProximity: 1.0 if |eventHour − nowHour| ≤ 1 (mod 24),
 recencyDecay: 0.97 ^ ageInDays
 ```
 
-Pick the highest score. Tie/all-zero fallback: `lastViewed`, then first
-saved trip `forward`.
+Each date contributes at most its strongest relevant view, so repeated checks
+cannot outweigh a habit repeated across days. Different directions stay separate;
+morning and evening reads use their own most relevant event on that date. Ignore
+invalid or future events. Preserve the raw 500-event history and its storage
+format; existing history benefits immediately, without migration.
+
+A history winner needs positive contributions on at least two distinct dates
+and a score at least 0.25 above the runner-up (zero when there is none).
+The margin uses the final score, including the location term below when used;
+0.25 is a quarter of one fresh, full-weight view. Thin evidence, near ties and
+very old evidence retain the fallback. These are conservative product thresholds,
+not a measured statistical confidence interval.
+
+Without `here`, try a confident history winner, then the unique strongest
+location factor, then `lastViewed`, then the first saved trip `forward`.
+With `here`, compare only candidates originating there using their base score;
+if none confidently wins, retain the existing homeward/last-viewed/first fallback.
+Explicit taps and pins still take precedence in the controller. Ranking saved
+rows uses the same capped scores, with the header's selected trip first.
 
 ### Geolocation term
 
@@ -859,8 +877,9 @@ a trip's destination with no history at all, the way back scores
 0.01 × 2.5 = 0.025 against the way out's 0.01 × 1.0 = 0.01, or 0.003 when the
 origin is more than 10 km away, so the reverse wins. With no fix every
 candidate carries the same floor, so they tie and the fallback answers as
-before. Any real history dwarfs the floor: a single view an hour off and a day
-old scores about 0.97, which outranks it from any distance.
+before. A single view can numerically outweigh the floor but cannot establish a habit.
+The two-date and 0.25-margin gates still apply before history can override
+the location-only fallback.
 
 Deterministic given (storage document, current time, fix). The fix is never
 persisted and never leaves the device; the document holds station ids and times

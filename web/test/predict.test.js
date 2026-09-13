@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 import {
   predict, scoreCandidate, scoreAll, dayTypeMatch, hourProximity, recencyDecay,
-  distanceKm, locationFactor, rankTrips, automaticHomeOf, homeOf, locate, PREDICT_FLOOR, HOME_VOTES_NEEDED
+  historyEvidence, distanceKm, locationFactor, rankTrips, automaticHomeOf, homeOf, locate, PREDICT_FLOOR, HOME_VOTES_NEEDED
 } from '../js/predict.js';
 import { emptyDoc, addTrip, recordView } from '../js/storage.js';
 import { INDEX, STATIONS, tripBetween } from './fixture.js';
@@ -86,7 +86,8 @@ test('the morning commute wins in the morning and the evening one in the evening
 test('on a Saturday an older weekend habit beats a fresher weekday one', () => {
   const d = doc([
     ['home', 'forward', MON_0800],                    // Monday 08:00, five days ago
-    ['other', 'forward', SAT_0800 - 7 * 86_400_000]   // the Saturday before, older
+    ['other', 'forward', SAT_0800 - 7 * 86_400_000],
+    ['other', 'forward', SAT_0800 - 14 * 86_400_000]
   ]);
   const saturdayMorning = SAT_0800 + 30 * 60000;
   const scores = Object.fromEntries(
@@ -203,13 +204,13 @@ test('without a fix the floor is the same everywhere, so lastViewed still answer
   assert.deepEqual(predict(d, MON_0800), { tripId: 'other', direction: 'reverse' });
 });
 
-test('one real view outweighs the floor even from the wrong end of the line', () => {
+test('one view cannot overrule an unambiguous location fallback', () => {
   const d = locatedDoc([['forward', MON_0800 - 86_400_000]]);
   const scores = Object.fromEntries(scoreAll(d, MON_0800, { fix: AT_PARRA })
     .map((c) => [c.direction, c.score]));
 
   assert.ok(scores.forward > scores.reverse, 'history dominates the floor');
-  assert.deepEqual(predict(d, MON_0800, { fix: AT_PARRA }), { tripId: 'home', direction: 'forward' });
+  assert.deepEqual(predict(d, MON_0800, { fix: AT_PARRA }), { tripId: 'home', direction: 'reverse' });
 });
 
 test('location-off prediction ignores a supplied fix', () => {
@@ -362,4 +363,19 @@ test('filtered candidates retain automatic home from the full saved document', (
   assert.equal(answer.kind, 'pair');
   assert.equal(answer.to.id, STATIONS.rhodes.id);
   assert.equal(homeOf(original).station.id, STATIONS.rhodes.id);
+});
+
+
+test('daily evidence uses the strongest relevant view, regardless of order or duplicates', () => {
+  const now = Date.parse('2026-09-11T08:00:00+10:00');
+  const event = (t, direction = 'forward') => ({ tripId: 'home', direction, t });
+  const near = event('2026-09-10T08:00:00+10:00');
+  const far = event('2026-09-10T10:30:00+10:00');
+  const evening = event('2026-09-10T18:00:00+10:00');
+  const evidence = historyEvidence([near, far, evening, near], 'home', 'forward', now);
+  assert.deepEqual(evidence, { score: 0.97, days: 1, receiptDays: 1 });
+  assert.deepEqual(historyEvidence([evening, near, far], 'home', 'forward', now), evidence);
+  assert.equal(historyEvidence([near, far, evening], 'home', 'forward', now + 10 * 3600000).days, 1);
+  assert.equal(historyEvidence([near, event(near.t, 'reverse')], 'home', 'forward', now).score, 0.97);
+  assert.equal(historyEvidence([event('invalid'), event('2026-09-12T08:00:00+10:00')], 'home', 'forward', now).days, 0);
 });

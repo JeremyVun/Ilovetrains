@@ -23,6 +23,9 @@ final class PredictionTests: XCTestCase {
             XCTAssertEqual(noLocation?.reverse, fixture.expected.noLocation?.direction == "reverse", fixture.name)
 
             for expected in fixture.expected.scores {
+                let evidence = historyEvidence(events: data.history, tripId: expected.tripId, reverse: expected.reverse, now: now)
+                XCTAssertEqual(evidence.days, expected.days, fixture.name)
+                XCTAssertEqual(evidence.receiptDays, expected.receiptDays, fixture.name)
                 XCTAssertEqual(
                     historyScore(events: data.history, tripId: expected.tripId, reverse: expected.reverse, now: now),
                     expected.value,
@@ -206,6 +209,8 @@ private struct FixtureScore: Decodable {
     var tripId: String
     var reverse: Bool
     var value: Double
+    var days: Int
+    var receiptDays: Int
 }
 
 private func epoch(_ value: String) -> Millis {

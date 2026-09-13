@@ -1,5 +1,1891 @@
 [
   {
+    "name": "one day of repeated checks cannot outweigh four commute days",
+    "wanted": [
+      "a",
+      false
+    ],
+    "fix": null,
+    "doc": {
+      "schemaVersion": 1,
+      "trips": [
+        {
+          "id": "a",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes",
+            "location": {
+              "lat": -33.8308,
+              "lon": 151.0879
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "200060",
+            "name": "Central",
+            "location": {
+              "lat": -33.884,
+              "lon": 151.206
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        },
+        {
+          "id": "b",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes",
+            "location": {
+              "lat": -33.8308,
+              "lon": 151.0879
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "202210",
+            "name": "Bondi Junction",
+            "location": {
+              "lat": -33.891,
+              "lon": 151.248
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        }
+      ],
+      "history": [
+        {
+          "tripId": "a",
+          "direction": "forward",
+          "t": "2026-09-01T08:00:00+10:00"
+        },
+        {
+          "tripId": "a",
+          "direction": "forward",
+          "t": "2026-09-02T08:00:00+10:00"
+        },
+        {
+          "tripId": "a",
+          "direction": "forward",
+          "t": "2026-09-03T08:00:00+10:00"
+        },
+        {
+          "tripId": "a",
+          "direction": "forward",
+          "t": "2026-09-04T08:00:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:00:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:01:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:02:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:03:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:04:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:05:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:06:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:07:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:08:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:09:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:10:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:11:00+10:00"
+        }
+      ],
+      "rides": [],
+      "homeVotes": [],
+      "preferences": {
+        "useLocation": true
+      },
+      "lastViewed": {
+        "tripId": "b",
+        "direction": "forward"
+      }
+    },
+    "now": "2026-09-07T08:00:00+10:00",
+    "stations": [
+      {
+        "id": "213820",
+        "name": "Rhodes",
+        "location": {
+          "lat": -33.8308,
+          "lon": 151.0879
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200060",
+        "name": "Central",
+        "location": {
+          "lat": -33.884,
+          "lon": 151.206
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "202210",
+        "name": "Bondi Junction",
+        "location": {
+          "lat": -33.891,
+          "lon": 151.248
+        },
+        "modes": [
+          "train"
+        ]
+      }
+    ],
+    "expected": {
+      "selection": {
+        "tripId": "a",
+        "reverse": false
+      },
+      "noLocation": {
+        "tripId": "a",
+        "direction": "forward"
+      },
+      "home": "213820",
+      "scores": [
+        {
+          "tripId": "a",
+          "reverse": false,
+          "value": 3.4896718406289997,
+          "days": 4,
+          "receiptDays": 4
+        },
+        {
+          "tripId": "a",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "b",
+          "reverse": false,
+          "value": 0.9128853804422149,
+          "days": 1,
+          "receiptDays": 1
+        },
+        {
+          "tripId": "b",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "one day alone cannot override the last viewed trip",
+    "wanted": [
+      "a",
+      true
+    ],
+    "fix": null,
+    "doc": {
+      "schemaVersion": 1,
+      "trips": [
+        {
+          "id": "a",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes",
+            "location": {
+              "lat": -33.8308,
+              "lon": 151.0879
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "200060",
+            "name": "Central",
+            "location": {
+              "lat": -33.884,
+              "lon": 151.206
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        },
+        {
+          "id": "b",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes",
+            "location": {
+              "lat": -33.8308,
+              "lon": 151.0879
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "202210",
+            "name": "Bondi Junction",
+            "location": {
+              "lat": -33.891,
+              "lon": 151.248
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        }
+      ],
+      "history": [
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:00:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:01:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:02:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:03:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:04:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:05:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:06:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:07:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:08:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:09:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:10:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:11:00+10:00"
+        }
+      ],
+      "rides": [],
+      "homeVotes": [],
+      "preferences": {
+        "useLocation": true
+      },
+      "lastViewed": {
+        "tripId": "a",
+        "direction": "reverse"
+      }
+    },
+    "now": "2026-09-07T08:00:00+10:00",
+    "stations": [
+      {
+        "id": "213820",
+        "name": "Rhodes",
+        "location": {
+          "lat": -33.8308,
+          "lon": 151.0879
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200060",
+        "name": "Central",
+        "location": {
+          "lat": -33.884,
+          "lon": 151.206
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "202210",
+        "name": "Bondi Junction",
+        "location": {
+          "lat": -33.891,
+          "lon": 151.248
+        },
+        "modes": [
+          "train"
+        ]
+      }
+    ],
+    "expected": {
+      "selection": {
+        "tripId": "a",
+        "reverse": true
+      },
+      "noLocation": {
+        "tripId": "a",
+        "direction": "reverse"
+      },
+      "home": "213820",
+      "scores": [
+        {
+          "tripId": "a",
+          "reverse": false,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "a",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "b",
+          "reverse": false,
+          "value": 0.9128853804422149,
+          "days": 1,
+          "receiptDays": 1
+        },
+        {
+          "tripId": "b",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "a tiny recency lead retains the last viewed trip",
+    "wanted": [
+      "a",
+      false
+    ],
+    "fix": null,
+    "doc": {
+      "schemaVersion": 1,
+      "trips": [
+        {
+          "id": "a",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes",
+            "location": {
+              "lat": -33.8308,
+              "lon": 151.0879
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "200060",
+            "name": "Central",
+            "location": {
+              "lat": -33.884,
+              "lon": 151.206
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        },
+        {
+          "id": "b",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes",
+            "location": {
+              "lat": -33.8308,
+              "lon": 151.0879
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "202210",
+            "name": "Bondi Junction",
+            "location": {
+              "lat": -33.891,
+              "lon": 151.248
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        }
+      ],
+      "history": [
+        {
+          "tripId": "a",
+          "direction": "forward",
+          "t": "2026-09-02T08:00:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-02T08:01:00+10:00"
+        },
+        {
+          "tripId": "a",
+          "direction": "forward",
+          "t": "2026-09-03T08:00:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-03T08:01:00+10:00"
+        }
+      ],
+      "rides": [],
+      "homeVotes": [],
+      "preferences": {
+        "useLocation": true
+      },
+      "lastViewed": {
+        "tripId": "a",
+        "direction": "forward"
+      }
+    },
+    "now": "2026-09-07T08:00:00+10:00",
+    "stations": [
+      {
+        "id": "213820",
+        "name": "Rhodes",
+        "location": {
+          "lat": -33.8308,
+          "lon": 151.0879
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200060",
+        "name": "Central",
+        "location": {
+          "lat": -33.884,
+          "lon": 151.206
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "202210",
+        "name": "Bondi Junction",
+        "location": {
+          "lat": -33.891,
+          "lon": 151.248
+        },
+        "modes": [
+          "train"
+        ]
+      }
+    ],
+    "expected": {
+      "selection": {
+        "tripId": "a",
+        "reverse": false
+      },
+      "noLocation": {
+        "tripId": "a",
+        "direction": "forward"
+      },
+      "home": "213820",
+      "scores": [
+        {
+          "tripId": "a",
+          "reverse": false,
+          "value": 1.7440268356999997,
+          "days": 2,
+          "receiptDays": 2
+        },
+        {
+          "tripId": "a",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "b",
+          "reverse": false,
+          "value": 1.7440637261424112,
+          "days": 2,
+          "receiptDays": 2
+        },
+        {
+          "tripId": "b",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "two independent days can establish a clear habit",
+    "wanted": [
+      "b",
+      false
+    ],
+    "fix": null,
+    "doc": {
+      "schemaVersion": 1,
+      "trips": [
+        {
+          "id": "a",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes",
+            "location": {
+              "lat": -33.8308,
+              "lon": 151.0879
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "200060",
+            "name": "Central",
+            "location": {
+              "lat": -33.884,
+              "lon": 151.206
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        },
+        {
+          "id": "b",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes",
+            "location": {
+              "lat": -33.8308,
+              "lon": 151.0879
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "202210",
+            "name": "Bondi Junction",
+            "location": {
+              "lat": -33.891,
+              "lon": 151.248
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        }
+      ],
+      "history": [
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-02T08:00:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-03T09:00:00+10:00"
+        }
+      ],
+      "rides": [],
+      "homeVotes": [],
+      "preferences": {
+        "useLocation": true
+      },
+      "lastViewed": null
+    },
+    "now": "2026-09-07T08:00:00+10:00",
+    "stations": [
+      {
+        "id": "213820",
+        "name": "Rhodes",
+        "location": {
+          "lat": -33.8308,
+          "lon": 151.0879
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200060",
+        "name": "Central",
+        "location": {
+          "lat": -33.884,
+          "lon": 151.206
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "202210",
+        "name": "Bondi Junction",
+        "location": {
+          "lat": -33.891,
+          "lon": 151.248
+        },
+        "modes": [
+          "train"
+        ]
+      }
+    ],
+    "expected": {
+      "selection": {
+        "tripId": "b",
+        "reverse": false
+      },
+      "noLocation": {
+        "tripId": "b",
+        "direction": "forward"
+      },
+      "home": "213820",
+      "scores": [
+        {
+          "tripId": "a",
+          "reverse": false,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "a",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "b",
+          "reverse": false,
+          "value": 1.7451511038633924,
+          "days": 2,
+          "receiptDays": 2
+        },
+        {
+          "tripId": "b",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "repeated checks do not beat a local homeward fallback",
+    "fix": {
+      "lat": -33.8308,
+      "lon": 151.0879
+    },
+    "wanted": [
+      "a",
+      false
+    ],
+    "doc": {
+      "schemaVersion": 1,
+      "trips": [
+        {
+          "id": "a",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes",
+            "location": {
+              "lat": -33.8308,
+              "lon": 151.0879
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "200060",
+            "name": "Central",
+            "location": {
+              "lat": -33.884,
+              "lon": 151.206
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        },
+        {
+          "id": "b",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes",
+            "location": {
+              "lat": -33.8308,
+              "lon": 151.0879
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "202210",
+            "name": "Bondi Junction",
+            "location": {
+              "lat": -33.891,
+              "lon": 151.248
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        }
+      ],
+      "history": [
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:00:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:01:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:02:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:03:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:04:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:05:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:06:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:07:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:08:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:09:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:10:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T08:11:00+10:00"
+        }
+      ],
+      "rides": [],
+      "homeVotes": [
+        {
+          "day": "2026-09-02",
+          "station": {
+            "id": "200060",
+            "name": "Central",
+            "location": {
+              "lat": -33.884,
+              "lon": 151.206
+            },
+            "modes": [
+              "train"
+            ]
+          }
+        },
+        {
+          "day": "2026-09-03",
+          "station": {
+            "id": "200060",
+            "name": "Central",
+            "location": {
+              "lat": -33.884,
+              "lon": 151.206
+            },
+            "modes": [
+              "train"
+            ]
+          }
+        },
+        {
+          "day": "2026-09-04",
+          "station": {
+            "id": "200060",
+            "name": "Central",
+            "location": {
+              "lat": -33.884,
+              "lon": 151.206
+            },
+            "modes": [
+              "train"
+            ]
+          }
+        }
+      ],
+      "preferences": {
+        "useLocation": true
+      },
+      "lastViewed": null
+    },
+    "now": "2026-09-07T08:00:00+10:00",
+    "stations": [
+      {
+        "id": "213820",
+        "name": "Rhodes",
+        "location": {
+          "lat": -33.8308,
+          "lon": 151.0879
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200060",
+        "name": "Central",
+        "location": {
+          "lat": -33.884,
+          "lon": 151.206
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "202210",
+        "name": "Bondi Junction",
+        "location": {
+          "lat": -33.891,
+          "lon": 151.248
+        },
+        "modes": [
+          "train"
+        ]
+      }
+    ],
+    "expected": {
+      "selection": {
+        "tripId": "a",
+        "reverse": false
+      },
+      "noLocation": {
+        "tripId": "a",
+        "direction": "forward"
+      },
+      "home": "200060",
+      "scores": [
+        {
+          "tripId": "a",
+          "reverse": false,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "a",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "b",
+          "reverse": false,
+          "value": 0.9128853804422149,
+          "days": 1,
+          "receiptDays": 1
+        },
+        {
+          "tripId": "b",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "established local history still outranks homeward fallback",
+    "fix": {
+      "lat": -33.8308,
+      "lon": 151.0879
+    },
+    "wanted": [
+      "b",
+      false
+    ],
+    "doc": {
+      "schemaVersion": 1,
+      "trips": [
+        {
+          "id": "a",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes",
+            "location": {
+              "lat": -33.8308,
+              "lon": 151.0879
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "200060",
+            "name": "Central",
+            "location": {
+              "lat": -33.884,
+              "lon": 151.206
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        },
+        {
+          "id": "b",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes",
+            "location": {
+              "lat": -33.8308,
+              "lon": 151.0879
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "202210",
+            "name": "Bondi Junction",
+            "location": {
+              "lat": -33.891,
+              "lon": 151.248
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        }
+      ],
+      "history": [
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-02T08:00:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-03T09:00:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-04T07:00:00+10:00"
+        }
+      ],
+      "rides": [],
+      "homeVotes": [
+        {
+          "day": "2026-09-02",
+          "station": {
+            "id": "200060",
+            "name": "Central",
+            "location": {
+              "lat": -33.884,
+              "lon": 151.206
+            },
+            "modes": [
+              "train"
+            ]
+          }
+        },
+        {
+          "day": "2026-09-03",
+          "station": {
+            "id": "200060",
+            "name": "Central",
+            "location": {
+              "lat": -33.884,
+              "lon": 151.206
+            },
+            "modes": [
+              "train"
+            ]
+          }
+        },
+        {
+          "day": "2026-09-04",
+          "station": {
+            "id": "200060",
+            "name": "Central",
+            "location": {
+              "lat": -33.884,
+              "lon": 151.206
+            },
+            "modes": [
+              "train"
+            ]
+          }
+        }
+      ],
+      "preferences": {
+        "useLocation": true
+      },
+      "lastViewed": null
+    },
+    "now": "2026-09-07T08:00:00+10:00",
+    "stations": [
+      {
+        "id": "213820",
+        "name": "Rhodes",
+        "location": {
+          "lat": -33.8308,
+          "lon": 151.0879
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200060",
+        "name": "Central",
+        "location": {
+          "lat": -33.884,
+          "lon": 151.206
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "202210",
+        "name": "Bondi Junction",
+        "location": {
+          "lat": -33.891,
+          "lon": 151.248
+        },
+        "modes": [
+          "train"
+        ]
+      }
+    ],
+    "expected": {
+      "selection": {
+        "tripId": "b",
+        "reverse": false
+      },
+      "noLocation": {
+        "tripId": "b",
+        "direction": "forward"
+      },
+      "home": "200060",
+      "scores": [
+        {
+          "tripId": "a",
+          "reverse": false,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "a",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "b",
+          "reverse": false,
+          "value": 2.6566665345624783,
+          "days": 3,
+          "receiptDays": 3
+        },
+        {
+          "tripId": "b",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "future views cannot establish a habit",
+    "wanted": [
+      "a",
+      false
+    ],
+    "fix": null,
+    "doc": {
+      "schemaVersion": 1,
+      "trips": [
+        {
+          "id": "a",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes",
+            "location": {
+              "lat": -33.8308,
+              "lon": 151.0879
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "200060",
+            "name": "Central",
+            "location": {
+              "lat": -33.884,
+              "lon": 151.206
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        },
+        {
+          "id": "b",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes",
+            "location": {
+              "lat": -33.8308,
+              "lon": 151.0879
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "202210",
+            "name": "Bondi Junction",
+            "location": {
+              "lat": -33.891,
+              "lon": 151.248
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        }
+      ],
+      "history": [
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-08T08:00:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-09T08:00:00+10:00"
+        }
+      ],
+      "rides": [],
+      "homeVotes": [],
+      "preferences": {
+        "useLocation": true
+      },
+      "lastViewed": null
+    },
+    "now": "2026-09-07T08:00:00+10:00",
+    "stations": [
+      {
+        "id": "213820",
+        "name": "Rhodes",
+        "location": {
+          "lat": -33.8308,
+          "lon": 151.0879
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200060",
+        "name": "Central",
+        "location": {
+          "lat": -33.884,
+          "lon": 151.206
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "202210",
+        "name": "Bondi Junction",
+        "location": {
+          "lat": -33.891,
+          "lon": 151.248
+        },
+        "modes": [
+          "train"
+        ]
+      }
+    ],
+    "expected": {
+      "selection": {
+        "tripId": "a",
+        "reverse": false
+      },
+      "noLocation": {
+        "tripId": "a",
+        "direction": "forward"
+      },
+      "home": "213820",
+      "scores": [
+        {
+          "tripId": "a",
+          "reverse": false,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "a",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "b",
+          "reverse": false,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "b",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "expired weak history cannot override a recent explicit choice",
+    "wanted": [
+      "a",
+      false
+    ],
+    "fix": null,
+    "doc": {
+      "schemaVersion": 1,
+      "trips": [
+        {
+          "id": "a",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes",
+            "location": {
+              "lat": -33.8308,
+              "lon": 151.0879
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "200060",
+            "name": "Central",
+            "location": {
+              "lat": -33.884,
+              "lon": 151.206
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        },
+        {
+          "id": "b",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes",
+            "location": {
+              "lat": -33.8308,
+              "lon": 151.0879
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "202210",
+            "name": "Bondi Junction",
+            "location": {
+              "lat": -33.891,
+              "lon": 151.248
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        }
+      ],
+      "history": [
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2025-09-02T08:00:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2025-09-03T08:00:00+10:00"
+        }
+      ],
+      "rides": [],
+      "homeVotes": [],
+      "preferences": {
+        "useLocation": true
+      },
+      "lastViewed": null
+    },
+    "now": "2026-09-07T08:00:00+10:00",
+    "stations": [
+      {
+        "id": "213820",
+        "name": "Rhodes",
+        "location": {
+          "lat": -33.8308,
+          "lon": 151.0879
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200060",
+        "name": "Central",
+        "location": {
+          "lat": -33.884,
+          "lon": 151.206
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "202210",
+        "name": "Bondi Junction",
+        "location": {
+          "lat": -33.891,
+          "lon": 151.248
+        },
+        "modes": [
+          "train"
+        ]
+      }
+    ],
+    "expected": {
+      "selection": {
+        "tripId": "a",
+        "reverse": false
+      },
+      "noLocation": {
+        "tripId": "a",
+        "direction": "forward"
+      },
+      "home": "213820",
+      "scores": [
+        {
+          "tripId": "a",
+          "reverse": false,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "a",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "b",
+          "reverse": false,
+          "value": 0.000025896207744572952,
+          "days": 2,
+          "receiptDays": 2
+        },
+        {
+          "tripId": "b",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "forward and reverse evidence stays separate",
+    "wanted": [
+      "a",
+      false
+    ],
+    "fix": null,
+    "doc": {
+      "schemaVersion": 1,
+      "trips": [
+        {
+          "id": "a",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes",
+            "location": {
+              "lat": -33.8308,
+              "lon": 151.0879
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "200060",
+            "name": "Central",
+            "location": {
+              "lat": -33.884,
+              "lon": 151.206
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        },
+        {
+          "id": "b",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes",
+            "location": {
+              "lat": -33.8308,
+              "lon": 151.0879
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "202210",
+            "name": "Bondi Junction",
+            "location": {
+              "lat": -33.891,
+              "lon": 151.248
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        }
+      ],
+      "history": [
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-09-03T08:00:00+10:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "reverse",
+          "t": "2026-09-04T08:00:00+10:00"
+        }
+      ],
+      "rides": [],
+      "homeVotes": [],
+      "preferences": {
+        "useLocation": true
+      },
+      "lastViewed": null
+    },
+    "now": "2026-09-07T08:00:00+10:00",
+    "stations": [
+      {
+        "id": "213820",
+        "name": "Rhodes",
+        "location": {
+          "lat": -33.8308,
+          "lon": 151.0879
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200060",
+        "name": "Central",
+        "location": {
+          "lat": -33.884,
+          "lon": 151.206
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "202210",
+        "name": "Bondi Junction",
+        "location": {
+          "lat": -33.891,
+          "lon": 151.248
+        },
+        "modes": [
+          "train"
+        ]
+      }
+    ],
+    "expected": {
+      "selection": {
+        "tripId": "a",
+        "reverse": false
+      },
+      "noLocation": {
+        "tripId": "a",
+        "direction": "forward"
+      },
+      "home": "213820",
+      "scores": [
+        {
+          "tripId": "a",
+          "reverse": false,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "a",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "b",
+          "reverse": false,
+          "value": 0.8852928099999999,
+          "days": 1,
+          "receiptDays": 1
+        },
+        {
+          "tripId": "b",
+          "reverse": true,
+          "value": 0.912673,
+          "days": 1,
+          "receiptDays": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "DST repeated hour is still one local date",
+    "now": "2026-04-12T02:45:00+10:00",
+    "wanted": [
+      "a",
+      false
+    ],
+    "fix": null,
+    "doc": {
+      "schemaVersion": 1,
+      "trips": [
+        {
+          "id": "a",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes",
+            "location": {
+              "lat": -33.8308,
+              "lon": 151.0879
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "200060",
+            "name": "Central",
+            "location": {
+              "lat": -33.884,
+              "lon": 151.206
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        },
+        {
+          "id": "b",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes",
+            "location": {
+              "lat": -33.8308,
+              "lon": 151.0879
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "202210",
+            "name": "Bondi Junction",
+            "location": {
+              "lat": -33.891,
+              "lon": 151.248
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        }
+      ],
+      "history": [
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-04-05T02:30:00+11:00"
+        },
+        {
+          "tripId": "b",
+          "direction": "forward",
+          "t": "2026-04-05T02:30:00+10:00"
+        }
+      ],
+      "rides": [],
+      "homeVotes": [],
+      "preferences": {
+        "useLocation": true
+      },
+      "lastViewed": null
+    },
+    "stations": [
+      {
+        "id": "213820",
+        "name": "Rhodes",
+        "location": {
+          "lat": -33.8308,
+          "lon": 151.0879
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200060",
+        "name": "Central",
+        "location": {
+          "lat": -33.884,
+          "lon": 151.206
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "202210",
+        "name": "Bondi Junction",
+        "location": {
+          "lat": -33.891,
+          "lon": 151.248
+        },
+        "modes": [
+          "train"
+        ]
+      }
+    ],
+    "expected": {
+      "selection": {
+        "tripId": "a",
+        "reverse": false
+      },
+      "noLocation": {
+        "tripId": "a",
+        "direction": "forward"
+      },
+      "home": "213820",
+      "scores": [
+        {
+          "tripId": "a",
+          "reverse": false,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "a",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "b",
+          "reverse": false,
+          "value": 0.8077265258928825,
+          "days": 1,
+          "receiptDays": 1
+        },
+        {
+          "tripId": "b",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        }
+      ]
+    }
+  },
+  {
     "name": "empty history chooses first saved trip",
     "doc": {
       "schemaVersion": 1,
@@ -116,22 +2002,30 @@
         {
           "tripId": "a",
           "reverse": false,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         },
         {
           "tripId": "a",
           "reverse": true,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         },
         {
           "tripId": "b",
           "reverse": false,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         },
         {
           "tripId": "b",
           "reverse": true,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         }
       ]
     }
@@ -256,22 +2150,30 @@
         {
           "tripId": "a",
           "reverse": false,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         },
         {
           "tripId": "a",
           "reverse": true,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         },
         {
           "tripId": "b",
           "reverse": false,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         },
         {
           "tripId": "b",
           "reverse": true,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         }
       ]
     }
@@ -409,22 +2311,30 @@
         {
           "tripId": "a",
           "reverse": false,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         },
         {
           "tripId": "a",
           "reverse": true,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         },
         {
           "tripId": "b",
           "reverse": false,
-          "value": 2.6566665345624783
+          "value": 2.6566665345624783,
+          "days": 3,
+          "receiptDays": 3
         },
         {
           "tripId": "b",
           "reverse": true,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         }
       ]
     }
@@ -549,22 +2459,30 @@
         {
           "tripId": "a",
           "reverse": false,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         },
         {
           "tripId": "a",
           "reverse": true,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         },
         {
           "tripId": "b",
           "reverse": false,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         },
         {
           "tripId": "b",
           "reverse": true,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         }
       ]
     }
@@ -689,22 +2607,30 @@
         {
           "tripId": "a",
           "reverse": false,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         },
         {
           "tripId": "a",
           "reverse": true,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         },
         {
           "tripId": "b",
           "reverse": false,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         },
         {
           "tripId": "b",
           "reverse": true,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         }
       ]
     }
@@ -845,22 +2771,30 @@
         {
           "tripId": "a",
           "reverse": false,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         },
         {
           "tripId": "a",
           "reverse": true,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         },
         {
           "tripId": "b",
           "reverse": false,
-          "value": 2.6566665345624783
+          "value": 2.6566665345624783,
+          "days": 3,
+          "receiptDays": 3
         },
         {
           "tripId": "b",
           "reverse": true,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         }
       ]
     }
@@ -1028,22 +2962,30 @@
         {
           "tripId": "a",
           "reverse": false,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         },
         {
           "tripId": "a",
           "reverse": true,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         },
         {
           "tripId": "b",
           "reverse": false,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         },
         {
           "tripId": "b",
           "reverse": true,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         }
       ]
     }
@@ -1159,34 +3101,42 @@
     ],
     "expected": {
       "selection": {
-        "tripId": "b",
-        "reverse": true
+        "tripId": "a",
+        "reverse": false
       },
       "noLocation": {
-        "tripId": "b",
-        "direction": "reverse"
+        "tripId": "a",
+        "direction": "forward"
       },
       "home": "213820",
       "scores": [
         {
           "tripId": "a",
           "reverse": false,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         },
         {
           "tripId": "a",
           "reverse": true,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         },
         {
           "tripId": "b",
           "reverse": false,
-          "value": 0
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         },
         {
           "tripId": "b",
           "reverse": true,
-          "value": 0.9995770449223291
+          "value": 0.9995770449223291,
+          "days": 1,
+          "receiptDays": 1
         }
       ]
     }

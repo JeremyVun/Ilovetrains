@@ -11,7 +11,7 @@ import { clock, countdownFigure, minutesUntil } from './time.js';
 import { journeyDeviceHtml, clampJourneyBars, chipInk } from './journeybar.js';
 import { cacheKey, leg } from './storage.js';
 import { AT_STATION_KM, distanceKm } from './stations.js';
-import { dayTypeMatch, homeOf, HOME_VOTES_NEEDED, hourProximity, isWeekend, rankTrips } from './predict.js';
+import { historyEvidence, homeOf, HOME_VOTES_NEEDED, isWeekend, rankTrips } from './predict.js';
 import { effectiveCap, journeyAllowed, preferencesOf, tripsForModes, SUPPORTED_MODES } from './preferences.js';
 import { selectRecommendation } from './recommendation.js';
 
@@ -59,22 +59,6 @@ export function tripIsOver(focus, nowMs) {
   if (!focus) return false;
   const arrival = arrivalMs(composedJourney(focus));
   return arrival !== null && nowMs > arrival;
-}
-
-/* The evidence a view-history receipt is allowed to claim: past views of this
-   very (trip, direction) that the predictor itself counted — same day type,
-   near this hour — and the distinct days they fall on. */
-function viewEvidence(doc, selected, nowMs) {
-  const days = new Set();
-  let events = 0;
-  for (const event of doc.history) {
-    if (event.tripId !== selected.tripId || event.direction !== selected.direction) continue;
-    const t = Date.parse(event.t);
-    if (Number.isNaN(t) || hourProximity(t, nowMs) <= 0 || dayTypeMatch(t, nowMs) !== 1) continue;
-    events += 1;
-    days.add(new Date(t).toDateString());
-  }
-  return { events, days: days.size };
 }
 
 function lastRidden(doc, tripId, nowMs) {
@@ -179,11 +163,10 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     if (outbound) receipt = `You rode out at ${clock(Date.parse(outbound.departedAt))}. Here’s the way back.`;
   }
   if (!receipt && opts.predicted && !activeFocus && !opts.fix && doc.trips.length >= 2) {
-    const evidence = viewEvidence(doc, selected, nowMs);
+    const evidence = historyEvidence(doc.history, selected.tripId, selected.direction, nowMs);
     // history records qualified board views, not rides, so the receipt says check.
-    if (evidence.events >= RECEIPT_EVIDENCE) {
+    if (evidence.receiptDays >= RECEIPT_EVIDENCE) {
       receipt = !isWeekend(nowMs) && new Date(nowMs).getHours() < 12
-        && evidence.days >= RECEIPT_EVIDENCE
         ? 'You check this trip most weekday mornings.' : 'You often check this trip around now.';
     }
   }

@@ -517,7 +517,7 @@ test('a view-history receipt needs three matching views across three days', () =
   const oneDay = receiptDoc(views([
     '2026-08-31T09:00:00+10:00', '2026-08-31T09:20:00+10:00', '2026-08-31T09:40:00+10:00'
   ]));
-  assert.equal(receiptOf(oneDay, at('09:21')), 'You often check this trip around now.');
+  assert.equal(receiptOf(oneDay, at('09:21')), '', 'repeated checks on one day are not a habit');
 });
 
 test('thin or unearned evidence prints no receipt at all', () => {

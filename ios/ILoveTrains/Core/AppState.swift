@@ -6,7 +6,24 @@ func clockTime(_ time: Double) -> String {
     let parts = sydneyCalendar.dateComponents([.hour, .minute], from: Date(timeIntervalSince1970: time / 1000))
     return String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
 }
-func epochNow() -> Double { (Date().timeIntervalSince1970 * 1000).rounded() }
+#if DEBUG
+// Offline UI drives need a date covered by the bundled timetable. Never enabled
+// in Release or ordinary app launches, including the wall-clock tracker tests.
+private let offlineTestClock: Double? = {
+    let process = ProcessInfo.processInfo
+    guard process.arguments.contains("--offline"),
+          let domain = process.environment["ILOVETRAINS_TEST_DOMAIN"], UUID(uuidString: domain) != nil,
+          let raw = process.environment["ILOVETRAINS_TEST_NOW"],
+          let value = Double(raw), value.isFinite, value > 0 else { return nil }
+    return value
+}()
+#endif
+func epochNow() -> Double {
+    #if DEBUG
+    if let offlineTestClock { return offlineTestClock }
+    #endif
+    return (Date().timeIntervalSince1970 * 1000).rounded()
+}
 enum Screen: String, Codable, Sendable { case home, board, detail, setup, settings }
 enum Appearance: String, Codable, CaseIterable, Sendable { case system, dark, light }
 enum TransferLimit: String, Codable, CaseIterable, Sendable { case direct, two, any }
