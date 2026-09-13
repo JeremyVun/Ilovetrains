@@ -602,11 +602,16 @@ the JSON yourself cannot make.
    first: a green sweep of somebody else's code. Pick a private port, and verify
    the served file is yours — `curl` a module and grep it for something your
    branch changed — before believing any frame.
-9. `--seed` navigates twice: once to acquire the origin, then again after
-   writing the key, so the app boots with the seeded document. A URL carrying a
-   fragment makes the second navigation same-document, the app never reloads,
-   and the shot is of an unseeded first run. Seed against the bare origin and
-   set `location.hash` from `--eval`, as `check-settings-browser.js` does.
+9. `--seed` runs before app scripts on the first navigation, scoped to the
+   requested top-level origin. It supports hash routes. The old two-navigation
+   approach could remain on an unseeded first-run screen because the second
+   navigation was same-document. The seed hook is removed after loading, so
+   later reloads preserve app changes instead of reseeding.
+10. `measure-open.js` waits for a successful current-board request. Flag
+    refresh can abort the first request (status 0) and retry with a transfer
+    limit; earlier-service paging uses `at`. Neither is the live response to
+    measure. Failures print response status, offline state, age and request
+    entries so an aborted request cannot masquerade as a fast successful load.
 
 ## shoot-states.js
 

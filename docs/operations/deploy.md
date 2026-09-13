@@ -176,6 +176,35 @@ read-only container probe verified the actual environment key `prod` and a true
 `tiny_train` evaluation (`FALLTHROUGH`). No `.env` files were read or credentials
 printed; the probe used the container's existing process environment.
 
+Version `1.7.1` (source `f78251074167`, service worker `v65`) deployed on
+2026-09-13 in job `63f61d2cfaf324e570514a393e3d8e81`. Image digest:
+`sha256:16f6841e427abbc685cbc2174291fbb52bdb37437dcda455e68c4f9c61f5934f`.
+Habit learning caps each trip direction at one contribution per local date,
+requires two dates and a clear score lead, and bases receipts on three matching
+dates. History stays on the device with no storage migration.
+
+Public health and all 38 shell/worker/download paths matched the release bytes.
+The corrected production open probe passed: warm cached paint 48 ms, successful
+fresh data 48 ms, four services, worker controlling; cold fresh data 902 ms.
+The probe now excludes cancelled requests and earlier-service paging, and its
+seed runs before the first app boot even on a hash route. The v64→v65 offline
+upgrade preserved trips/preferences and verified the new cached modules.
+
+Go and all 506 web tests passed, as did both recorded web journeys, four habit
+browser cases at two sizes in both schemes, and the Home light/dark baseline checks
+on all three clients. Android full Debug and signed Release gates passed (174
+JVM tests). The final iOS gate passed 213 core and 18 UI tests; the separate
+fresh-install permission-prompt case was expectedly skipped. The offline UI
+flow uses a covered fixture date; the slow Sunday search is recorded in the
+roadmap. Replacement-trip handling remains queued separately.
+
+Android 1.7.1/code 8 is published at `/downloads/`; its APK SHA-256 is
+`5a8e4edb587f991b54bf7bf29be69cf94271cc25ca8beea40d463581c648028c`.
+iOS 1.7.1 (8) was signed, verified against 77 release input hashes and uploaded
+to internal TestFlight at 18:04 AEST. Apple accepted it for processing;
+processing completion and group assignment require App Store Connect sign-in
+and have not been confirmed. No tester invitation was sent.
+
 Version `1.7.0` (source `ec1193e1ea3c`, service worker `v64`) deployed on
 2026-09-12 in job `1519948963f5ff6208b39b369e0e0cf3`. Image digest:
 `sha256:ab8186316e44837fa97b8d6c400f94b4b4546bc569d07161f9dbbffeb9188cd4`.

@@ -82,7 +82,10 @@ function liveSeed(now) {
 const TIMING_EVAL = `(async () => {
   const deadline = Date.now() + 5000;
   const apiEntry = () => performance.getEntriesByType('resource')
-    .find((r) => r.name.includes('/api/v1/departures') && r.responseEnd > 0);
+    // Flags may cancel the initial request and retry with a transfer limit.
+    // Earlier-service paging is also not the current board's live response.
+    .find((r) => r.name.includes('/api/v1/departures') && r.responseStatus === 200
+      && r.responseEnd > 0 && !new URL(r.name).searchParams.has('at'));
   while (!apiEntry() && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50));
 
   const nav = performance.getEntriesByType('navigation')[0] || {};
@@ -94,6 +97,9 @@ const TIMING_EVAL = `(async () => {
     domInteractiveMs: Math.round(nav.domInteractive || 0),
     apiResponseEndMs: api ? Math.round(api.responseEnd) : null,
     apiStatus: api ? api.responseStatus : null,
+    apiRequests: performance.getEntriesByType('resource')
+      .filter((r) => r.name.includes('/api/v1/departures'))
+      .map((r) => ({ status: r.responseStatus, end: Math.round(r.responseEnd), url: r.name })),
     offline: window.__trains.state.offline,
     dataAgeMs: Date.now() - Date.parse((window.__trains.state.body || {}).generatedAt || ''),
     apiFromServiceWorker: api ? Boolean(api.workerStart) : null,
@@ -150,8 +156,12 @@ async function main() {
         'sw=' + t.serviceWorker.padEnd(11),
         'cached paint(FCP)=' + String(t.fcpMs) + 'ms',
         ' live data=' + String(t.apiResponseEndMs) + 'ms',
+        ' status=' + String(t.apiStatus),
+        ' offline=' + String(t.offline),
+        ' age=' + String(t.dataAgeMs) + 'ms',
         ' rows=' + t.rowsOnScreen,
         ' figures=' + JSON.stringify(t.figures));
+      if (t.apiStatus !== 200) console.log(name + ' requests=' + JSON.stringify(t.apiRequests));
     }
     const bar = failures(warm);
     if (bar.length) {

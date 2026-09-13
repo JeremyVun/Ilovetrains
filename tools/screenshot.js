@@ -72,9 +72,10 @@
  *    --geo-permission are therefore applied after load, and the fix Chrome
  *    hands back is stamped with the MACHINE clock, not a pinned one.
  *
- * Seeding note: localStorage is origin-scoped, so --seed navigates to the URL
- * once to acquire the origin, writes the key, then navigates again. Anything
- * the app wrote during the first load is cleared before seeding.
+ * Seeding runs before application scripts on the first navigation, restricted
+ * to the requested top-level origin. Navigating twice to a hash route can be
+ * same-document and leave the original unseeded app running. Remove the seed
+ * script after that navigation so later reloads preserve the app's changes.
  */
 'use strict';
 
@@ -188,16 +189,20 @@ async function main() {
       await page.send('Emulation.setEmulatedMedia', { media: '', features: args.media });
     }
 
+    let seedScript;
     if (args.seed) {
       const doc = fs.readFileSync(args.seed, 'utf8');
       JSON.parse(doc); // fail loudly here, not inside the page
-      await navigate(page, args.url);
-      await page.send('Runtime.evaluate', {
-        expression: `localStorage.clear();localStorage.setItem(${JSON.stringify(args.key)},${JSON.stringify(doc)})`
+      const seed = await page.send('Page.addScriptToEvaluateOnNewDocument', {
+        source: `if (window === window.top && location.origin === ${JSON.stringify(new URL(args.url).origin)}) {
+          localStorage.clear();localStorage.setItem(${JSON.stringify(args.key)},${JSON.stringify(doc)});
+        }`
       });
+      seedScript = seed.identifier;
     }
 
     await navigate(page, args.url);
+    if (seedScript) await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: seedScript });
     await sleep(args.wait);
 
     // TRAP 7: the fix lands after the load, never before it. Granted on the
