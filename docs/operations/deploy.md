@@ -85,13 +85,13 @@ generation; the bundled bootstrap serves a new volume immediately.
    Settings displays its canonical version. The Git revision is retained in
    the image's `org.opencontainers.image.revision` label for diagnostics.
 
-2. If deployment configuration changed, edit
-   `../projects/stacks/ilovetrains/`, then commit and push the infra repository.
-   The stack uses `docker-compose.yml` and `config.env`. Its pre-commit hook
-   seals the gitignored `secrets.env` into the committed `secrets.env.age`;
-   the VM decrypts it during reconciliation. Once the infra change lands,
-   `config.env` will pin the released numbered image tag in
-   `ILOVETRAINS_VERSION` instead of `latest`; it has not landed yet.
+2. Set `ILOVETRAINS_VERSION` in `../projects/stacks/ilovetrains/config.env`
+   to the released version, plus any other deployment configuration change,
+   then commit and push the infra repository. The stack runs that numbered
+   image tag, never `latest` (pinned since infra `09ca1b2`, 14 September
+   2026). The stack uses `docker-compose.yml` and `config.env`. Its
+   pre-commit hook seals the gitignored `secrets.env` into the committed
+   `secrets.env.age`; the VM decrypts it during reconciliation.
 
 3. Deploy through the infra repository:
 
