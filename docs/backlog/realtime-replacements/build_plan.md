@@ -14,7 +14,7 @@ files; if a phase finds it needs one, coordinate through coord first. Never
 read or source `.env`. Record each gate's exact command and result here; a
 skipped or partial gate is not done.
 
-Phase 5's visual-regression run is visual QA, so only Opus 5 or Astra may run
+Phase 5's visual-regression run is visual QA, so only Opus or Astra may run
 or judge it; Sol never does. All other work is nonvisual. Phases 2, 3 and 4
 are independent after phase 1 and may run in parallel. Assign their models
 under the owner's routing and delegation limits at build time. An Astra
