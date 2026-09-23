@@ -170,6 +170,22 @@ export function applyArrivalResult(doc, result, nowMs) {
   return next;
 }
 
+/** How a pin relates to the answer home last displayed (analytics.md,
+    `pinned_<kind>`); null when a same-trip answer showed no journey. */
+export function pinResult(answer, selection, journey) {
+  if (!answer || !selection || !journey) return null;
+  if (selection.tripId !== answer.tripId || selection.direction !== answer.direction) return 'trip';
+  if (!answer.journeyKey) return null;
+  return journeyKey(journey) === answer.journeyKey ? 'same' : 'service';
+}
+
+const rideIdentity = (ride) => `${ride.tripId}|${ride.direction}|${ride.scheduledDeparture || ride.departedAt}`;
+
+export function rideAdded(before, after) {
+  const known = new Set(((before && before.rides) || []).map(rideIdentity));
+  return ((after && after.rides) || []).some((ride) => !known.has(rideIdentity(ride)));
+}
+
 export function matchJourney(journeys, snapshot) {
   const key = journeyKey(snapshot);
   return (Array.isArray(journeys) ? journeys : []).find((j) => journeyKey(j) === key) || null;

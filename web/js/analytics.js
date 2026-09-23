@@ -10,6 +10,7 @@ export const EXPERIMENTS = Object.freeze({
   'strip-placement': Object.freeze({ variants: Object.freeze(['a3', 'a2']), offset: 0 })
 });
 
+const PLATFORM = 'web';
 const PROBE_KEY = 'trains.analytics.probe';
 const HOST = 'ilovetrains.jeremyvun.com';
 const COUNT_CAP = 1_000_000;
@@ -26,9 +27,19 @@ const SETUP_SOURCES = {
   saved_setup: new Set(['location', 'nearby', 'search', 'redirect', 'redirect_lost'])
 };
 const HEADER_KINDS = ['predicted', 'focus', 'usual', 'home', 'pair', 'inferred'];
+const PIN_RESULTS = new Set(['same', 'service', 'trip']);
+const RIDE_BASES = new Set(['location', 'estimate']);
+const OWN_DIMS = [
+  ...HEADER_KINDS.map((kind) => ['pinned_' + kind, 'r', PIN_RESULTS]),
+  ['rode_pin', 'b', RIDE_BASES],
+  ['rode_auto', 'b', RIDE_BASES],
+  ['opened', 'm', MILESTONES],
+  ...Object.entries(SETUP_SOURCES).map(([name, values]) => [name, 'f', values])
+].reduce((map, [name, key, values]) => map.set(name, { key, values }), new Map());
+const COMPOSED = new Set(['r', 'b']);
 const EVENT_NAMES = new Set([
-  ...HEADER_KINDS.flatMap((kind) => ['shown_' + kind, 'hit_' + kind, 'miss_' + kind]),
-  'change_inferred', 'entered_inferred', 'back_focus', 'back_inferred',
+  ...HEADER_KINDS.flatMap((kind) => ['shown_' + kind, 'hit_' + kind, 'miss_' + kind, 'pinned_' + kind]),
+  'rode_pin', 'rode_auto', 'change_inferred', 'entered_inferred', 'back_focus', 'back_inferred',
   'asked_panel', 'granted_panel', 'denied_panel', 'later_panel',
   'asked_setup', 'granted_setup', 'denied_setup',
   'opened', 'shown_setup', 'saved_setup'
@@ -78,38 +89,46 @@ function callerDims(name, dims) {
     return null;
   }
   const keys = Object.keys(dims);
-  if (name === 'opened') {
-    const value = dims.m;
-    return keys.length === 1 && keys[0] === 'm' && MILESTONES.has(value)
-      ? { m: value } : null;
-  }
-  const sources = SETUP_SOURCES[name];
-  if (sources) {
-    const value = dims.f;
-    return keys.length === 1 && keys[0] === 'f' && sources.has(value)
-      ? { f: value } : null;
-  }
-  return keys.length === 0 ? {} : null;
+  const own = OWN_DIMS.get(name);
+  if (!own) return keys.length === 0 ? {} : null;
+  const value = dims[own.key];
+  if (keys.length !== 1 || keys[0] !== own.key || !own.values.has(value)) return null;
+  const extra = { [own.key]: value };
+  if (COMPOSED.has(own.key)) extra['pl.' + own.key] = PLATFORM + '.' + value;
+  return extra;
 }
 
 function validStoredDims(name, dims) {
   if (!dims || typeof dims !== 'object' || Array.isArray(dims)) return false;
-  if (!USAGE_BANDS.has(dims.u)) return false;
-  const expected = ['u'];
+  if (!USAGE_BANDS.has(dims.u) || dims.pl !== PLATFORM || dims['pl.u'] !== PLATFORM + '.' + dims.u) {
+    return false;
+  }
+  const expected = ['u', 'pl', 'pl.u'];
   for (const [id, experiment] of Object.entries(EXPERIMENTS)) {
     const key = 'x.' + id;
     if (!experiment.variants.includes(dims[key])) return false;
     expected.push(key);
   }
-  if (name === 'opened') {
-    if (!MILESTONES.has(dims.m)) return false;
-    expected.push('m');
-  } else if (SETUP_SOURCES[name]) {
-    if (!SETUP_SOURCES[name].has(dims.f)) return false;
-    expected.push('f');
+  const own = OWN_DIMS.get(name);
+  if (own) {
+    if (!own.values.has(dims[own.key])) return false;
+    expected.push(own.key);
+    if (COMPOSED.has(own.key)) {
+      if (dims['pl.' + own.key] !== PLATFORM + '.' + dims[own.key]) return false;
+      expected.push('pl.' + own.key);
+    }
   }
   const keys = Object.keys(dims);
   return keys.length === expected.length && expected.every((key) => keys.includes(key));
+}
+
+/* Entries queued by the shell before platform dimensions existed keep their
+   counts rather than invalidating the whole queue. */
+function upgradeEntry(entry) {
+  const dims = entry && entry.d;
+  if (!dims || typeof dims !== 'object' || Array.isArray(dims)
+    || Object.hasOwn(dims, 'pl') || Object.hasOwn(dims, 'pl.u')) return entry;
+  return { ...entry, d: { ...dims, pl: PLATFORM, 'pl.u': PLATFORM + '.' + dims.u } };
 }
 
 function validQueueEntry(entry) {
@@ -143,8 +162,8 @@ export function createAnalytics(options) {
     try {
       const stored = JSON.parse(storage.getItem(QUEUE_KEY));
       if (!stored || !Array.isArray(stored.queue)) return [];
-      const valid = stored.queue.every(validQueueEntry);
-      return valid ? stored.queue.slice(-QUEUE_CAP) : [];
+      const queue = stored.queue.map(upgradeEntry);
+      return queue.every(validQueueEntry) ? queue.slice(-QUEUE_CAP) : [];
     } catch (_) {
       return [];
     }
@@ -161,7 +180,8 @@ export function createAnalytics(options) {
       const extra = callerDims(name, dims);
       if (!extra) return;
       const doc = getDoc();
-      const d = { u: band(doc), ...experimentDims(doc, enabled), ...extra };
+      const u = band(doc);
+      const d = { u, pl: PLATFORM, 'pl.u': PLATFORM + '.' + u, ...experimentDims(doc, enabled), ...extra };
       events.push({ t: name, d });
       if (!enabled) return;
       const queue = readQueue();

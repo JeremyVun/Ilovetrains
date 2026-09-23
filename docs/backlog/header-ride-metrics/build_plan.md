@@ -36,7 +36,7 @@ Owns `docs/contracts/analytics.md`, `docs/contracts/client-storage.md`
 the branch marked for the owner's verdict. Verify: contracts agree with
 design.md; no other contract still says native analytics is off.
 
-## Phase 2: web (lead) — done marker: [ ]
+## Phase 2: web (lead) — done marker: [x] 2026-09-23
 
 Owns `web/js/analytics.js`, the pin and ride emission points in
 `web/js/main.js`, `web/sw.js` `VERSION`, `web/test/analytics.test.js` and new
@@ -76,3 +76,15 @@ server, drive open → header → row tap → detail → pin, background the app
 check the captured body: exact `{p,t,d,n}` shape, `pl`, ordering, no field
 outside the vocabulary. Run the full primary gates from `CLAUDE.md` once on
 the final sources. Then offer the close stage.
+
+## Phase 2 results (2026-09-23)
+
+`npm test` 517/517; `check-analytics-browser.js` passes and now asserts the
+exact dimension keys (`pl`, `pl.u`); `playtest-regressions.sh` exit 0.
+`check-controller-lifecycle.js` gained `estimate-ride-count` (a passed pinned
+estimate counts one `rode_pin` with `b: estimate`, and a reopen counts none),
+which passes and was proven to bite. Its older `arrival-persistence` scenario
+fails identically on `field-report-fixes-head` without these changes (one
+destination fix no longer completes a guarded ride), and `shoot-states.js`
+`focus-returns-home` fails its `Running · Pinned` invariant on `main` too;
+both are inherited, not this item's.
