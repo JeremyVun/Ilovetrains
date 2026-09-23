@@ -70,7 +70,10 @@ iOS implementation requested on 2026-09-07.
   reference labels it `SCHEDULED`; the departure the rider acts on is
   timetable-only in both. Owner ruling 2026-09-11: keep the divergence rather
   than change what `journey.realtime` means.
-- Anonymous analytics remain disabled for native v1, as on Android. User-written
+- Release builds send the anonymous header, pin and ride counters in
+  [analytics.md](analytics.md) with `pl: "ios"`, as on Android: no web-only
+  setup, panel or strip-experiment events, an open is a user-visible
+  foreground entry, and debug builds never send. User-written
   feedback still sends only after tapping Send feedback. Drafts live in memory
   across navigation and clear after a successful submission. The success banner
   dismisses after four seconds; errors remain manually dismissible.

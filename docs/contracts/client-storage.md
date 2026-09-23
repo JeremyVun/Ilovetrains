@@ -280,7 +280,8 @@ user's and an event must never rewrite `trains.v1`:
 
 ```json
 {"queue": [{"t": "shown_predicted",
-            "d": {"u": "6-10", "x.strip-placement": "a3"}, "n": 5}]}
+            "d": {"u": "6-10", "pl": "web", "pl.u": "web.6-10",
+                  "x.strip-placement": "a3"}, "n": 5}]}
 ```
 
 - Written only while analytics is enabled; on any other origin nothing is
@@ -298,11 +299,20 @@ user's and an event must never rewrite `trains.v1`:
   Overlapping flush triggers share one in-flight fetch, and anything
   recorded during that request survives.
   These counters never go to this app's server.
-- `d` carries at most three keys: the usage band `u`, a running experiment's
-  variant `x.<experiment>`, and either a setup source word `f` or, on
-  `opened` alone, its milestone `m`. Never a station, coordinate, trip, line,
-  clock time, journey or anything typed into a field. A new event name or dimension value is a
-  change to this contract, not a build decision.
+- `d` carries the usage band `u`, the platform `pl` and composite `pl.u`, a
+  running experiment's variant `x.<experiment>`, and the event's own keys: a
+  setup source word `f`, `opened`'s milestone `m`, a pin result `r` with
+  `pl.r`, or a ride basis `b` with `pl.b` ([analytics.md](analytics.md)).
+  Never a station, coordinate, trip, line, clock time, journey or anything
+  typed into a field. A new event name or dimension value is a change to this
+  contract, not a build decision. Entries from before `pl` are upgraded on
+  read, not dropped.
+- Android and iOS keep `{opens, queue}` in an app-private `analytics-v1`
+  store (iOS: a JSON file in Application Support excluded from backup;
+  Android: private app storage), separate from the personal document, with
+  the same entry shape without `x.*`. Only release builds write it. A
+  malformed store is dropped whole. `opens` leaves the device only as a usage
+  band or milestone.
 
 ## Trip selection
 

@@ -119,10 +119,14 @@ moves through are binding in `docs/contracts/ui.md`.
 5. **No ads, no accounts, no tracking.** Saved trips, history, rides and
    location fixes stay on the device. The app sends anonymous counters to
    our self-hosted analytics service: which kind of answer the header gave,
-   whether it was acted on, a usage band and an experiment variant. Events
+   whether it was acted on, whether a pinned train was the one it showed,
+   whether a recorded ride was pinned or entered automatically, the platform,
+   a usage band and an experiment variant. Events
    contain no device or session identifier, station, trip, coordinate or
-   clock time. Do Not Track disables analytics; Global Privacy Control does
-   not, because nothing here is personal data to sell or share.
+   clock time. Do Not Track disables web analytics; Global Privacy Control
+   does not, because nothing here is personal data to sell or share. The
+   phone apps send the same counters from release builds with no opt-out
+   control (2026-09-23).
    The exact vocabulary is in `docs/contracts/analytics.md`.
 6. **Subtraction is the default.** Under "every affordance earns its place",
    iterate by deletion. The round that produced the current design deleted
@@ -232,7 +236,7 @@ Open Data. Precise interfaces in `docs/contracts/`.
 ```
 Browser (localStorage: trips, history, rides, focus, home, searches, cache)
   ├─ static shell ─────────── service worker, cache-first, VERSION-bumped
-  ├─ anonymous counters ───── shared analytics service, direct cross-origin POST
+  ├─ anonymous counters ───── shared analytics service, direct POST (native apps too)
   └─ fetch /api/v1/... ────── JSON, CDN s-maxage ~30s (shared across users)
                 └─ Go backend (stateless cache/proxy, in-memory TTL cache,
                    single-flight, stale-on-error) ── TfNSW Trip Planner API

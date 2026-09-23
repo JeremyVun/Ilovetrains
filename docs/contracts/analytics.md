@@ -1,6 +1,6 @@
 # Contract: Anonymous analytics and experiments
 
-The browser posts anonymous counters directly to
+Every client (web, Android and iOS) posts anonymous counters directly to
 `https://analytics.jeremyvun.com/e`, project `ilovetrains`. The train API
 does not receive analytics. Saved trips, history, rides, location fixes and
 experiment assignment stay on the device. The server posts its own accuracy
@@ -9,14 +9,20 @@ listed under "Server accuracy events" below.
 
 ## Privacy and enablement
 
-Sending requires the production hostname `ilovetrains.jeremyvun.com`, usable
-localStorage, and no Do Not Track (`'1'`). Global Privacy Control is not an
+On the web, sending requires the production hostname
+`ilovetrains.jeremyvun.com`, usable localStorage, and no Do Not Track (`'1'`). Global Privacy Control is not an
 opt-out here: it objects to selling or sharing personal data, and these
 counters contain none. Otherwise
 the client neither writes telemetry nor queues or sends events, and every
 experiment uses its control. The in-memory event ledger still records the
-approved events for local verification. Disclosure is in the documentation;
-there is no in-app prompt or disclosure copy.
+approved events for local verification. On Android and iOS, sending requires
+a release build; debug builds, including every test and seeded run, record the
+same events in an in-memory ledger and never persist or send them, unless a
+debug-only `ILOVETRAINS_ANALYTICS_URL` override (iOS launch environment,
+Android intent extra, compiled out of release) points transport at a local
+capture endpoint for verification. Native clients have no opt-out control
+(owner ruling, 2026-09-23). Disclosure is in the privacy policy; there is no
+in-app prompt or disclosure copy.
 
 An event is exactly `{p, t, d, n}`: project, event name, categorical dimensions
 and repeat count. No device or session ID, timestamp, presence heartbeat,
@@ -24,15 +30,25 @@ station, trip, line, coordinate, distance, viewport, user agent or typed text
 is an event field. Names, dimension keys and values are closed vocabularies
 enforced by the analytics module; extending them requires a contract change.
 
-`d` contains the usage band `u`, the active experiment dimension
-`x.strip-placement` (`a3` or `a2`), and at most one of setup source `f` or
-open milestone `m`. Callers cannot override the derived usage band or variant.
+`d` contains the usage band `u`, the platform `pl` (`web`, `android` or
+`ios`), the composite `pl.u` (`<pl>.<u>`, for example `ios.6-10`), on the web
+the active experiment dimension `x.strip-placement` (`a3` or `a2`), and the
+event's own keys: setup source `f`, open milestone `m`, pin result `r` with
+its composite `pl.r`, or ride basis `b` with its composite `pl.b`. Native
+events never carry `x.*`, which keeps them out of both experiment arms.
+Callers cannot override the derived usage band, platform or variant.
 
 ## Device state and assignment
 
 The optional document field `telemetry: {opens, bucket}` is specified in
-[client-storage.md](client-storage.md). The controller increments `opens`
-once per page load before the first displayed home or setup answer. The first
+[client-storage.md](client-storage.md). The web controller increments `opens`
+once per page load before the first displayed home or setup answer. Native
+clients keep `opens` in their own `analytics-v1` store and increment it once
+per user-visible foreground entry that displays a home or setup answer,
+because a phone app stays alive in the background for hours; each such open
+also resets the first-row-tap classification and repeated-`shown_*`
+suppression. Native bands therefore count foreground entries, not page loads.
+Native clients draw no bucket: they run no experiment. The first
 increment draws a bucket 0–99 using `crypto.getRandomValues`; later opens
 retain it. No answer means no increment. Analytics never waits for a network
 request before painting the answer.
@@ -84,6 +100,29 @@ Setup is a separate answer kind with setup-specific events.
 | `granted_setup`, `denied_setup` | Outcome of an explicit setup location request | — |
 | `saved_setup` | Setup saves a valid pair, after resolving a redirect if present | `f`: `location`, `nearby`, `search`, `redirect`, `redirect_lost` |
 | `opened` | First answer reaches an open milestone | `m`: one of the milestone strings above |
+| `pinned_<kind>` | Explicit pin while home's own answer is attributed this open, after any `hit_<kind>` for the same pin | `r`: `same`, `service`, `trip`; composite `pl.r` |
+| `rode_pin`, `rode_auto` | Arrival settlement appends a ride absent from `rides` before that write; `pin` for `by: "focus"`, `auto` for `by: "inferred"` | `b`: `location`, `estimate`; composite `pl.b` |
+
+Android and iOS send `opened`, `shown_<kind>`, `hit_<kind>`, `miss_<kind>`,
+`pinned_<kind>`, `rode_pin` and `rode_auto` under the same rules. Setup,
+location-panel, `entered_inferred`, `back_*` and `change_inferred` events are
+web-only. Native prediction saves no pair automatically, so native never sends
+a `pair` kind. Native derives the kind as the web does: a visible focus is
+`inferred` or `focus` by its `by`; with no station here the answer is
+`predicted`; with a station here, the homeward candidate chosen without a
+habit or location winner is `home`, and any other answer is `usual`.
+
+`pinned_<kind>` compares the pinned journey with home's last rendered answer
+before the pin: its trip, direction and displayed lead journey (the
+recommendation, or the followed journey for `focus` and `inferred`). `trip`
+means another trip or direction; `same` means the same trip and direction with
+an equal identity key (every service leg's line and scheduled departure:
+`journeyKey` on web, `Journey.key` on native); `service` means the same trip
+and direction with another key. A same-trip pin when home displayed no lead
+journey emits nothing. Each pin action emits at most once; unpinning emits
+nothing. `rode_*` never fires for a correction of an existing ride or a legacy
+ride restored by migration; a withdrawn estimate ride recorded again counts
+again.
 
 Explicit selection is browsing and emits no new home `shown_*`. Returning
 from the board to the same answer adds no exposure. A location fix changing
@@ -120,8 +159,21 @@ Going hidden or leaving the page tries `sendBeacon` with a `text/plain` Blob;
 if refused, it falls back to `fetch` with `keepalive`. An `online` event
 also flushes. Known-offline calls keep the queue without sending. Fetches
 POST one JSON array with `Content-Type: text/plain`, avoiding preflight.
-The service worker ignores the cross-origin request. The client sends no
-ingest key; the analytics deployment runs open ingest for this project.
+The service worker ignores the cross-origin request.
+
+Queue entries written before `pl` existed lack both `pl` and `pl.u`; an
+otherwise valid entry missing both is upgraded on read with `pl: "web"` and
+its `pl.u`, so a shell update loses no counts.
+
+Native clients hold the same compacted queue (200 entries, 1,000,000 repeat
+saturation, closed-vocabulary validation on read, snapshot settlement on 2xx,
+one request in flight) in their `analytics-v1` store and POST it as one JSON
+array with `Content-Type: application/json`, without cookies or credentials.
+They flush 10 seconds after the first event of a foreground session, when the
+app goes to the background (best effort within the platform's background
+allowance), and at the next foreground entry while anything is queued.
+
+No client sends an ingest key; the analytics deployment runs open ingest for this project.
 Configuring ingest keys on the service silently drops these events until the
 client carries one.
 
@@ -175,6 +227,24 @@ usage and variant dimensions. For header kind `k`:
 - Strip correction: `change_inferred[x.strip-placement=v] /
   shown_inferred[x.strip-placement=v]`, comparing `a2` and `a3`. Other
   counters split by variant show effects on the rest of the flow.
+
+Per platform `P`, with the composites composed at emit time:
+
+- Trip hit rate: `hit_k[pl=P] / (hit_k[pl=P] + miss_k[pl=P])`. Returning
+  acceptance per platform reads `pl.u` where the ratios above read `u`.
+- Train match: `pinned_k[pl.r=P.same] / Σ_r pinned_k[pl.r=P.r]`. The
+  `service` share is the right-trip, wrong-train rate; `trip` is a wrong trip
+  corrected by pinning.
+- Zero-tap rides: `rode_auto[pl=P]`, with its location-confirmed share
+  `rode_auto[pl.b=P.location] / rode_auto[pl=P]`. Automatic entry needs a
+  platform sighting, so these rides follow location answers; compare with
+  `shown_usual + shown_home` for a lower-bound rate.
+- Pin follow-through: `rode_pin[pl=P] / Σ_k pinned_k[pl=P]`.
+
+These count answers, pins and recorded rides, not people. Location
+permission, the web's foreground-only sampling and best-effort delivery shape
+every ride figure. Native open bands count foreground entries, so compare
+rates across platforms, never band-for-band open counts.
 
 Zero denominators mean no observation. No-action acceptance is a product
 assumption, not proof that the rider took that service. Browser and production
