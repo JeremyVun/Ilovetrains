@@ -89,19 +89,19 @@ and [registered-device signing](https://developer.apple.com/documentation/xcode/
 The paid individual membership for Yee Vun (`perch.admin@gmail.com`), team
 `8QYAPRZLHG`, renews on 2027-04-14. The owner accepted the updated Developer
 Program agreement on 2026-09-08 and signed into Xcode with this account.
-Xcode 26.4 successfully archived through version 1.7.1 (8), signing
+Xcode 26.4 successfully archived through version 1.8.0 (9), signing
 both the app and Live Activity extension. TestFlight requires an active paid membership.
 
 The App Store Connect record is [ilovetrains, Apple ID 6809801045](https://appstoreconnect.apple.com/apps/6809801045/testflight).
 Both explicit identifiers are registered on the paid team. The record uses
 English (Australia), SKU `ilovetrains-ios`, and Full Access.
-The latest internal-only upload succeeded on 2026-09-13 at 18:04 AEST from
-source `f78251074167`, using `ios/releases/TestFlight-1.7.1-8.xcarchive`, through
-the Apple account signed into Xcode (no API key on this Mac). Apple accepted
-the package for processing; all 77 release input hashes and both signatures
-were verified. A successful upload alone does not mean the build is installable:
-verify TestFlight processing and group assignment before announcing availability.
-Build 8 processing and group assignment have not been confirmed: the browser
+The latest internal-only upload succeeded on 2026-09-23 at 23:29 AEST from
+source `e0e2ddb284d8`, using `ios/releases/TestFlight-1.8.0-9.xcarchive`, through
+the Apple account signed into Xcode (no API key on this Mac); the export
+reported the upload complete. A successful upload alone does not mean the build
+is installable: verify TestFlight processing and group assignment before
+announcing availability.
+Build 9 processing and group assignment have not been confirmed: the browser
 requires App Store Connect sign-in. The internal group and owner invitation
 were left pending by the initial setup; verify them before creating group
 `Jeremy`, adding `perch.admin@gmail.com`, and assigning the latest processed

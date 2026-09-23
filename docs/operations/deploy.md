@@ -176,6 +176,36 @@ read-only container probe verified the actual environment key `prod` and a true
 `tiny_train` evaluation (`FALLTHROUGH`). No `.env` files were read or credentials
 printed; the probe used the container's existing process environment.
 
+Version `1.8.0` (source `e0e2ddb284d8`, service worker `v68`) deployed on
+2026-09-23 in job `e1247c5262b6da07442ca374819d73c2`, infra pin `20b0c36`.
+Image digest:
+`sha256:1006784244fcf6dbefddad33e8ccc1bd6ccb09b24509bf5171ab92116f1e9fa5`.
+It carries the offline iPhone field-report fixes (timetable evidence for
+inferred travel mode, overdue unconfirmed trips ending and counting as ridden,
+pin-started trackers, trimmed saved-trip rows, `AGO` on departed detail) and
+the resting freshness indicator on open.
+
+Public health and all 38 shell/worker/download paths matched the release bytes;
+`/js/main.js` and `/sw.js` keep `no-store`. The production open probe met the
+bar: warm cached paint 108 ms, live data 156 ms, worker controlling; cold live
+data 764 ms. `check-shell-upgrade.js --previous-ref f78251074167` upgraded
+v65→v68 offline with Direct only and the saved trip preserved.
+
+Go, 511 web tests, both recorded web journeys, the settings and
+commute-feedback browser checks and the full three-client visual regression
+(123 frames matching; setup keyboard timing and uncommitted tracker frames
+excepted) passed on the final sources. Android Debug and signed Release gates
+passed (176 JVM tests), with 61 of 62 instrumented tests:
+`missingSundayMetroUsesBoundedNextServiceSearch` took 12.3 s against its 12 s
+bound under host load 37 and passed in 9.2 s on rerun. iOS passed 215 core and
+19 UI tests; the fresh-install permission-prompt case was expectedly skipped.
+
+Android 1.8.0/code 9 is published at `/downloads/`; its APK SHA-256 is
+`03063230b751169df5ef272ea1d145c9a99015b1e8097319c4ba1d29db6f1db1`.
+iOS 1.8.0 (9) was archived, signed and uploaded to internal TestFlight at
+23:29 AEST. Processing and group assignment need App Store Connect sign-in and
+have not been confirmed.
+
 Version `1.7.1` (source `f78251074167`, service worker `v65`) deployed on
 2026-09-13 in job `63f61d2cfaf324e570514a393e3d8e81`. Image digest:
 `sha256:16f6841e427abbc685cbc2174291fbb52bdb37437dcda455e68c4f9c61f5934f`.
