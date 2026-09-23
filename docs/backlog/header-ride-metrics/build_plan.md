@@ -27,7 +27,7 @@ and `rmdir` it afterwards.
 - A dimension object always contains `u`, `pl`, `pl.u`; plus `x.*` on web;
   plus exactly the event's own keys (`m`, `f`, `r`+`pl.r`, `b`+`pl.b`).
 
-## Phase 1: contracts and privacy copy (lead) — done marker: [ ]
+## Phase 1: contracts and privacy copy (lead) — done marker: [x] 2026-09-23
 
 Owns `docs/contracts/analytics.md`, `docs/contracts/client-storage.md`
 ("Analytics queue" and native storage sections),
