@@ -813,10 +813,12 @@ private class Fixtures {
     private val pyrmontBoard = pyrmontBoardSource.copy(generatedAt = pyrmontNow)
 
     val centralTrip = SavedTrip("central-parramatta", centralBoard.from, centralBoard.to, lines = listOf("T1"))
+    // Production always computes a ride line for every saved trip; these fixtures have no rides.
     private fun state(now: Long = centralNow, board: BoardData = centralBoard) = AppState(
         ready = true, screen = Screen.Home, trips = listOf(centralTrip), totalTrips = 1,
         selectedTripId = centralTrip.id, board = board, homeBoard = board, now = now,
         appearance = Appearance.Dark, enabledModes = AllModes, locationGranted = true,
+        tripMetadata = mapOf(centralTrip.id to "Never ridden"),
     )
 
     val home = state()
@@ -922,6 +924,7 @@ private class Fixtures {
         trips = listOf(SavedTrip("rhodes-bondi", activeBoard.from, activeBoard.to, lines = listOf("T9", "T4"))),
         selectedTripId = "rhodes-bondi",
         focus = FocusedJourney("rhodes-bondi", false, activeJourney, activeBoard, pinned = true),
+        tripMetadata = mapOf("rhodes-bondi" to "Never ridden"),
     )
     // Stress delta: the T9 loses nine minutes and the printed T4 connection is gone.
     private val lostFollowed = Journey(listOf(
@@ -954,7 +957,8 @@ private class Fixtures {
     val c1TransferAfter = activeAt(activeJourney.legs.last().effectiveDeparture + 3 * 60_000)
 
     val beachTrip = SavedTrip("rhodes-bondi", transferBoard.from, transferBoard.to, lines = listOf("T9", "T4"))
-    val twoTripsState = home.copy(trips = listOf(centralTrip, beachTrip), totalTrips = 2)
+    val twoTripsState = home.copy(trips = listOf(centralTrip, beachTrip), totalTrips = 2,
+        tripMetadata = mapOf(centralTrip.id to "Never ridden", beachTrip.id to "Never ridden"))
     val deletedState = home.copy(message = "Rhodes → Bondi Junction deleted", undoAvailable = true)
     val longNamesState = state(pyrmontNow, pyrmontBoard).copy(
         trips = listOf(SavedTrip("pyrmont-double-bay", pyrmontBoard.from, pyrmontBoard.to, lines = listOf("F4", "F7"))),

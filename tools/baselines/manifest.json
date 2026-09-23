@@ -1,14 +1,14 @@
 {
   "web": {
-    "commit": "f619995",
-    "date": "2026-09-11",
-    "device": "Google Chrome 152.0.7977.84, 390x844 css @2x"
+    "commit": "f8ae8b7",
+    "date": "2026-09-23",
+    "device": "Google Chrome 153.0.8010.53, 390x844 css @2x"
   },
   "ios": {
-    "commit": "8c7eaf4",
-    "date": "2026-09-11",
-    "device": "tcr-p3-vr iPhone 17 1206x2622px, content size large",
-    "simulator": "tcr-p3-vr iPhone 17",
+    "commit": "f8ae8b7",
+    "date": "2026-09-23",
+    "device": "ilt-field-fixes-iphone17 1206x2622px, content size large · ilt-field-fixes-iphone17 1206x2622px ActivityKit card crops, com.apple.CoreSimulator.SimRuntime.iOS-26-4",
+    "simulator": "ilt-field-fixes-iphone17",
     "tracker": {
       "commit": "116efdc",
       "date": "2026-09-08",
@@ -17,8 +17,8 @@
     }
   },
   "android": {
-    "commit": "b47701a",
-    "date": "2026-09-11",
-    "device": "sdk_gphone64_arm64 API 36, configuredRoot=390x844dp configuredSafeDrawing=0,0,0,0dp configuredContent=390x844dp density=2.625 fontScale=1.0 capturedBitmap=1024x2216px capturedLogical=390x844dp · serial=emulator-5562 device=sdk_gphone64_arm64 build=google/sdk_gphone64_arm64/emu64a:16/BE4B.251210.005/14574095:user/release-keys sdk=36 size_dp=390x844 size_px=1024x2216 density=420 font_scale=1.0 schemes=dark,light cases=ride,transfer,final,unknown-platform,tight-transfer,offline-stale,long-content,missed-connection,first-leg-cancelled,final-leg-cancelled surfaces=shade capture_only=1 capture_mode=deterministic system-surface capture only; lifecycle checks skipped fixture=tools/fixtures/conformance/travel-tracker.json capture_clock=fixed fixture review epoch through DEBUG-only model seam"
+    "commit": "f8ae8b7",
+    "date": "2026-09-23",
+    "device": "sdk_gphone64_arm64 API 36, configuredRoot=390x844dp configuredSafeDrawing=0,0,0,0dp configuredContent=390x844dp density=2.625 fontScale=1.0 capturedBitmap=1024x2216px capturedLogical=390x844dp · serial=emulator-5580 device=sdk_gphone64_arm64 build=google/sdk_gphone64_arm64/emu64a:16/BE4B.251210.005/14574095:user/release-keys sdk=36 size_dp=390x844 size_px=1024x2216 density=420 font_scale=1.0 schemes=dark,light cases=ride,transfer,final,unknown-platform,tight-transfer,offline-stale,long-content,missed-connection,first-leg-cancelled,final-leg-cancelled surfaces=shade capture_only=1 capture_mode=deterministic system-surface capture only; lifecycle checks skipped fixture=tools/fixtures/conformance/travel-tracker.json capture_clock=fixed fixture review epoch through DEBUG-only model seam"
   }
 }
