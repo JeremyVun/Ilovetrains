@@ -52,7 +52,32 @@ The app embeds `TravelTrackerWidget.appex`, bundle ID
 `com.ilovetrains.ios.TravelTrackerWidget`. The generator compiles `ios/Shared/`
 into both targets and `ios/TravelTrackerWidget/` only into the extension. Device
 signing must cover both targets with the configured team. Live Activities use
-local ActivityKit updates; no push entitlement or shared app group is needed.
+local ActivityKit updates; no push entitlement is needed.
+
+The home-screen widget reads `widget-v1.json` from the App Group
+`group.com.ilovetrains.ios`, which both targets claim in
+`ILoveTrains/ILoveTrains.entitlements` and
+`TravelTrackerWidget/TravelTrackerWidget.entitlements` (set by the generator as
+`CODE_SIGN_ENTITLEMENTS`). The first signed build after the group was added
+must run with Xcode signed in to team `8QYAPRZLHG` and
+`-allowProvisioningUpdates` (`--device`, `--testflight`, or Xcode's Run and
+Archive) so automatic signing registers the group and adds it to both App IDs
+and their profiles. Without that registration the signed build fails, and a
+profile without the group leaves the widget on its empty state.
+
+`CODE_SIGNING_ALLOWED=NO`, which every helper above uses for the simulator,
+embeds no entitlements, so an unsigned simulator build has no group container:
+the app publishes nothing and the widget shows its empty state. Build with
+local ad-hoc signing to see the widget answer on a simulator:
+
+```sh
+xcodebuild -project ios/ILoveTrains.xcodeproj -scheme ILoveTrains \
+  -derivedDataPath /tmp/ilovetrains-ios-signed-sim \
+  -destination "platform=iOS Simulator,id=$ILOVETRAINS_SIMULATOR_ID" \
+  build CODE_SIGN_IDENTITY=-
+```
+
+That build embeds the simulated entitlements and needs no Apple account.
 
 `ios/releases/ILoveTrains.xcarchive` from `--unsigned-archive` is an **unsigned
 Release archive**, useful for inspection and later signing. It cannot be
