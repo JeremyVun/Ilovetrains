@@ -74,7 +74,7 @@ final class HeaderKindTests: XCTestCase {
             )
             data.useLocation = ((doc["preferences"] as? [String: Any])?["useLocation"] as? Bool) ?? true
             let fix = (fixture["fix"] as? [String: Double]).map { Fix(lat: $0["lat"] ?? 0, lon: $0["lon"] ?? 0, at: at) }
-            let stations = try ((fixture["stations"] as? [Any]) ?? []).map(station)
+            let stations = try ((fixture["stations"] as? [Any]) ?? []).map { try station($0) }
             XCTAssertEqual(predict(data: data, stations: stations, fix: fix, now: at)?.kind.rawValue, web[name] ?? "predicted", name)
             data.useLocation = false
             XCTAssertEqual(predict(data: data, stations: stations, fix: fix, now: at)?.kind, .predicted, name)

@@ -244,8 +244,8 @@ final class AnalyticsTests: XCTestCase {
         XCTAssertEqual(state.queue.map(\.t), ["opened", "shown_predicted"])
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path), [analyticsStoreName])
         XCTAssertEqual(try url.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup, true)
-        XCTAssertEqual(FileAnalyticsStore().url.deletingLastPathComponent(),
-                       FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0])
+        XCTAssertEqual(FileAnalyticsStore().url.deletingLastPathComponent().standardizedFileURL.path,
+                       FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].standardizedFileURL.path)
     }
 
     func testADebugBuildKeepsALedgerAndNeverPersistsOrSends() {
@@ -364,6 +364,19 @@ final class AnalyticsTests: XCTestCase {
         XCTAssertEqual(sent[0]["t"] as? String, "rode_pin")
         XCTAssertEqual(sent[0]["n"] as? Int, 2)
         XCTAssertEqual(sent[0]["d"] as? [String: String], ["u": "2-5", "pl": "ios", "pl.u": "ios.2-5", "b": "location", "pl.b": "ios.location"])
+    }
+
+    func testTransportSecurityLeavesALocalhostCaptureURLAlone() async throws {
+        let server = try CaptureServer(status: 204)
+        let port = try await server.start()
+        defer { server.stop() }
+        var request = URLRequest(url: try XCTUnwrap(URL(string: "http://localhost:\(port)/e")))
+        request.httpMethod = "POST"; request.httpBody = Data("[]".utf8)
+        do {
+            _ = try await analyticsSession.data(for: request)
+        } catch let error as URLError {
+            XCTAssertNotEqual(error.code, .appTransportSecurityRequiresSecureConnection)
+        }
     }
 
     func testAServerErrorIsNotAnAcceptance() async throws {

@@ -75,8 +75,10 @@ final class MetricsControllerTests: XCTestCase {
         XCTAssertEqual(displayedHomeLead(model.state)?.key, first.key)
 
         model.openTrip(id: "trip")
-        let shown = try XCTUnwrap(model.state.board)
-        model.state.recommendation = JourneyRecommendation(journey: second, board: shown)
+        var moved = try XCTUnwrap(model.state.board)
+        moved.homeJourneyKey = second.key
+        model.state.board = moved; model.state.homeBoard = moved
+        model.state.recommendation = JourneyRecommendation(journey: second, board: moved)
         XCTAssertEqual(displayedHomeLead(model.state)?.key, second.key, "Home would now lead with the later service")
         model.openJourney(second)
         model.pinJourney(second)
