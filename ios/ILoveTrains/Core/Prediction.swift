@@ -20,11 +20,13 @@ struct Selection: Codable, Equatable, Sendable {
     var tripId: String
     var reverse: Bool
     var receipt: String?
+    var kind: HeaderKind
 
-    init(tripId: String, reverse: Bool, receipt: String? = nil) {
+    init(tripId: String, reverse: Bool, receipt: String? = nil, kind: HeaderKind = .predicted) {
         self.tripId = tripId
         self.reverse = reverse
         self.receipt = receipt
+        self.kind = kind
     }
 }
 
@@ -176,7 +178,8 @@ func predict(data: UserData, stations: [Station], fix: Fix?, now: Millis) -> Sel
     } else {
         receipt = nil
     }
-    return Selection(tripId: selected.trip.id, reverse: selected.reverse, receipt: receipt)
+    let kind: HeaderKind = here == nil ? .predicted : selected == homeward && winner == nil ? .home : .usual
+    return Selection(tripId: selected.trip.id, reverse: selected.reverse, receipt: receipt, kind: kind)
 }
 
 func inferredFocus(data: UserData, fix: Fix, now: Millis) -> FocusedJourney? {
