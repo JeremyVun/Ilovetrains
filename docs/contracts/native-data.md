@@ -140,7 +140,10 @@ to 30 hours if it finds no viable journey or a long transfer still needs a
 later-service comparison. The
 result limit is a cap, not a promise to fill a board by reading farther into
 the future. Connections, shared station objects and trip metadata are cached
-for nearby requests. It keeps distinct later departures for the board while
+for nearby requests. The 30-second refresh tick and a realtime arrival never
+restart a board request that is still running, because a restart would cancel
+a local plan that outlasts the tick; changing trip, direction, services or the
+transfer cap still does. It keeps distinct later departures for the board while
 selecting the earliest usable arrival for each origin service. New trips obey
 the enabled mode set. Every leg carries exact
 `TripIdentity(source,tripId,serviceDate,fromStopId,toStopId,fromSequence,

@@ -48,10 +48,10 @@ geometric. Observations waiting on an owner ruling:
   the ridden leg alone. Which axis does the owner want?
 
 ## Routing that just works
-- Investigate slow native offline searches across the captured Sunday metro
-  gap. On 13 September 2026, iOS's existing Sunday integration case took 46s;
-  the live-date offline UI drive remained at “Opening timetable” beyond 25s.
-  Check whether the 30s refresh can keep cancelling an unfinished search.
+- Offline searches on closed-line days take minutes: the app's board request
+  across the captured Sunday metro gap took 155 s on Android and over 240 s
+  in the iOS drive (2026-09-23). The refresh no longer cancels them, so they
+  finish. [Offline router speed](backlog/offline-router-speed/design.md).
 - Tune the server transfer floor (`MIN_CONNECTION_TIME`) from real
   connections rather than defaults; never show a trip the user would not
   take.

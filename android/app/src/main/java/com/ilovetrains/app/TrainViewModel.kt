@@ -368,7 +368,12 @@ class TrainViewModel private constructor(
             while (isActive) {
                 delay(1000); mutable.value = mutable.value.copy(now = trackerNow())
                 ensureArrivalMonitoring()
-                if (++ticks % 30 == 0 && mutable.value.ready) { refreshSharedData(); refresh(); readFlags() }
+                if (++ticks % 30 == 0 && mutable.value.ready) {
+                    refreshSharedData()
+                    // A restart would cancel an offline plan that takes longer than one tick, so it could never finish.
+                    if (boardJob?.isActive != true) refresh()
+                    readFlags()
+                }
                 else if (data.focus != null) evaluateArrival()
             }
         }
