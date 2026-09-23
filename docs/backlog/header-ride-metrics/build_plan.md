@@ -48,7 +48,7 @@ Verify: `(cd web && npm test)`;
 value, `rode_pin` versus `rode_auto`, no emission on ride correction, a pin
 with no header answer emits no `pinned_*`.
 
-## Phase 3: Android (Terra, worktree `/private/tmp/ilt-metrics-android`) — done marker: [ ]
+## Phase 3: Android (Opus, worktree `/private/tmp/ilt-metrics-android`) — done marker: [ ]
 
 Owns a new `Analytics.kt` (vocabulary, queue, store, transport, enablement),
 the kind added to `Selection` in `Prediction.kt`, emission points in
@@ -60,7 +60,7 @@ for each prediction path, the three `r` values, `rode_*` only on a new ride,
 queue compaction, cap, saturation, snapshot settlement, malformed-store drop,
 and that a debug build never sends without the override.
 
-## Phase 4: iOS (Terra, worktree `/private/tmp/ilt-metrics-ios`) — done marker: [ ]
+## Phase 4: iOS (Opus, after phase 3; worktree `/private/tmp/ilt-metrics-ios`) — done marker: [ ]
 
 Same scope as phase 3 in `ios/ILoveTrains/Core/Analytics.swift`,
 `Prediction.swift`, `TrainViewModel.swift`, the app entry point for the
