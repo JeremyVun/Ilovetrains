@@ -2,34 +2,33 @@ import XCTest
 @testable import ILoveTrains
 
 final class HomeStatusTests: XCTestCase {
-    func testFuturePinnedSavedTripReadsPinned() {
+    func testFuturePinnedHeaderReadsPinned() {
         let now: Millis = 1_000_000
-        let focus = makeFocus(now: now)
+        let presentation = focusStatusPresentation(makeFocus(now: now), now: now, complete: false)
 
-        XCTAssertEqual(savedTripFocusStatus(focus, now: now, complete: false), "Pinned")
+        XCTAssertEqual(presentation.text, "Pinned")
+        XCTAssertTrue(presentation.pinIcon)
     }
 
     func testExceptionalStatusesOutrankFuturePin() {
         let now: Millis = 1_000_000
         var cancelled = makeFocus(now: now)
         cancelled.journey.legs[0].cancelled = true
-        XCTAssertEqual(savedTripFocusStatus(cancelled, now: now, complete: false), "Cancelled · Pinned")
+        XCTAssertEqual(focusStatus(cancelled, now: now, complete: false), "Cancelled")
 
-        XCTAssertEqual(savedTripFocusStatus(makeFocus(now: now), now: now, complete: true), "Trip over · Pinned")
+        XCTAssertEqual(focusStatus(makeFocus(now: now), now: now, complete: true), "Trip over")
     }
 
-    func testHeaderAndSavedRowUseTheSameLiveLateStatus() {
+    func testHeaderLateStatusNeedsFreshLiveData() {
         let now: Millis = 1_000_000
         var focus = makeFocus(now: now)
         focus.journey.legs[0].estimatedDeparture = focus.journey.departure + 120_000
         focus.board.journeys = [focus.journey]
 
         XCTAssertEqual(focusStatus(focus, now: now, complete: false), "Running late")
-        XCTAssertEqual(savedTripFocusStatus(focus, now: now, complete: false), "Running late · Pinned")
 
         focus.board.serverStale = true
         XCTAssertEqual(focusStatus(focus, now: now, complete: false), "Running late")
-        XCTAssertEqual(savedTripFocusStatus(focus, now: now, complete: false), "Running late · Pinned")
 
         var unavailable = focus
         unavailable.board.offline = true

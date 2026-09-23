@@ -128,8 +128,7 @@ Both apps exist (`android/`, `ios/`) and lag the web by one round. Remaining:
 - **Travel tracker follow-ups** (the tracker shipped in 1.6.0; contracts in
   `ios-deviations.md`, `android-deviations.md`, `native-data.md` and
   `client-storage.md`): platform-number boxes on the trip line in the app's
-  visual language, which the owner wants to see but has not required; an A/B
-  test of pin-triggered entry beside the automatic travel-mode baseline; and
+  visual language, which the owner wants to see but has not required; and
   the iOS verification drives accepted as limits on 2026-09-10: enlarged
   text, the 390-point phone, the minimal Dynamic Island and VoiceOver.
 - **Ride history as a stat**: "you rode this 4 times this week" in the

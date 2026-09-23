@@ -22,4 +22,3 @@ success:
   - element_exists: ".hm-e.to del.hm-was:has-text(\"10:08\")"
   - element_exists: ".hm-e.to .hm-t:has-text(\"10:18\")"
   - element_exists: ".hm-rec:has-text(\"The T9 arrives at 10:00, but the T4 left at 09:58.\")"
-  - element_exists: "[data-row-status].status-lost"

@@ -12,7 +12,7 @@ import { journeyDetail, journeyKey, departureKey, legsOf, arrivalMs, departureMs
 import {
   focusOf, visibleFocus, setFocus, clearFocus, isFocused, focusExpired, matchJourney,
   applyFocusSnapshot, applyArrivalResult, composedJourney, recoveryModel, recoveryOf,
-  directionsModel, inferTravel, journeyCancelled, TRAVEL_LATE_MS
+  inferTravel, journeyCancelled, TRAVEL_LATE_MS
 } from './focus.js';
 import * as Board from './board.js';
 import { clampJourneyBars } from './journeybar.js';
@@ -490,18 +490,20 @@ function explicitSelection() {
 }
 
 /* Hiding, restoring or ending a followed journey reconciles the selected
-   pair without changing saved data. */
-function reconcileSuggestionSelection() {
+   pair without changing saved data. Releasing a pin is not a trip choice, so
+   Home answers again from where the phone is. */
+function reconcileSuggestionSelection(released = false) {
   const followed = focusSelection();
   if (followed && state.selection?.tripId === followed.tripId
       && state.selection?.direction === followed.direction) return false;
-  if (!followed && suggestionAllowed(state.selection)) return false;
-  const next = followed || predict(tripsForModes(state.doc, state.stations), now(), { fix: validFix() });
+  if (!followed && !released && suggestionAllowed(state.selection)) return false;
+  state.leap = null;
+  const next = followed || (released ? locateSelection()
+    : predict(tripsForModes(state.doc, state.stations), now(), { fix: validFix() }));
   if (!state.selection && !next) return false;
   invalidateSuggestions();
   state.selection = next;
   state.predicted = !followed;
-  state.leap = null;
   state.body = null;
   state.journey = null;
   state.pastBodies = [];
@@ -854,7 +856,7 @@ function settleArrival({ sample = null, monitoring = false, matchingRefresh = fa
   state.arrivalDecision = decision;
   const next = applyArrivalResult(state.doc, decision, now());
   if (JSON.stringify(next) !== JSON.stringify(state.doc)) ctx.update(next);
-  if (decision.action === 'expire') state.previousOpen = null;
+  if (decision.action === 'expire' || decision.action === 'recordAndExpire') state.previousOpen = null;
   if (!focusOf(state.doc) || ['arrived', 'expiredUnconfirmed'].includes(decision.state)) {
     stopArrivalMonitoring();
   }
@@ -1360,27 +1362,18 @@ function detailModel() {
   const model = journeyDetail(journey, now(), opts);
   return {
     ...model,
-    row: detailRow(journey, model, opts),
+    row: detailRow(journey, opts),
     focused,
     pinned: isFocused(state.doc, state.journey) && focusOf(state.doc)?.by !== 'inferred',
     footer: handoff ? { ...board.footer, text: handoff.freshness || board.footer.text } : board.footer
   };
 }
 
-/* Once the journey has left, its promoted row counts to the next thing the
-   rider does, not to a departure that has already happened: the figure and
-   provenance become the smart header's (ui.md, journey detail). */
-function detailRow(journey, model, opts) {
-  const row = promotedRow(journey, now(), { ...opts, fallbackHeadsign: opts.toName });
-  // A cancelled journey keeps the board's dash and its CANCELLED word.
-  if (!model.departed || model.cancelled) return row;
-  const directions = directionsModel(journey, now(), opts);
-  return {
-    ...row,
-    figure: directions.figure,
-    provenance: directions.provenance,
-    wide: directions.figure.length >= 3
-  };
+/* The promoted row keeps the board row's figure: once the journey has left it
+   reads as time since departure, never as a new countdown (ui.md, journey
+   detail). */
+function detailRow(journey, opts) {
+  return promotedRow(journey, now(), { ...opts, fallbackHeadsign: opts.toName });
 }
 
 function renderDetail() {
@@ -1416,8 +1409,11 @@ function unpinService() {
   // A subsequent location fix must not immediately infer the released ride.
   state.previousOpen = null;
   state.headerKind = null;
-  if (state.view !== 'home') return ctx.go('#/');
-  reconcileSuggestionSelection();
+  if (state.view !== 'home') {
+    state.selection = null;
+    return ctx.go('#/');
+  }
+  reconcileSuggestionSelection(true);
   if (state.selection) loadSelectedCache();
   renderHome();
   fetchLive();

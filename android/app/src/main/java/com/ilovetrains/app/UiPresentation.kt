@@ -98,12 +98,6 @@ fun focusStatus(focus: FocusedJourney, now: Long, complete: Boolean, arrival: Ar
     return FocusStatus("Running", false)
 }
 
-fun savedTripFocusStatus(focus: FocusedJourney, now: Long, complete: Boolean, arrival: ArrivalResult? = null): String {
-    val status = focusStatus(focus, now, complete, arrival).text
-    val labelled = focus.pinned && status != "Pinned" && !focus.lostConnectionAhead(now)
-    return if (labelled) "$status · Pinned" else status
-}
-
 fun figureToken(figure: Figure): String = figure.value + if (figure.unit == "H") "H" else ""
 
 fun wideFigure(figure: Figure): Boolean = figureToken(figure).length >= 3
@@ -125,13 +119,17 @@ fun shownLeadEvidence(
     observedSources: List<BoardData>,
     now: Long,
     suppressed: Boolean,
+    timetable: BoardData? = null,
 ): ShownLeadEvidence? {
     if (suppressed) return null
-    val lead = nextHomeJourney(board, now)?.takeUnless { it.retained } ?: return null
+    val shown = nextHomeJourney(board, now) ?: return null
     val observed = observedSources.filter { source ->
-        source.isLive(now) && source.journeys.any { it == lead && !it.retained }
-    }.maxByOrNull { it.generatedAt } ?: return null
-    return ShownLeadEvidence(observed, lead)
+        !shown.retained && source.isLive(now) && source.journeys.any { it == shown && !it.retained }
+    }.maxByOrNull { it.generatedAt }
+    if (observed != null) return ShownLeadEvidence(observed, shown)
+    // Offline, this refresh's own timetable plan still observes the shown service.
+    val planned = timetable?.journeys?.find { it.key == shown.key && !it.retained && !it.cancelled } ?: return null
+    return ShownLeadEvidence(timetable, planned)
 }
 
 fun shouldCastHomeVote(screen: Screen, hasTrips: Boolean, station: Station?, alreadyVoted: Boolean): Boolean =

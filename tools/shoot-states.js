@@ -2271,13 +2271,12 @@ function pageScript(state) {
       }
     }
 
-    /* One status word for one journey: the header's top line and the focused
-       saved-trip row cannot disagree, and each state declares what it says. */
+    /* The header's top line owns the journey status and each state declares
+       what it says; saved-trip rows never repeat it. */
     const topStatus = document.querySelector('[data-focus-status]');
-    const rowStatus = document.querySelector('[data-row-status]');
-    if (topStatus && rowStatus && topStatus.textContent.trim() !== rowStatus.textContent.trim()) {
-      problems.push('the status reads "' + topStatus.textContent.trim() + '" in the top line and "'
-        + rowStatus.textContent.trim() + '" in the saved-trip row');
+    const shownSub = document.querySelector('.tripr.shown .hm-sub, .tripr.focused .hm-sub');
+    if (topStatus && topStatus.textContent.trim() && shownSub?.textContent.includes(topStatus.textContent.trim())) {
+      problems.push('the saved-trip row repeats the header status "' + topStatus.textContent.trim() + '"');
     }
     if (expect.status !== undefined) {
       const said = topStatus ? topStatus.textContent.trim() : null;

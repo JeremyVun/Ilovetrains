@@ -161,7 +161,8 @@ export function applyArrivalResult(doc, result, nowMs) {
     if (result.state === 'arrived') next = recordRide(next, selection, next.focus.journey, ends.from, ends.to);
   } else if (result.action === 'withdraw') {
     next = correctRide(next, selection, next.focus.journey, nowMs, false);
-  } else if (result.action === 'expire') {
+  } else if (result.action === 'expire' || result.action === 'recordAndExpire') {
+    if (result.action === 'recordAndExpire') next = recordRide(next, selection, next.focus.journey, ends.from, ends.to);
     if (next.lastOpen?.tripId === focus.tripId && next.lastOpen.direction === focus.direction
         && journeyKey(next.lastOpen.journey) === journeyKey(focus.journey)) next.lastOpen = null;
     delete next.focus;

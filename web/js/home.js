@@ -354,22 +354,19 @@ function nextServiceHtml(next) {
   </button>`;
 }
 
-function pinHtml(icon = true, word = true) {
-  const tag = icon ? 'button' : 'span';
-  const action = icon ? ' data-act="unpin" aria-label="Unpin this service" title="Unpin this service"' : '';
-  return `<${tag}${action} class="pin-status${word ? '' : ' pin-alone'}" data-pinned>${icon ? '<svg class="pin-icon" aria-hidden="true" viewBox="0 0 16 16"><path d="M5 1h6v1l-1 1v3l3 3v1H9v5H7v-5H3V9l3-3V3L5 2z"/></svg>' : ''}${word ? 'Pinned' : ''}</${tag}>`;
+function pinHtml(word = true) {
+  return `<button data-act="unpin" aria-label="Unpin this service" title="Unpin this service" class="pin-status${word ? '' : ' pin-alone'}" data-pinned><svg class="pin-icon" aria-hidden="true" viewBox="0 0 16 16"><path d="M5 1h6v1l-1 1v3l3 3v1H9v5H7v-5H3V9l3-3V3L5 2z"/></svg>${word ? 'Pinned' : ''}</button>`;
 }
 
-function selectedStatusHtml(model, icon = false) {
+function selectedStatusHtml(model) {
   const status = model.status;
   const onlyPin = model.pinned && model.directions.phase === 'pre' && status.kind === 'ordinary';
-  if (onlyPin) return pinHtml(icon);
-  // Beside a lost connection an explicit pin is the icon alone, and the saved
-  // row carries the status only (ui.md, smart home).
+  if (onlyPin) return pinHtml();
+  // Beside a lost connection an explicit pin is the icon alone (ui.md, smart home).
   if (status.kind === 'lost') {
-    return statusHtml(status) + (model.pinned && icon ? pinHtml(true, false) : '');
+    return statusHtml(status) + (model.pinned ? pinHtml(false) : '');
   }
-  return statusHtml(status) + (model.pinned ? `<span class="pin-separator"> · </span>${pinHtml(icon)}` : '');
+  return statusHtml(status) + (model.pinned ? `<span class="pin-separator"> · </span>${pinHtml()}` : '');
 }
 
 export function emptyServicesHtml(modes) {
@@ -401,7 +398,7 @@ function statusHtml(status) {
 function topHtml(model) {
   const status = model.status;
   if (status) {
-    return `<span class="answer-kind${statusClass(status)}" data-focus-status data-late="${status.late}"><span class="answer-line">${selectedStatusHtml(model, true)}</span></span>`;
+    return `<span class="answer-kind${statusClass(status)}" data-focus-status data-late="${status.late}"><span class="answer-line">${selectedStatusHtml(model)}</span></span>`;
   }
   const top = model.top;
   const name = top.name
@@ -413,15 +410,11 @@ function badge(line) {
   return `<b class="hm-bdg" data-line-code="${esc(line.code)}" style="background:${lineFill(line.colourKey)};color:${chipInk(line.colourKey)};">${esc(line.code)}</b>`;
 }
 
-function subHtml(entry, model) {
-  if (entry.selected && model.status) {
-    return `<b class="${statusClass(model.status).trim()}" data-row-status data-late="${model.status.late}">${selectedStatusHtml(model)}</b>`;
-  }
+/* The header already names its own trip and status, so every row carries only
+   its own facts. */
+function subHtml(entry) {
   if (entry.justAdded) {
     return `<i class="hm-new">Just added</i>${entry.distance ? ` · ${esc(entry.distance)}` : ''}`;
-  }
-  if (entry.selected) {
-    return `<b>Shown above</b>${entry.distance ? ` · ${esc(entry.distance)}` : ''}`;
   }
   return [entry.distance ? `<b>${esc(entry.distance)}</b>` : '', esc(entry.ridden)]
     .filter(Boolean).join(' · ');
@@ -440,7 +433,7 @@ function tripRowHtml(entry, model) {
   const label = `Open ${entry.from} to ${entry.to} departures`;
   const cue = 'Departures<span class="arrow">›</span>';
   return `<button class="tripr${state}" data-svc data-tap data-act="${action}" data-id="${esc(entry.trip.id)}" data-direction="${esc(entry.direction)}" aria-label="${esc(label)}">
-    <span class="hm-in">${spine}<span class="hm-bd"><span class="hm-nm" data-fit-trip>${name}</span><span class="hm-sub">${subHtml(entry, model)}</span></span><span class="route-cue">${cue}</span></span>
+    <span class="hm-in">${spine}<span class="hm-bd"><span class="hm-nm" data-fit-trip>${name}</span><span class="hm-sub">${subHtml(entry)}</span></span><span class="route-cue">${cue}</span></span>
   </button>`;
 }
 

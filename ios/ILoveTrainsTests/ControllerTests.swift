@@ -64,7 +64,7 @@ final class ControllerTests: XCTestCase {
         XCTAssertTrue(restored.rides.isEmpty)
     }
 
-    func testOverdueGuardResumeKeepsFocusUntilFreshEvidenceAndStopsOnPause() async throws {
+    func testOverdueGuardWaitsOnResumeThenCountsTheRideInsteadOfReviving() async throws {
         var (data, _) = departedFocus()
         let now = epochNow()
         data.focus?.journey.legs[0].arrival = now - 8_000_000
@@ -91,10 +91,17 @@ final class ControllerTests: XCTestCase {
             try await Task.sleep(for: .milliseconds(10))
         }
         location.onFix?(Fix(lat: -33.9, lon: 151.1, at: epochNow(), speed: 10, accuracyMetres: 10))
-        try await settled(store) { ($0.focus?.arrivalGuard?.retainedAt ?? 0) >= now }
-        XCTAssertNotNil(model.state.focus)
-        XCTAssertFalse(model.state.focusComplete)
-        model.pause()
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertNotNil(model.state.focus, "the resume lookup must get its chance before an overdue expiry")
+        let waiting = await store.load()
+        XCTAssertEqual(waiting.focus?.arrivalGuard?.retainedAt, now - 8_000_000)
+        for _ in 0..<250 {
+            if await store.load().focus == nil { break }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        let settled = await store.load()
+        XCTAssertNil(settled.focus)
+        XCTAssertEqual(settled.rides.map(\.tripId), ["trip"])
         XCTAssertFalse(location.isMonitoring)
     }
 
@@ -617,7 +624,7 @@ final class ControllerTests: XCTestCase {
         model.pause()
     }
 
-    func testExpiryStillClearsTheFocusAndACancelledJourneyRecordsNoRide() async throws {
+    func testExpiryClearsTheFocusAndCountsTheRideButACancelledJourneyRecordsNone() async throws {
         var expired = departedFocus()
         let late = expired.stale - 1_800_000 - 120_000
         expired.data.focus!.journey.legs[0].departure = late - 600_000
@@ -627,7 +634,7 @@ final class ControllerTests: XCTestCase {
         expired.data.focus!.board.journeys[0].legs[0].estimatedArrival = late
         let (store, model) = try await networkedModel(data: expired.data, arrival: late)
         model.resume()
-        try await settled(store) { $0.focus == nil && $0.rides.isEmpty }
+        try await settled(store) { $0.focus == nil && $0.rides.map(\.tripId) == ["trip"] }
         model.pause()
 
         let cancelled = departedFocus()

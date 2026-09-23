@@ -318,10 +318,8 @@ private fun SavedTripRow(trip: SavedTrip, state: AppState, actions: UiActions, m
     val lines = trip.lines
     val highlighted = focused || shown
     val metadata = state.tripMetadata[trip.id].orEmpty()
-    val status = state.focus?.takeIf { it.tripId == trip.id }
-        ?.let { savedTripFocusStatus(it, state.now, state.focusComplete, state.arrival) }
-        ?: if (shown) "Shown above" else ""
-    val summary = listOf(status, metadata).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "Saved trip" }
+    // The header already names its own trip and status, so every row carries only its own facts.
+    val summary = metadata.ifBlank { "Saved trip" }
     val justAdded = state.justAddedTripId == trip.id && shown && state.focus == null
     // Plain remember: the lazy list's saved state would bring an undone row back already dismissed.
     val dismissState = remember(trip.id) { SwipeToDismissBoxState(SwipeToDismissBoxValue.Settled, positionalThreshold = { it * 0.5f }) }

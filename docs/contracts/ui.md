@@ -146,16 +146,15 @@ When the flag is off, the trip line remains unchanged and does no animation work
   persisted, and it never leaves the device.
 - When a journey is focused, that line is its status instead: `RUNNING`,
   `RUNNING LATE`, `CONNECTION GONE`, `LATE · CONNECTION GONE`, `CANCELLED` or
-  `TRIP OVER`. The same string appears in the
-  focused saved-trip row. An explicitly pinned service adds a pin icon and
-  `PINNED` in the header, and `PINNED` in the row; beside a lost connection it
+  `TRIP OVER`. Only the header carries it; the focused saved-trip row does
+  not repeat it (owner ruling, 2026-09-23). An explicitly pinned service adds a
+  pin icon and `PINNED` in the header; beside a lost connection it
   adds the pin icon alone, without the word, and a recovery journey is never
   labelled `PINNED`. Before departure, an ordinary
   `RUNNING` status is replaced by `PINNED`; late, cancelled and completed
   statuses retain their words. Inferred travel never gets a pin indicator.
   A cancellation replacement is not labelled as the pinned service.
-  The header pin indicator releases the pin when tapped; the saved-row label
-  is read-only. No copy claims the rider is aboard. The status line keeps
+  The header pin indicator releases the pin when tapped. No copy claims the rider is aboard. The status line keeps
   identical height with and without the icon; the trip grid starts 14px below
   the status band.
 - `RUNNING LATE` requires all three of: fresh data, neither stale nor offline;
@@ -213,8 +212,7 @@ When the flag is off, the trip line remains unchanged and does no animation work
 - While the lost change is ahead of the rider the status is `CONNECTION GONE`
   in the warning colour, prefixed `LATE · ` whenever `RUNNING LATE` is granted
   as well. It retires once the candidate's first leg departs, leaving an
-  ordinary ride. `CANCELLED` and `TRIP OVER` outrank it. The focused saved-trip
-  row carries the same string.
+  ordinary ride. `CANCELLED` and `TRIP OVER` outrank it.
 - With a candidate, the arrival clock keeps the original effective arrival
   struck beside the composed arrival, in the arrival clock's own size. The
   change carries the label `<STATION> · <LINE> <HH:MM>`, naming the service the
@@ -280,12 +278,13 @@ When the flag is off, the trip line remains unchanged and does no animation work
   sub line reserves 106px for. Names use 19px type; an overflowing paired
   name fits down in 0.25px steps to a 16px floor. If the complete pair still
   cannot fit, it wraps at that floor and the row expands only as needed;
-  names are never truncated or made smaller. The sub line is the status on the focused row,
-  `SHOWN ABOVE` and the distance on the header's own unfocused trip, and the
-  distance with the last ride on every other. On the one open where the app
+  names are never truncated or made smaller. Every row's sub line is its
+  distance with the last ride, the header's own trip included: the row neither
+  says it is `SHOWN ABOVE` nor repeats the header's status, which the screen
+  already shows (owner ruling, 2026-09-23). On the one open where the app
   itself saved the trip it is showing, that row's sub line reads `Just added`
-  in 12px italic in place of `SHOWN ABOVE`, with the distance beside it as
-  usual; the mark is gone by the next open. Rows carry both stacked
+  in 12px italic with the distance beside it; the mark is gone by the next
+  open. Rows carry both stacked
   line-colour rules and coloured line-code badges for known lines, in journey
   order. Native clients update saved line codes with the first displayed cached,
   local or online board; they do not wait for all refresh sources to finish.
@@ -614,13 +613,15 @@ When the flag is off, the trip line remains unchanged and does no animation work
   action rail `Pin this train` or `Pin this ferry`,
   chosen from the first leg (`Unpin this train` or ferry when pinned), which shares its geometry with home's `New trip`
   rail.
-- Once the journey has departed, the promoted row's figure and provenance are
-  the directions ladder's, `TO CHANGE` or `TO GO`, and the steps the rider is
-  past take the quiet done treatment: secondary ink, no strike. There are no
-  per-leg countdowns. Stale detail keeps numerical figures based on its stored
-  times and preserves the existing stale/offline freshness indication. During
-  a transfer dwell, To change counts to the next leg's effective departure,
-  including offline and retained journeys. Cancelled detail keeps its dash.
+- Once the journey has departed, the promoted row keeps the board row's
+  figure: the time since departure with `AGO`, never a countdown to the next
+  action, which belongs to the home header alone. The same place counting
+  down to departure and then jumping to `21 min TO GO` read as a sudden delay
+  (owner ruling, 2026-09-23). The steps the rider is past take the quiet done
+  treatment: secondary ink, no strike. There are no per-leg countdowns. Stale
+  detail keeps numerical figures based on its stored times and preserves the
+  existing stale/offline freshness indication. Cancelled detail keeps its
+  dash.
 - The journey bar is a percentage time axis: departure is 0%, arrival is 100%,
   and each ride and transfer segment uses its true share of total journey time,
   measured from effective times. There is no minimum visual transfer width.
@@ -657,6 +658,8 @@ existing type hierarchy. Keep the last ETA and destination instruction visible; 
 | Fresh away plus sustained movement | `Arrival uncertain` | Whole minutes `Past estimate`; `Still on the way to <destination>.` |
 | Stopped away, ambiguous or missing position | `Arrival unconfirmed` | Dash; `Arrival time needs an update.` |
 
+The main figure is the home header's; journey detail keeps its board-row
+figure and shows the instruction and `Last estimate` tail only.
 Minutes past estimate uses nonnegative floor elapsed minutes; in its first
 minute use a dash rather than a misleading zero. Never print `0 min TO GO`,
 `Trip over`, “You've arrived,” or a return offer for an unconfirmed trip.

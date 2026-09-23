@@ -61,15 +61,21 @@ test('duplicates, backwards callbacks and faster-than-five-second fixes are reje
   }
 });
 
-test('only accepted current evidence checkpoints retention; render ticks do not', () => {
+test('only accepted evidence of a moving ride checkpoints retention; render ticks do not', () => {
   const input = { identity: 'one', departureMs: epoch - 100000, arrivalMs: epoch,
     nowMs: epoch + 70000, guard: { armed: true, retainedAt: epoch }, destination: fixture.destination };
   const tick = reduceArrival(input);
   assert.equal(Date.parse(tick.guard.retainedAt), epoch);
-  const fix = reduceArrival({ ...input, sample: { at: input.nowMs, lat: 0, lon: 0, accuracy: 10 } });
-  assert.equal(Date.parse(fix.guard.retainedAt), input.nowMs);
-  const noRenew = reduceArrival({ ...input, nowMs: input.nowMs + 70000, guard: fix.guard, window: fix.window });
-  assert.equal(noRenew.guard.retainedAt, fix.guard.retainedAt);
+  const standing = reduceArrival({ ...input, sample: { at: input.nowMs, lat: 0, lon: 0, accuracy: 10, speed: 0 } });
+  assert.equal(Date.parse(standing.guard.retainedAt), epoch);
+  let moving = { guard: input.guard, window: null };
+  for (const offset of [0, 15000, 30000]) {
+    moving = reduceArrival({ ...input, nowMs: input.nowMs + offset, guard: moving.guard, window: moving.window,
+      sample: { at: input.nowMs + offset, lat: 0, lon: 0, accuracy: 10, speed: 10 } });
+  }
+  assert.equal(Date.parse(moving.guard.retainedAt), input.nowMs + 30000);
+  const noRenew = reduceArrival({ ...input, nowMs: input.nowMs + 100000, guard: moving.guard, window: moving.window });
+  assert.equal(noRenew.guard.retainedAt, moving.guard.retainedAt);
 });
 
 test('corrupt metadata cannot latch a completion and missing retention does not renew on reload', () => {

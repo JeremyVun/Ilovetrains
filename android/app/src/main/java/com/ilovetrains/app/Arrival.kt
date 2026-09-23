@@ -21,7 +21,7 @@ object ArrivalConstants {
 
 enum class ArrivalState { Travelling, CheckingArrival, ArrivalUnconfirmed, Arrived, ExpiredUnconfirmed }
 enum class ArrivalBasis { Location, Estimate }
-enum class ArrivalAction { None, Record, Correct, Withdraw, Expire }
+enum class ArrivalAction { None, Record, Correct, Withdraw, Expire, RecordAndExpire }
 
 data class ArrivalGuard(
     val armed: Boolean? = null,
@@ -121,15 +121,19 @@ fun reduceArrival(input: ArrivalInput): ArrivalResult {
         val metres = distance(sample, input.destination) ?: return false
         return sample.accuracy <= 50 && metres + sample.accuracy <= 200
     }
-    val useful = accepted?.let { sample -> near(sample) || ((distance(sample, input.destination) ?: Double.NEGATIVE_INFINITY) - sample.accuracy >= 300) } == true
+    fun deadline(): Long = guard.let { current ->
+        if (current?.armed == true && !confirmed && !legacy) {
+            max(input.arrivalMs + ArrivalConstants.Expiry, requireNotNull(current.retainedAt) + ArrivalConstants.Retention)
+        } else input.arrivalMs + ArrivalConstants.Expiry
+    }
     val retainedAt = guard?.retainedAt
+    // Only a ride still moving, or a later estimate, keeps an unconfirmed trip; an overdue one never revives.
     if (guard?.armed == true && retainedAt != null &&
-        (useful || input.matchingRefresh && input.arrivalMs > input.nowMs) && input.nowMs - retainedAt >= 60_000) {
+        (accepted != null && moving || input.matchingRefresh && input.arrivalMs > input.nowMs) &&
+        input.nowMs - retainedAt >= 60_000 && input.nowMs <= deadline()) {
         guard = guard.copy(retainedAt = input.nowMs)
     }
-    val expiryDeadline = if (guard?.armed == true && !confirmed && !legacy) {
-        max(input.arrivalMs + ArrivalConstants.Expiry, requireNotNull(guard.retainedAt) + ArrivalConstants.Retention)
-    } else input.arrivalMs + ArrivalConstants.Expiry
+    val expiryDeadline = deadline()
     val expired = input.nowMs > expiryDeadline && !(input.resumeWaitUntilMs?.let { input.nowMs < it } == true)
     if (input.cancelled) return result(if (expired) ArrivalState.ExpiredUnconfirmed else ArrivalState.Travelling,
         action = if (expired) ArrivalAction.Expire else if (input.legacyCompleted) ArrivalAction.Withdraw else ArrivalAction.None)
@@ -165,7 +169,8 @@ fun reduceArrival(input: ArrivalInput): ArrivalResult {
             away = away, moving = moving)
     }
     if (expired) {
-        return result(ArrivalState.ExpiredUnconfirmed, action = ArrivalAction.Expire)
+        return if (input.legacyCompleted) result(ArrivalState.ExpiredUnconfirmed, action = ArrivalAction.Expire)
+        else result(ArrivalState.ExpiredUnconfirmed, ArrivalBasis.Estimate, ArrivalAction.RecordAndExpire)
     }
     if (guard?.armed != true && !input.permissionPending) {
         guard = (guard ?: ArrivalGuard()).copy(basis = ArrivalBasis.Estimate)

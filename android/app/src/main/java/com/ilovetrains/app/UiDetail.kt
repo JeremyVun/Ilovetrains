@@ -44,15 +44,6 @@ fun DetailScreen(state: AppState, actions: UiActions) {
     val overdue = activeProgress && state.now >= journey.effectiveArrival
     val progress = if (!activeProgress) null else if (overdue) .98f else
         ((((state.now - journey.effectiveDeparture) / 60_000) * 60_000).toFloat() / duration).coerceIn(0f, .999f)
-    val detailFigure = when {
-        journey.cancelled -> null
-        overdue -> {
-            val past = ((state.now - journey.effectiveArrival) / 60_000).toInt()
-            Figure(if (state.arrival?.moving == true && past > 0) past.toString() else "—",
-                if (state.arrival?.moving == true && past > 0) "min" else "", "Last estimate", past = true)
-        }
-        else -> directionFigureFor(journey, state.now)
-    }
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxWidth().padding(horizontal = PagePadding)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -80,8 +71,8 @@ fun DetailScreen(state: AppState, actions: UiActions) {
             Rule(heavy = true)
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            // The promoted row keeps the board's figure, so departed reads as time since departure, never a new countdown.
             BoardRow(journey, board, state.now, detail = true,
-                figureOverride = detailFigure,
                 axisTravelledAt = progress?.let { journey.effectiveDeparture + (duration * it).toLong() },
                 axisProgress = progress?.takeIf { !overdue || state.arrival?.moving == true },
                 recoveryFrom = recoveryFrom)

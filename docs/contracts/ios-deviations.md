@@ -103,9 +103,9 @@ on resume. OS dismissal remains surface suppression, never ride completion.
 
 ## Persistent travel tracker
 
-Automatic inferred travel-mode entry starts a local Live Activity when the app
-can request one and iOS permits it. Pinning alone does not start tracking;
-replacing an already-tracked focus also replaces its activity. The containing
+Entering travel mode, inferred or by pinning a train, starts a local Live
+Activity when the app can request one and iOS permits it (owner ruling,
+2026-09-23); replacing an already-tracked focus also replaces its activity. The containing
 app publishes focused journey updates through ActivityKit, and the widget
 extension renders the lock-screen and Dynamic Island surfaces. No push token,
 `Always` location permission or personal server state is introduced.

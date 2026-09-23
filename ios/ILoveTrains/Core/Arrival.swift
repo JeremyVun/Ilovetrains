@@ -19,6 +19,7 @@ enum ArrivalAction: String, Codable, Sendable {
     case correct
     case withdraw
     case expire
+    case recordAndExpire
 }
 
 struct ArrivalGuard: Codable, Equatable, Sendable {
@@ -239,18 +240,19 @@ func reduceArrival(_ input: ArrivalInput) -> ArrivalResult {
         guard let distance = distanceMetres(sample, input.destination) else { return false }
         return sample.accuracy <= 50 && distance + sample.accuracy <= 200
     }
-    let useful = accepted.map { sample in
-        nearPosition(sample) || (distanceMetres(sample, input.destination).map { $0 - sample.accuracy >= 300 } ?? false)
-    } ?? false
+    func deadline() -> Millis {
+        guardState?.armed == true && !confirmed && !legacy
+            ? max(arrival + ArrivalRules.expiry, (guardState?.retainedAt ?? now) + ArrivalRules.retention)
+            : arrival + ArrivalRules.expiry
+    }
+    // Only a ride still moving, or a later estimate, keeps an unconfirmed trip; an overdue one never revives.
     if guardState?.armed == true,
-       useful || (input.matchingRefresh && arrival > now),
+       (accepted != nil && moving) || (input.matchingRefresh && arrival > now),
        let retainedAt = guardState?.retainedAt,
-       now - retainedAt >= 60_000 {
+       now - retainedAt >= 60_000, now <= deadline() {
         guardState?.retainedAt = now
     }
-    let expiryDeadline = guardState?.armed == true && !confirmed && !legacy
-        ? max(arrival + ArrivalRules.expiry, (guardState?.retainedAt ?? now) + ArrivalRules.retention)
-        : arrival + ArrivalRules.expiry
+    let expiryDeadline = deadline()
     let expired = now > expiryDeadline && !(input.resumeWaitUntilMs.map { now < $0 } ?? false)
     if input.cancelled {
         return result(
@@ -285,7 +287,9 @@ func reduceArrival(_ input: ArrivalInput) -> ArrivalResult {
         return result(.arrived, basis: .location, action: input.legacyCompleted ? .correct : .record)
     }
     if expired {
-        return result(.expiredUnconfirmed, action: .expire)
+        return input.legacyCompleted
+            ? result(.expiredUnconfirmed, action: .expire)
+            : result(.expiredUnconfirmed, basis: .estimate, action: .recordAndExpire)
     }
     if now < arrival {
         if guardState?.basis == .estimate { guardState?.basis = nil }

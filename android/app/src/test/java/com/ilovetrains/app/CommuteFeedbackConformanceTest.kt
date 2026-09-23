@@ -110,6 +110,7 @@ class CommuteFeedbackConformanceTest {
         "correct" -> ArrivalAction.Correct
         "withdraw" -> ArrivalAction.Withdraw
         "expire" -> ArrivalAction.Expire
+        "recordAndExpire" -> ArrivalAction.RecordAndExpire
         else -> ArrivalAction.None
     }
     private fun basis(value: String) = if (value == "location") ArrivalBasis.Location else ArrivalBasis.Estimate

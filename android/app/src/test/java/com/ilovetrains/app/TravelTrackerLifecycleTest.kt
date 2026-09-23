@@ -32,18 +32,14 @@ class TravelTrackerLifecycleTest {
         assertTrue(runtime.starts.isEmpty())
     }
 
-    @Test fun pinDoesNotEnterButAnActiveTrackerFollowsAPinnedReplacement() {
+    @Test fun pinEntersAndAnActiveTrackerFollowsAPinnedReplacement() {
         val store = FakeStore()
         val runtime = FakeRuntime(allowed = true)
         val lifecycle = TravelTrackerLifecycle(store, runtime)
         lifecycle.activityResumed()
 
-        val pin = focus("pin", pinned = true)
-        assertNull(lifecycle.reconcile(pin, pin, NOW))
-        assertTrue(runtime.starts.isEmpty())
-
-        val inferred = focus("first", pinned = false)
-        val first = requireNotNull(lifecycle.reconcile(inferred, inferred, NOW))
+        val pin = focus("first", pinned = true)
+        val first = requireNotNull(lifecycle.reconcile(pin, pin, NOW))
         assertEquals(listOf(first.revision), runtime.starts)
 
         val replacement = focus("replacement", pinned = true)

@@ -315,7 +315,8 @@ read them in a different order:
   user made one, else the focus, else the prediction.
 
 The explicit selection is the trip whose saved-trip row the user tapped. It
-lasts for the page load and is never persisted, and it never writes `focus`. A
+lasts for the page load and is never persisted, and it never writes `focus`.
+Unpinning clears it on the Home it returns to. A
 location fix arriving afterwards re-predicts only when nothing explicit was
 chosen.
 
@@ -394,7 +395,10 @@ The document may contain an optional `focus` field for a pinned or inferred serv
   nothing else writes it. `Pinned` on home and `Unpin this train` (or ferry)
   in detail remove an explicit focus without deleting the saved trip. They
   clear the in-memory followed source and persisted `lastOpen` evidence so
-  a subsequent fix cannot immediately restore the released journey. Accepting
+  a subsequent fix cannot immediately restore the released journey. Releasing
+  a pin is not a trip choice: a Home that shows the release answers again from
+  the prediction, where the phone is now, rather than holding the released
+  trip and direction as an explicit selection. Accepting
   the return offer clears completed focus. Completed or never-guarded focus
   expires at effective arrival plus 30 minutes; unresolved armed focus follows
   the later retention deadline in the final-arrival contract below.
@@ -536,6 +540,13 @@ so a successful refresh after the fix supplies the platform sighting. A
 failed refresh cannot invent one. Inference uses the snapshot from before
 those writes, even when the station index or fix arrives late.
 
+Native clients record it after each refresh from a lead that was observed:
+in fresh live data, or, without that, in the refresh's own offline timetable
+plan, whose matching non-cancelled service becomes the snapshot. A saved row
+retained from an earlier answer is not evidence by itself. Without this, a
+phone with no connection never recorded `lastOpen` and could never enter
+travel mode (owner field report, 2026-09-23).
+
 With `J = lastOpen.journey`, `D` its effective
 departure, `A` its effective arrival, and `O` and `Z` the origin and
 destination of `leg(trip, lastOpen.direction)` on the saved trip:
@@ -597,7 +608,7 @@ do not let an initial paint/clock tick settle it; query silently first.
 Permission failure/denial permits the never-armed fallback, without prompting.
 
 Once armed, loss of GPS, permission, app visibility or the location preference
-never turns time alone into arrival. Turning location off immediately stops
+never turns time alone into arrival before expiry. Turning location off immediately stops
 collection and clears all raw evidence; the guard's boolean remains. An
 already recorded legacy ride is not revoked merely by migration.
 
@@ -653,7 +664,7 @@ turn. Failed/unmatched refresh retains its snapshot and honest freshness.
 | Guard armed, `now < A`, no destination confirmation | Travelling. |
 | Guard armed, `now >= A`, fresh credible away evidence | Arrival unconfirmed immediately, whether moving or stopped. |
 | Guard armed, no decisive evidence, `A <= now < A + 3 min` | Checking arrival. |
-| Guard armed, no decisive evidence, `now >= A + 3 min` | Arrival unconfirmed; no automatic completion. |
+| Guard armed, no decisive evidence, `now >= A + 3 min` | Arrival unconfirmed; no completion until expiry. |
 | Guard never armed, accepted snapshot's ETA passed | Arrived with estimate basis, preserving the existing refresh-before-settlement rule. |
 | ETA moves back into future without location confirmation | Return to travelling; withdraw an estimate-only ride as existing correction does. |
 
@@ -678,17 +689,28 @@ arrival and now as its fallback; do not renew a corrupt checkpoint on every
 reload. Clamp a future retention checkpoint to now before using its deadline.
 
 Initialize `retainedAt` when armed. While foregrounded and guarded, checkpoint
-it at most once a minute only on useful near/away position evidence or a
-matching refresh whose ETA is still in the future. This is retention evidence,
-not arrival evidence; an old/stale estimate or a render does not renew it.
-An unconfirmed focus expires after both `A + 30 min` and `retainedAt + 2 h`
-have passed. Use the later deadline. A continuing delayed train with useful
-foreground evidence keeps its focus; reopening an old trip without evidence
-does not renew it. Evaluate fresh evidence before expiry when available on
-resume, allowing the normal provider lookup up to 15 seconds before applying
-an overdue expiry. Expiry is silent removal, not “Arrived,” no return offer,
-no ride record. Clear matching `lastOpen` so it cannot immediately reinfer.
-Completed/never-guarded focus keeps the existing ETA-plus-30-minute expiry.
+it at most once a minute only on a newly accepted position that leaves the
+evidence window moving away from the destination (sustained vehicle-like
+movement, fresh away evidence) or on a matching refresh whose ETA is still in
+the future, and only while the current deadline has not passed. This is
+retention evidence, not arrival evidence; standing still away from the
+destination, a position near it, an old/stale estimate or a render does not
+renew it. An unconfirmed focus expires after both `A + 30 min` and
+`retainedAt + 2 h` have passed. Use the later deadline. A continuing delayed
+train with moving foreground evidence keeps its focus; reopening an old trip
+does not renew it, and no evidence revives a focus whose deadline has passed:
+an away position at the office or the next evening kept a morning trip
+showing for good (owner field report, 2026-09-23). Evaluate fresh evidence
+before expiry when available on resume, allowing the normal provider lookup
+up to 15 seconds before applying an overdue expiry; only destination
+confirmation can pre-empt it. Expiry is silent removal, not “Arrived,” and no
+return offer. It records the followed journey as ridden with estimate basis
+(`recordAndExpire`) unless the journey is cancelled or a ride for it already
+exists (plain `expire`): a phone left in a pocket after a pin rode the train
+(owner ruling, 2026-09-23). Clear matching `lastOpen` so it cannot
+immediately reinfer. Completed/never-guarded focus keeps the existing
+ETA-plus-30-minute expiry, and records the same way if the app was not open
+to record it at the estimate.
 
 Location confirmation is persisted atomically with its ride write. Ride
 identity/deduplication and endpoint snapshots stay unchanged. Existing ride
@@ -696,7 +718,7 @@ arrival fields retain the service's effective arrival estimate, not the phone
 sample timestamp; `confirmedAt` separately supplies the location completion
 latch. A matching refresh can update the ride's effective times after physical
 arrival without removing it. Estimate-only rides remain revisable/withdrawable.
-Guarded unconfirmed/expired trips never enter completed-ride history. An
+Guarded unconfirmed trips enter completed-ride history only when they expire. An
 existing same-identity recorded ride restores the old completion behavior when
 there is no new metadata; migration does not rewrite past rides. A plain
 restore preserves a legacy ride even before ETA; a successful matching refresh
@@ -720,9 +742,9 @@ Journey snapshots and effective times remain in the existing focus. Identity is
 the saved trip ID, direction and ordered service-leg key; an updated estimate or
 platform does not create a new tracker.
 
-Automatic inferred entry starts a tracker session, subject to OS permission.
-Pinning alone does not start one. Replacing focus during an active session also
-replaces the tracker, including a deliberate replacement pin. Browsing another
+Entering travel mode starts a tracker session, subject to OS permission,
+whether it was inferred or pinned (owner ruling, 2026-09-23). Replacing focus
+during an active session replaces the tracker. Browsing another
 board has no effect. Temporary mode/cap hiding removes the system surface while
 retaining its session and suppression metadata; deleting the trip or removing
 focus ends it.
@@ -938,7 +960,8 @@ ride writes atomically through the existing personal-document owner.
 Location-confirmed rides stay completed when an ETA moves forward; matching
 refreshes can correct their effective times. Estimate-only rides remain
 correctable and withdraw when their accepted ETA moves back into the future.
-Guarded unconfirmed or silently expired journeys never become rides. An old
+Guarded unconfirmed journeys become estimate rides only at expiry; cancelled
+ones never do. An old
 same-identity ride with no arrival metadata restores legacy completion rather
 than being revoked by migration.
 

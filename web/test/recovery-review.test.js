@@ -273,12 +273,15 @@ function scenarios() {
   ].map(([name, doc, now, opts]) => [name, doc, body, now, opts]);
 }
 
+// The saved-trip list below the header lost its repeated status on 2026-09-23.
+const headerOf = (html) => html.slice(0, html.indexOf('data-t="trip-list"'));
+
 test('the home header is byte-identical to the base commit on every non-lost journey', async () => {
   const base = await baseModules();
   const differences = [];
   for (const [name, doc, body, now, opts] of scenarios()) {
-    const before = base.home.homeHtml(base.home.homeModel(doc, SELECTION, body, now, opts));
-    const after = homeHtml(homeModel(doc, SELECTION, body, now, opts));
+    const before = headerOf(base.home.homeHtml(base.home.homeModel(doc, SELECTION, body, now, opts)));
+    const after = headerOf(homeHtml(homeModel(doc, SELECTION, body, now, opts)));
     if (before !== after) differences.push(name);
   }
   assert.deepEqual(differences, ['riding, arrival-only delay (documented exception)']);

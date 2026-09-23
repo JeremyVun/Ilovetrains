@@ -24,7 +24,7 @@ class UiPresentationTest {
         assertEquals("Platform 5", platformText("5", "train", full = true))
     }
 
-    @Test fun focusStatusUsesTheActiveLegAndOneMeaningForHeaderAndSavedRow() {
+    @Test fun focusStatusUsesTheActiveLegAndNeedsFreshLiveDataForLate() {
         val now = 1_000_000L
         val first = Leg("T1", "train", "Beta", a, b, now - 600_000, now - 60_000)
         val second = Leg("T2", "train", "Gamma", b, c, now + 60_000, now + 600_000,
@@ -34,17 +34,15 @@ class UiPresentationTest {
         val focus = FocusedJourney("trip", false, journey, live)
 
         assertEquals("Running late", focusStatus(focus, now, complete = false).text)
-        assertEquals("Running late · Pinned", savedTripFocusStatus(focus, now, complete = false))
         val degraded = focus.copy(board = live.copy(serverStale = true))
         assertEquals("Running late", focusStatus(degraded, now, false).text)
-        assertEquals("Running late · Pinned", savedTripFocusStatus(degraded, now, false))
         for (unavailable in listOf(live.copy(offline = true), live.copy(source = "schedule"), live.copy(generatedAt = now - 90_001))) {
             assertEquals("Running", focusStatus(focus.copy(board = unavailable), now, false).text)
         }
         assertEquals("Running", focusStatus(focus.copy(journey = journey.copy(retained = true)), now, false).text)
         assertEquals("Cancelled", focusStatus(focus.copy(journey = journey.copy(legs = listOf(first.copy(cancelled = true), second))), now, false).text)
         assertEquals("Trip over", focusStatus(focus, now, complete = true).text)
-        assertEquals("Pinned", savedTripFocusStatus(focus.copy(journey = Journey(listOf(second.copy(estimatedDeparture = null)))), now, false))
+        assertEquals("Pinned", focusStatus(focus.copy(journey = Journey(listOf(second.copy(estimatedDeparture = null)))), now, false).text)
     }
 
     @Test fun figureWidthUsesTheRenderedTokenAndNextUsesSharedRoundingAcrossSourceStates() {
@@ -104,6 +102,21 @@ class UiPresentationTest {
         val earlierSource = final.copy(journeys = listOf(earlier), generatedAt = now - 30_000)
         val pages = withRecommendation.copy(recommendationPages = listOf(RecommendationPage(now, earlierSource, false, TransferConstraint(null))))
         assertSame(earlierSource, boardForOpenedJourney(null, pages, null, earlier))
+    }
+
+    @Test fun shownLeadEvidenceFallsBackToThisRefreshTimetableOffline() {
+        val now = 6_000_000L
+        val planned = Journey(listOf(Leg("T1", "train", "Beta", a, b, now + 60_000, now + 300_000)))
+        val timetable = BoardData(a, b, listOf(planned), now, source = "schedule", offline = true)
+        val shown = BoardData(a, b, listOf(planned.copy(retained = true)), now - 600_000, source = "schedule", offline = true)
+
+        val evidence = shownLeadEvidence(shown, listOf(timetable), now, suppressed = false, timetable = timetable)
+        assertSame(timetable, evidence?.board)
+        assertSame(planned, evidence?.journey)
+        assertNull(shownLeadEvidence(shown, listOf(timetable), now, suppressed = false))
+        assertNull(shownLeadEvidence(shown, listOf(timetable), now, suppressed = true, timetable = timetable))
+        val cancelled = timetable.copy(journeys = listOf(planned.copy(legs = planned.legs.map { it.copy(cancelled = true) })))
+        assertNull(shownLeadEvidence(shown, emptyList(), now, suppressed = false, timetable = cancelled))
     }
 
     @Test fun homeVotesAreLimitedToTheHomeScreen() {

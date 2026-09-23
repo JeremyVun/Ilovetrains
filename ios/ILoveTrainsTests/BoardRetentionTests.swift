@@ -21,6 +21,29 @@ final class BoardRetentionTests: XCTestCase {
         )
     }
 
+    func testOfflineTimetablePlanIsEvidenceForTheShownRetainedLead() {
+        let planned = Journey(legs: [Leg(
+            line: "T9", mode: "train", headsign: "Epping", from: townHall, to: rhodes,
+            departure: now + 60_000, arrival: now + 25 * 60_000
+        )])
+        var retained = planned
+        retained.retained = true
+        let saved = BoardData(from: townHall, to: rhodes, journeys: [retained], generatedAt: now - 600_000, offline: true)
+        let timetable = OfflinePlanResult(
+            board: BoardData(from: townHall, to: rhodes, journeys: [planned], generatedAt: now, offline: true),
+            recommendation: nil
+        )
+        let shown = JourneyRecommendation(journey: retained, board: saved)
+
+        let evidence = shownLeadEvidence(shown, timetable: timetable, now: now, maxTransfers: nil)
+        XCTAssertEqual(evidence?.journey, planned)
+        XCTAssertEqual(evidence?.board, timetable.board)
+        XCTAssertNil(shownLeadEvidence(shown, timetable: nil, now: now, maxTransfers: nil))
+        var cancelled = timetable
+        cancelled.board.journeys[0].legs[0].cancelled = true
+        XCTAssertNil(shownLeadEvidence(shown, timetable: cancelled, now: now, maxTransfers: nil))
+    }
+
     func testFocusedJourneyKeepsLastKnownDelayAcrossRestart() throws {
         let focus = FocusedJourney(tripId: "trip", reverse: false, journey: t9, board: previous).lastKnown()
         let restored = try JSONDecoder().decode(FocusedJourney.self, from: JSONEncoder().encode(focus))

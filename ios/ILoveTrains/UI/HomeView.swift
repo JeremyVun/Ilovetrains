@@ -433,15 +433,11 @@ private struct SavedTripRow: View {
     private var justAddedDistance: String {
         (state.tripMetadata[trip.id] ?? "").components(separatedBy: " · ").first { $0.hasSuffix(" away") } ?? ""
     }
+    /// The header already names its own trip and status, so every row carries only its own facts.
     private var summary: String {
         if justAdded { return ["Just added", justAddedDistance].filter { !$0.isEmpty }.joined(separator: " · ") }
-        let status = state.focus.flatMap { focus in
-            focus.tripId == trip.id
-                ? savedTripFocusStatus(focus, now: state.now, complete: state.focusComplete)
-                : nil
-        } ?? (state.selectedTripId == trip.id ? "Shown above" : "")
-        return [status, state.tripMetadata[trip.id] ?? ""].filter { !$0.isEmpty }.joined(separator: " · ").isEmpty
-            ? "Saved trip" : [status, state.tripMetadata[trip.id] ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")
+        let metadata = state.tripMetadata[trip.id] ?? ""
+        return metadata.isEmpty ? "Saved trip" : metadata
     }
 }
 
@@ -461,12 +457,6 @@ func focusStatusPresentation(_ focus: FocusedJourney, now: Millis, complete: Boo
         pinWord: focus.pinned && !lost,
         warning: lost || text == "Cancelled" || text == "Running late"
     )
-}
-
-func savedTripFocusStatus(_ focus: FocusedJourney, now: Millis, complete: Bool) -> String {
-    let presentation = focusStatusPresentation(focus, now: now, complete: complete)
-    return presentation.pinWord && presentation.text != "Pinned"
-        ? "\(presentation.text) · Pinned" : presentation.text
 }
 
 let connectionGoneWord = "Connection gone"

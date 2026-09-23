@@ -229,8 +229,9 @@ test('every saved-trip row leads with its distance in bold, not just the tracked
   assert.ok(model.ranked[1].distance, 'the unselected row has a distance to print');
   assert.ok(html.includes(`<b>${model.ranked[1].distance}</b>`),
     'the distance is bold on an unselected row');
-  // The header's own row leads with SHOWN ABOVE and prints its distance after.
-  assert.ok(html.includes(`<b>Shown above</b> · ${model.ranked[0].distance}`));
+  // The header's own row carries only its own facts: no SHOWN ABOVE.
+  assert.ok(html.includes(`<b>${model.ranked[0].distance}</b> · ${model.ranked[0].ridden}`));
+  assert.ok(!html.includes('Shown above'));
 });
 
 
@@ -266,35 +267,35 @@ function screen(journeys, time, { focus = null, ...opts } = {}) {
   return { model, html: homeHtml(model) };
 }
 
-test('the focused status reads the same in the top line and the focused row', () => {
+test('the focused status reads in the top line only; the focused row keeps its own facts', () => {
   const late = delayLeg(transferJourneys()[0], 1, 1);
   const { model, html } = screen([late], '09:53', { focus: late });
 
   assert.deepEqual([model.status.text, model.status.leg, model.status.late], ['Running late', 1, true]);
-  assert.equal(html.match(/Running <span class="status-late-word">late<\/span>/g).length, 2);
+  assert.equal(html.match(/Running <span class="status-late-word">late<\/span>/g).length, 1);
   assert.ok(html.includes('class="answer-kind status-copy status-late status-late" data-focus-status data-late="true"'));
   assert.ok(html.includes('<span class="answer-line">'), 'the status is one flex item');
-  assert.ok(html.includes('class="status-copy status-late status-late" data-row-status data-late="true"'));
+  assert.ok(!html.includes('data-row-status'));
   assert.ok(html.includes('class="tripr focused"'));
   assert.ok(html.includes(' active-late"'), 'the header carries the late class for its countdown');
 
   const onTime = screen([transferJourneys()[0]], '09:53', { focus: transferJourneys()[0] });
   assert.equal(onTime.model.status.text, 'Running');
-  assert.equal(onTime.html.match(/>Running</g).length, 2);
+  assert.equal(onTime.html.match(/>Running</g).length, 1);
   assert.ok(!onTime.html.includes(' active-late"'));
 });
 
-test('cancelled and completed statuses reach both placements too', () => {
+test('cancelled and completed statuses reach the top line', () => {
   const cancelled = cancelLeg(transferJourneys()[0], 1);
   const cx = screen([cancelled], '09:53', { focus: cancelled });
   assert.equal(cx.model.status.text, 'Cancelled');
-  assert.equal(cx.html.match(/>Cancelled</g).length, 2);
-  assert.ok(cx.html.includes('status-copy status-exception" data-row-status'));
+  assert.equal(cx.html.match(/>Cancelled</g).length, 1);
+  assert.ok(!cx.html.includes('data-row-status'));
 
   const over = screen([transferJourneys()[0]], '10:11', { focus: transferJourneys()[0] });
   assert.equal(over.model.status.text, 'Trip over');
   assert.ok(over.html.includes('data-focus-status data-late="false"><span class="answer-line">Trip over<'));
-  assert.ok(over.html.includes('data-row-status data-late="false">Trip over<'));
+  assert.ok(!over.html.includes('data-row-status'));
 });
 
 test('a focused journey cancelled before it leaves shows the next train', () => {
@@ -305,7 +306,7 @@ test('a focused journey cancelled before it leaves shows the next train', () => 
   assert.equal(model.directions.depTime, '09:39', 'the header carries the next running service');
   assert.equal(model.directions.instruction, '09:24 CANCELLED · NEXT TRAIN');
   assert.equal(model.status.text, 'Cancelled');
-  assert.ok(html.includes('data-row-status'));
+  assert.ok(html.includes('data-focus-status'));
 });
 
 test('a focused cancellation can take an eligible replacement from its independent source', () => {
@@ -746,8 +747,7 @@ test('the trip the app just saved is marked once, on the open that saved it', ()
     transferBody(), at('09:21'), { predicted: true, loadedAt, ...opts }));
 
   assert.match(mark(at('09:20')), /<i class="hm-new">Just added<\/i>/);
-  assert.ok(!mark(at('09:20')).includes('<b>Shown above</b>'), 'SHOWN ABOVE gives way for this open');
-  assert.ok(mark(at('09:19')).includes('<b>Shown above</b>'), 'a trip saved before this open is not new');
+  assert.ok(!mark(at('09:19')).includes('hm-new'), 'a trip saved before this open is not new');
   assert.ok(!mark(at('09:20'), { predicted: false }).includes('hm-new'));
   assert.ok(!mark(at('09:20'), { loadedAt: undefined }).includes('hm-new'));
 });
@@ -944,14 +944,14 @@ test('a lost connection keeps the original arrival struck beside the one the rid
   assert.match(html, /data-transfer-station[^>]*>TOWN HALL · T4 10:08</i);
 });
 
-test('the lost status is warned in both places, with the pin icon alone beside it', () => {
+test('the lost status is warned in the top line, with the pin icon alone beside it', () => {
   const { model, html } = lostScreen();
 
   assert.deepEqual([model.status.text, model.status.kind, model.status.late],
     ['Late · Connection gone', 'lost', true]);
-  assert.equal(html.match(/Late · Connection gone/g).length, 2, 'the top line and the focused row');
+  assert.equal(html.match(/Late · Connection gone/g).length, 1, 'the top line only');
   assert.match(html, /class="answer-kind status-copy status-lost status-late"/);
-  assert.match(html, /class="status-copy status-lost status-late" data-row-status/);
+  assert.doesNotMatch(html, /data-row-status/);
   assert.equal(html.match(/class="pin-icon"/g).length, 1, 'the icon is the header pin, once');
   assert.doesNotMatch(html, /Pinned/, 'a recovery journey is never labelled PINNED');
   assert.match(html, / active-late"/, 'the countdown is painted late with the status');

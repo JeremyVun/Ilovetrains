@@ -441,9 +441,8 @@ final class TrainViewModel: ObservableObject {
             guard request == generation, !Task.isCancelled else { return }
             resolveRedirect(result)
             if let recommendation = state.recommendation, let id {
-                let lead = recommendation.journey
-                let freshlyObserved = recommendationIsFresh(recommendation, now: now, maxTransfers: transferLimit)
-                if recordLastAnswer, data.focus == nil, state.screen == .home, lead.retained != true, freshlyObserved {
+                let evidence = shownLeadEvidence(recommendation, timetable: localPlan, now: now, maxTransfers: transferLimit)
+                if recordLastAnswer, data.focus == nil, state.screen == .home, let evidence {
                     let here = stationHere(data: data, stations: state.stations, fix: fix, now: now)
                     let stationId = here.flatMap { station in fix.map { distanceMetres($0, station) <= 200 ? station.id : nil } ?? nil }
                     data.lastAnswer = LastAnswer(
@@ -451,8 +450,8 @@ final class TrainViewModel: ObservableObject {
                         reverse: reverse,
                         at: now,
                         stationId: stationId,
-                        board: recommendation.board,
-                        journey: lead
+                        board: evidence.board,
+                        journey: evidence.journey
                     )
                 }
                 persist(); syncPersonal()
@@ -766,12 +765,12 @@ final class TrainViewModel: ObservableObject {
             changed = true
         }
         let rides = switch result.action {
-        case .record, .correct: settledRides(data.rides, focus: focus, arrived: true, ends: ends(id: focus.tripId, reverse: focus.reverse))
+        case .record, .correct, .recordAndExpire: settledRides(data.rides, focus: focus, arrived: true, ends: ends(id: focus.tripId, reverse: focus.reverse))
         case .withdraw: settledRides(data.rides, focus: focus, arrived: false, ends: ends(id: focus.tripId, reverse: focus.reverse))
         case .none, .expire: data.rides
         }
         if rides != data.rides { data.rides = rides; changed = true }
-        if result.action == .expire {
+        if result.action == .expire || result.action == .recordAndExpire {
             data.focus = nil
             if data.lastAnswer?.tripId == focus.tripId, data.lastAnswer?.reverse == focus.reverse {
                 data.lastAnswer = nil
@@ -972,8 +971,9 @@ final class TrainViewModel: ObservableObject {
     func unpinJourney() {
         guard let focus = data.focus, focus.pinned else { return }
         clearArrivalMonitoring()
-        data.focus = nil; data.lastAnswer = nil; persist(); state.selectedTripId = focus.tripId; state.reverse = focus.reverse
-        explicit = true; state.screen = .home; state.detail = nil; syncPersonal(); refresh()
+        data.focus = nil; data.lastAnswer = nil; persist()
+        // Releasing a pin is not a trip choice: Home answers where the phone is now.
+        explicit = false; state.screen = .home; state.detail = nil; choosePrediction(); syncPersonal(); refresh()
     }
     func showReturn() {
         guard let focus = data.focus else { return }

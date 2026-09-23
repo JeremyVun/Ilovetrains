@@ -312,7 +312,7 @@ class ControllerParityInstrumentedTest {
         assertTrue("provider stop callback was not invoked", stopCalls >= 3)
     }
 
-    @Test fun expiredGuardWaitsForResumeEvidenceBeforeVisibilityAndSettlement() = runBlocking {
+    @Test fun expiredGuardWaitsForResumeEvidenceThenCountsTheRideInsteadOfReviving() = runBlocking {
         val now = System.currentTimeMillis()
         val journey = journey(primaryTrip.from, primaryTrip.to, now - 14_400_000, now - 10_800_000, "T1")
         val board = BoardData(primaryTrip.from, primaryTrip.to, listOf(journey), now - 10_800_000, source = "live")
@@ -324,10 +324,10 @@ class ControllerParityInstrumentedTest {
         model.activityResumed()
         model.permission(true, false)
         model.arrivalLocation(Fix(primaryTrip.from.lat, primaryTrip.from.lon, System.currentTimeMillis(), 10.0, 20.0))
+        assertNotNull("the resume lookup lost its chance before the overdue expiry", model.state.value.focus)
         model.arrivalLookupComplete()
-        assertNotNull("fresh evidence failed to retain the guarded focus", model.state.value.focus)
-        assertFalse(model.state.value.focusComplete)
-        assertTrue(storedAfterWrites().rides.isEmpty())
+        assertNull("away evidence revived an overdue focus", model.state.value.focus)
+        assertEquals(listOf(primaryTrip.id), storedAfterWrites().rides.map { it.tripId })
     }
 
     @Test fun completedEstimateIsNotRearmedByColdLoadMonitoring() = runBlocking {

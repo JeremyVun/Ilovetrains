@@ -4,7 +4,7 @@ import XCTest
 @testable import ILoveTrains
 
 final class TravelTrackerControllerTests: XCTestCase {
-    func testAutomaticInferenceStartsButPinAloneDoesNot() async {
+    func testAutomaticInferenceAndPinBothStartTracking() async {
         let now = 1_800_000_000_000.0
         let inferred = trackerFocus(id: "inferred", now: now, pinned: false)
         let inferredDriver = TrackerDriver()
@@ -19,7 +19,7 @@ final class TravelTrackerControllerTests: XCTestCase {
         let pinnedController = TravelTrackerController(store: TrackerStore(), driver: pinnedDriver)
         await pinnedController.reconcile(focus: pinned, visibleFocus: pinned, now: now, recordedComplete: false)
         await pinnedController.awaitPublications()
-        XCTAssertTrue(pinnedDriver.current.isEmpty)
+        XCTAssertEqual(pinnedDriver.current.single?.attributes.focus.tripId, "pinned")
     }
 
     func testPinReplacementDuringActiveSessionReplacesActivity() async {

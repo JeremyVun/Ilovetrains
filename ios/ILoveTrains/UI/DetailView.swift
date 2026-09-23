@@ -35,10 +35,8 @@ struct DetailView: View {
                 GeometryReader { geometry in
                     ScrollView {
                         LazyVStack(spacing: 0) {
+                            // The promoted row keeps the board's figure, so departed reads as time since departure, never a new countdown.
                             BoardRow(journey: shown, board: model.state.board, now: model.state.now, detail: true,
-                                     figureOverride: !shown.cancelled
-                                        ? arrivalFigure(focused ? model.state.arrival : nil, journey: shown, now: model.state.now)
-                                            ?? directionFigureFor(shown, now: model.state.now) : nil,
                                      recoveryChangeIndex: plan?.recoveryChangeIndex)
                             if let instruction = arrivalInstruction(
                                 focused ? model.state.arrival : nil,

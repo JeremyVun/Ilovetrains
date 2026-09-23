@@ -150,8 +150,8 @@ internal class TravelTrackerLifecycle(
             val resumableCompletion = session.suppressedIdentity == identity &&
                 session.suppression == TravelTrackerSuppression.Completed &&
                 TravelTrackerState.derive(focus, now, session.generation + 1, arrival) != null
-            val newInference = !focus.pinned && session.suppressedIdentity != identity
-            if (resumableCompletion || newInference) {
+            val newFocus = session.suppressedIdentity != identity
+            if (resumableCompletion || newFocus) {
                 session = session.copy(activeIdentity = identity, generation = session.generation + 1)
                 changed = true
             }

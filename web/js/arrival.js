@@ -97,13 +97,15 @@ export function reduceArrival(input) {
     const d = distanceMetres(sample, input.destination);
     return d !== null && sample.accuracy <= 50 && d + sample.accuracy <= 200;
   };
-  const useful = accepted && (nearPosition(accepted) || ((distanceMetres(accepted, input.destination) ?? -Infinity) - accepted.accuracy >= 300));
-  if (guard?.armed && (useful || (input.matchingRefresh && arrival > now)) && now - time(guard.retainedAt) >= MINUTE) {
-    guard = { ...guard, retainedAt: iso(now) };
-  }
-  const expiryDeadline = guard?.armed && !confirmed && !legacy
+  const deadline = () => guard?.armed && !confirmed && !legacy
     ? Math.max(arrival + ARRIVAL.expiry, time(guard.retainedAt) + ARRIVAL.retention)
     : arrival + ARRIVAL.expiry;
+  // Only a ride still moving, or a later estimate, keeps an unconfirmed trip; an overdue one never revives.
+  if (guard?.armed && ((accepted && moving) || (input.matchingRefresh && arrival > now))
+      && now - time(guard.retainedAt) >= MINUTE && now <= deadline()) {
+    guard = { ...guard, retainedAt: iso(now) };
+  }
+  const expiryDeadline = deadline();
   const expired = now > expiryDeadline && !(finite(input.resumeWaitUntilMs) && now < input.resumeWaitUntilMs);
   if (input.cancelled) return result(expired ? 'expiredUnconfirmed' : 'travelling', null,
     expired ? 'expire' : input.legacyCompleted ? 'withdraw' : 'none');
@@ -125,7 +127,9 @@ export function reduceArrival(input) {
     return result('arrived', 'location', input.legacyCompleted ? 'correct' : 'record');
   }
   if (expired) {
-    return result('expiredUnconfirmed', null, 'expire');
+    return input.legacyCompleted
+      ? result('expiredUnconfirmed', null, 'expire')
+      : result('expiredUnconfirmed', 'estimate', 'recordAndExpire');
   }
   if (now < arrival) {
     if (guard?.basis === 'estimate') { guard = { ...guard }; delete guard.basis; }

@@ -316,9 +316,8 @@ actor TravelTrackerController {
                     arrivalState: arrivalState,
                     arrivalMoving: arrivalMoving
                 ) != nil
-            let newInference = !focus.pinned
-                && !(session.suppressedIdentity == identity && session.suppression == .dismissed)
-            if completedCanResume || newInference {
+            let newFocus = !(session.suppressedIdentity == identity && session.suppression == .dismissed)
+            if completedCanResume || newFocus {
                 session.generation += 1
                 session.active = TravelTrackerSession.Active(
                     identity: identity,

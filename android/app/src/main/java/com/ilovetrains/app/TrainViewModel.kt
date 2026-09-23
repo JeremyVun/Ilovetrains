@@ -497,7 +497,8 @@ class TrainViewModel private constructor(
                     var changed = false
                     val evidence = shownLeadEvidence(displayed,
                         listOfNotNull(result, localResult, displayed.recommendation?.source), now,
-                        suppressLastAnswer || data.focus != null || mutable.value.screen != Screen.Home)
+                        suppressLastAnswer || data.focus != null || mutable.value.screen != Screen.Home,
+                        timetable = localResult)
                     if (evidence != null) {
                         val here = stationHere(data, stations, fix, mutable.value.now)
                         data = data.copy(lastAnswer = LastAnswer(selectedId, reversed, mutable.value.now,
@@ -697,7 +698,10 @@ class TrainViewModel private constructor(
                 val rides = data.rides.settled(updatedFocus, false, ends(updatedFocus.tripId, updatedFocus.reverse))
                 if (rides !== data.rides) { data = data.copy(rides = rides); changed = true }
             }
-            ArrivalAction.Expire -> {
+            ArrivalAction.Expire, ArrivalAction.RecordAndExpire -> {
+                if (result.action == ArrivalAction.RecordAndExpire) {
+                    data = data.copy(rides = data.rides.settled(updatedFocus, true, ends(updatedFocus.tripId, updatedFocus.reverse)))
+                }
                 data = data.copy(focus = null, lastAnswer = data.lastAnswer?.takeUnless {
                     it.tripId == updatedFocus.tripId && it.reverse == updatedFocus.reverse
                 })
@@ -882,7 +886,12 @@ class TrainViewModel private constructor(
         resetArrivalTracking()
         persist(); historyRecorded = false; mutable.value = mutable.value.copy(screen = Screen.Home, detail = null); syncPersonal(); refresh()
     }
-    override fun unpinJourney() { data = data.copy(focus = null, lastAnswer = null); resetArrivalTracking(); persist(); syncPersonal(); refresh() }
+    override fun unpinJourney() {
+        data = data.copy(focus = null, lastAnswer = null); resetArrivalTracking(); persist()
+        // Releasing a pin is not a trip choice: Home answers again from where the phone is.
+        if (mutable.value.screen == Screen.Home) { explicit = false; choosePrediction() }
+        syncPersonal(); refresh()
+    }
     override fun showReturn() {
         val focus = data.focus ?: return
         data = data.copy(focus = null, lastAnswer = null); resetArrivalTracking(); persist(); explicit = true; historyRecorded = false

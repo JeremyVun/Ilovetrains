@@ -119,17 +119,12 @@ class TravelTrackerIntegrationTest {
         assertServiceStopped()
     }
 
-    @Test fun lifecyclePinPolicyStartsInferredButNotPinAlone() {
+    @Test fun lifecyclePinPolicyStartsForAPinAlone() {
         grantNotifications()
         launchActivity()
         clearFocus()
 
-        val pinned = fixture("ride", "pin-only", pinned = true)
-        setFocus(pinned)
-        SystemClock.sleep(1_500)
-        assertNull("a pin alone must not start tracking", trackerNotification())
-
-        setFocus(pinned.copy(pinned = false))
+        setFocus(fixture("ride", "pin-only", pinned = true))
         val notification = waitForNotification()
         assertContains(notification, "Central", "P21", "P26", "Kellyville")
     }

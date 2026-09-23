@@ -624,12 +624,8 @@ button.pin-status { height: 44px; margin: -15px 0; }
   letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.tripr.focused .hm-sub b { color: var(--ink); }
-.tripr.shown:not(.focused) .hm-sub b { color: var(--ink-2); }
-.tripr.focused .hm-sub b.status-late,
-.tripr.focused .hm-sub b.status-exception,
-.tripr.focused .hm-sub b.status-lost { color: var(--warn); }
-.tripr.focused .hm-sub b.status-uncertain { color: var(--ink-2); }
+.tripr.focused .hm-sub b,
+.tripr.shown .hm-sub b { color: var(--ink-2); }
 .hm-end {
   flex: none; padding: 14px 0 6px; white-space: nowrap; font-size: 10px;
   font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3);
