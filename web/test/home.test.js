@@ -708,6 +708,18 @@ test('the freshness pill rests while the first board is still in the post', () =
   assert.deepEqual([offline.freshness, offline.dot], ['Offline', 'stale']);
 });
 
+test('a saved board painted before the first answer rests its pill unless it is still live', () => {
+  const body = receiptBody(at('09:21'));
+  const saved = { stale: true, freshness: 'Offline', dot: 'stale' };
+  const live = { stale: false, freshness: 'Live', dot: 'live' };
+  const asking = homeModel(homeDoc(), HOME_SELECTION, body, at('09:21'), { awaiting: true, candidateSource: saved });
+  assert.deepEqual([asking.freshness, asking.dot], ['', 'idle']);
+  const answered = homeModel(homeDoc(), HOME_SELECTION, body, at('09:21'), { awaiting: false, candidateSource: saved });
+  assert.deepEqual([answered.freshness, answered.dot], ['Offline', 'stale']);
+  const stillLive = homeModel(homeDoc(), HOME_SELECTION, body, at('09:21'), { awaiting: true, candidateSource: live });
+  assert.deepEqual([stillLive.freshness, stillLive.dot], ['Live', 'live']);
+});
+
 
 /* ---- home from votes, its receipts, and the two marks the fix earns ----- */
 

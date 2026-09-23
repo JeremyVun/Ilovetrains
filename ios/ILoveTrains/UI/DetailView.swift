@@ -20,7 +20,7 @@ struct DetailView: View {
                         BackControl(label: "\(first.from.shortName) departures", action: model.back)
                             .fixedSize(horizontal: true, vertical: false)
                         Spacer(minLength: 8)
-                        FreshnessView(board: model.state.board, now: model.state.now)
+                        FreshnessView(board: model.state.board, now: model.state.now, awaiting: model.state.awaitingAnswer)
                     }
                     TrainLabel(text: "Journey").padding(.top, 2)
                     (Text(first.from.shortName) + Text(" → ").foregroundColor(colors.ink3) + Text(last.to.shortName))

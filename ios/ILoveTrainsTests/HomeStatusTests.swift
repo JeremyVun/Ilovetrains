@@ -2,6 +2,21 @@ import XCTest
 @testable import ILoveTrains
 
 final class HomeStatusTests: XCTestCase {
+    func testFreshnessRestsUntilTheFirstAnswerUnlessTheBoardIsAlreadyLive() {
+        let now: Millis = 1_000_000
+        let from = Station(id: "from", name: "From")
+        let to = Station(id: "to", name: "To")
+        let timetable = BoardData(from: from, to: to, journeys: [], generatedAt: now, source: "schedule", offline: true)
+        let saved = BoardData(from: from, to: to, journeys: [], generatedAt: now - 600_000, source: "live", offline: true)
+        let live = BoardData(from: from, to: to, journeys: [], generatedAt: now - 10_000, source: "live")
+
+        XCTAssertTrue(freshnessRests(timetable, now: now, awaiting: true))
+        XCTAssertTrue(freshnessRests(saved, now: now, awaiting: true))
+        XCTAssertFalse(freshnessRests(live, now: now, awaiting: true))
+        XCTAssertFalse(freshnessRests(timetable, now: now, awaiting: false))
+        XCTAssertFalse(freshnessRests(saved, now: now, awaiting: false))
+    }
+
     func testFuturePinnedSavedTripReadsPinned() {
         let now: Millis = 1_000_000
         let focus = makeFocus(now: now)

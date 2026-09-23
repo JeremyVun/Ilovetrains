@@ -6,7 +6,7 @@ struct BoardView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            BoardMast(board: model.state.board, now: model.state.now, back: model.back)
+            BoardMast(board: model.state.board, now: model.state.now, awaiting: model.state.awaitingAnswer, back: model.back)
             if let board = model.state.board {
                 boardBody(board)
             } else {
@@ -62,12 +62,13 @@ struct BoardView: View {
 private struct BoardMast: View {
     let board: BoardData?
     let now: Millis
+    let awaiting: Bool
     let back: () -> Void
     @Environment(\.trainColors) private var colors
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack { BackControl(label: "Home", action: back); Spacer(); FreshnessView(board: board, now: now) }
+            HStack { BackControl(label: "Home", action: back); Spacer(); FreshnessView(board: board, now: now, awaiting: awaiting) }
             if let board {
                 HStack(spacing: 9) {
                     Text(board.from.shortName).frame(maxWidth: .infinity, alignment: .leading)

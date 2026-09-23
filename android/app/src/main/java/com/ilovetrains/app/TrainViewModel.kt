@@ -39,6 +39,7 @@ class TrainViewModel private constructor(
     private var fix: Fix? = null
     private var explicit = false
     private var generation = 0L
+    private var answeredPair: String? = null
     private var boardJob: Job? = null
     private var earlierJob: Job? = null
     private var focusJob: Job? = null
@@ -382,6 +383,7 @@ class TrainViewModel private constructor(
     }
     fun pause() {
         refreshLoop?.cancel(); refreshLoop = null; boardJob?.cancel(); earlierJob?.cancel(); focusJob?.cancel(); historyJob?.cancel(); realtimeJob?.cancel(); generation++
+        answeredPair = null
         mutable.value = mutable.value.copy(refreshing = false, distanceMetres = null, nearestStation = null)
         fix = null
         stopArrivalMonitoring(clearWindow = true)
@@ -437,11 +439,17 @@ class TrainViewModel private constructor(
         suppressNextLastAnswer = false
         val pair = ends(); val modes = data.modes.toSet()
         if (pair == null || modes.isEmpty()) {
-            mutable.value = mutable.value.copy(board = null, homeBoard = visibleFocus()?.board, refreshing = false)
+            mutable.value = mutable.value.copy(board = null, homeBoard = visibleFocus()?.board, refreshing = false, boardAnswerPending = false)
             refreshFocus(); return
         }
         val selectedId = mutable.value.selectedTripId; val reversed = mutable.value.reverse
-        mutable.value = mutable.value.copy(refreshing = true)
+        // The first request after opening or changing trips owns the freshness claim until it answers.
+        val pairKey = "${pair.first.id}\u0000${pair.second.id}"
+        val firstAnswer = pairKey != answeredPair || mutable.value.board == null
+        answeredPair = pairKey
+        mutable.value = mutable.value.copy(refreshing = true,
+            boardAnswerPending = firstAnswer || mutable.value.boardAnswerPending,
+            focusAnswerPending = firstAnswer && data.focus != null || mutable.value.focusAnswerPending)
         boardJob = viewModelScope.launch {
             val (from, to) = pair
             val cached = store.cached(from, to, modes)?.withinTransferCap(data.maxTransfers)?.let { saved ->
@@ -478,12 +486,14 @@ class TrainViewModel private constructor(
                     publishBoard(mergeBoardResults(previous, first.second.takeUnless { first.first }, first.second.takeIf { first.first },
                         mutable.value.now, requestFailed = false), request)
                 }
+                if (first.first) mutable.value = mutable.value.copy(boardAnswerPending = false)
                 val localResult = if (first.first) local.await() else first.second
                 val result = if (first.first) first.second else live.await()
                 if (request != generation) return@supervisorScope
                 val final = mergeBoardResults(previous, localResult, result, mutable.value.now, requestFailed = result == null)
                     ?: BoardData(from, to, emptyList(), 0, offline = true, error = "No saved board for this trip yet")
                 publishBoard(final, request)
+                mutable.value = mutable.value.copy(boardAnswerPending = false)
                 resolveRedirect(final)
                 mutable.value = mutable.value.copy(refreshing = false)
                 runCatching { store.cache(mutable.value.board ?: final, modes) }
@@ -591,6 +601,7 @@ class TrainViewModel private constructor(
             if (match != null) data = data.copy(focus = current.copy(journey = match, board = result, alternatives = null))
             else current.demotedForUnmatchedBoard()?.let { data = data.copy(focus = it) }
             settleFocus(matchingRefresh = match != null); persist(); syncPersonal()
+            mutable.value = mutable.value.copy(focusAnswerPending = false)
             settleRecovery(focus, match != null)
         }
     }
