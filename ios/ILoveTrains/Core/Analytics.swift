@@ -131,7 +131,8 @@ func parseAnalyticsStore(_ data: Data?) -> AnalyticsState? {
 
 func analyticsStoreData(_ state: AnalyticsState) -> Data {
     let queue: [[String: Any]] = state.queue.map { ["t": $0.t, "d": $0.d, "n": $0.n] }
-    return (try? JSONSerialization.data(withJSONObject: ["opens": state.opens, "queue": queue], options: [.sortedKeys])) ?? Data()
+    let root: [String: Any] = ["opens": state.opens, "queue": queue]
+    return (try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])) ?? Data()
 }
 
 func analyticsBody(_ queue: [AnalyticsEntry]) -> Data {
@@ -165,7 +166,8 @@ final class FileAnalyticsStore: AnalyticsStore {
     }
 
     func read() throws -> Data? {
-        FileManager.default.fileExists(atPath: url.path) ? try Data(contentsOf: url) : nil
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        return try Data(contentsOf: url)
     }
 
     func write(_ data: Data) throws {
@@ -195,7 +197,7 @@ func postAnalytics(_ body: Data, to url: URL, session: URLSession = analyticsSes
     request.httpMethod = "POST"; request.httpBody = body
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
     request.httpShouldHandleCookies = false
-    guard let (_, response) = try? await session.data(for: request) else { return false }
+    guard let response = (try? await session.data(for: request))?.1 else { return false }
     return (response as? HTTPURLResponse).map { (200...299).contains($0.statusCode) } ?? false
 }
 
