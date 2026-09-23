@@ -15,15 +15,18 @@ fun distanceMetres(a: Fix, b: Station): Double {
     return 6_371_000 * 2 * atan2(sqrt(h.coerceIn(0.0, 1.0)), sqrt((1 - h).coerceIn(0.0, 1.0)))
 }
 fun compatible(trip: SavedTrip, modes: Set<String>) = modes.isNotEmpty() && listOf(trip.from, trip.to).all { s -> s.modes.any { it in modes } }
-fun visibleFocus(data: UserData, now: Long, resumeWaitUntil: Long? = null): FocusedJourney? = data.focus?.takeIf { focus ->
+fun focusExpiry(focus: FocusedJourney): Long {
     val guard = focus.arrivalGuard
     val arrival = focus.composed.effectiveArrival
-    val expiry = if (guard?.armed == true && guard.basis != ArrivalBasis.Location) {
+    return if (guard?.armed == true && guard.basis != ArrivalBasis.Location) {
         max(arrival + ArrivalConstants.Expiry, (guard.retainedAt ?: arrival) + ArrivalConstants.Retention)
     } else arrival + ArrivalConstants.Expiry
+}
+fun visibleFocus(data: UserData, now: Long, resumeWaitUntil: Long? = null): FocusedJourney? = data.focus?.takeIf { focus ->
+    val guard = focus.arrivalGuard
     val awaitingEvidence = guard?.armed == true && guard.basis != ArrivalBasis.Location &&
         resumeWaitUntil?.let { now < it } == true
-    (now <= expiry || awaitingEvidence) &&
+    (now <= focusExpiry(focus) || awaitingEvidence) &&
         data.trips.find { it.id == focus.tripId }?.let { compatible(it, data.modes) } == true &&
         focus.journey.legs.all { it.mode in data.modes }
 }

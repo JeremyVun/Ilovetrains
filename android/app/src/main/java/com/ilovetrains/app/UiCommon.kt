@@ -61,19 +61,21 @@ fun Freshness(board: BoardData?, now: Long, modifier: Modifier = Modifier) {
     val c = LocalTrainColors.current
     val live = board.isLive(now)
     val stale = board.offline || now - board.generatedAt > 90_000
-    val text = when {
-        board.offline && board.source == "schedule" -> "Offline · timetable${board.coverage.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""}"
-        board.offline -> "Offline · last updated ${ageText(now - board.generatedAt)} ago"
-        stale -> "Last updated ${ageText(now - board.generatedAt)} ago"
-        live -> "Live"
-        else -> "Updated ${ageText(now - board.generatedAt)} ago"
-    }
+    val text = freshnessText(board, now)
     Row(modifier.heightIn(min = 36.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(5.dp).clip(RoundedCornerShape(50)).background(
             if (live) c.live else if (stale) c.warning else c.ink3))
         Spacer(Modifier.width(8.dp))
         Label(text, color = if (board.offline) c.warning else c.ink3)
     }
+}
+
+fun freshnessText(board: BoardData, now: Long): String = when {
+    board.offline && board.source == "schedule" -> "Offline · timetable${board.coverage.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""}"
+    board.offline -> "Offline · last updated ${ageText(now - board.generatedAt)} ago"
+    now - board.generatedAt > 90_000 -> "Last updated ${ageText(now - board.generatedAt)} ago"
+    board.isLive(now) -> "Live"
+    else -> "Updated ${ageText(now - board.generatedAt)} ago"
 }
 
 fun ageText(age: Long): String = when {

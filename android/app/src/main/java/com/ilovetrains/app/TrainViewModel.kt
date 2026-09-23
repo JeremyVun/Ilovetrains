@@ -36,6 +36,8 @@ class TrainViewModel private constructor(
     val state = mutable.asStateFlow()
     private var data = UserData()
     private val writes = Channel<UserData>(Channel.UNLIMITED)
+    private val widgetWrites = Channel<Unit>(Channel.CONFLATED)
+    private var widgetScheduleCache: Pair<WidgetScheduleInputs, List<WidgetScheduleEntry>>? = null
     private var stations = emptyList<Station>()
     private var fix: Fix? = null
     private var explicit = false
@@ -89,10 +91,20 @@ class TrainViewModel private constructor(
         // Dispatched, not immediate: Home is judged once an action has settled, as the rider sees it.
         viewModelScope.launch(Dispatchers.Main) { state.collect(::observeHome) }
         viewModelScope.launch {
-            for (snapshot in writes) runCatching { store.save(snapshot) }.onFailure { message("Couldn’t save changes on this phone. Free some storage and try again.") }
+            for (snapshot in writes) {
+                runCatching { store.save(snapshot) }.onFailure { message("Couldn’t save changes on this phone. Free some storage and try again.") }
+                widgetWrites.trySend(Unit)
+            }
+        }
+        viewModelScope.launch {
+            for (pending in widgetWrites) {
+                while (withTimeoutOrNull(2_000) { widgetWrites.receive() } != null) Unit
+                runCatching { publishWidget() }
+            }
         }
         viewModelScope.launch {
             data = store.load(); stations = runCatching { store.stations() }.getOrDefault(emptyList())
+            widgetWrites.trySend(Unit)
             if (data.useLocation && arrivalPermissionPending && arrivalResumeWaitUntil == null) {
                 arrivalResumeWaitUntil = System.currentTimeMillis() + 15_000
             }
@@ -116,6 +128,18 @@ class TrainViewModel private constructor(
         }
     }
     private fun persist() { writes.trySend(data) }
+    private suspend fun publishWidget() {
+        val data = data; val stations = stations; val now = System.currentTimeMillis()
+        val inputs = WidgetScheduleInputs(data, now)
+        // A week of hourly predictions reads the whole history 168 times; keep it off the main thread.
+        val schedule = widgetScheduleCache?.takeIf { it.first == inputs }?.second
+            ?: withContext(Dispatchers.Default) { widgetSchedule(data, stations, now) }.also { widgetScheduleCache = inputs to it }
+        val boards = widgetBoardPairs(data, schedule).mapNotNull { (from, to) -> store.cached(from, to, data.modes) }
+        val context = getApplication<Application>()
+        if (store.saveWidget(widgetSnapshot(data, schedule, boards, now)) && HomeWidgetWork.placed(context)) {
+            HomeWidgetWork.refresh(context)
+        }
+    }
     private fun readFlags() {
         if (debugTrackerCaptureMode) return
         viewModelScope.launch {

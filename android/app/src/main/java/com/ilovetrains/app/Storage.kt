@@ -175,11 +175,24 @@ object Wire {
 
 class DeviceStore(private val context: Context) {
     private val stateFile = AtomicFile(File(context.filesDir, "personal-v1.json"))
+    private val widgetFile = AtomicFile(File(context.filesDir, WidgetSnapshotFile))
     private val cacheDir = File(context.cacheDir, "boards").apply { mkdirs() }
+    @Volatile private var widgetPublished: WidgetSnapshot? = null
     suspend fun load(): UserData = withContext(Dispatchers.IO) {
         runCatching { Wire.user(JSONObject(stateFile.openRead().bufferedReader().use { it.readText() })) }.getOrDefault(UserData())
     }
     suspend fun save(data: UserData) = withContext(Dispatchers.IO) { write(stateFile, Wire.user(data).toString()) }
+    suspend fun widget(): WidgetSnapshot? = withContext(Dispatchers.IO) {
+        runCatching { WidgetWire.snapshot(JSONObject(widgetFile.openRead().bufferedReader().use { it.readText() })) }.getOrNull()
+    }
+    /** Returns whether the rider's answer changed, which is when the widget should be asked to redraw. */
+    suspend fun saveWidget(snapshot: WidgetSnapshot): Boolean = withContext(Dispatchers.IO) {
+        val previous = widgetPublished ?: widget()
+        if (previous != null && snapshot.copy(writtenAt = previous.writtenAt) == previous) return@withContext false
+        write(widgetFile, WidgetWire.snapshot(snapshot).toString())
+        widgetPublished = snapshot
+        widgetAnswerChanged(previous, snapshot)
+    }
     private fun write(file: AtomicFile, text: String) {
         val stream = file.startWrite()
         try { stream.write(text.toByteArray()); file.finishWrite(stream) }
