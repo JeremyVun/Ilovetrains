@@ -10,6 +10,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.selects.select
+import java.io.File
 import java.time.Instant
 import java.util.UUID
 import kotlin.math.roundToInt
@@ -78,8 +79,15 @@ class TrainViewModel private constructor(
     private var trackerPublicationGeneration = 0L
     @Volatile private var debugTrackerClock: Long? = null
     @Volatile private var debugTrackerCaptureMode = false
+    private val metrics = HeaderMetrics((application as? TrainApplication)?.analytics
+        ?: Analytics.create(debug = true, store = FileAnalyticsStore(File(application.filesDir, AnalyticsStoreName))))
+    private var predictedSelection: Selection? = null
+    private var observedScreen: Screen? = null
+    private var autoSavedTripId: String? = null
 
     init {
+        // Dispatched, not immediate: Home is judged once an action has settled, as the rider sees it.
+        viewModelScope.launch(Dispatchers.Main) { state.collect(::observeHome) }
         viewModelScope.launch {
             for (snapshot in writes) runCatching { store.save(snapshot) }.onFailure { message("Couldn’t save changes on this phone. Free some storage and try again.") }
         }
@@ -348,7 +356,9 @@ class TrainViewModel private constructor(
     private fun choosePrediction() {
         if (explicit && data.trips.any { it.id == mutable.value.selectedTripId && compatible(it, data.modes) }) return
         val focus = visibleFocus()
-        val selection = focus?.let { Selection(it.tripId, it.reverse) } ?: predict(data, stations, fix, mutable.value.now)
+        val predicted = if (focus == null) predict(data, stations, fix, mutable.value.now) else null
+        val selection = focus?.let { Selection(it.tripId, it.reverse, kind = if (it.pinned) HeaderKind.Focus else HeaderKind.Inferred) } ?: predicted
+        predictedSelection = predicted
         mutable.value = mutable.value.copy(selectedTripId = selection?.tripId, reverse = selection?.reverse ?: false, receipt = selection?.receipt)
         syncPersonal()
     }
@@ -358,7 +368,9 @@ class TrainViewModel private constructor(
     }
     fun resume() {
         if (refreshLoop != null) return
+        metrics.resumed()
         if (hasResumed) mutable.value = mutable.value.copy(justAddedTripId = null)
+        autoSavedTripId = null
         hasResumed = true
         mutable.value = mutable.value.copy(now = trackerNow())
         refreshLoop = viewModelScope.launch {
@@ -371,6 +383,24 @@ class TrainViewModel private constructor(
                 else if (data.focus != null) evaluateArrival()
             }
         }
+    }
+    /** The activity left the screen for real, not for a configuration change: the next resume is a new open. */
+    fun backgrounded() { metrics.backgrounded() }
+    private fun observeHome(shown: AppState) {
+        val previous = observedScreen
+        observedScreen = shown.screen
+        if (!shown.ready) return
+        try {
+            if (shown.screen == Screen.Setup && !shown.selectingHome) metrics.setupShown(newVisit = previous != Screen.Setup)
+            if (shown.screen != Screen.Home) return
+            val focus = shown.focus
+            val tripId = focus?.tripId ?: shown.selectedTripId ?: return
+            val reverse = focus?.reverse ?: shown.reverse
+            val browsing = explicit && data.trips.any { it.id == tripId && compatible(it, data.modes) }
+            val kind = homeAnswerKind(focus, browsing, predictedSelection, tripId, reverse, autoSavedTripId)
+            val lead: () -> String? = if (focus != null) ({ focus.journey.key }) else ({ displayedHomeLead(shown)?.key })
+            metrics.homeShown(kind, tripId, reverse, lead)
+        } catch (_: Exception) { }
     }
     private fun startForegroundWork() {
         choosePrediction()
@@ -691,8 +721,9 @@ class TrainViewModel private constructor(
         }
         when (result.action) {
             ArrivalAction.Record, ArrivalAction.Correct -> {
-                val rides = data.rides.settled(updatedFocus, true, ends(updatedFocus.tripId, updatedFocus.reverse))
-                if (rides !== data.rides) { data = data.copy(rides = rides); changed = true }
+                val before = data.rides
+                val rides = before.settled(updatedFocus, true, ends(updatedFocus.tripId, updatedFocus.reverse))
+                if (rides !== before) { data = data.copy(rides = rides); changed = true; noteRide(before, updatedFocus, result.basis) }
             }
             ArrivalAction.Withdraw -> {
                 val rides = data.rides.settled(updatedFocus, false, ends(updatedFocus.tripId, updatedFocus.reverse))
@@ -700,7 +731,9 @@ class TrainViewModel private constructor(
             }
             ArrivalAction.Expire, ArrivalAction.RecordAndExpire -> {
                 if (result.action == ArrivalAction.RecordAndExpire) {
-                    data = data.copy(rides = data.rides.settled(updatedFocus, true, ends(updatedFocus.tripId, updatedFocus.reverse)))
+                    val before = data.rides
+                    data = data.copy(rides = before.settled(updatedFocus, true, ends(updatedFocus.tripId, updatedFocus.reverse)))
+                    noteRide(before, updatedFocus, result.basis)
                 }
                 data = data.copy(focus = null, lastAnswer = data.lastAnswer?.takeUnless {
                     it.tripId == updatedFocus.tripId && it.reverse == updatedFocus.reverse
@@ -714,6 +747,10 @@ class TrainViewModel private constructor(
         if (result.state == ArrivalState.Arrived) stopArrivalMonitoring(clearWindow = true)
         if (changed) persist()
         if (sync) syncPersonal()
+    }
+
+    private fun noteRide(before: List<Ride>, focus: FocusedJourney, basis: ArrivalBasis?) {
+        if (basis != null && recordedNewRide(before, data.rides, focus)) metrics.rode(focus.pinned, basis)
     }
 
     private fun ensureArrivalMonitoring() {
@@ -814,6 +851,7 @@ class TrainViewModel private constructor(
             val fromHere = data.trips.filter { compatible(it, data.modes) }.any { it.from.id == here.id || it.to.id == here.id }
             if (!fromHere && home != null && home.id != here.id && home.modes.any { it in data.modes }) {
                 val trip = SavedTrip(UUID.randomUUID().toString(), here, home)
+                autoSavedTripId = trip.id
                 data = data.copy(trips = data.trips + trip); persist()
                 mutable.value = mutable.value.copy(justAddedTripId = trip.id)
             }
@@ -849,6 +887,7 @@ class TrainViewModel private constructor(
         if (!compatible(trip, data.modes)) return
         explicit = true
         val direction = if (id == mutable.value.selectedTripId && !reverse) mutable.value.reverse else reverse
+        if (mutable.value.screen == Screen.Home) metrics.tripTapped(id, direction)
         mutable.value = mutable.value.copy(selectedTripId = id, reverse = direction, screen = Screen.Board,
             detail = null, receipt = null, justAddedTripId = null)
         syncPersonal(); historyRecorded = false; scheduleHistory(); refresh()
@@ -879,6 +918,7 @@ class TrainViewModel private constructor(
         val id = mutable.value.selectedTripId ?: return; val board = mutable.value.board ?: return
         val pair = ends(id, mutable.value.reverse) ?: return
         if (board.from.id != pair.first.id || board.to.id != pair.second.id) return
+        metrics.pinned(id, mutable.value.reverse, journey.key)
         val source = board.copy(journeys = (listOf(journey) + board.journeys).distinctBy { it.key })
         var focus = FocusedJourney(id, mutable.value.reverse, journey, source)
         if (!source.isLive(mutable.value.now) && (journey.realtime || journey.cancelled)) focus = focus.lastKnown()
@@ -887,6 +927,7 @@ class TrainViewModel private constructor(
         persist(); historyRecorded = false; mutable.value = mutable.value.copy(screen = Screen.Home, detail = null); syncPersonal(); refresh()
     }
     override fun unpinJourney() {
+        metrics.released()
         data = data.copy(focus = null, lastAnswer = null); resetArrivalTracking(); persist()
         // Releasing a pin is not a trip choice: Home answers again from where the phone is.
         if (mutable.value.screen == Screen.Home) { explicit = false; choosePrediction() }
@@ -894,6 +935,7 @@ class TrainViewModel private constructor(
     }
     override fun showReturn() {
         val focus = data.focus ?: return
+        metrics.released()
         data = data.copy(focus = null, lastAnswer = null); resetArrivalTracking(); persist(); explicit = true; historyRecorded = false
         mutable.value = mutable.value.copy(selectedTripId = focus.tripId, reverse = !focus.reverse, screen = Screen.Home, board = null, homeBoard = null,
             receipt = "You rode out at ${clockTime(focus.journey.effectiveDeparture)}. Here’s the way back.")
@@ -920,6 +962,7 @@ class TrainViewModel private constructor(
             recentFrom = (listOf(from) + data.recentFrom.filter { it.id != from.id }).take(3),
             recentTo = (listOf(to) + data.recentTo.filter { it.id != to.id }).take(3), lastTripId = trip.id, lastReverse = reverse)
         persist(); explicit = true; historyRecorded = false
+        metrics.setupSaved()
         redirectTargetId = redirect?.let { trip.id }
         mutable.value = mutable.value.copy(screen = if (redirect == null) Screen.Home else Screen.Board,
             selectedTripId = trip.id, reverse = reverse, setupFrom = null, setupTo = null, board = null, receipt = null)

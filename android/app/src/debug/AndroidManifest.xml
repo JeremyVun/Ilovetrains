@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- Debug builds may post analytics to a local capture server; release keeps cleartext off. -->
+    <application
+        android:networkSecurityConfig="@xml/debug_network_security"
+        tools:ignore="UnusedAttribute" />
+</manifest>
