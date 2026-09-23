@@ -10,6 +10,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.selects.select
+import java.io.File
 import java.time.Instant
 import java.util.UUID
 import kotlin.math.roundToInt
@@ -79,7 +80,7 @@ class TrainViewModel private constructor(
     @Volatile private var debugTrackerClock: Long? = null
     @Volatile private var debugTrackerCaptureMode = false
     private val metrics = HeaderMetrics((application as? TrainApplication)?.analytics
-        ?: Analytics.create(debug = true, store = FileAnalyticsStore(java.io.File(application.filesDir, AnalyticsStoreName))))
+        ?: Analytics.create(debug = true, store = FileAnalyticsStore(File(application.filesDir, AnalyticsStoreName))))
     private var predictedSelection: Selection? = null
     private var observedScreen: Screen? = null
 
