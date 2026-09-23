@@ -55,13 +55,13 @@ class AnalyticsTest {
         assertEquals(listOf("1", "5", "10", "15", "20", "25", "30", "40", "50", "75", "100", "150", "200", "250"), milestones)
     }
 
-    @Test fun theNativeVocabularyIsClosedAndCarriesNoPairOrExperiment() {
-        val kinds = listOf("predicted", "focus", "usual", "home", "inferred")
+    @Test fun theNativeVocabularyIsClosedAndCarriesNoExperiment() {
+        val kinds = listOf("predicted", "focus", "usual", "home", "pair", "inferred")
         val expected = kinds.flatMap { k -> listOf("shown_$k", "hit_$k", "miss_$k", "pinned_$k") }.toSet() +
             setOf("opened", "rode_pin", "rode_auto")
         assertEquals(expected, AnalyticsEventNames)
         assertTrue(validAnalyticsEvent("shown_home", dims("6-10")))
-        assertFalse(validAnalyticsEvent("shown_pair", dims("6-10")))
+        assertTrue(validAnalyticsEvent("shown_pair", dims("6-10")))
         assertFalse(validAnalyticsEvent("shown_setup", dims("1") + ("f" to "empty")))
         assertFalse(validAnalyticsEvent("shown_home", dims("6-10") + ("x.strip-placement" to "a3")))
         assertFalse(validAnalyticsEvent("shown_home", mapOf("u" to "6-10", "pl" to "web", "pl.u" to "web.6-10")))
@@ -188,7 +188,7 @@ class AnalyticsTest {
             """{"opens":"7","queue":[]}""",
             """{"opens":7,"queue":[],"bucket":3}""",
             """{"opens":7,"queue":{}}""",
-            """{"opens":7,"queue":[$valid,{"t":"shown_pair","d":{"u":"6-10","pl":"android","pl.u":"android.6-10"},"n":1}]}""",
+            """{"opens":7,"queue":[$valid,{"t":"change_inferred","d":{"u":"6-10","pl":"android","pl.u":"android.6-10"},"n":1}]}""",
             """{"opens":7,"queue":[$valid,{"t":"shown_home","d":{"u":"6-10","pl":"android","pl.u":"android.6-10","x.strip-placement":"a3"},"n":1}]}""",
             """{"opens":7,"queue":[{"t":"shown_home","d":{"u":"6-10"},"n":1}]}""",
             """{"opens":7,"queue":[{"t":"shown_home","d":{"u":"6-10","pl":"android","pl.u":"android.6-10"},"n":0}]}""",

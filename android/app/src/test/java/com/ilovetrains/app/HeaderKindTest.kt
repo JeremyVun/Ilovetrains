@@ -88,6 +88,9 @@ class HeaderKindTest {
         assertNull(homeAnswerKind(null, browsing = true, predicted, "a", false))
         assertNull("an answer home did not predict is not its own", homeAnswerKind(null, browsing = false, predicted, "a", true))
         assertNull(homeAnswerKind(null, browsing = false, null, "a", false))
+        assertEquals("the trip home saved from here this open is a pair answer",
+            HeaderKind.Pair, homeAnswerKind(null, browsing = false, predicted, "a", false, autoSavedTripId = "a"))
+        assertEquals(HeaderKind.Home, homeAnswerKind(null, browsing = false, predicted, "a", false, autoSavedTripId = "b"))
     }
 
     @Test fun theLeadIsTheJourneyHomeShowsForTheSelectedTripAndDirection() {

@@ -83,6 +83,7 @@ class TrainViewModel private constructor(
         ?: Analytics.create(debug = true, store = FileAnalyticsStore(File(application.filesDir, AnalyticsStoreName))))
     private var predictedSelection: Selection? = null
     private var observedScreen: Screen? = null
+    private var autoSavedTripId: String? = null
 
     init {
         // Dispatched, not immediate: Home is judged once an action has settled, as the rider sees it.
@@ -369,6 +370,7 @@ class TrainViewModel private constructor(
         if (refreshLoop != null) return
         metrics.resumed()
         if (hasResumed) mutable.value = mutable.value.copy(justAddedTripId = null)
+        autoSavedTripId = null
         hasResumed = true
         mutable.value = mutable.value.copy(now = trackerNow())
         refreshLoop = viewModelScope.launch {
@@ -395,7 +397,7 @@ class TrainViewModel private constructor(
             val tripId = focus?.tripId ?: shown.selectedTripId ?: return
             val reverse = focus?.reverse ?: shown.reverse
             val browsing = explicit && data.trips.any { it.id == tripId && compatible(it, data.modes) }
-            val kind = homeAnswerKind(focus, browsing, predictedSelection, tripId, reverse)
+            val kind = homeAnswerKind(focus, browsing, predictedSelection, tripId, reverse, autoSavedTripId)
             val lead: () -> String? = if (focus != null) ({ focus.journey.key }) else ({ displayedHomeLead(shown)?.key })
             metrics.homeShown(kind, tripId, reverse, lead)
         } catch (_: Exception) { }
@@ -849,6 +851,7 @@ class TrainViewModel private constructor(
             val fromHere = data.trips.filter { compatible(it, data.modes) }.any { it.from.id == here.id || it.to.id == here.id }
             if (!fromHere && home != null && home.id != here.id && home.modes.any { it in data.modes }) {
                 val trip = SavedTrip(UUID.randomUUID().toString(), here, home)
+                autoSavedTripId = trip.id
                 data = data.copy(trips = data.trips + trip); persist()
                 mutable.value = mutable.value.copy(justAddedTripId = trip.id)
             }

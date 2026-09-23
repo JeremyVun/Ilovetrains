@@ -22,7 +22,7 @@ private const val AnalyticsProject = "ilovetrains"
 private const val Platform = "android"
 
 enum class HeaderKind(val wire: String) {
-    Predicted("predicted"), Focus("focus"), Usual("usual"), Home("home"), Inferred("inferred")
+    Predicted("predicted"), Focus("focus"), Usual("usual"), Home("home"), Pair("pair"), Inferred("inferred")
 }
 
 enum class PinResult(val wire: String) { Same("same"), Service("service"), Trip("trip") }
@@ -278,10 +278,14 @@ class Analytics internal constructor(
 }
 
 /** How home's answer came about (design: "Header kind on native"). Null is browsing an explicit choice. */
-internal fun homeAnswerKind(focus: FocusedJourney?, browsing: Boolean, predicted: Selection?, tripId: String?, reverse: Boolean): HeaderKind? = when {
+internal fun homeAnswerKind(
+    focus: FocusedJourney?, browsing: Boolean, predicted: Selection?, tripId: String?, reverse: Boolean,
+    autoSavedTripId: String? = null,
+): HeaderKind? = when {
     focus != null -> if (focus.pinned) HeaderKind.Focus else HeaderKind.Inferred
     browsing -> null
     else -> predicted?.takeIf { it.tripId == tripId && it.reverse == reverse }?.kind
+        ?.let { if (tripId == autoSavedTripId) HeaderKind.Pair else it }
 }
 
 /** The lead journey Home shows for a trip answer, derived as HomeScreen derives it. */
