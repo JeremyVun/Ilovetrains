@@ -48,7 +48,7 @@ Verify: `(cd web && npm test)`;
 value, `rode_pin` versus `rode_auto`, no emission on ride correction, a pin
 with no header answer emits no `pinned_*`.
 
-## Phase 3: Android (Opus, worktree `/private/tmp/ilt-metrics-android`) — done marker: [ ]
+## Phase 3: Android (Opus, worktree `/private/tmp/ilt-metrics-android`) — done marker: [x] 2026-09-23
 
 Owns a new `Analytics.kt` (vocabulary, queue, store, transport, enablement),
 the kind added to `Selection` in `Prediction.kt`, emission points in
@@ -60,7 +60,7 @@ for each prediction path, the three `r` values, `rode_*` only on a new ride,
 queue compaction, cap, saturation, snapshot settlement, malformed-store drop,
 and that a debug build never sends without the override.
 
-## Phase 4: iOS (Opus, after phase 3; worktree `/private/tmp/ilt-metrics-ios`) — done marker: [ ]
+## Phase 4: iOS (Opus, after phase 3; worktree `/private/tmp/ilt-metrics-ios`) — done marker: [x] 2026-09-24
 
 Same scope as phase 3 in `ios/ILoveTrains/Core/Analytics.swift`,
 `Prediction.swift`, `TrainViewModel.swift`, the app entry point for the
@@ -88,3 +88,20 @@ fails identically on `field-report-fixes-head` without these changes (one
 destination fix no longer completes a guarded ride), and `shoot-states.js`
 `focus-returns-home` fails its `Running · Pinned` invariant on `main` too;
 both are inherited, not this item's.
+
+## Phase 3 and 4 results
+
+Android: full `tools/build-android.sh` green (210 unit tests, lint 0 errors)
+after the lead's follow-up: the automatic home pair reports `pair`, and debug
+builds allow cleartext to loopback hosts only (`src/debug`
+network-security config) so the capture override can reach a local server.
+iOS: `tools/build-ios.sh --test` green (254 unit, 19 UI with the existing
+Live Activity denial skip); new tests proven to bite on the new-ride guard;
+ATS already allows a loopback `http://` capture; the privacy manifest now
+declares anonymous product interaction for analytics. Both clients treat any
+answer on the automatically saved trip as `pair` for the rest of that open,
+in either direction.
+
+Owner action before the next App Store build: update the App Store Connect
+privacy answers to "Product Interaction, not linked, not used for tracking,
+Analytics".
