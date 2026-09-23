@@ -22,7 +22,7 @@ for anything personal.
 
 - Under a minute, no account, no permission prompt.
 - The home screen makes sense with zero history: the header is the next
-  train, the row says `SHOWN ABOVE`, and nothing claims to know Dev.
+  train, the row says `NEVER RIDDEN`, and nothing claims to know Dev.
 
 ## Pressure points
 
@@ -36,6 +36,6 @@ for anything personal.
   first contact look like then?
 - The header's figure slot reads `TIMETABLE ONLY` while the first board is
   still loading. Dev has not seen a timetable; the word describes nothing.
-- The trip row's sub line says `SHOWN ABOVE` and nothing else, and every
-  other row later says `NEVER RIDDEN`. Does the first row feel like a
+- The trip row's sub line says `NEVER RIDDEN` and nothing else, as every
+  row does until a ride is recorded. Does the first row feel like a
   configured thing, or like a placeholder?
