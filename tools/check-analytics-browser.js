@@ -218,7 +218,11 @@ async function runScenario(ws, body, scenario) {
         throw new Error(`${scenario.name}: payload ${JSON.stringify(payload)}`);
       }
       for (const event of payload) {
+        const keys = Object.keys(event.d).sort().join(',');
+        const expectedKeys = ['pl', 'pl.u', 'u', 'x.strip-placement', ...(event.t === 'opened' ? ['m'] : [])]
+          .sort().join(',');
         if (event.p !== 'ilovetrains' || event.n !== 1 || event.d.u !== '1'
+          || event.d.pl !== 'web' || event.d['pl.u'] !== 'web.1' || keys !== expectedKeys
           || event.d['x.strip-placement'] !== expectedVariant) {
           throw new Error(`${scenario.name}: invalid payload event ${JSON.stringify(event)}`);
         }

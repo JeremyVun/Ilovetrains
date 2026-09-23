@@ -740,7 +740,7 @@ async function states() {
     focus.click();
     await sleep(160);
   }`,
-      events: ['shown_predicted', 'hit_predicted', 'hit_predicted', 'shown_focus']
+      events: ['shown_predicted', 'hit_predicted', 'hit_predicted', 'pinned_predicted', 'shown_focus']
     }),
     home('analytics-setup-cancel-hit', transferJourneys(), {
       after: `document.querySelector('[data-act="new-trip"]').click();
@@ -939,7 +939,7 @@ async function states() {
     mascot('mascot-next-pin-flow', {
       now: Date.parse('2026-09-07T04:33:00+10:00'),
       generatedAt: '2026-09-07T04:33:00+10:00',
-      events: ['shown_predicted', 'hit_predicted', 'shown_focus'],
+      events: ['shown_predicted', 'hit_predicted', 'pinned_predicted', 'shown_focus'],
       after: `
   document.querySelector('[data-next-service]').click();
   await sleep(140);

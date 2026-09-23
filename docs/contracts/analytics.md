@@ -106,11 +106,13 @@ Setup is a separate answer kind with setup-specific events.
 Android and iOS send `opened`, `shown_<kind>`, `hit_<kind>`, `miss_<kind>`,
 `pinned_<kind>`, `rode_pin` and `rode_auto` under the same rules. Setup,
 location-panel, `entered_inferred`, `back_*` and `change_inferred` events are
-web-only. Native prediction saves no pair automatically, so native never sends
-a `pair` kind. Native derives the kind as the web does: a visible focus is
-`inferred` or `focus` by its `by`; with no station here the answer is
-`predicted`; with a station here, the homeward candidate chosen without a
-habit or location winner is `home`, and any other answer is `usual`.
+web-only. Native derives the kind as the web does: a visible focus is
+`inferred` or `focus` by its `by`; a trip home saved automatically from here
+during this open is `pair` while it is the answer; with no station here the
+answer is `predicted`; with a station here, the homeward candidate chosen
+without a habit or location winner is `home`, and any other answer is
+`usual`. The web reads `pair` only for the render that saved it; native keeps
+it for the rest of that open.
 
 `pinned_<kind>` compares the pinned journey with home's last rendered answer
 before the pin: its trip, direction and displayed lead journey (the

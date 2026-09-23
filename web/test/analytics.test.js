@@ -27,7 +27,8 @@ const dimensionlessEvents = [
 
 /* A document with no bucket still rides in the control arm, so every enabled
    event carries the experiment dimension. */
-const d = (u = '1') => ({ u, 'x.strip-placement': 'a3' });
+const dv = (u, variant) => ({ u, pl: 'web', 'pl.u': `web.${u}`, 'x.strip-placement': variant });
+const d = (u = '1') => dv(u, 'a3');
 
 function fakeFetch(...responses) {
   const calls = [];
@@ -95,7 +96,7 @@ test('an event carries its usage band, its own dims and the experiment, and noth
   const { analytics } = make({ getDoc: () => bucketed(37, 4) });
   analytics.track('saved_setup', { f: 'search' });
   assert.deepEqual(analytics.events, [
-    { t: 'saved_setup', d: { u: '2-5', f: 'search', 'x.strip-placement': 'a2' } }
+    { t: 'saved_setup', d: { ...dv('2-5', 'a2'), f: 'search' } }
   ]);
 });
 
@@ -113,7 +114,10 @@ test('only the fixed event and caller-dimension vocabulary reaches the ledger', 
     ...milestones.map((m) => ['opened', { m }]),
     ...['location', 'empty'].map((f) => ['shown_setup', { f }]),
     ...['location', 'nearby', 'search', 'redirect', 'redirect_lost']
-      .map((f) => ['saved_setup', { f }])
+      .map((f) => ['saved_setup', { f }]),
+    ...['predicted', 'focus', 'usual', 'home', 'pair', 'inferred']
+      .flatMap((kind) => ['same', 'service', 'trip'].map((r) => ['pinned_' + kind, { r }])),
+    ...['rode_pin', 'rode_auto'].flatMap((name) => ['location', 'estimate'].map((b) => [name, { b }]))
   ];
   const { analytics } = make({ enabled: false });
   for (const [name, dims] of eventCases) analytics.track(name, dims);
@@ -139,10 +143,10 @@ test('personal, arbitrary and reserved caller dimensions are rejected', () => {
 
   assert.equal(docReads, 1, 'rejected calls do not inspect the document');
   assert.deepEqual(analytics.events, [
-    { t: 'shown_predicted', d: { u: '2-5', 'x.strip-placement': 'a2' } }
+    { t: 'shown_predicted', d: dv('2-5', 'a2') }
   ]);
   assert.deepEqual(analytics.queue(), [
-    { t: 'shown_predicted', d: { u: '2-5', 'x.strip-placement': 'a2' }, n: 1 }
+    { t: 'shown_predicted', d: dv('2-5', 'a2'), n: 1 }
   ]);
 });
 
@@ -163,7 +167,7 @@ test('accepted caller dimensions are copied before document access', () => {
   analytics.track('saved_setup', dims);
   assert.equal(reads, 1);
   assert.deepEqual(analytics.events, [
-    { t: 'saved_setup', d: { u: '2-5', 'x.strip-placement': 'a2', f: 'search' } }
+    { t: 'saved_setup', d: { ...dv('2-5', 'a2'), f: 'search' } }
   ]);
 });
 
@@ -177,7 +181,7 @@ test('repeats compact to a count, a changed dimension starts a new entry', () =>
   analytics.track('shown_predicted');
   assert.deepEqual(analytics.queue(), [
     { t: 'shown_predicted', d: d(), n: 5 },
-    { t: 'shown_predicted', d: { u: '2-5', 'x.strip-placement': 'a2' }, n: 1 }
+    { t: 'shown_predicted', d: dv('2-5', 'a2'), n: 1 }
   ]);
   assert.equal(analytics.events.length, 6, 'the ledger keeps every record');
   assert.deepEqual(JSON.parse(storage._map.get(QUEUE_KEY)).queue.length, 2);
@@ -199,7 +203,7 @@ test('the queue is capped at 200 entries, oldest dropped', () => {
   assert.equal(queue.length, QUEUE_CAP);
   assert.deepEqual(queue[0], {
     t: combinations[1].name,
-    d: { u: '1', 'x.strip-placement': 'a2' },
+    d: dv('1', 'a2'),
     n: 1
   });
   assert.equal(queue.at(-1).t, combinations[QUEUE_CAP].name);
@@ -221,7 +225,7 @@ test('disabled records to the ledger and writes nothing at all', () => {
   const fetchFn = fakeFetch({ ok: true });
   const { analytics, storage, scheduled } = make({ enabled: false, fetchFn });
   analytics.track('shown_predicted');
-  assert.deepEqual(analytics.events, [{ t: 'shown_predicted', d: { u: '1' } }]);
+  assert.deepEqual(analytics.events, [{ t: 'shown_predicted', d: { u: '1', pl: 'web', 'pl.u': 'web.1' } }]);
   assert.deepEqual([...storage._map.keys()], []);
   assert.deepEqual(scheduled, []);
   return analytics.flush().then(() => assert.equal(fetchFn.calls.length, 0));
@@ -252,7 +256,14 @@ test('obsolete or privacy-invalid persisted entries are dropped before sending',
     { t: 'shown_predicted', d: { ...d(), station: 'Central' }, n: 1 },
     { t: 'shown_predicted', d: { u: '1', 'x.strip-placement': 'personal-id' }, n: 1 },
     { t: 'shown_predicted', d: d(), n: 1_000_001 },
-    { t: 'shown_predicted', d: d(), n: 1, sid: 'page-load-1' }
+    { t: 'shown_predicted', d: d(), n: 1, sid: 'page-load-1' },
+    { t: 'shown_predicted', d: { ...d(), pl: 'ios', 'pl.u': 'ios.1' }, n: 1 },
+    { t: 'shown_predicted', d: { ...d(), 'pl.u': 'web.51+' }, n: 1 },
+    { t: 'shown_predicted', d: { u: '1', pl: 'web', 'x.strip-placement': 'a3' }, n: 1 },
+    { t: 'pinned_usual', d: d(), n: 1 },
+    { t: 'pinned_usual', d: { ...d(), r: 'same' }, n: 1 },
+    { t: 'pinned_usual', d: { ...d(), r: 'same', 'pl.r': 'web.trip' }, n: 1 },
+    { t: 'rode_pin', d: { ...d(), b: 'guess', 'pl.b': 'web.guess' }, n: 1 }
   ];
   for (const entry of invalidEntries) {
     const storage = memoryStore();
@@ -418,5 +429,37 @@ test('overlapping fetch and page-leave flushes share one send and preserve newer
   assert.deepEqual(analytics.queue(), [{ t: 'shown_predicted', d: d(), n: 1 }]);
   await analytics.flush();
   assert.equal(fetchFn.calls.length, 2);
+  assert.deepEqual(analytics.queue(), []);
+});
+
+test('pins and rides carry their own dimension and its platform composite', () => {
+  const { analytics } = make({ getDoc: () => bucketed(37, 4) });
+  analytics.track('pinned_usual', { r: 'service' });
+  analytics.track('rode_auto', { b: 'location' });
+  analytics.track('pinned_usual', { r: 'other' });
+  analytics.track('pinned_usual');
+  analytics.track('pinned_usual', { r: 'same', 'pl.r': 'web.same' });
+  analytics.track('rode_pin', { r: 'same' });
+  analytics.track('shown_usual', { r: 'same' });
+  assert.deepEqual(analytics.events, [
+    { t: 'pinned_usual', d: { ...dv('2-5', 'a2'), r: 'service', 'pl.r': 'web.service' } },
+    { t: 'rode_auto', d: { ...dv('2-5', 'a2'), b: 'location', 'pl.b': 'web.location' } }
+  ]);
+});
+
+test('entries queued before platform dimensions are upgraded and sent, not dropped', async () => {
+  const storage = memoryStore();
+  storage.setItem(QUEUE_KEY, JSON.stringify({ queue: [
+    { t: 'shown_predicted', d: { u: '6-10', 'x.strip-placement': 'a2' }, n: 3 },
+    { t: 'opened', d: { u: '1', 'x.strip-placement': 'a3', m: '1' }, n: 1 }
+  ] }));
+  const fetchFn = fakeFetch({ ok: true });
+  const { analytics } = make({ storage, fetchFn, getDoc: () => bucketed(37, 7) });
+  analytics.track('shown_predicted');
+  await analytics.flush();
+  assert.deepEqual(fetchFn.calls[0].body, [
+    { p: PROJECT, t: 'shown_predicted', d: dv('6-10', 'a2'), n: 4 },
+    { p: PROJECT, t: 'opened', d: { ...d(), m: '1' }, n: 1 }
+  ]);
   assert.deepEqual(analytics.queue(), []);
 });

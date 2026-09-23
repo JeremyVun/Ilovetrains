@@ -27,7 +27,7 @@ and `rmdir` it afterwards.
 - A dimension object always contains `u`, `pl`, `pl.u`; plus `x.*` on web;
   plus exactly the event's own keys (`m`, `f`, `r`+`pl.r`, `b`+`pl.b`).
 
-## Phase 1: contracts and privacy copy (lead) — done marker: [ ]
+## Phase 1: contracts and privacy copy (lead) — done marker: [x] 2026-09-23
 
 Owns `docs/contracts/analytics.md`, `docs/contracts/client-storage.md`
 ("Analytics queue" and native storage sections),
@@ -36,7 +36,7 @@ Owns `docs/contracts/analytics.md`, `docs/contracts/client-storage.md`
 the branch marked for the owner's verdict. Verify: contracts agree with
 design.md; no other contract still says native analytics is off.
 
-## Phase 2: web (lead) — done marker: [ ]
+## Phase 2: web (lead) — done marker: [x] 2026-09-23
 
 Owns `web/js/analytics.js`, the pin and ride emission points in
 `web/js/main.js`, `web/sw.js` `VERSION`, `web/test/analytics.test.js` and new
@@ -48,7 +48,7 @@ Verify: `(cd web && npm test)`;
 value, `rode_pin` versus `rode_auto`, no emission on ride correction, a pin
 with no header answer emits no `pinned_*`.
 
-## Phase 3: Android (Terra, worktree `/private/tmp/ilt-metrics-android`) — done marker: [ ]
+## Phase 3: Android (Opus, worktree `/private/tmp/ilt-metrics-android`) — done marker: [x] 2026-09-23
 
 Owns a new `Analytics.kt` (vocabulary, queue, store, transport, enablement),
 the kind added to `Selection` in `Prediction.kt`, emission points in
@@ -60,7 +60,7 @@ for each prediction path, the three `r` values, `rode_*` only on a new ride,
 queue compaction, cap, saturation, snapshot settlement, malformed-store drop,
 and that a debug build never sends without the override.
 
-## Phase 4: iOS (Terra, worktree `/private/tmp/ilt-metrics-ios`) — done marker: [ ]
+## Phase 4: iOS (Opus, after phase 3; worktree `/private/tmp/ilt-metrics-ios`) — done marker: [x] 2026-09-24
 
 Same scope as phase 3 in `ios/ILoveTrains/Core/Analytics.swift`,
 `Prediction.swift`, `TrainViewModel.swift`, the app entry point for the
@@ -68,7 +68,7 @@ override, and new XCTest cases in `ios/ILoveTrainsTests/` (add them to the
 Xcode project). Verify: `tools/build-ios.sh --unit`, then
 `tools/build-ios.sh --test` once on final sources.
 
-## Phase 5: integration and wire verification (lead) — done marker: [ ]
+## Phase 5: integration and wire verification (lead) — done marker: [x] 2026-09-24
 
 Merge phases 3 and 4 into `header-ride-metrics`. On each platform, run a
 debug build with `ILOVETRAINS_ANALYTICS_URL` pointed at a local capture
@@ -76,3 +76,44 @@ server, drive open → header → row tap → detail → pin, background the app
 check the captured body: exact `{p,t,d,n}` shape, `pl`, ordering, no field
 outside the vocabulary. Run the full primary gates from `CLAUDE.md` once on
 the final sources. Then offer the close stage.
+
+## Phase 2 results (2026-09-23)
+
+`npm test` 517/517; `check-analytics-browser.js` passes and now asserts the
+exact dimension keys (`pl`, `pl.u`); `playtest-regressions.sh` exit 0.
+`check-controller-lifecycle.js` gained `estimate-ride-count` (a passed pinned
+estimate counts one `rode_pin` with `b: estimate`, and a reopen counts none),
+which passes and was proven to bite. Its older `arrival-persistence` scenario
+fails identically on `field-report-fixes-head` without these changes (one
+destination fix no longer completes a guarded ride), and `shoot-states.js`
+`focus-returns-home` fails its `Running · Pinned` invariant on `main` too;
+both are inherited, not this item's.
+
+## Phase 3 and 4 results
+
+Android: full `tools/build-android.sh` green (210 unit tests, lint 0 errors)
+after the lead's follow-up: the automatic home pair reports `pair`, and debug
+builds allow cleartext to loopback hosts only (`src/debug`
+network-security config) so the capture override can reach a local server.
+iOS: `tools/build-ios.sh --test` green (254 unit, 19 UI with the existing
+Live Activity denial skip); new tests proven to bite on the new-ride guard;
+ATS already allows a loopback `http://` capture; the privacy manifest now
+declares anonymous product interaction for analytics. Both clients treat any
+answer on the automatically saved trip as `pair` for the rest of that open,
+in either direction.
+
+Owner action before the next App Store build: update the App Store Connect
+privacy answers to "Product Interaction, not linked, not used for tracking,
+Analytics".
+
+## Phase 5 results
+
+Merged `header-ride-metrics-android` and `-ios` without conflicts; each
+platform's sources are identical to its gated branch. Wire capture through the
+debug override on the session emulator and simulator: a fresh install's first
+open posted exactly `[{"p":"ilovetrains","t":"opened","d":{"u":"1","pl":"android","pl.u":"android.1","m":"1"},"n":1}]`
+(and the `ios` equivalent) as `application/json` with no cookie or
+authorization header. The richer sequences (shown, hit, pinned, rode) are
+proven by the controller-level tests on each platform, not by a captured
+drive. `go test ./...` passed on two reruns after one run reported a failing
+package that the retained output did not name; web `npm test` 517/517.

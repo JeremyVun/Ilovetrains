@@ -66,8 +66,9 @@ temporary exclusion by either.
 Native expiry restores scheduled times and static platform baselines, as bound
 by [native-data.md](native-data.md).
 
-The same generated prediction and row cases run in XCTest. Native anonymous
-telemetry is disabled; explicit feedback drafts remain only in controller memory.
+The same generated prediction and row cases run in XCTest. Release builds keep
+anonymous counters in `analytics-v1` (see "Analytics queue"); explicit
+feedback drafts remain only in controller memory.
 Both native journey decoders reject empty journeys and timestamps outside the finite
 JavaScript Date range (absolute epoch milliseconds at most 8.64e15). Malformed
 journey evidence must not discard otherwise valid saved trips.

@@ -12,7 +12,7 @@ import { journeyDetail, journeyKey, departureKey, legsOf, arrivalMs, departureMs
 import {
   focusOf, visibleFocus, setFocus, clearFocus, isFocused, focusExpired, matchJourney,
   applyFocusSnapshot, applyArrivalResult, composedJourney, recoveryModel, recoveryOf,
-  inferTravel, journeyCancelled, TRAVEL_LATE_MS
+  inferTravel, journeyCancelled, pinResult, rideAdded, TRAVEL_LATE_MS
 } from './focus.js';
 import * as Board from './board.js';
 import { clampJourneyBars } from './journeybar.js';
@@ -116,6 +116,7 @@ const state = {
   headerKind: null,
   headerTripId: null,
   headerDirection: null,
+  headerJourneyKey: null,
   lastShown: null,
   lastShownKind: null,
   tapped: false,
@@ -855,6 +856,11 @@ function settleArrival({ sample = null, monitoring = false, matchingRefresh = fa
   state.arrivalWindow = decision.window;
   state.arrivalDecision = decision;
   const next = applyArrivalResult(state.doc, decision, now());
+  if (rideAdded(state.doc, next)) {
+    analytics.track(focus.by === 'inferred' ? 'rode_auto' : 'rode_pin', {
+      b: decision.basis === 'location' ? 'location' : 'estimate'
+    });
+  }
   if (JSON.stringify(next) !== JSON.stringify(state.doc)) ctx.update(next);
   if (decision.action === 'expire' || decision.action === 'recordAndExpire') state.previousOpen = null;
   if (!focusOf(state.doc) || ['arrived', 'expiredUnconfirmed'].includes(decision.state)) {
@@ -1021,7 +1027,7 @@ function renderHome() {
     stripVariant: activeVariant('strip-placement')
   });
   lastHome = home;
-  if (kind) trackShown(kind, home.selected);
+  if (kind) trackShown(kind, home.selected, home.journey);
   if (askLocation && !state.askedPanel) {
     state.askedPanel = true;
     analytics.track('asked_panel');
@@ -1057,11 +1063,12 @@ function homeAnswerKind() {
   return state.leap || 'predicted';
 }
 
-function trackShown(kind, selection) {
+function trackShown(kind, selection, journey) {
   const key = `${kind}:${selection.tripId}:${selection.direction}`;
   state.headerKind = kind;
   state.headerTripId = selection.tripId;
   state.headerDirection = selection.direction;
+  state.headerJourneyKey = journey ? journeyKey(journey) : null;
   if (key === state.lastShown) return;
   state.lastShown = key;
   state.lastShownKind = kind;
@@ -1423,10 +1430,16 @@ function detailAction(action) {
   if (action === 'unpin' && isFocused(state.doc, state.journey)) return unpinService();
   if (action === 'board') return ctx.go('#/board');
   if (action === 'focus') {
-    if (state.headerKind && state.headerKind !== 'setup'
-      && state.selection.tripId === state.headerTripId
-      && state.selection.direction === state.headerDirection) {
-      analytics.track('hit_' + state.headerKind);
+    if (state.headerKind && state.headerKind !== 'setup') {
+      if (state.selection.tripId === state.headerTripId
+        && state.selection.direction === state.headerDirection) {
+        analytics.track('hit_' + state.headerKind);
+      }
+      const answer = {
+        tripId: state.headerTripId, direction: state.headerDirection, journeyKey: state.headerJourneyKey
+      };
+      const r = pinResult(answer, state.selection, state.journey);
+      if (r) analytics.track('pinned_' + state.headerKind, { r });
     }
     state.headerKind = null;
     stopArrivalMonitoring();
@@ -1872,6 +1885,7 @@ if (location.hostname === 'localhost') {
     state.headerKind = null;
     state.headerTripId = null;
     state.headerDirection = null;
+    state.headerJourneyKey = null;
     state.lastShown = null;
     state.lastShownKind = null;
     state.tapped = false;

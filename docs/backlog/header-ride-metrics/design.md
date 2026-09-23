@@ -59,8 +59,9 @@ The native clients send `opened`, `shown_<kind>`, `hit_<kind>`, `miss_<kind>`,
 `pinned_<kind>`, `rode_pin` and `rode_auto`. Setup, location-panel,
 `entered_inferred`, `back_*` and `change_inferred` events stay web-only: native
 setup and permission flows differ, and porting them is not needed for these
-three questions. Native never emits `shown_pair`, `hit_pair`, `miss_pair` or
-`pinned_pair`, because native prediction does not save a pair automatically.
+three questions. Both phones save a trip home automatically from an
+unsaved station, as the web does, so native sends `pair` too (corrected
+2026-09-23 after the Android build found the auto-save).
 
 ## Mechanism
 
@@ -71,6 +72,8 @@ Native `predict` (Android `Prediction.kt`, iOS `Prediction.swift`) returns a
 (`web/js/predict.js` `locate`, `web/js/main.js` `homeAnswerKind`):
 
 - a visible focus: `inferred` when `by` is inferred, otherwise `focus`;
+- the trip saved automatically from here to home during this open, while it
+  is the answer: `pair`;
 - no station here: `predicted`;
 - a station here, with the homeward candidate selected and no habit or
   location winner: `home`;

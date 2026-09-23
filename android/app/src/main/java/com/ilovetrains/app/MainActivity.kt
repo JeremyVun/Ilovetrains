@@ -54,6 +54,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        captureAnalytics(intent)
         model.attachActivity(this, locationRequest, silentLocation, locationDisabled, arrivalMonitoring, notificationPermissionRequest)
         handleTrackerIntent(intent)
         setContent {
@@ -79,7 +80,11 @@ class MainActivity : ComponentActivity() {
         model.resume()
         if (hasLocation() && model.state.value.ready && model.state.value.useLocation) takeLocation()
     }
-    override fun onStop() { foreground = false; stopLocation(); model.activityStopped(); model.pause(); super.onStop() }
+    override fun onStop() {
+        foreground = false; stopLocation(); model.activityStopped(); model.pause()
+        if (!isChangingConfigurations) model.backgrounded()
+        super.onStop()
+    }
     override fun onDestroy() {
         stopLocation()
         model.detachActivity(this, notificationPermissionRequest)
@@ -88,7 +93,12 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        captureAnalytics(intent)
         handleTrackerIntent(intent)
+    }
+    private fun captureAnalytics(intent: Intent?) {
+        if (!BuildConfig.DEBUG) return
+        intent?.getStringExtra(AnalyticsUrlExtra)?.let((application as TrainApplication).analytics::captureTo)
     }
     private fun handleTrackerIntent(intent: Intent?) {
         if (intent?.action == TravelTrackerService.ActionOpen) intent.trackerRevision()?.let(model::openTrackedJourney)

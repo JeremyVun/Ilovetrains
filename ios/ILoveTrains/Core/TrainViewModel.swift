@@ -62,6 +62,12 @@ final class TrainViewModel: ObservableObject {
     private let undoWindow: Duration
     let location: any LocationProviding
     private let keepalive: any TrackerKeepaliveDriving
+    private let metrics: HeaderMetrics
+    private var predictedSelection: Selection?
+    private var autoSavedTripId: String?
+    private var observedScreen: Screen?
+    private var homeObservationPending = false
+    private var stateObservation: AnyCancellable?
     #if DEBUG
     var seeded = false
     var networkDisabled = false
@@ -75,10 +81,12 @@ final class TrainViewModel: ObservableObject {
         tracker: TravelTrackerController? = nil,
         location: (any LocationProviding)? = nil,
         keepalive: (any TrackerKeepaliveDriving)? = nil,
-        undoWindow: Duration = defaultUndoWindow
+        undoWindow: Duration = defaultUndoWindow,
+        analytics: Analytics? = nil
     ) {
         self.location = location ?? LocationService()
         self.keepalive = keepalive ?? TrackerKeepalive()
+        self.metrics = HeaderMetrics(analytics: analytics ?? .shared)
         self.api = api; self.planner = planner; self.undoWindow = undoWindow
         var trackerDirectory: URL?
         #if DEBUG
@@ -99,6 +107,7 @@ final class TrainViewModel: ObservableObject {
         }
         self.location.onFix = { [weak self] in self?.receiveLocation($0) }
         self.location.onFailure = { [weak self] in self?.locationFailed($0) }
+        stateObservation = $state.sink { [weak self] _ in self?.scheduleHomeObservation() }
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--offline") { networkDisabled = true }
         if configureTrackerCase() { seeded = true; return }
@@ -240,7 +249,9 @@ final class TrainViewModel: ObservableObject {
             return
         }
         let focus = currentFocus()
-        let selected = focus.map { Selection(tripId: $0.tripId, reverse: $0.reverse) } ?? predict(data: data, stations: state.stations, fix: fix, now: state.now)
+        let predicted = focus == nil ? predict(data: data, stations: state.stations, fix: fix, now: state.now) : nil
+        let selected = focus.map { Selection(tripId: $0.tripId, reverse: $0.reverse, kind: $0.pinned ? .focus : .inferred) } ?? predicted
+        predictedSelection = predicted
         let changed = state.selectedTripId != selected?.tripId || state.reverse != (selected?.reverse ?? false)
         state.selectedTripId = selected?.tripId; state.reverse = selected?.reverse ?? false; state.receipt = selected?.receipt
         state.selectionPredicted = focus == nil && selected != nil
@@ -253,6 +264,7 @@ final class TrainViewModel: ObservableObject {
 
     func resume() {
         active = true
+        if metrics.resumed() { autoSavedTripId = nil }
         let returningFromKeepalive = keepalive.isRunning
         keepalive.stop()
         background = false
@@ -284,6 +296,7 @@ final class TrainViewModel: ObservableObject {
         }
     }
     func pause() {
+        metrics.backgrounded()
         background = true
         if startTrackerKeepalive() {
             clearArrivalMonitoring()
@@ -314,6 +327,28 @@ final class TrainViewModel: ObservableObject {
         generation += 1; sharedGeneration += 1; state.refreshing = false; state.distanceMetres = nil
         state.earlierLoading = false
         state.nearestStation = nil; fix = nil; location.stop()
+    }
+    private func scheduleHomeObservation() {
+        guard !homeObservationPending else { return }
+        homeObservationPending = true
+        // Judged once the current action has settled, as the rider sees Home.
+        Task { [weak self] in
+            guard let self else { return }
+            homeObservationPending = false
+            observeHome()
+        }
+    }
+    private func observeHome() {
+        let shown = state
+        let previous = observedScreen
+        observedScreen = shown.screen
+        guard shown.ready else { return }
+        if shown.screen == .setup, !shown.selectingHome { metrics.setupShown(newVisit: previous != .setup) }
+        guard shown.screen == .home, let tripId = shown.focus?.tripId ?? shown.selectedTripId else { return }
+        let reverse = shown.focus?.reverse ?? shown.reverse
+        let kind = homeAnswerKind(focus: shown.focus, predicted: shown.selectionPredicted ? predictedSelection : nil,
+                                  tripId: tripId, reverse: reverse, autoSavedTripId: autoSavedTripId)
+        metrics.homeShown(kind: kind, tripId: tripId, reverse: reverse, lead: shown.focus?.journey.key ?? displayedHomeLead(shown)?.key)
     }
     private func silentLocation() {
         guard data.useLocation, active, !background else { return }
@@ -769,7 +804,11 @@ final class TrainViewModel: ObservableObject {
         case .withdraw: settledRides(data.rides, focus: focus, arrived: false, ends: ends(id: focus.tripId, reverse: focus.reverse))
         case .none, .expire: data.rides
         }
-        if rides != data.rides { data.rides = rides; changed = true }
+        if rides != data.rides {
+            let before = data.rides
+            data.rides = rides; changed = true
+            if let basis = result.basis, rideAppended(before: before, after: rides) { metrics.rode(pinned: focus.pinned, basis: basis) }
+        }
         if result.action == .expire || result.action == .recordAndExpire {
             data.focus = nil
             if data.lastAnswer?.tripId == focus.tripId, data.lastAnswer?.reverse == focus.reverse {
@@ -880,6 +919,7 @@ final class TrainViewModel: ObservableObject {
         if !explicit, data.focus == nil, let here, let home = data.home ?? automaticHome(data: data), here.id != home.id,
            !data.trips.contains(where: { compatible($0, modes: data.modes) && ($0.from.id == here.id || $0.to.id == here.id) }), !home.modes.isDisjoint(with: data.modes) {
             let trip = SavedTrip(id: UUID().uuidString, from: here, to: home, createdAt: current)
+            autoSavedTripId = trip.id
             addTrip(trip); state.justAddedTripId = trip.id; persist()
         }
         choosePrediction(); syncPersonal()
@@ -907,6 +947,7 @@ final class TrainViewModel: ObservableObject {
         guard let trip = data.trips.first(where: { $0.id == id }), compatible(trip, modes: data.modes) else { return }
         explicit = true
         let direction = id == state.selectedTripId && !reverse ? state.reverse : reverse
+        if state.screen == .home { metrics.tripTapped(tripId: id, reverse: direction) }
         if id != state.selectedTripId || state.reverse != direction { state.board = nil; state.recommendation = nil }
         state.selectedTripId = id; state.reverse = direction; state.screen = .board; state.detail = nil; state.receipt = nil
         state.selectionPredicted = false
@@ -961,6 +1002,7 @@ final class TrainViewModel: ObservableObject {
     }
     func pinJourney(_ journey: Journey) {
         guard !journey.cancelled, data.withinTransferLimit(journey), journeyAllowed(journey, modes: data.modes), let id = state.selectedTripId, var board = state.board, let pair = ends(), board.from.id == pair.0.id, board.to.id == pair.1.id else { return }
+        metrics.pinned(tripId: id, reverse: state.reverse, journeyKey: journey.key)
         board.journeys = merge(board.journeys, [journey])
         var focus = FocusedJourney(tripId: id, reverse: state.reverse, journey: journey, board: board)
         if !board.isLive(state.now), journey.realtime || journey.cancelled { focus = focus.lastKnown() }
@@ -970,6 +1012,7 @@ final class TrainViewModel: ObservableObject {
     }
     func unpinJourney() {
         guard let focus = data.focus, focus.pinned else { return }
+        metrics.released()
         clearArrivalMonitoring()
         data.focus = nil; data.lastAnswer = nil; persist()
         // Releasing a pin is not a trip choice: Home answers where the phone is now.
@@ -977,6 +1020,7 @@ final class TrainViewModel: ObservableObject {
     }
     func showReturn() {
         guard let focus = data.focus else { return }
+        metrics.released()
         clearArrivalMonitoring()
         data.focus = nil; data.lastAnswer = nil; persist(); explicit = true; historyRecorded = false
         state.selectedTripId = focus.tripId; state.reverse = !focus.reverse; state.screen = .home; state.board = nil; state.homeBoard = nil
@@ -1010,6 +1054,7 @@ final class TrainViewModel: ObservableObject {
         data.recentTo = Array(([to] + data.recentTo.filter { $0.id != to.id }).prefix(3))
         data.lastTripId = trip.id; data.lastReverse = reverse
         persist(); historyRecorded = false
+        metrics.setupSaved()
         let visible = compatible(trip, modes: data.modes)
         explicit = visible
         state.selectionPredicted = false

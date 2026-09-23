@@ -257,6 +257,7 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
   return {
     selected,
     trip: selectedTrip,
+    journey,
     directions,
     ranked,
     home,

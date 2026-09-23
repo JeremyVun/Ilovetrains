@@ -218,6 +218,11 @@ const arrivalScript = `(async () => {
   t.route();
   await sleep(500);
   if (t.state.doc.rides.length !== 1) throw new Error('the destination fix did not persist the completed ride');
+  const counted = () => t.analytics.events.filter((event) => event.t.startsWith('rode_'));
+  if (counted().length !== 1 || counted()[0].t !== 'rode_auto' || counted()[0].d.b !== 'location'
+    || counted()[0].d['pl.b'] !== 'web.location') {
+    throw new Error('the located inferred ride was not counted once: ' + JSON.stringify(counted()));
+  }
   const back = document.querySelector('[data-act="way-back"]');
   if (!back) throw new Error('the destination fix did not show the way-back offer');
   back.click();
@@ -232,9 +237,33 @@ const arrivalScript = `(async () => {
   await sleep(500);
   if (t.state.doc.focus) throw new Error('the completed journey was inferred again from lastOpen');
   if (t.state.doc.rides.length !== 1) throw new Error('the completed ride did not survive the next open');
+  if (counted().length !== 1) throw new Error('reopening counted the recorded ride again: ' + JSON.stringify(counted()));
+})()`;
+
+const arrived = journeyAt(nowMs, -60_000);
+const estimateDoc = docAt(nowMs, arrived, true);
+estimateDoc.focus.by = 'focus';
+estimateDoc.preferences = { useLocation: false };
+const estimateScript = `(async () => {
+  const t = window.__trains;
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  await sleep(500);
+  const counted = () => t.analytics.events.filter((event) => event.t.startsWith('rode_'));
+  if (t.state.doc.rides.length !== 1) throw new Error('the passed estimate did not record the pinned ride');
+  if (counted().length !== 1 || counted()[0].t !== 'rode_pin' || counted()[0].d.b !== 'estimate'
+    || counted()[0].d['pl.b'] !== 'web.estimate') {
+    throw new Error('the estimated pinned ride was not counted once: ' + JSON.stringify(counted()));
+  }
+  t.state.fix = null;
+  const storage = await import('/js/storage.js');
+  t.state.doc = storage.parseDoc(localStorage.getItem(storage.STORAGE_KEY));
+  t.route();
+  await sleep(500);
+  if (counted().length !== 1) throw new Error('reopening counted the recorded ride again: ' + JSON.stringify(counted()));
 })()`;
 
 try {
+  await run('estimate-ride-count', estimateDoc, from.location, estimateScript, firstPort + 5);
   await run('fresh-fixes', freshDoc, from.location, freshScript, firstPort);
   await run('deferred-index', focusedDoc, from.location, indexScript, firstPort + 1, '#/board');
   await run('stale-callback', freshDoc, from.location, staleCallbackScript, firstPort + 2, '#/board');
