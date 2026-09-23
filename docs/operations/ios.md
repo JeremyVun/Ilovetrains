@@ -78,6 +78,18 @@ xcodebuild -project ios/ILoveTrains.xcodeproj -scheme ILoveTrains \
 ```
 
 That build embeds the simulated entitlements and needs no Apple account.
+`simctl` cannot place a widget, so the opt-in `HomeWidgetSmokeTests` drives
+SpringBoard's Edit → Add Widget gallery with the same build settings; it
+skips unless `TEST_RUNNER_HOME_WIDGET_SMOKE=1` is set, and
+`TEST_RUNNER_HOME_WIDGET_SWIPES=1` picks the medium size:
+
+```sh
+TEST_RUNNER_HOME_WIDGET_SMOKE=1 xcodebuild -project ios/ILoveTrains.xcodeproj \
+  -scheme ILoveTrains -derivedDataPath /tmp/ilovetrains-ios-signed-sim \
+  -destination "platform=iOS Simulator,id=$ILOVETRAINS_SIMULATOR_ID" \
+  -parallel-testing-enabled NO -only-testing:ILoveTrainsUITests/HomeWidgetSmokeTests \
+  test CODE_SIGN_IDENTITY=-
+```
 
 `ios/releases/ILoveTrains.xcarchive` from `--unsigned-archive` is an **unsigned
 Release archive**, useful for inspection and later signing. It cannot be
