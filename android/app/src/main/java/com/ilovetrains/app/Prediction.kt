@@ -7,7 +7,7 @@ import java.util.Locale
 import kotlin.math.*
 
 data class Fix(val lat: Double, val lon: Double, val at: Long, val speed: Double? = null, val accuracyMetres: Double? = null)
-data class Selection(val tripId: String, val reverse: Boolean, val receipt: String? = null)
+data class Selection(val tripId: String, val reverse: Boolean, val receipt: String? = null, val kind: HeaderKind = HeaderKind.Predicted)
 fun distanceMetres(a: Fix, b: Station): Double {
     if (b.lat == 0.0 && b.lon == 0.0) return Double.POSITIVE_INFINITY
     val p = Math.PI / 180; val dLat = (b.lat - a.lat) * p; val dLon = (b.lon - a.lon) * p
@@ -87,7 +87,12 @@ fun predict(data: UserData, stations: List<Station>, fix: Fix?, now: Long): Sele
     val receipt = if (selected == homeward && winner == null) {
         if (data.votes.count { it.station.id == home?.id } >= 3) "Your days usually start at ${home?.shortName}." else "You usually travel from ${home?.shortName}."
     } else if (here == null && !hasCurrentFix && trips.size >= 2) historyReceipt(data.history, selected.trip.id, selected.reverse, now) else null
-    return Selection(selected.trip.id, selected.reverse, receipt)
+    val kind = when {
+        here == null -> HeaderKind.Predicted
+        selected == homeward && winner == null -> HeaderKind.Home
+        else -> HeaderKind.Usual
+    }
+    return Selection(selected.trip.id, selected.reverse, receipt, kind)
 }
 fun historyReceipt(history: List<ViewEvent>, id: String, reverse: Boolean, now: Long): String? {
     val zone = Sydney; val n = Instant.ofEpochMilli(now).atZone(zone)
