@@ -361,16 +361,20 @@ actor DeviceStore {
     private let stateURL: URL
     private let backupURL: URL
     private let cacheDirectory: URL
+    private let widgetDirectory: URL?
     private let bundle: Bundle
     private let fileManager = FileManager.default
+    private var widgetPublished: WidgetSnapshot?
 
-    init(directory: URL? = nil, bundle: Bundle = .main) {
+    /// Only the default store publishes to the shared container, so tests and UI-test domains never overwrite the real widget.
+    init(directory: URL? = nil, bundle: Bundle = .main, widgetDirectory: URL? = nil) {
         let base = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("ILoveTrains", isDirectory: true)
         self.directory = base
         stateURL = base.appendingPathComponent("personal-v1.json")
         backupURL = base.appendingPathComponent("personal-v1.backup.json")
         cacheDirectory = base.appendingPathComponent("boards", isDirectory: true)
+        self.widgetDirectory = widgetDirectory ?? (directory == nil ? widgetContainerURL() : base)
         self.bundle = bundle
     }
 
@@ -394,6 +398,20 @@ actor DeviceStore {
             protect(backupURL)
         }
         try write(payload, to: stateURL)
+    }
+
+    /// Returns whether the rider's answer changed, which is when the widget should be asked to redraw.
+    @discardableResult
+    func saveWidget(_ snapshot: WidgetSnapshot) async throws -> Bool {
+        guard let widgetDirectory else { return false }
+        let previous = widgetPublished ?? readWidgetSnapshot(directory: widgetDirectory)
+        var comparable = snapshot
+        comparable.writtenAt = previous?.writtenAt ?? snapshot.writtenAt
+        if comparable == previous { return false }
+        try fileManager.createDirectory(at: widgetDirectory, withIntermediateDirectories: true)
+        try write(encoder.encode(snapshot), to: widgetDirectory.appendingPathComponent(widgetSnapshotFileName))
+        widgetPublished = snapshot
+        return widgetAnswerChanged(previous, snapshot)
     }
 
     func stations() async throws -> [Station] {

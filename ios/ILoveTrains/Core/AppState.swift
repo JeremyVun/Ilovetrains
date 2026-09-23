@@ -1,11 +1,5 @@
 import Foundation
 
-let sydneyZone = TimeZone(identifier: "Australia/Sydney")!
-var sydneyCalendar: Calendar { var c = Calendar(identifier: .gregorian); c.timeZone = sydneyZone; return c }
-func clockTime(_ time: Double) -> String {
-    let parts = sydneyCalendar.dateComponents([.hour, .minute], from: Date(timeIntervalSince1970: time / 1000))
-    return String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
-}
 #if DEBUG
 // Offline UI drives need a date covered by the bundled timetable. Never enabled
 // in Release or ordinary app launches, including the wall-clock tracker tests.

@@ -57,15 +57,7 @@ struct FreshnessView: View {
             let scheduled = board.source == "schedule"
             let live = board.isLive(now)
             let stale = !scheduled && !live
-            let copy: String = {
-                if scheduled {
-                    return "Offline · timetable"
-                }
-                if board.offline { return "Offline · last updated \(ageText(now - board.generatedAt)) ago" }
-                if stale { return "Last updated \(ageText(now - board.generatedAt)) ago" }
-                if live { return "Live" }
-                return "Updated \(ageText(now - board.generatedAt)) ago"
-            }()
+            let copy = freshnessText(board, now: now)
             HStack(spacing: 8) {
                 Circle().fill(live ? colors.live : (stale || scheduled ? colors.warning : colors.ink3))
                     .frame(width: 5, height: 5)
@@ -76,12 +68,6 @@ struct FreshnessView: View {
             .accessibilityIdentifier("freshness")
         }
     }
-}
-
-func ageText(_ age: Millis) -> String {
-    if age < 60_000 { return "\(max(0, Int(age / 1_000)))s" }
-    if age < 3_600_000 { return "\(Int(age / 60_000))m" }
-    return "\(Int(age / 3_600_000))h"
 }
 
 struct ActionRail: View {

@@ -31,13 +31,14 @@ widget.build_configurations.each do |config|
     'PRODUCT_BUNDLE_IDENTIFIER' => 'com.ilovetrains.ios.TravelTrackerWidget',
     'INFOPLIST_FILE' => 'TravelTrackerWidget/Info.plist',
     'GENERATE_INFOPLIST_FILE' => 'NO', 'APPLICATION_EXTENSION_API_ONLY' => 'YES',
-    'SKIP_INSTALL' => 'YES'
+    'SKIP_INSTALL' => 'YES', 'CODE_SIGN_ENTITLEMENTS' => 'TravelTrackerWidget/TravelTrackerWidget.entitlements'
   })
 end
 app.build_configurations.each do |config|
   config.build_settings['EXCLUDED_SOURCE_FILE_NAMES'] = 'calibration.json' if config.name == 'Release'
   config.build_settings.merge!({ 'PRODUCT_BUNDLE_IDENTIFIER' => 'com.ilovetrains.ios',
     'INFOPLIST_FILE' => 'ILoveTrains/Info.plist', 'ASSETCATALOG_COMPILER_APPICON_NAME' => 'AppIcon',
+    'CODE_SIGN_ENTITLEMENTS' => 'ILoveTrains/ILoveTrains.entitlements',
     'GENERATE_INFOPLIST_FILE' => 'NO', 'OTHER_LDFLAGS' => ['$(inherited)', '-lsqlite3', '-lz'] })
 end
 [[tests, 'com.ilovetrains.ios.tests'], [ui_tests, 'com.ilovetrains.ios.uitests']].each do |target, bundle|

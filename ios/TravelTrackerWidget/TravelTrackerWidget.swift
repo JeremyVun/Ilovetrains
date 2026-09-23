@@ -7,6 +7,7 @@ import WidgetKit
 struct TravelTrackerWidgets: WidgetBundle {
     var body: some Widget {
         TravelTrackerLiveActivity()
+        HomeTripWidget()
     }
 }
 

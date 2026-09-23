@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import WidgetKit
 #if DEBUG
 import OSLog
 #endif
@@ -37,6 +38,8 @@ final class TrainViewModel: ObservableObject {
     private var arrivalTask: Task<Void, Never>?
     private var loop: Task<Void, Never>?
     private var writeTask: Task<Void, Never>?
+    private var widgetTask: Task<Void, Never>?
+    private var widgetScheduleCache: (inputs: WidgetScheduleInputs, entries: [WidgetScheduleEntry])?
     private var bootstrap: Task<Void, Error>?
     private var historyRecorded = false
     private var settingsBack: Screen = .home
@@ -127,6 +130,7 @@ final class TrainViewModel: ObservableObject {
         #endif
         if active, data.useLocation, data.focus != nil { arrivalPermissionPending = true; arrivalResumeWaitUntil = state.now + 15_000 }
         state.stations = (try? await store.stations()) ?? []
+        publishWidget()
         if active {
             focusRefreshPending = canNetwork && data.focus != nil
             beginArrivalMonitoring()
@@ -153,6 +157,40 @@ final class TrainViewModel: ObservableObject {
             await previous?.value
             do { try await store.save(snapshot) }
             catch { show("Couldn’t save changes on this phone. Free some storage and try again.") }
+        }
+        publishWidget()
+    }
+    private func publishWidget() {
+        #if DEBUG
+        if seeded { return }
+        #endif
+        widgetTask?.cancel()
+        widgetTask = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(2)) } catch { return }
+            await self?.writeWidget()
+        }
+    }
+    private func writeWidget() async {
+        let data = self.data, stations = state.stations, now = epochNow()
+        let inputs = WidgetScheduleInputs(data: data, now: now)
+        let schedule: [WidgetScheduleEntry]
+        if let cached = widgetScheduleCache, cached.inputs == inputs {
+            schedule = cached.entries
+        } else {
+            // A week of hourly predictions reads the whole history 168 times; keep it off the main actor.
+            schedule = await Task.detached(priority: .utility) { widgetSchedule(data: data, stations: stations, now: now) }.value
+            widgetScheduleCache = (inputs, schedule)
+        }
+        var boards: [BoardData] = []
+        for pair in widgetBoardPairs(data: data, schedule: schedule) {
+            if let board = await store.cached(from: pair.0, to: pair.1, modes: data.modes) { boards.append(board) }
+        }
+        guard !Task.isCancelled else { return }
+        let snapshot = widgetSnapshot(data: data, schedule: schedule, boards: boards, now: now)
+        let previous = writeTask, store = store
+        writeTask = Task {
+            await previous?.value
+            if (try? await store.saveWidget(snapshot)) == true { WidgetCenter.shared.reloadTimelines(ofKind: homeWidgetKind) }
         }
     }
     private func currentFocus() -> FocusedJourney? {
