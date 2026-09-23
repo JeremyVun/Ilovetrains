@@ -4,7 +4,7 @@ Owner ruling, 2026-09-09: “use C1, and make sure the platform number carries
 the same lower contrast after the transfer.”
 
 The transfer before/during/after and missing-telemetry frames are verified web
-client captures for 1.6.0 (service worker v58), replacing their illustrative
+client captures for 1.7.1 (service worker v67), replacing their illustrative
 targets. Reproduce them with `tools/check-commute-feedback.js` against a local
 server; see [tools instructions](../../../../tools/README.md).
 Both phone sizes (390×844 and 412×732) and schemes are captured at 2× resolution.

@@ -1122,18 +1122,19 @@ async function checkResumeExpiry() {
         await new Promise(resolve => setTimeout(resolve, 30));
         h.clock.set(h.clock.now + 2000);
         t.tick();
-        if (!t.state.doc.focus || t.state.doc.rides.length) throw new Error('fresh away evidence did not retain unconfirmed focus');
+        // Away evidence after the deadline cannot revive the trip; it ends and counts as ridden.
+        if (t.state.doc.focus || t.state.doc.rides.length !== 1) throw new Error('away evidence revived an overdue focus or the ride was not counted');
       });
   }
-  await runCase('overdue restore without evidence expires at the bounded deadline', focusedConfig(journey),
+  await runCase('overdue restore without evidence ends and counts the ride at the bounded deadline', focusedConfig(journey),
     doc, async () => {
       const t = window.__trains, h = window.__commuteHarness;
       await new Promise(resolve => setTimeout(resolve, 100));
       if (!t.state.doc.focus) throw new Error('expired before lookup allowance');
       h.clock.set(h.clock.now + 15_001);
       t.tick();
-      if (t.state.doc.focus || t.state.doc.rides.length || h.geo.activeIds().length) {
-        throw new Error('overdue focus did not expire silently at lookup deadline');
+      if (t.state.doc.focus || t.state.doc.rides.length !== 1 || h.geo.activeIds().length) {
+        throw new Error('overdue focus did not end and count its ride at the lookup deadline');
       }
     });
 }

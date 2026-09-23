@@ -110,12 +110,12 @@
     return '<svg class="settings-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.74l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>';
   }
 
-  function tripRows(from, to, status, direct) {
+  function tripRows(from, to, direct) {
     var lines = direct
       ? '<span class="hm-spine"><i style="background:' + lineColour('T1') + '"></i></span><span class="hm-bd"><span class="hm-nm"><span class="hm-bdg" style="background:' + lineColour('T1') + ';color:' + chipInk('T1') + '">T1</span>' + esc(from) + ' <em>→</em> ' + esc(to) + '</span>'
       : '<span class="hm-spine"><i style="background:' + lineColour('T9') + '"></i><i style="background:' + lineColour('T4') + '"></i></span><span class="hm-bd"><span class="hm-nm"><span class="hm-bdg" style="background:' + lineColour('T9') + ';color:' + chipInk('T9') + '">T9</span>' + esc(from) + ' <em>→</em> <span class="hm-bdg" style="background:' + lineColour('T4') + ';color:' + chipInk('T4') + '">T4</span>' + esc(to) + '</span>';
     return '<div class="hm-ix tl" data-scroller><div class="hm-anchor"><div class="l">My trips</div></div>'
-      + '<button class="tripr focused" data-tap><span class="hm-in">' + lines + '<span class="hm-sub"><b>' + esc(status) + '</b> · Pinned</span><span class="route-cue">Departures <span class="arrow">›</span></span></span></span></button>'
+      + '<button class="tripr focused" data-tap><span class="hm-in">' + lines + '<span class="hm-sub">Never ridden</span><span class="route-cue">Departures <span class="arrow">›</span></span></span></span></button>'
       + '<div class="hm-end">— End of trips</div></div>';
   }
 
@@ -126,19 +126,19 @@
       + '<section class="hm-hd ' + (model.uncertain ? 'uncertain-figure' : '') + '" data-probe="smart header"><span class="hm-fig"><span class="hm-n">' + figure + '</span><span class="hm-st">' + esc(model.provenance || '') + '</span></span>'
       + '<span class="hm-ends"><span class="hm-e from"><span class="hm-stn">' + esc(model.from) + '</span><span class="hm-t">' + esc(model.dep) + '</span></span><span class="hm-e to"><span class="hm-stn">' + esc(model.to) + '</span><span class="hm-t">' + esc(model.arr) + '</span>' + (model.lastEstimate ? '<span class="hm-estimate">Last estimate</span>' : '') + '</span></span>'
       + model.bar + '<span class="hm-sign hm-act">' + esc(model.instruction) + '</span></section><div class="hm-rule"></div>'
-      + tripRows(model.from, model.to, model.rowStatus, model.direct) + '<div class="hm-bar split"><button data-tap><span class="g">+</span>New trip</button><button data-tap>' + settingsIcon() + 'Settings</button></div></main>';
+      + tripRows(model.from, model.to, model.direct) + '<div class="hm-bar split"><button data-tap><span class="g">+</span>New trip</button><button data-tap>' + settingsIcon() + 'Settings</button></div></main>';
   }
 
   function homeModel(name) {
-    if (name === 'direct') return { status: 'Running · Pinned', figure: '12', unit: 'min', provenance: 'To go', from: 'Central', to: 'Parramatta', dep: '22:48', arr: '23:17', instruction: 'Get off at Parramatta', bar: directBar(17 / 29, true), rowStatus: 'Running', direct: true };
-    if (name === 'transfer-before') return { status: 'Running · Pinned', figure: '19', unit: 'min', provenance: 'To go', from: 'Rhodes', to: 'Bondi Junction', dep: '09:24', arr: '10:08', instruction: 'Get off at Town Hall · Platform 3', bar: transferBar(25 / 44, true), rowStatus: 'Running' };
-    if (name === 'transfer-during') return { status: 'Running · Pinned', figure: '14', unit: 'min', provenance: 'To go', from: 'Rhodes', to: 'Bondi Junction', dep: '09:24', arr: '10:08', instruction: 'Change at Town Hall · Platform 5', bar: transferBar(30 / 44, true), rowStatus: 'Running' };
-    if (name === 'transfer-after') return { status: 'Running · Pinned', figure: '7', unit: 'min', provenance: 'To go', from: 'Rhodes', to: 'Bondi Junction', dep: '09:24', arr: '10:08', instruction: 'Get off at Bondi Junction · Platform 2', bar: transferBar(37 / 44, true), rowStatus: 'Running' };
-    if (name === 'transfer') return { status: 'Running · Pinned', figure: '7', unit: 'min', provenance: 'To go', from: 'Rhodes', to: 'Bondi Junction', dep: '09:24', arr: '10:08', instruction: 'Get off at Bondi Junction · Platform 2', bar: transferBar(37 / 44, true), rowStatus: 'Running' };
+    if (name === 'direct') return { status: 'Running · Pinned', figure: '12', unit: 'min', provenance: 'To go', from: 'Central', to: 'Parramatta', dep: '22:48', arr: '23:17', instruction: 'Get off at Parramatta', bar: directBar(17 / 29, true), direct: true };
+    if (name === 'transfer-before') return { status: 'Running · Pinned', figure: '19', unit: 'min', provenance: 'To go', from: 'Rhodes', to: 'Bondi Junction', dep: '09:24', arr: '10:08', instruction: 'Get off at Town Hall · Platform 3', bar: transferBar(25 / 44, true) };
+    if (name === 'transfer-during') return { status: 'Running · Pinned', figure: '14', unit: 'min', provenance: 'To go', from: 'Rhodes', to: 'Bondi Junction', dep: '09:24', arr: '10:08', instruction: 'Change at Town Hall · Platform 5', bar: transferBar(30 / 44, true) };
+    if (name === 'transfer-after') return { status: 'Running · Pinned', figure: '7', unit: 'min', provenance: 'To go', from: 'Rhodes', to: 'Bondi Junction', dep: '09:24', arr: '10:08', instruction: 'Get off at Bondi Junction · Platform 2', bar: transferBar(37 / 44, true) };
+    if (name === 'transfer') return { status: 'Running · Pinned', figure: '7', unit: 'min', provenance: 'To go', from: 'Rhodes', to: 'Bondi Junction', dep: '09:24', arr: '10:08', instruction: 'Get off at Bondi Junction · Platform 2', bar: transferBar(37 / 44, true) };
     if (name === 'overdue-moving') {
-      return { status: 'Arrival uncertain', figure: '3', unit: 'min', provenance: 'Past estimate', from: 'Rhodes', to: 'Bondi Junction', dep: '09:24', arr: '10:08', lastEstimate: true, instruction: 'Still on the way to Bondi Junction.', bar: transferBar(.93, true), rowStatus: 'Arrival uncertain', uncertain: true };
+      return { status: 'Arrival uncertain', figure: '3', unit: 'min', provenance: 'Past estimate', from: 'Rhodes', to: 'Bondi Junction', dep: '09:24', arr: '10:08', lastEstimate: true, instruction: 'Still on the way to Bondi Junction.', bar: transferBar(.93, true), uncertain: true };
     }
-    return { status: 'Arrival unconfirmed', figure: '—', provenance: '', from: 'Rhodes', to: 'Bondi Junction', dep: '09:24', arr: '10:08', lastEstimate: true, instruction: 'Arrival time needs an update.', bar: transferBar(.93, false), rowStatus: 'Arrival uncertain', uncertain: true };
+    return { status: 'Arrival unconfirmed', figure: '—', provenance: '', from: 'Rhodes', to: 'Bondi Junction', dep: '09:24', arr: '10:08', lastEstimate: true, instruction: 'Arrival time needs an update.', bar: transferBar(.93, false), uncertain: true };
   }
 
   function svgElement(tag, attrs, children) {

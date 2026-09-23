@@ -1,7 +1,7 @@
 {
-  "date": "2026-09-10",
-  "version": "1.6.0",
-  "serviceWorker": "v58",
+  "date": "2026-09-23",
+  "version": "1.7.1",
+  "serviceWorker": "v67",
   "builtCommand": "node tools/check-commute-feedback.js --url http://localhost:<port> --out <tmp-dir>",
   "fixtures": "tools/check-commute-feedback.js",
   "frames": [
@@ -10,168 +10,168 @@
       "kind": "illustrative target",
       "width": 780,
       "height": 1688,
-      "sha256": "a6fb7c37cdd6edcf24b4899ba388a529e81b770aa7ffebef4b4b1c04e007b11a"
+      "sha256": "5e83b03784fea232b728e9c1816c782fe4cad31328f756faa58ddfcd61a27a36"
     },
     {
       "file": "c1-fade-390x844-direct.png",
       "kind": "illustrative target",
       "width": 780,
       "height": 1688,
-      "sha256": "82ae85c4841d7092c24c6cc27f8b1105a748a392f07f03ee94f04feb0b9ad002"
+      "sha256": "d34d9e45916eca6cc923f7b59c0fdc667754c08ed3a32b5dad39e7a152061b21"
     },
     {
       "file": "c1-fade-390x844-missing-telemetry-light.png",
       "kind": "built web client",
       "width": 780,
       "height": 1688,
-      "sha256": "d08c5c67046f11bda69cb801b61b59c96ba2b22d3f4d880c57523fbf8304e19f"
+      "sha256": "416e420054d0158c62d911b4030dc039834d0c992153d7924e8a9ddb60712ed7"
     },
     {
       "file": "c1-fade-390x844-missing-telemetry.png",
       "kind": "built web client",
       "width": 780,
       "height": 1688,
-      "sha256": "1bf4976c0807dd5f1926d27f6882a3f9c84d552ede439e09b67221386fe868f6"
+      "sha256": "d0e0d623c1f8c63afa816ffe681d42539e1f2ee5841f6e545ae6c3e6b2d3927a"
     },
     {
       "file": "c1-fade-390x844-overdue-moving-light.png",
       "kind": "illustrative target",
       "width": 780,
       "height": 1688,
-      "sha256": "ecd13ed94950ed6779fa6bd022888763d8cc2dc8c30596bff19410785661c0c4"
+      "sha256": "4be8a3fe77e416147dca9744de8da501ad36deea47b2f537418a212d1a246671"
     },
     {
       "file": "c1-fade-390x844-overdue-moving.png",
       "kind": "illustrative target",
       "width": 780,
       "height": 1688,
-      "sha256": "253358452166d6c3c5940d6e052a557f349ba13f141f6770244e2e87872e62f0"
+      "sha256": "b4eca7a88160b0b4caac43fa04414b94393010033c4a9443095b6b766b95e822"
     },
     {
       "file": "c1-fade-390x844-transfer-after-light.png",
       "kind": "built web client",
       "width": 780,
       "height": 1688,
-      "sha256": "ecdbd1fb93a2b55c686df56b8f638a9e6d1adae62e4efca63e9bce0fb266d339"
+      "sha256": "96852b19d28607032e8ec2e7dde4d962765195474e15b09b0b3ba2af831494be"
     },
     {
       "file": "c1-fade-390x844-transfer-after.png",
       "kind": "built web client",
       "width": 780,
       "height": 1688,
-      "sha256": "3247a40e3a7cdfb65da24d514c4370ed9424d8e26ca5e972491fade154521b3d"
+      "sha256": "9e1f7cf310e83d57b870c27e88878c5bde7a9c175fd0a31e50e2118e4597b865"
     },
     {
       "file": "c1-fade-390x844-transfer-before-light.png",
       "kind": "built web client",
       "width": 780,
       "height": 1688,
-      "sha256": "e7b08e8d187015dd84948507d53b287f2c5dc4e10992b8d18349d16edf8a6f08"
+      "sha256": "d57b03db3c6f3511ee9dafdd022709e19db94a6090b1483c82cc552634756291"
     },
     {
       "file": "c1-fade-390x844-transfer-before.png",
       "kind": "built web client",
       "width": 780,
       "height": 1688,
-      "sha256": "5f06d20530aacc119dc55e17ac18c132d78403102829f4a0fc01638bfafccfa3"
+      "sha256": "7920b23dfa952a3bd63094a2c4aa482a2dd128e0cdd1845b073dc014ef245eba"
     },
     {
       "file": "c1-fade-390x844-transfer-during-light.png",
       "kind": "built web client",
       "width": 780,
       "height": 1688,
-      "sha256": "dab93af5ee7e4e293b95a0a4de15fd338378e7089f45be4e1b6115a1e27b5498"
+      "sha256": "1e64061e55fcd10f298b59d5f36822626a8d7c303d56e6c81c62d624a507597c"
     },
     {
       "file": "c1-fade-390x844-transfer-during.png",
       "kind": "built web client",
       "width": 780,
       "height": 1688,
-      "sha256": "6c8179e331b51b57bdec998b3f454f164f68a7507117a7c1c47acb2a2236a8d8"
+      "sha256": "cb85ac302c0c25e89c595fc25a179a9d3ed803b354f5806e185a4053b0ff27da"
     },
     {
       "file": "c1-fade-412x732-direct-light.png",
       "kind": "illustrative target",
       "width": 824,
       "height": 1464,
-      "sha256": "d4a287bc6f69333d90f8492bfc2eb79857de3590b40a7cf613a20975d82c38a8"
+      "sha256": "2a96ef7e609a006615ca20d9f68c359e2c19fbc8518e2cc0a69016d621823206"
     },
     {
       "file": "c1-fade-412x732-direct.png",
       "kind": "illustrative target",
       "width": 824,
       "height": 1464,
-      "sha256": "7e6e253fc31e3e47ad96d196cc0a46b3dd63c5820fa6113df0042642c0d7d740"
+      "sha256": "51e435769a68081fad45d8b06d97faaf1553ea146e1fc81ebd20cf1117e461da"
     },
     {
       "file": "c1-fade-412x732-missing-telemetry-light.png",
       "kind": "built web client",
       "width": 824,
       "height": 1464,
-      "sha256": "1f2bbc3fe99a91ec6315f03eee81437f7521d6786b550d33cdd3c3c568ab4c81"
+      "sha256": "b72772ab7814b1ff64108fe40b38b702bcdc2c5ec775e0bbb81789a81e1f2bba"
     },
     {
       "file": "c1-fade-412x732-missing-telemetry.png",
       "kind": "built web client",
       "width": 824,
       "height": 1464,
-      "sha256": "0d2b8bfa02ae7498b4a21addc8731ec4acdad084926d4c453e5ebc3d5bbb9afd"
+      "sha256": "99c0dd53cc20344cf5c2d59625b4dc22009251ab036e95f0ed55f94d44ee8e9b"
     },
     {
       "file": "c1-fade-412x732-overdue-moving-light.png",
       "kind": "illustrative target",
       "width": 824,
       "height": 1464,
-      "sha256": "3b87a92844c3e28ae08578305da6b9468e4550f7f28c6522669192b9d43a70b6"
+      "sha256": "78d93aebd49f37cc836e9ae6b5e7a36ea57ca7cdf09ed89bc6ce1eddecfb5c39"
     },
     {
       "file": "c1-fade-412x732-overdue-moving.png",
       "kind": "illustrative target",
       "width": 824,
       "height": 1464,
-      "sha256": "9b961bd5152b656a9796812c1584896eb4e13f6489a50ccf672c2bfa08a6efcc"
+      "sha256": "5fcbffbdd97184f5b2e73485679e295831bf597e506e777d6365b11c3a0476ff"
     },
     {
       "file": "c1-fade-412x732-transfer-after-light.png",
       "kind": "built web client",
       "width": 824,
       "height": 1464,
-      "sha256": "7e7e6543e5e44826c9cc67a1a19ec0287c9f6f306aa4d0e61367896d6cefe458"
+      "sha256": "8059b0cd6a33abb5dc03f65be9afe99d7ade8f383013c2b108522524a107f8bc"
     },
     {
       "file": "c1-fade-412x732-transfer-after.png",
       "kind": "built web client",
       "width": 824,
       "height": 1464,
-      "sha256": "7482110741745af2378719907baa7d109d3a094b0609d1c455d7477c5c711926"
+      "sha256": "dd7b4c1b4d60090026a12038311f15d192931462ca39cdcde7fadcb8cf6b713a"
     },
     {
       "file": "c1-fade-412x732-transfer-before-light.png",
       "kind": "built web client",
       "width": 824,
       "height": 1464,
-      "sha256": "f5cec1adae1a8d63f5bfa580702114e50ab86b3ce65bd4ea2705c7a6274953ef"
+      "sha256": "54ce55f2efe79e9399cced8e16efd2a956077fbb597f7d586c44b8b3bb483e84"
     },
     {
       "file": "c1-fade-412x732-transfer-before.png",
       "kind": "built web client",
       "width": 824,
       "height": 1464,
-      "sha256": "6cf49aa7e576c1a76e84299f88e071e87882786586f8024bbfcf31673cff4fee"
+      "sha256": "8800fffc7501abe53db191e5ed88ee3741092081f57cda541452d10f4e712e49"
     },
     {
       "file": "c1-fade-412x732-transfer-during-light.png",
       "kind": "built web client",
       "width": 824,
       "height": 1464,
-      "sha256": "ede332e62dbe303483a65c722dd7db4ada88f16004cf89fca46619052758990d"
+      "sha256": "c11dd1d28f9c9a669141e2302261bf22a19d3ff960c4dfb921725ba9d484d97d"
     },
     {
       "file": "c1-fade-412x732-transfer-during.png",
       "kind": "built web client",
       "width": 824,
       "height": 1464,
-      "sha256": "3abca4648fd089c3fdbdbb6890b44901b77c29893a04401e7cafe775e749e35f"
+      "sha256": "6ccb33659eb0508e1f34eda0f5d56df7ddf56b952543d1c8842d9c9e0a8713a7"
     }
   ]
 }
