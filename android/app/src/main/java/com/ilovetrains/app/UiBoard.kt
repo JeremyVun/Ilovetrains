@@ -32,7 +32,7 @@ fun BoardScreen(state: AppState, actions: UiActions) {
     val c = LocalTrainColors.current
     if (board == null) {
         Column(Modifier.fillMaxSize()) {
-            BoardMast(null, state.now, actions)
+            BoardMast(null, state.now, state.awaitingAnswer, actions)
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Label(if (state.refreshing) "Opening timetable" else "Timetable unavailable", color = c.ink3)
             }
@@ -40,7 +40,7 @@ fun BoardScreen(state: AppState, actions: UiActions) {
         return
     }
     Column(Modifier.fillMaxSize()) {
-        BoardMast(board, state.now, actions)
+        BoardMast(board, state.now, state.awaitingAnswer, actions)
         val visibleJourneys = board.journeys
         val past = remember(visibleJourneys, state.now) { visibleJourneys.filter { it.effectiveDeparture < state.now } }
         val future = remember(visibleJourneys, state.now) { visibleJourneys.filter { it.effectiveDeparture >= state.now } }
@@ -89,13 +89,13 @@ fun BoardScreen(state: AppState, actions: UiActions) {
 }
 
 @Composable
-private fun BoardMast(board: BoardData?, now: Long, actions: UiActions) {
+private fun BoardMast(board: BoardData?, now: Long, awaiting: Boolean, actions: UiActions) {
     val c = LocalTrainColors.current
     Column(Modifier.fillMaxWidth().padding(start = PagePadding, end = PagePadding, top = 8.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             BackButton("Home", actions::back)
             Spacer(Modifier.weight(1f))
-            Freshness(board, now)
+            Freshness(board, now, awaiting)
         }
         if (board != null) {
             Row(Modifier.fillMaxWidth().heightIn(min = 69.dp).padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {

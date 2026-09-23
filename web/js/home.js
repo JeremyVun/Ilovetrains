@@ -225,7 +225,8 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     };
   });
   // A board still in the post is not offline; the pill rests until it answers.
-  const waiting = !activeFocus && (!enabledModes.length || (!body && !opts.offline));
+  const waiting = (opts.awaiting && displaySource?.dot !== 'live')
+    || (!activeFocus && (!enabledModes.length || (!body && !opts.offline)));
   const status = activeFocus ? focusStatus(replacement ? activeFocus.journey : journey, {
     activeLeg: directions.activeLeg,
     stale: displayStale,

@@ -93,6 +93,8 @@ const state = {
   seenKey: null,
   serverStale: false,
   offline: false,
+  boardAnswerPending: false,
+  focusAnswerPending: false,
   viewRecorded: false,
   root: null,
   view: null,
@@ -181,6 +183,7 @@ let focusInflight = null;
 let recoveryInflight = null;
 let recommendationInflight = null;
 let requestGeneration = 0;
+let answeredKey = null;
 let preserveSelection = false;
 let suppressPreferenceEvents = false;
 let geoGeneration = 0;
@@ -524,6 +527,7 @@ function loadSelectedCache() {
   state.body = cached ? filterBody(cached.body, enabledModes(), maxTransfers()) : null;
   state.serverStale = cached?.serverStale === true;
   state.offline = false;
+  if (currentKey() !== answeredKey) awaitFirstAnswers();
   state.recommendationPages = cached?.recommendationPages || [];
   const sources = cached ? [{
     body: cached.body, serverStale: cached.serverStale === true,
@@ -531,6 +535,21 @@ function loadSelectedCache() {
   },
     ...state.recommendationPages] : [];
   setRecommendationCandidates(sources, true);
+}
+
+/* A board painted before the first answer since opening or changing trips is
+   not yet offline: freshness rests until that request answers or fails. */
+function awaitFirstAnswers() {
+  state.boardAnswerPending = true;
+  state.focusAnswerPending = Boolean(focusOf(state.doc));
+}
+
+function awaitingAnswer() {
+  return state.boardAnswerPending || (state.focusAnswerPending && Boolean(focusSelection()));
+}
+
+function restingFooter(footer) {
+  return awaitingAnswer() && footer.dot !== 'live' ? { ...footer, text: '', dot: 'idle' } : footer;
 }
 
 function sourceEnvelope(source, offline = false) {
@@ -1003,6 +1022,7 @@ function renderHome() {
     fix: validFix(),
     stale: focused ? focusModel.stale : candidateModel.stale,
     offline: focused ? !followed || followed.offline : state.offline,
+    awaiting: awaitingAnswer(),
     candidateSource: candidateFreshness,
     recommendation: state.recommendation,
     alternative: state.recommendation && earliestAlternative(
@@ -1121,6 +1141,8 @@ function showBoard(root) {
 function renderBoard({ addedAbove = false, fade = true } = {}) {
   if (state.view !== 'board') return;
   const model = currentModel();
+  const settled = model.footer;
+  model.footer = restingFooter(settled);
   const html = Board.boardHtml({
     trip: selectedTrip(),
     direction: state.selection.direction,
@@ -1144,7 +1166,8 @@ function renderBoard({ addedAbove = false, fade = true } = {}) {
     }
     wireTimeline();
   }
-  patchFresh(state.root.querySelector('.sy-fresh .lbl'), Board.freshnessText(model));
+  patchFresh(state.root.querySelector('.sy-fresh .lbl'),
+    model.footer === settled ? Board.freshnessText(model) : '');
 }
 
 /* True while a departing row is fading and the rebuild is deferred. One fade is
@@ -1379,6 +1402,7 @@ function detailRow(journey, opts) {
 function renderDetail() {
   const model = detailModel();
   if (!model) { location.hash = '#/'; return; }
+  model.footer = restingFooter(model.footer);
   const freshness = model.footer.text;
   model.footer = { ...model.footer, text: '' };
   const html = Detail.detailHtml(model);
@@ -1517,6 +1541,7 @@ async function refreshFollowed() {
   const trip = focus && findTrip(state.doc, focus.tripId);
   if (!trip || document.hidden) {
     state.focusRefreshPending = null;
+    if (!trip) state.focusAnswerPending = false;
     return;
   }
   const identity = identityOfFocus(focus);
@@ -1546,6 +1571,7 @@ async function refreshFollowed() {
     const matched = matchJourney(body.journeys, current.journey);
     if (matched) ctx.update(applyFocusSnapshot(state.doc, focus, body));
     state.focusRefreshPending = null;
+    state.focusAnswerPending = false;
     settleArrival({ matchingRefresh: Boolean(matched) });
     state.focusOffline = false;
     if (matchJourney(body.journeys, current.journey)) {
@@ -1560,6 +1586,7 @@ async function refreshFollowed() {
   } catch (_) {
     if (focusInflight === controller && (!controller.signal.aborted || timedOut)) {
       state.focusRefreshPending = null;
+      state.focusAnswerPending = false;
       settleArrival();
       state.focusOffline = true;
       renderCurrent();
@@ -1581,6 +1608,7 @@ async function fetchLive({ independent = false } = {}) {
   if (!modes.length) {
     state.body = { ...(state.body || {}), journeys: [] };
     state.offline = false;
+    state.boardAnswerPending = false;
     renderCurrent();
     return;
   }
@@ -1602,6 +1630,8 @@ async function fetchLive({ independent = false } = {}) {
     state.body = eligible;
     state.serverStale = serverStale;
     state.offline = false;
+    answeredKey = key;
+    state.boardAnswerPending = false;
     if (state.view === 'detail' && state.journey && matchJourney(eligible.journeys, state.journey)) {
       state.detailSource = {
         key, journeyKey: journeyKey(state.journey),
@@ -1623,6 +1653,8 @@ async function fetchLive({ independent = false } = {}) {
   } catch (error) {
     if (controller.signal.aborted || generation !== requestGeneration || error.name === 'AbortError') return;
     state.offline = true;
+    answeredKey = key;
+    state.boardAnswerPending = false;
     setRecommendationCandidates([
       { body: state.body || {}, serverStale: state.serverStale },
       ...state.recommendationPages
@@ -1818,10 +1850,12 @@ document.addEventListener('visibilitychange', () => {
     state.focusRefreshPending = null;
     flagsRequest?.abort();
     flagsRequest = null;
+    answeredKey = null;
     return;
   }
   loadFlags();
   if (!onLiveView() && state.view !== 'settings') return;
+  if (state.selection) awaitFirstAnswers();
   suppressPreferenceEvents = false;
   if (state.view === 'home') {
     state.fix = null;

@@ -45,6 +45,8 @@ struct AppState {
     var focus: FocusedJourney?
     var now = epochNow()
     var refreshing = false
+    var boardAnswerPending = false
+    var focusAnswerPending = false
     var appearance: Appearance = .system
     var enabledModes = allModes
     var transferLimit: TransferLimit = .two
@@ -87,4 +89,5 @@ struct AppState {
     var transferLimitOffered: Bool { flags[transferLimitFlagKey] == true }
     var selectedTrip: SavedTrip? { trips.first { $0.id == selectedTripId } }
     var shownBoard: BoardData? { screen == .home ? homeBoard ?? board : board }
+    var awaitingAnswer: Bool { boardAnswerPending || (focusAnswerPending && focus != nil) }
 }
