@@ -68,7 +68,7 @@ override, and new XCTest cases in `ios/ILoveTrainsTests/` (add them to the
 Xcode project). Verify: `tools/build-ios.sh --unit`, then
 `tools/build-ios.sh --test` once on final sources.
 
-## Phase 5: integration and wire verification (lead) — done marker: [ ]
+## Phase 5: integration and wire verification (lead) — done marker: [x] 2026-09-24
 
 Merge phases 3 and 4 into `header-ride-metrics`. On each platform, run a
 debug build with `ILOVETRAINS_ANALYTICS_URL` pointed at a local capture
@@ -105,3 +105,15 @@ in either direction.
 Owner action before the next App Store build: update the App Store Connect
 privacy answers to "Product Interaction, not linked, not used for tracking,
 Analytics".
+
+## Phase 5 results
+
+Merged `header-ride-metrics-android` and `-ios` without conflicts; each
+platform's sources are identical to its gated branch. Wire capture through the
+debug override on the session emulator and simulator: a fresh install's first
+open posted exactly `[{"p":"ilovetrains","t":"opened","d":{"u":"1","pl":"android","pl.u":"android.1","m":"1"},"n":1}]`
+(and the `ios` equivalent) as `application/json` with no cookie or
+authorization header. The richer sequences (shown, hit, pinned, rode) are
+proven by the controller-level tests on each platform, not by a captured
+drive. `go test ./...` passed on two reruns after one run reported a failing
+package that the retained output did not name; web `npm test` 517/517.
