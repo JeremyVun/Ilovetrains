@@ -462,7 +462,7 @@ final class CaptureServer: @unchecked Sendable {
             var buffer = buffer
             if let chunk { buffer.append(chunk) }
             if let request = Self.request(in: buffer) {
-                lock.withLock { captured.append(request) }
+                lock.withLock { self.captured.append(request) }
                 let reason = status == 204 ? "No Content" : "Service Unavailable"
                 let reply = "HTTP/1.1 \(status) \(reason)\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
                 connection.send(content: Data(reply.utf8), completion: .contentProcessed { _ in connection.cancel() })
