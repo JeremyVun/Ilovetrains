@@ -772,7 +772,7 @@ private struct JourneyBar: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let layout = JourneyBarLayout(journey: journey, width: proxy.size.width)
+            let layout = JourneyBarLayout(journey: journey, width: proxy.size.width, clearsChips: style.monochrome)
             ZStack(alignment: .topLeading) {
                 ForEach(Array(layout.segments.enumerated()), id: \.offset) { _, segment in
                     Rectangle()
@@ -815,7 +815,9 @@ private struct JourneyBarLayout {
     var segments: [Segment] = []
     var chips: [Chip] = []
 
-    init(journey: Journey, width: CGFloat) {
+    /// `clearsChips` stops the ride line at each chip, because an accented rendering composites the chips
+    /// in their own layer and a cut-out numeral would otherwise show the line running through it.
+    init(journey: Journey, width: CGFloat, clearsChips: Bool) {
         guard let first = journey.legs.first else { return }
         let start = journey.effectiveDeparture
         let span = max(1, journey.effectiveArrival - start)
@@ -845,6 +847,20 @@ private struct JourneyBarLayout {
                 place(leg.toPlatform, leg, at: x(leg.effectiveArrival), trailing: true)
             }
             place(next.fromPlatform, next, at: x(next.effectiveDeparture), trailing: false)
+        }
+        guard clearsChips else { return }
+        segments = segments.flatMap { segment in
+            chips.reduce([segment]) { pieces, chip in
+                pieces.flatMap { piece -> [Segment] in
+                    let end = piece.x + piece.width, chipEnd = chip.x + chip.width
+                    guard chip.x < end, chipEnd > piece.x else { return [piece] }
+                    var before = piece, after = piece
+                    before.width = chip.x - piece.x
+                    after.x = chipEnd
+                    after.width = end - chipEnd
+                    return [before, after].filter { $0.width > 0 }
+                }
+            }
         }
     }
 }
