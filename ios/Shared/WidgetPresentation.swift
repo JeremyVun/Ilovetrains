@@ -147,6 +147,24 @@ func widgetLockSentence(_ content: WidgetContent) -> WidgetLockSentence {
     }
 }
 
+/// Tinted and lock renderings lose the warning paint, so they name a tight change still ahead instead (owner ruling, 2026-09-24).
+func widgetNamesTightChange(_ journey: Journey, now: Millis, monochrome: Bool) -> Bool {
+    guard monochrome, !journey.cancelled else { return false }
+    let states = connectionStates(journey.legs)
+    return states.indices.contains { states[$0] == .tight && now < journey.legs[$0 + 1].effectiveDeparture }
+}
+
+let widgetTightChangeText = "Tight change"
+
+/// A tight change takes the lock's last line as a data warning does, and leads that warning when both apply.
+func widgetLockFooter(_ content: WidgetContent, sentence: WidgetLockSentence, monochrome: Bool) -> String? {
+    let warning = content.freshness.flatMap { $0.warns ? $0.text : nil }
+    guard let lead = content.lead, widgetNamesTightChange(lead, now: content.date, monochrome: monochrome) else {
+        return warning ?? sentence.arrival
+    }
+    return warning.map { "\(widgetTightChangeText) · \($0)" } ?? widgetTightChangeText
+}
+
 func widgetNoServiceText(_ content: WidgetContent) -> String {
     guard let board = content.board else { return "No saved board for this trip yet" }
     if board.offline && board.generatedAt <= 0 { return "No saved board for this trip yet" }
