@@ -287,7 +287,8 @@ private struct SmallRidingView: View {
                     .lineLimit(1).minimumScaleFactor(0.8)
             }
             .padding(.top, 2)
-            Spacer(minLength: 3)
+            // Tight gaps keep the following step on a 164 pt tile now that both chips are 20 pt tall.
+            Spacer(minLength: 2)
             if let place = stepPlace(step) {
                 HStack(spacing: 6) {
                     if style.monochrome { LineName(leg: step.leg, style: style) }
@@ -303,9 +304,9 @@ private struct SmallRidingView: View {
                         WidgetChip(text: chip, leg: next.leg, style: style)
                     }
                 }
-                .padding(.top, 4)
+                .padding(.top, 2)
             }
-            FreshnessLine(freshness: content.freshness, style: style).padding(.top, 4)
+            FreshnessLine(freshness: content.freshness, style: style).padding(.top, 3)
         }
     }
 }
