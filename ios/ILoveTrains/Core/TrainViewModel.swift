@@ -57,7 +57,7 @@ final class TrainViewModel: ObservableObject {
     private var redirectTargetId: String?
     private var pendingDeletion: PendingDeletion?
     private var undoTask: Task<Void, Never>?
-    private var pendingTrackerURL: URL?
+    private var pendingURL: URL?
     private var arrivalWindow: ArrivalWindow?
     private var arrivalPermissionPending = false
     private var arrivalResumeWaitUntil: Millis?
@@ -141,7 +141,7 @@ final class TrainViewModel: ObservableObject {
             publish(retainedOfflineBoard(cached), request: generation)
         }
         state.ready = true; state.screen = data.trips.isEmpty ? .setup : .home
-        if let url = pendingTrackerURL { pendingTrackerURL = nil; openTracker(url) }
+        if let url = pendingURL { pendingURL = nil; openURL(url) }
         refresh(); refreshFlags()
         do { try await bootstrap?.value }
         catch { state.timetableStatus = "Offline timetable unavailable. Download it in Settings." }
@@ -1019,8 +1019,27 @@ final class TrainViewModel: ObservableObject {
         supplementTask?.cancel(); supplementTask = nil
         recordHistory(); state.screen = .detail; state.detail = journey
     }
+    func openURL(_ url: URL) {
+        switch url.host {
+        case widgetHomeURL.host: openHomeFromWidget()
+        case widgetSetupURL.host:
+            guard state.ready else { pendingURL = url; return }
+            newTrip()
+        default: openTracker(url)
+        }
+    }
+    /// A widget tap lands on Home answering as an open does, never on whatever screen was left behind.
+    private func openHomeFromWidget() {
+        guard state.ready else { return }
+        if state.screen == .setup { cancelSetupLocation() }
+        historyTask?.cancel()
+        redirect = nil; redirectTargetId = nil
+        state.screen = .home; state.detail = nil; state.selectingHome = false
+        explicit = false; historyRecorded = false
+        choosePrediction(); syncPersonal(); silentLocation(); refresh()
+    }
     func openTracker(_ url: URL) {
-        guard state.ready else { pendingTrackerURL = url; return }
+        guard state.ready else { pendingURL = url; return }
         Task {
             guard let identity = await tracker.focusIdentity(for: url),
                   let focus = data.focus, focus.trackerIdentity == identity else { return }

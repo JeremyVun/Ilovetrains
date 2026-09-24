@@ -7,6 +7,8 @@ let widgetScheduleHours = 168
 let widgetBoardLimit = 8
 let widgetLiveRefresh: Millis = 900_000
 let widgetTimelineHorizon: Millis = 10_800_000
+let widgetHomeURL = URL(string: "ilovetrains://home")!
+let widgetSetupURL = URL(string: "ilovetrains://setup")!
 private let hourMillis: Millis = 3_600_000
 private let widgetCalendar = sydneyCalendar
 
@@ -83,9 +85,43 @@ struct WidgetContent: Equatable, Sendable {
     var date: Millis
     var answer: WidgetAnswer?
     var board: BoardData?
-    var next: Journey?
-    var following: [Journey]
-    var provenance: String?
+    /// The header's answer: the followed service, or the recommendation among the board's eligible departures.
+    var lead: Journey?
+    /// The cancelled departure the lead stands in for, as the header's `<time> cancelled · next train`.
+    var replaced: Journey?
+    var following: [Journey] = []
+    var freshness: WidgetFreshness?
+
+    /// A board, as the medium prints it: the replaced departure, the lead, then what leaves after it.
+    var rows: [Journey] { Array(([replaced, lead].compactMap { $0 } + following).prefix(3)) }
+}
+
+enum WidgetFreshness: Equatable, Sendable {
+    case updated(Millis), lastKnown(Millis), offline(Millis), timetable, unavailable
+
+    /// A widget is almost never live, so it always prints the clock time of its data, never an age that freezes.
+    var text: String {
+        switch self {
+        case let .updated(at): "Last updated \(clockTime(at))"
+        case let .lastKnown(at): "Last known · Last updated \(clockTime(at))"
+        case let .offline(at): "Offline · Last updated \(clockTime(at))"
+        case .timetable: "Offline · timetable"
+        case .unavailable: "Offline"
+        }
+    }
+
+    var warns: Bool {
+        switch self {
+        case .updated, .lastKnown: false
+        case .offline, .timetable, .unavailable: true
+        }
+    }
+}
+
+func widgetFreshness(_ board: BoardData, lead: Journey?) -> WidgetFreshness {
+    if board.offline && board.generatedAt <= 0 { return .unavailable }
+    if board.offline { return board.source == "schedule" ? .timetable : .offline(board.generatedAt) }
+    return lead?.retained == true ? .lastKnown(board.generatedAt) : .updated(board.generatedAt)
 }
 
 func canonicalWidgetModes(_ modes: Set<String>) -> [String] {
@@ -191,54 +227,84 @@ func widgetRequests(_ snapshot: WidgetSnapshot, from now: Millis, until: Millis,
     return requests
 }
 
-/// A failed or unmatched fetch shows the app's last board as the app shows a retained one.
-func widgetSource(_ request: WidgetRequest, fetched: BoardData?) -> BoardData? {
+/// A failed fetch shows the app's last board as the app shows a retained one; with none, the answer is offline.
+func widgetSource(_ request: WidgetRequest, fetched: BoardData?) -> BoardData {
     if let fetched {
-        guard let key = request.focusJourneyKey else { return fetched }
-        if let match = fetched.journeys.first(where: { $0.key == key }) {
-            var board = fetched
-            board.journeys = [match]
-            return board
-        }
+        guard let key = request.focusJourneyKey, !fetched.journeys.contains(where: { $0.key == key }),
+              let fallback = request.fallback else { return fetched }
+        // A working answer that no longer carries the followed service leaves its last copy last known, not offline.
+        var kept = retainedOfflineBoard(fallback)
+        kept.offline = false
+        return kept
     }
     return request.fallback.map(retainedOfflineBoard)
+        ?? BoardData(from: request.from, to: request.to, generatedAt: 0, offline: true)
 }
 
 func widgetContent(_ snapshot: WidgetSnapshot, sources: [String: BoardData], at t: Millis) -> WidgetContent {
-    guard let answer = widgetAnswer(snapshot, at: t) else {
-        return WidgetContent(date: t, answer: nil, board: nil, next: nil, following: [], provenance: nil)
-    }
+    guard let answer = widgetAnswer(snapshot, at: t) else { return WidgetContent(date: t) }
     let board = sources[widgetRequest(for: answer, in: snapshot, now: t).key]
-    if let focus = answer.focus {
-        return WidgetContent(date: t, answer: answer, board: board, next: board?.journeys.first ?? focus.journey,
-                             following: [], provenance: board.map { freshnessText($0, now: t) })
-    }
+    let modes = Set(snapshot.modes)
     let upcoming = (board?.journeys ?? [])
-        .filter { snapshot.eligible($0) && $0.effectiveDeparture > t }
+        .filter { snapshot.eligible($0) && $0.effectiveDeparture >= t }
         .sorted { $0.effectiveDeparture < $1.effectiveDeparture }
-    let lead = upcoming.firstIndex { !$0.cancelled } ?? upcoming.indices.first
+    let candidates = board.map(recommendationCandidates) ?? []
+    var lead: Journey?
+    var replaced: Journey?
+    if let focus = answer.focus {
+        let followed = board?.journeys.first { $0.key == focus.journey.key } ?? focus.journey
+        lead = followed
+        if followed.cancelled, t < followed.effectiveDeparture,
+           let replacement = selectRecommendation(
+               candidates.filter { $0.journey.effectiveDeparture > followed.effectiveDeparture },
+               now: t, modes: modes, maxTransfers: snapshot.transferCap
+           ) {
+            lead = replacement.journey
+            replaced = followed
+        }
+    } else {
+        lead = selectRecommendation(candidates, now: t, modes: modes, maxTransfers: snapshot.transferCap)?.journey
+            ?? upcoming.first { !$0.cancelled } ?? upcoming.first
+        replaced = upcoming.first.flatMap { $0.cancelled && $0.key != lead?.key ? $0 : nil }
+    }
+    var following: [Journey] = []
+    if let lead, t <= lead.effectiveDeparture {
+        let later = upcoming.firstIndex { $0.key == lead.key }.map { Array(upcoming[($0 + 1)...]) }
+            ?? upcoming.filter { $0.effectiveDeparture > lead.effectiveDeparture }
+        following = Array(later.filter { $0.key != replaced?.key }.prefix(2))
+    }
     return WidgetContent(
         date: t,
         answer: answer,
         board: board,
-        next: lead.map { upcoming[$0] },
-        following: lead.map { Array(upcoming[($0 + 1)...].prefix(2)) } ?? [],
-        provenance: board.map { freshnessText($0, now: t) }
+        lead: lead,
+        replaced: replaced,
+        following: following,
+        freshness: board.map { widgetFreshness($0, lead: lead) }
     )
 }
 
-func widgetNextBoundary(_ snapshot: WidgetSnapshot, sources: [String: BoardData], after t: Millis, until: Millis) -> Millis? {
-    var candidates: [Millis] = []
-    if let change = widgetNextAnswerChange(snapshot, after: t, until: until) { candidates.append(change) }
-    if let answer = widgetAnswer(snapshot, at: t),
-       let board = sources[widgetRequest(for: answer, in: snapshot, now: t).key] {
-        let departures = answer.focus == nil
-            ? board.journeys.filter(snapshot.eligible).map(\.effectiveDeparture)
-            : board.journeys.prefix(1).map(\.effectiveDeparture)
-        if let next = departures.filter({ $0 > t }).min() { candidates.append(next) }
-        if board.isLive(t) { candidates.append(board.generatedAt + 90_001) }
+/// Minute boundaries keep the printed countdown true; the exact service times move the lead the moment it leaves.
+func widgetEntryDates(_ snapshot: WidgetSnapshot, sources: [String: BoardData], from now: Millis, until: Millis) -> [Millis] {
+    var dates = Set<Millis>([now])
+    var minute = (now / 60_000).rounded(.down) * 60_000 + 60_000
+    while minute <= until {
+        dates.insert(minute)
+        minute += 60_000
     }
-    return candidates.filter { $0 > t && $0 <= until }.min()
+    var t = now
+    while let change = widgetNextAnswerChange(snapshot, after: t, until: until) {
+        dates.insert(change)
+        t = change
+    }
+    for board in sources.values {
+        for leg in board.journeys.flatMap(\.legs) {
+            for instant in [leg.effectiveDeparture, leg.effectiveArrival] where instant > now && instant <= until {
+                dates.insert(instant + 1)
+            }
+        }
+    }
+    return dates.sorted()
 }
 
 func widgetTimeline(
@@ -246,15 +312,11 @@ func widgetTimeline(
     sources: [String: BoardData],
     from now: Millis,
     until: Millis,
-    limit: Int = 60
+    limit: Int = 300
 ) -> [WidgetContent] {
-    var entries = [widgetContent(snapshot, sources: sources, at: now)]
-    var t = now
-    while entries.count < limit, let next = widgetNextBoundary(snapshot, sources: sources, after: t, until: until) {
-        t = next
-        entries.append(widgetContent(snapshot, sources: sources, at: t))
-    }
-    return entries
+    widgetEntryDates(snapshot, sources: sources, from: now, until: until)
+        .prefix(limit)
+        .map { widgetContent(snapshot, sources: sources, at: $0) }
 }
 
 /// Board freshness alone never asks the system to redraw; the widget keeps its own refresh budget.

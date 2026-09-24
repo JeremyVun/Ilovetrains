@@ -1,24 +1,31 @@
 import Foundation
 
-func orderedLineCodes(_ journey: Journey) -> [String] {
-    var seen = Set<String>()
-    return journey.legs.map(\.line).filter { !$0.isEmpty && seen.insert($0).inserted }
-}
-
 func mergeEarlierJourneys(_ earlier: [Journey], current: [Journey], cutoff: Millis) -> [Journey] {
     var rows = Dictionary(earlier.filter { $0.departure >= cutoff }.map { ($0.key, $0) }, uniquingKeysWith: { _, last in last })
     current.forEach { rows[$0.key] = $0 }
     return rows.values.sorted { $0.effectiveDeparture < $1.effectiveDeparture }
 }
 
-struct JourneyRecommendation: Equatable, Sendable {
-    var journey: Journey
-    var board: BoardData
-}
-
 struct OfflinePlanResult: Equatable, Sendable {
     var board: BoardData
     var recommendation: JourneyRecommendation?
+}
+
+/// What the shown lead was observed in: fresh live data, or this refresh's own timetable plan when offline.
+func shownLeadEvidence(
+    _ shown: JourneyRecommendation,
+    timetable: OfflinePlanResult?,
+    now: Millis,
+    maxTransfers: Int?
+) -> JourneyRecommendation? {
+    if recommendationIsFresh(shown, now: now, maxTransfers: maxTransfers) { return shown }
+    guard let timetable, !shown.journey.cancelled else { return nil }
+    if let planned = timetable.recommendation, planned.journey.key == shown.journey.key, planned.journey.retained != true {
+        return planned
+    }
+    return timetable.board.journeys
+        .first { $0.key == shown.journey.key && $0.retained != true && !$0.cancelled }
+        .map { JourneyRecommendation(journey: $0, board: timetable.board) }
 }
 
 private let pastBoardRetention: Millis = 86_400_000
