@@ -348,7 +348,6 @@ private struct MediumBoard: View {
                 BoardRowView(
                     journey: journey,
                     now: content.date,
-                    lead: journey.key == content.lead?.key,
                     pinned: journey.key == content.lead?.key && content.answer?.focus?.pinned == true && content.replaced == nil,
                     style: style
                 )
@@ -371,7 +370,6 @@ private struct MediumBoard: View {
 private struct BoardRowView: View {
     let journey: Journey
     let now: Millis
-    let lead: Bool
     let pinned: Bool
     let style: WidgetStyle
 
@@ -383,7 +381,7 @@ private struct BoardRowView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: 9) {
                 Text(clockTime(journey.effectiveDeparture))
-                    .font(.system(size: 21, weight: scheduled ? .ultraLight : lead ? .light : .thin))
+                    .font(.system(size: 21, weight: scheduled ? .ultraLight : .light))
                     .tracking(-0.6)
                     .foregroundStyle(style.clock(journey, now: now, includesHorizon: true))
                     .strikethrough(journey.cancelled)
@@ -456,7 +454,7 @@ private struct MediumSteps: View {
                 let done = index < next
                 HStack(alignment: .center, spacing: 9) {
                     Text(clockTime(step.time))
-                        .font(.system(size: 21, weight: index == next ? .light : .thin)).tracking(-0.6)
+                        .font(.system(size: 21, weight: .light)).tracking(-0.6)
                         .foregroundStyle(done ? colors.ink3 : colors.ink)
                         .lineLimit(1)
                         .frame(width: 58, alignment: .leading)
