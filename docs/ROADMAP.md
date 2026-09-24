@@ -22,7 +22,8 @@ the anonymous counters in `docs/contracts/analytics.md`.
   best alternative. Recovery lives in the header, never as a control in the
   cancelled journey detail (`docs/contracts/ui.md`).
 - Known accepted gap to watch: right trip, wrong service (missed the 09:24,
-  caught the 09:39). Revisit only if it bites.
+  caught the 09:39). The `service` share of `pinned_<kind>` measures it
+  (`docs/contracts/analytics.md`); revisit if that share bites.
 
 ## Usability hardening
 Every item is a measured complaint from a real phone, not a hypothesis.
@@ -48,17 +49,26 @@ geometric. Observations waiting on an owner ruling:
   the ridden leg alone. Which axis does the owner want?
 
 ## Routing that just works
-- Investigate slow native offline searches across the captured Sunday metro
-  gap. On 13 September 2026, iOS's existing Sunday integration case took 46s;
-  the live-date offline UI drive remained at “Opening timetable” beyond 25s.
-  Check whether the 30s refresh can keep cancelling an unfinished search.
+- Offline searches on closed-line days take minutes: the app's board request
+  across the captured Sunday metro gap took 155 s on Android and over 240 s
+  in the iOS drive (2026-09-23). The refresh no longer cancels them, so they
+  finish. [Offline router speed](backlog/offline-router-speed/design.md).
 - Tune the server transfer floor (`MIN_CONNECTION_TIME`) from real
   connections rather than defaults; never show a trip the user would not
   take.
 - Disruption and trackwork awareness surfaced on saved trips and in the
   header.
-- Handle replacement stop patterns and platform changes across web, Android
-  and iOS: [replacement trips](backlog/realtime-replacements/design.md).
+- Stop phones falsely cancelling or dropping replaced trains, and show their
+  new platforms and ends: [replacement trips](backlog/realtime-replacements/design.md).
+- Full replacement routing on phones was narrowed out on 2026-09-14:
+  boarding at stations a replacement adds, services moved into the search
+  window, and the declined “No longer stops at {station}” wording. Only
+  revisit it with new evidence that riders need it. NSW TrainLink, Metro and
+  Ferries replacements, which carry stop sequences, keep exact matching until
+  they are captured and checked.
+- Replacement updates whose times run backwards. In the 2026-09-06 capture,
+  `N782.442.149.128.D.6.91065721` lists Ourimbah to Gosford about an hour
+  late. Phones show those feed times for matched stops today.
 - Consider locally routing added services without a static timetable trip;
   separate from replacement trips and dependent on complete feed metadata.
 - No routing configuration surface beyond the transfer limit row

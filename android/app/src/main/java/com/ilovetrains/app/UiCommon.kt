@@ -56,17 +56,18 @@ fun Rule(modifier: Modifier = Modifier, heavy: Boolean = false) {
 }
 
 @Composable
-fun Freshness(board: BoardData?, now: Long, modifier: Modifier = Modifier) {
+fun Freshness(board: BoardData?, now: Long, awaiting: Boolean, modifier: Modifier = Modifier) {
     if (board == null) return
     val c = LocalTrainColors.current
     val live = board.isLive(now)
-    val stale = board.offline || now - board.generatedAt > 90_000
-    val text = freshnessText(board, now)
+    val resting = freshnessRests(board, now, awaiting)
+    val stale = !resting && (board.offline || now - board.generatedAt > 90_000)
+    val text = if (resting) "" else freshnessText(board, now)
     Row(modifier.heightIn(min = 36.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(5.dp).clip(RoundedCornerShape(50)).background(
             if (live) c.live else if (stale) c.warning else c.ink3))
         Spacer(Modifier.width(8.dp))
-        Label(text, color = if (board.offline) c.warning else c.ink3)
+        Label(text, color = if (board.offline && !resting) c.warning else c.ink3)
     }
 }
 
@@ -77,6 +78,9 @@ fun freshnessText(board: BoardData, now: Long): String = when {
     board.isLive(now) -> "Live"
     else -> "Updated ${ageText(now - board.generatedAt)} ago"
 }
+
+/** A board painted before the first answer since opening is not yet offline. */
+fun freshnessRests(board: BoardData, now: Long, awaiting: Boolean) = awaiting && !board.isLive(now)
 
 fun ageText(age: Long): String = when {
     age < 60_000 -> "${(age.coerceAtLeast(0) / 1000)}s"

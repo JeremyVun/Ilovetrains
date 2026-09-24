@@ -796,11 +796,13 @@ function cacheAndAttributionScript() {
     t.state.doc.lastOpen = null;
     history.replaceState(null, '', '#/');
     t.route();
-    await waitFor(() => document.querySelector('.hm-fresh .pulse.stale'), 'cached server-stale source lost its neutral dot');
-    assert(document.querySelector('.hm-fresh .lbl').textContent !== 'Live', 'cached server-stale source was labeled Live');
+    // Until the changed trip's first request answers, freshness rests over the cached board (ui.md).
+    await waitFor(() => document.querySelector('.hm-fresh .pulse.idle'), 'cached server-stale source did not rest before its first answer');
+    assert(document.querySelector('.hm-fresh .lbl').textContent === '', 'cached server-stale source was labeled before its first answer');
     const firstHome = pending.at(-1);
     firstHome.resolve(new Response(${JSON.stringify(JSON.stringify(trainBody))}, { status: 200 }));
     await sleep(50);
+    assert(!document.querySelector('.hm-fresh .pulse.idle'), 'freshness still rested after the first answer');
     assert(t.state.doc.lastOpen === null, 'preference-caused refresh wrote lastOpen attribution');
     t.refresh();
     await waitFor(() => pending.at(-1) !== firstHome, 'independent refresh did not start');

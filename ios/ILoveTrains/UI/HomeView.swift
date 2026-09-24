@@ -111,7 +111,7 @@ private struct SmartLoadingHeader: View {
         VStack(spacing: 0) {
             HStack {
                 TrainLabel(text: "Next train", color: colors.ink2, size: 11)
-                Spacer(); FreshnessView(board: board, now: model.state.now)
+                Spacer(); FreshnessView(board: board, now: model.state.now, awaiting: model.state.awaitingAnswer)
             }.padding(.horizontal, pagePadding).frame(minHeight: 22)
             HStack {
                 Text(copy).font(.system(size: 15, weight: .light)).foregroundStyle(colors.ink2)
@@ -195,7 +195,7 @@ private struct SmartHeader: View {
                 } else {
                     TrainLabel(text: status, color: statusWarning ? colors.warning : colors.ink2, size: 11)
                 }
-                Spacer(); FreshnessView(board: board, now: model.state.now)
+                Spacer(); FreshnessView(board: board, now: model.state.now, awaiting: model.state.awaitingAnswer)
             }.padding(.horizontal, pagePadding).frame(minHeight: pinned ? 44 : 22)
 
             Button { model.openJourney(journey) } label: {

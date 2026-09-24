@@ -77,7 +77,7 @@ private fun SmartLoadingHeader(state: AppState, board: BoardData?, actions: UiAc
         Row(Modifier.fillMaxWidth().heightIn(min = 22.dp).padding(horizontal = PagePadding), verticalAlignment = Alignment.CenterVertically) {
             Label("Next train", color = c.ink2, size = 11)
             Spacer(Modifier.weight(1f))
-            if (board != null) Freshness(board, state.now)
+            if (board != null) Freshness(board, state.now, state.awaitingAnswer)
         }
         Row(Modifier.fillMaxWidth().heightIn(min = 126.dp).padding(horizontal = PagePadding), verticalAlignment = Alignment.CenterVertically) {
             Text(when {
@@ -156,7 +156,7 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
                 }
             }
             Spacer(Modifier.weight(1f))
-            Freshness(board, state.now)
+            Freshness(board, state.now, state.awaitingAnswer)
         }
         Row(Modifier.fillMaxWidth().clickable(role = Role.Button) { actions.openJourney(journey) }
             .testTag("home-journey").padding(horizontal = PagePadding, vertical = 10.dp), verticalAlignment = Alignment.Top) {

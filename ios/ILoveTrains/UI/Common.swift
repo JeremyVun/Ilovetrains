@@ -50,24 +50,31 @@ struct BackControl: View {
 struct FreshnessView: View {
     let board: BoardData?
     let now: Millis
+    let awaiting: Bool
     @Environment(\.trainColors) private var colors
 
     var body: some View {
         if let board {
-            let scheduled = board.source == "schedule"
+            let resting = freshnessRests(board, now: now, awaiting: awaiting)
+            let scheduled = !resting && board.source == "schedule"
             let live = board.isLive(now)
-            let stale = !scheduled && !live
-            let copy = freshnessText(board, now: now)
+            let stale = !resting && !scheduled && !live
+            let copy = resting ? "" : freshnessText(board, now: now)
             HStack(spacing: 8) {
                 Circle().fill(live ? colors.live : (stale || scheduled ? colors.warning : colors.ink3))
                     .frame(width: 5, height: 5)
-                TrainLabel(text: copy, color: board.offline || scheduled ? colors.warning : colors.ink3)
+                TrainLabel(text: copy, color: !resting && (board.offline || scheduled) ? colors.warning : colors.ink3)
             }
             .frame(minHeight: 36)
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("freshness")
         }
     }
+}
+
+/// A board painted before the first answer since opening is not yet offline.
+func freshnessRests(_ board: BoardData, now: Millis, awaiting: Bool) -> Bool {
+    awaiting && !board.isLive(now)
 }
 
 struct ActionRail: View {

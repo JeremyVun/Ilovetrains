@@ -85,6 +85,7 @@ data class AppState(
     val selectedTripId: String? = null, val reverse: Boolean = false, val board: BoardData? = null,
     val homeBoard: BoardData? = null, val detail: Journey? = null, val focus: FocusedJourney? = null,
     val now: Long = System.currentTimeMillis(), val refreshing: Boolean = false,
+    val boardAnswerPending: Boolean = false, val focusAnswerPending: Boolean = false,
     val appearance: Appearance = Appearance.System, val enabledModes: Set<String> = AllModes,
     // Null while the transferLimit flag is off, which is when Settings offers no choice.
     val transferLimit: TransferLimit? = null,
@@ -108,6 +109,7 @@ data class AppState(
 ) {
     val selectedTrip get() = trips.find { it.id == selectedTripId }
     val shownBoard get() = if (screen == Screen.Home) homeBoard ?: board else board
+    val awaitingAnswer get() = boardAnswerPending || focusAnswerPending && focus != null
 }
 interface UiActions {
     fun back()

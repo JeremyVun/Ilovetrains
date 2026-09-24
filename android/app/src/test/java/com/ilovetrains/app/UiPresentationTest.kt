@@ -24,6 +24,19 @@ class UiPresentationTest {
         assertEquals("Platform 5", platformText("5", "train", full = true))
     }
 
+    @Test fun freshnessRestsUntilTheFirstAnswerUnlessTheBoardIsAlreadyLive() {
+        val now = 1_000_000L
+        val timetable = BoardData(a, b, emptyList(), now, source = "schedule", offline = true)
+        val saved = BoardData(a, b, emptyList(), now - 600_000, source = "live", offline = true)
+        val live = BoardData(a, b, emptyList(), now - 10_000, source = "live")
+
+        assertTrue(freshnessRests(timetable, now, awaiting = true))
+        assertTrue(freshnessRests(saved, now, awaiting = true))
+        assertFalse(freshnessRests(live, now, awaiting = true))
+        assertFalse(freshnessRests(timetable, now, awaiting = false))
+        assertFalse(freshnessRests(saved, now, awaiting = false))
+    }
+
     @Test fun focusStatusUsesTheActiveLegAndNeedsFreshLiveDataForLate() {
         val now = 1_000_000L
         val first = Leg("T1", "train", "Beta", a, b, now - 600_000, now - 60_000)

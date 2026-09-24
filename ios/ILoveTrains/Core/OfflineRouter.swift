@@ -98,7 +98,37 @@ struct OfflineRouter: Sendable {
 
     private struct StateKey: Hashable {
         var transfers: Int
-        var value: String
+        var mode: String
+        var trip: Int
+        var sequence: Int
+    }
+
+    private struct StationSet {
+        private var words: [UInt64]
+
+        init(count: Int) { words = Array(repeating: 0, count: (count + 63) / 64) }
+
+        func contains(_ station: Int) -> Bool { words[station >> 6] & (1 << UInt64(station & 63)) != 0 }
+
+        func adding(_ station: Int) -> StationSet {
+            if contains(station) { return self }
+            var next = self
+            next.words[station >> 6] |= 1 << UInt64(station & 63)
+            return next
+        }
+
+        func isSubset(of other: StationSet) -> Bool {
+            for index in words.indices where words[index] & ~other.words[index] != 0 { return false }
+            return true
+        }
+    }
+
+    private struct RoutingIndex {
+        var trips: [Int] = []
+        var fromStations: [Int] = []
+        var toStations: [Int] = []
+        var remainingTransfers: [Int] = []
+        var stationCount = 0
     }
 
     private struct TripStateKey: Hashable {
@@ -116,7 +146,8 @@ struct OfflineRouter: Sendable {
         var firstDeparture: Millis
         var transfers: Int
         var node: PathNode
-        var visitedStations: Set<String>
+        var visited: StationSet
+        var tripCode: Int
         var longWaitEnds: Set<Millis>
         var identity: [ServiceOrder]
     }
@@ -150,7 +181,7 @@ struct OfflineRouter: Sendable {
         guard from.id != to.id, limit > 0,
               connections.contains(where: { $0.toStationId == to.id && $0.dropOffType == 0 && !$0.cancelled }) else { return [] }
         let bound = maxTransfers ?? self.maxTransfers
-        let remainingTransfers = transferDistances(to: to.id, connections: connections, isCancelled: isCancelled)
+        guard let routing = routingIndex(to: to.id, connections: connections, isCancelled: isCancelled) else { return [] }
 
         var seenTrips = Set<String>()
         var seeds: [Int] = []
@@ -186,7 +217,7 @@ struct OfflineRouter: Sendable {
                 seed: connections[index],
                 connections: connections,
                 maxTransfers: bound,
-                remainingTransfers: remainingTransfers,
+                routing: routing,
                 isCancelled: isCancelled
             ) {
                 candidates.append(result)
@@ -220,7 +251,7 @@ struct OfflineRouter: Sendable {
         guard from.id != to.id,
               connections.contains(where: { $0.toStationId == to.id && $0.dropOffType == 0 && !$0.cancelled }) else { return nil }
         let bound = maxTransfers ?? self.maxTransfers
-        let remainingTransfers = transferDistances(to: to.id, connections: connections, isCancelled: isCancelled)
+        guard let routing = routingIndex(to: to.id, connections: connections, isCancelled: isCancelled) else { return nil }
         var seenTrips = Set<String>()
         var candidates: [Label] = []
         var bestCost = Millis.infinity
@@ -243,7 +274,7 @@ struct OfflineRouter: Sendable {
                 connections: connections,
                 maxTransfers: bound,
                 stopAfterEarliest: false,
-                remainingTransfers: remainingTransfers,
+                routing: routing,
                 searchEnd: bestCost,
                 isCancelled: isCancelled
             )
@@ -265,7 +296,7 @@ struct OfflineRouter: Sendable {
         seed: ScheduledConnection,
         connections: [ScheduledConnection],
         maxTransfers: Int,
-        remainingTransfers: [String: Int],
+        routing: RoutingIndex,
         isCancelled: () -> Bool
     ) -> Label? {
         routeSeedCandidates(
@@ -275,7 +306,7 @@ struct OfflineRouter: Sendable {
             connections: connections,
             maxTransfers: maxTransfers,
             stopAfterEarliest: true,
-            remainingTransfers: remainingTransfers,
+            routing: routing,
             isCancelled: isCancelled
         ).min { betterDestination($0, than: $1, weighted: false) }
     }
@@ -287,27 +318,30 @@ struct OfflineRouter: Sendable {
         connections: [ScheduledConnection],
         maxTransfers: Int,
         stopAfterEarliest: Bool,
-        remainingTransfers: [String: Int],
+        routing: RoutingIndex,
         searchEnd: Millis = .infinity,
         isCancelled: () -> Bool
     ) -> [Label] {
         guard seed.effectiveArrival >= seed.effectiveDeparture,
-              let seedRemaining = remainingTransfers[seed.tripKey], seedRemaining <= maxTransfers else { return [] }
+              routing.remainingTransfers[startIndex] <= maxTransfers else { return [] }
+        let seedTrip = routing.trips[startIndex]
         let seedLabel = Label(
             arrival: seed.effectiveArrival,
             firstDeparture: seed.effectiveDeparture,
             transfers: 0,
             node: PathNode(connection: seed, previous: nil),
-            visitedStations: [seed.fromStationId, seed.toStationId],
+            visited: StationSet(count: routing.stationCount)
+                .adding(routing.fromStations[startIndex]).adding(routing.toStations[startIndex]),
+            tripCode: seedTrip,
             longWaitEnds: [],
             identity: [ServiceOrder(line: seed.line, departure: seed.departure)]
         )
-        var stationLabels: [String: [StateKey: [Label]]] = [:]
-        var tripLabels: [String: [TripStateKey: [Label]]] = [
-            seed.tripKey: [TripStateKey(transfers: 0, sequence: seed.toSequence): [seedLabel]]
+        var stationLabels: [Int: [StateKey: [Label]]] = [:]
+        var tripLabels: [Int: [TripStateKey: [Label]]] = [
+            seedTrip: [TripStateKey(transfers: 0, sequence: seed.toSequence): [seedLabel]]
         ]
         if seed.dropOffType == 0, maxTransfers > 0 {
-            addStationLabel(&stationLabels, station: seed.toStationId, candidate: seedLabel)
+            addStationLabel(&stationLabels, station: routing.toStations[startIndex], candidate: seedLabel)
         }
         var destinations = seed.toStationId == destination && seed.dropOffType == 0 ? [seedLabel] : []
 
@@ -326,27 +360,36 @@ struct OfflineRouter: Sendable {
             if stopAfterEarliest,
                let best = destinations.min(by: { betterDestination($0, than: $1, weighted: false) }),
                connection.effectiveDeparture > best.arrival { break }
-            guard let transfersNeeded = remainingTransfers[connection.tripKey] else { continue }
-            let onboard = tripLabels[connection.tripKey]
-            let waiting = stationLabels[connection.fromStationId]
+            let transfersNeeded = routing.remainingTransfers[index]
+            if transfersNeeded > maxTransfers { continue }
+            let tripCode = routing.trips[index]
+            let fromStation = routing.fromStations[index]
+            let toStation = routing.toStations[index]
+            let onboard = tripLabels[tripCode]
+            let waiting = stationLabels[fromStation]
             if onboard == nil && waiting == nil { continue }
 
             var nextLabels: [(Label, Bool)] = []
-            onboard?.filter { $0.key.sequence == connection.fromSequence }.values.joined().forEach { label in
-                if label.node.connection.toSequence == connection.fromSequence,
-                   label.arrival <= connection.effectiveDeparture,
-                   label.transfers + transfersNeeded <= maxTransfers {
-                    nextLabels.append((label, false))
+            if let onboard {
+                for transfers in 0...maxTransfers {
+                    for label in onboard[TripStateKey(transfers: transfers, sequence: connection.fromSequence)] ?? []
+                    where label.node.connection.toSequence == connection.fromSequence
+                        && label.arrival <= connection.effectiveDeparture
+                        && label.transfers + transfersNeeded <= maxTransfers {
+                        nextLabels.append((label, false))
+                    }
                 }
             }
-            waiting?.values.joined().forEach { label in
-                let wait = connection.effectiveDeparture - label.arrival
-                if label.node.connection.tripKey != connection.tripKey,
-                   label.transfers + 1 + transfersNeeded <= maxTransfers,
-                   connection.pickupType == 0,
-                   wait >= transferMillis(previous: label.node.connection, next: connection, stationId: connection.fromStationId),
-                   !label.visitedStations.contains(connection.toStationId) {
-                    nextLabels.append((label, true))
+            if let waiting {
+                for label in waiting.values.joined() {
+                    let wait = connection.effectiveDeparture - label.arrival
+                    if label.tripCode != tripCode,
+                       label.transfers + 1 + transfersNeeded <= maxTransfers,
+                       connection.pickupType == 0,
+                       wait >= transferMillis(previous: label.node.connection, next: connection, stationId: connection.fromStationId),
+                       !label.visited.contains(toStation) {
+                        nextLabels.append((label, true))
+                    }
                 }
             }
 
@@ -360,18 +403,19 @@ struct OfflineRouter: Sendable {
                     firstDeparture: prior.firstDeparture,
                     transfers: prior.transfers + (transferring ? 1 : 0),
                     node: PathNode(connection: connection, previous: prior.node),
-                    visitedStations: prior.visitedStations.union([connection.fromStationId, connection.toStationId]),
+                    visited: prior.visited.adding(fromStation).adding(toStation),
+                    tripCode: tripCode,
                     longWaitEnds: waits,
                     identity: transferring ? prior.identity + [ServiceOrder(line: connection.line, departure: connection.departure)] : prior.identity
                 )
                 let tripState = TripStateKey(transfers: next.transfers, sequence: connection.toSequence)
-                let existingTripLabels = tripLabels[connection.tripKey]?[tripState] ?? []
+                let existingTripLabels = tripLabels[tripCode]?[tripState] ?? []
                 if existingTripLabels.contains(where: { dominates($0, next) }) { continue }
-                tripLabels[connection.tripKey, default: [:]][tripState] =
+                tripLabels[tripCode, default: [:]][tripState] =
                     existingTripLabels.filter { !dominates(next, $0) } + [next]
                 if connection.dropOffType == 0 {
                     if next.transfers < maxTransfers {
-                        addStationLabel(&stationLabels, station: connection.toStationId, candidate: next)
+                        addStationLabel(&stationLabels, station: toStation, candidate: next)
                     }
                     if connection.toStationId == destination {
                         destinations.append(next)
@@ -383,6 +427,31 @@ struct OfflineRouter: Sendable {
             }
         }
         return destinations
+    }
+
+    private func routingIndex(to destination: String, connections: [ScheduledConnection], isCancelled: () -> Bool) -> RoutingIndex? {
+        let distances = transferDistances(to: destination, connections: connections, isCancelled: isCancelled)
+        var tripCodes: [String: Int] = [:]
+        var stationCodes: [String: Int] = [:]
+        func code(_ key: String, in codes: inout [String: Int]) -> Int {
+            if let value = codes[key] { return value }
+            codes[key] = codes.count
+            return codes.count - 1
+        }
+        var routing = RoutingIndex()
+        routing.trips.reserveCapacity(connections.count)
+        routing.fromStations.reserveCapacity(connections.count)
+        routing.toStations.reserveCapacity(connections.count)
+        routing.remainingTransfers.reserveCapacity(connections.count)
+        for (index, connection) in connections.enumerated() {
+            if index.isMultiple(of: 256), isCancelled() { return nil }
+            routing.trips.append(code(connection.tripKey, in: &tripCodes))
+            routing.fromStations.append(code(connection.fromStationId, in: &stationCodes))
+            routing.toStations.append(code(connection.toStationId, in: &stationCodes))
+            routing.remainingTransfers.append(distances[connection.tripKey] ?? .max)
+        }
+        routing.stationCount = stationCodes.count
+        return routing
     }
 
     private func transferDistances(to destination: String, connections: [ScheduledConnection], isCancelled: () -> Bool) -> [String: Int] {
@@ -435,11 +504,16 @@ struct OfflineRouter: Sendable {
     }
 
     private func addStationLabel(
-        _ labels: inout [String: [StateKey: [Label]]],
-        station: String,
+        _ labels: inout [Int: [StateKey: [Label]]],
+        station: Int,
         candidate: Label
     ) {
-        let key = StateKey(transfers: candidate.transfers, value: candidate.node.connection.mode + "\0" + candidate.node.connection.tripKey + "\0" + String(candidate.node.connection.toSequence))
+        let key = StateKey(
+            transfers: candidate.transfers,
+            mode: candidate.node.connection.mode,
+            trip: candidate.tripCode,
+            sequence: candidate.node.connection.toSequence
+        )
         let existing = labels[station]?[key] ?? []
         if existing.contains(where: { dominates($0, candidate) }) { return }
         labels[station, default: [:]][key] = existing.filter { !dominates(candidate, $0) } + [candidate]
@@ -447,7 +521,7 @@ struct OfflineRouter: Sendable {
 
     private func dominates(_ existing: Label, _ candidate: Label) -> Bool {
         guard existing.arrival <= candidate.arrival,
-              existing.visitedStations.isSubset(of: candidate.visitedStations),
+              existing.visited.isSubset(of: candidate.visited),
               existing.longWaitEnds.isSubset(of: candidate.longWaitEnds) else { return false }
         if existing.arrival != candidate.arrival { return true }
         if existing.firstDeparture != candidate.firstDeparture { return existing.firstDeparture < candidate.firstDeparture }
