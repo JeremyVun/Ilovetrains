@@ -206,28 +206,33 @@ class WidgetSnapshotTest {
         assertNull(contents[5].next)
     }
 
-    @Test fun eachDepartureIsRedrawnALeadEarlySoTheCountdownNeverPassesZero() {
+    @Test fun redrawsLandBeforeEachDepartureHoweverLateTheJobRuns() {
         val now = at("2026-09-28T08:00:00+10:00")
         val data = habits()
         val snapshot = widgetSnapshot(data, widgetSchedule(data, emptyList(), now), emptyList(), now)
         val request = widgetRequest(widgetAnswer(snapshot, now)!!, snapshot, now)
-        val departures = listOf(240_000L, 270_000L, 660_000L).map { service(rhodes, central, now + it, 25) }
+        val departures = listOf(240_000L, 250_000L, 660_000L, 1_560_000L).map { service(rhodes, central, now + it, 25) }
         val sources = mapOf(request.key to BoardData(rhodes, central, departures, now - 600_000, source = "live"))
         val until = now + 1_800_000
 
-        assertEquals(WidgetDraw(now, now + 180_000), widgetDraw(snapshot, sources, now, until))
-        assertEquals(WidgetDraw(now + 240_000, now + 210_000), widgetDraw(snapshot, sources, now + 180_000, until))
-        assertEquals(WidgetDraw(now + 270_000, now + 600_000), widgetDraw(snapshot, sources, now + 210_000, until))
+        assertEquals(WidgetDraw(now, now + 134_285), widgetDraw(snapshot, sources, now, until))
+        assertEquals(WidgetDraw(now + 240_000, now + 238_571), widgetDraw(snapshot, sources, now + 230_000, until))
         assertEquals(departures[1], widgetContent(snapshot, sources, now + 240_000).next)
-        assertEquals(departures[2], widgetContent(snapshot, sources, now + 270_000).next)
-        var run = now
-        while (true) {
-            val draw = widgetDraw(snapshot, sources, run, until)
-            val lead = widgetContent(snapshot, sources, draw.at).next ?: break
-            val redraw = draw.redraw ?: break
-            assertTrue(redraw > run)
-            assertTrue(lead.effectiveDeparture - redraw >= WidgetRedrawLead)
-            run = redraw
+        // A job runs between on time and three quarters of its delay late.
+        for (late in listOf(0.0, .4, .75)) {
+            var run = now
+            var shown = widgetContent(snapshot, sources, run).next!!
+            while (true) {
+                val draw = widgetDraw(snapshot, sources, run, until)
+                val lead = widgetContent(snapshot, sources, draw.at).next ?: break
+                if (lead != shown) assertTrue(run >= shown.effectiveDeparture - WidgetRedrawLead)
+                shown = lead
+                val redraw = draw.redraw ?: break
+                val next = redraw + ((redraw - run) * late).toLong()
+                assertTrue(next > run)
+                assertTrue(lead.effectiveDeparture > next)
+                run = next
+            }
         }
     }
 

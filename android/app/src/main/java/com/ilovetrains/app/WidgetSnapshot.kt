@@ -9,8 +9,11 @@ const val WidgetScheduleHours = 168
 const val WidgetBoardLimit = 8
 const val WidgetLiveRefresh = 15 * 60_000L
 const val WidgetFollowingLimit = 4
-// WorkManager ran departure redraws 18 and 27 s late on an idle, charging Pixel emulator; the chronometer counts below zero until one runs.
-const val WidgetRedrawLead = 60_000L
+// The chronometer counts below zero until a redraw runs, so a boundary this close is drawn as already passed.
+const val WidgetRedrawLead = 15_000L
+// JobScheduler holds a delayed job's alarm for up to three quarters of the delay (measured: 101 s late on a 136 s delay).
+private const val JobLateness = 1.75
+private const val RedrawMargin = 5_000L
 private const val HourMillis = 3_600_000L
 
 data class WidgetStop(val id: String, val name: String, val modes: List<String>) {
@@ -173,12 +176,15 @@ fun widgetContent(snapshot: WidgetSnapshot, sources: Map<String, BoardData>, t: 
 
 data class WidgetDraw(val at: Long, val redraw: Long?)
 
-/** Each boundary is drawn [WidgetRedrawLead] early, so a train leaves the widget before its countdown can pass zero. */
+/**
+ * The next boundary is approached in redraws that each land before it however late the job runs, and one within
+ * [WidgetRedrawLead] draws the widget as it stands after the boundary, so a countdown never passes zero.
+ */
 fun widgetDraw(snapshot: WidgetSnapshot, sources: Map<String, BoardData>, now: Long, until: Long): WidgetDraw {
     var at = now
     while (true) {
         val next = widgetNextBoundary(snapshot, sources, at, until) ?: return WidgetDraw(at, null)
-        if (next - WidgetRedrawLead > now) return WidgetDraw(at, next - WidgetRedrawLead)
+        if (next - now > WidgetRedrawLead) return WidgetDraw(at, now + ((next - now - RedrawMargin) / JobLateness).toLong())
         at = next
     }
 }
