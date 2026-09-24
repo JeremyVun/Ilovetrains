@@ -1,7 +1,10 @@
 package com.ilovetrains.app
 
+import android.util.Log
 import androidx.glance.appwidget.GlanceAppWidgetManager
+import androidx.glance.appwidget.state.getAppWidgetState
 import androidx.glance.appwidget.state.updateAppWidgetState
+import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.appwidget.updateAll
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -9,13 +12,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assume.assumeTrue
 import org.junit.Test
+import org.json.JSONObject
 import org.junit.runner.RunWith
 import java.time.LocalTime
 import java.time.ZonedDateTime
 
 /**
  * Seeds every placed home widget with one of the comps round's scenarios, shifted to the current minute, and
- * stops the widget's own refresh so the capture is not overwritten; `refresh` hands it back to live data.
+ * stops the widget's own refresh so the capture is not overwritten; `refresh` hands it back to live data, and
+ * `probe` logs (tag WidgetProbe) the view each placed widget draws at every size the launcher reports.
  * Skipped unless a scenario is named:
  * `adb shell am instrument -w -e class com.ilovetrains.app.HomeWidgetScenarios -e scenario late
  * com.ilovetrains.app.test/androidx.test.runner.AndroidJUnitRunner`.
@@ -30,6 +35,19 @@ class HomeWidgetScenarios {
         if (name == "refresh") {
             HomeWidgetWork.refresh(context)
             delay(10_000)
+            return@runBlocking
+        }
+        if (name == "probe") {
+            val manager = GlanceAppWidgetManager(context)
+            val measure = PaintWidgetMeasure(context)
+            manager.getGlanceIds(HomeTripWidget::class.java).forEach { id ->
+                val content = getAppWidgetState(context, PreferencesGlanceStateDefinition, id)[WidgetContentKey]
+                    ?.let { WidgetWire.content(JSONObject(it)) }
+                manager.getAppWidgetSizes(id).forEach { size ->
+                    "$id ${size.width.value}x${size.height.value} ${widgetView(content, size.width.value, size.height.value, measure)}"
+                        .chunked(3000).forEach { Log.i("WidgetProbe", it) }
+                }
+            }
             return@runBlocking
         }
         val content = requireNotNull(scenario(name!!, System.currentTimeMillis())) { "Unknown scenario $name" }

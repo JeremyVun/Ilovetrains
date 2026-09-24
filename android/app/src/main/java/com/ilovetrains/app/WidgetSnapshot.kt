@@ -9,6 +9,8 @@ const val WidgetScheduleHours = 168
 const val WidgetBoardLimit = 8
 const val WidgetLiveRefresh = 15 * 60_000L
 const val WidgetFollowingLimit = 4
+// WorkManager ran departure redraws 18 and 27 s late on an idle, charging Pixel emulator; the chronometer counts below zero until one runs.
+const val WidgetRedrawLead = 60_000L
 private const val HourMillis = 3_600_000L
 
 data class WidgetStop(val id: String, val name: String, val modes: List<String>) {
@@ -167,6 +169,18 @@ fun widgetContent(snapshot: WidgetSnapshot, sources: Map<String, BoardData>, t: 
             it.effectiveDeparture > maxOf(t, lead.journey.effectiveDeparture - 1)
     }.sortedBy { it.effectiveDeparture }.take(WidgetFollowingLimit)
     return WidgetContent(t, answer, board, lead.journey, following, provenance, lead.cancelledLead)
+}
+
+data class WidgetDraw(val at: Long, val redraw: Long?)
+
+/** Each boundary is drawn [WidgetRedrawLead] early, so a train leaves the widget before its countdown can pass zero. */
+fun widgetDraw(snapshot: WidgetSnapshot, sources: Map<String, BoardData>, now: Long, until: Long): WidgetDraw {
+    var at = now
+    while (true) {
+        val next = widgetNextBoundary(snapshot, sources, at, until) ?: return WidgetDraw(at, null)
+        if (next - WidgetRedrawLead > now) return WidgetDraw(at, next - WidgetRedrawLead)
+        at = next
+    }
 }
 
 fun widgetNextBoundary(snapshot: WidgetSnapshot, sources: Map<String, BoardData>, after: Long, until: Long): Long? {

@@ -110,18 +110,21 @@ class HomeWidgetWorker(context: Context, params: WorkerParameters) : CoroutineWo
         }
         val now = System.currentTimeMillis()
         val snapshot = DeviceStore(context).widget() ?: WidgetSnapshot(now, emptyList(), emptyList(), null, emptyList(), null, emptyList())
-        val sources = widgetAnswer(snapshot, now)?.let { answer ->
-            val request = widgetRequest(answer, snapshot, now)
-            val cache = WidgetDepartureCache(File(context.cacheDir, "widget-departures.json"))
-            val fetched = cache.fresh(request.key, now) ?: runCatching {
-                TransitApi().departures(request.from, request.to, request.modes, request.at, request.transferLimit)
-            }.getOrNull()?.also { cache.put(request.key, it, now) }
-            widgetSource(request, fetched)?.let { mapOf(request.key to it) }
-        }.orEmpty()
-        val json = WidgetWire.content(widgetContent(snapshot, sources, now)).toString()
+        val cache = WidgetDepartureCache(File(context.cacheDir, "widget-departures.json"))
+        // Boundaries are drawn early, so an answer that changes within the lead needs its board now.
+        val sources = listOfNotNull(widgetAnswer(snapshot, now), widgetAnswer(snapshot, now + WidgetRedrawLead))
+            .map { widgetRequest(it, snapshot, now) }.distinctBy { it.key }
+            .mapNotNull { request ->
+                val fetched = cache.fresh(request.key, now) ?: runCatching {
+                    TransitApi().departures(request.from, request.to, request.modes, request.at, request.transferLimit)
+                }.getOrNull()?.also { cache.put(request.key, it, now) }
+                widgetSource(request, fetched)?.let { request.key to it }
+            }.toMap()
+        val draw = widgetDraw(snapshot, sources, now, now + WidgetRenderHorizon)
+        val json = WidgetWire.content(widgetContent(snapshot, sources, draw.at)).toString()
         ids.forEach { id -> updateAppWidgetState(context, id) { it[WidgetContentKey] = json } }
         HomeTripWidget().updateAll(context)
-        widgetNextBoundary(snapshot, sources, now, now + WidgetRenderHorizon)?.let { HomeWidgetWork.redrawAt(context, it - now) }
+        draw.redraw?.let { HomeWidgetWork.redrawAt(context, it - now) }
         return Result.success()
     }
 }
