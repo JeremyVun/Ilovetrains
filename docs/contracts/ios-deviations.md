@@ -85,6 +85,21 @@ the `TO CHANGE` / `TO GO` label in the warning colour as well as the figure and
 status; web keeps them neutral. Because late is granted on an arrival delay,
 this shows whenever the ridden leg loses time en route.
 
+## Home-screen widget
+
+- The widget joins the Live Activity's extension (`TravelTrackerWidget`) and
+  shares the App Group `group.com.ilovetrains.ios` with the app. Unsigned
+  simulator builds (`CODE_SIGNING_ALLOWED=NO`, every helper script) embed no
+  entitlements, so the app publishes nothing and the widget shows its empty
+  state; renderer checks use the locally signed simulator build in
+  `docs/operations/ios.md`. Device builds need the group registered to the
+  team.
+- Timeline entries fall on every minute boundary plus each departure and
+  arrival, so the minutes and steps advance without reloads. Live data
+  reloads at most every 15 minutes, within WidgetKit's daily budget.
+- iOS 26 draws a sheen over the top of every widget and places lock-screen
+  widgets below the clock at the bottom of the screen.
+
 ## Foreground arrival evidence
 
 While a stored focus is under way, the existing foreground location owner can

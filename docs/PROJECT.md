@@ -167,6 +167,10 @@ moves through are binding in `docs/contracts/ui.md`.
   “Use my location”, fills a confidently identified nearby station, and focuses
   the destination. Uncertain locations offer station choices; failure or denial
   leaves a clear recovery action and manual search available.
+- **Widgets** (Android and iOS): "Next train" on the home screen and the iOS
+  lock screen shows the header's train for the trip the app predicts for this
+  hour, or the pinned one, without opening the app
+  ([ui.md](contracts/ui.md#home-screen-widgets)).
 - Dark is the primary scheme; light is derived by measurement and shipped.
 
 The measured geometry that resulted is recorded as invariants in

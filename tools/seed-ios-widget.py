@@ -6,11 +6,12 @@ answer in place of the network, and the scenario clock) into the App Group
 container, then relaunches the app with ILOVETRAINS_WIDGET_RELOAD=1 so WidgetKit
 asks for a new timeline without the app publishing over the seed.
 
-    seed-widget.py --device UDID --scenario live
-    seed-widget.py --device UDID --clear      # back to the live network
+    tools/seed-ios-widget.py --device UDID --scenario live
+    tools/seed-ios-widget.py --device UDID --clear      # back to the live network
 
-Scenarios come from the comps workshop's wdata.js (SCEN): live, late, cxl, sched,
-stale, pinned, riding, home, ferry, long, none, nodata, empty, wide.
+Scenarios come from tools/fixtures/widgets/scenarios.json (captured fixtures plus
+the deltas it declares): live, late, cxl, sched, stale, pinned, riding, home,
+ferry, long, none, nodata, empty, wide.
 """
 import argparse
 import json
@@ -24,12 +25,12 @@ APP = "com.ilovetrains.ios"
 GROUP = "group.com.ilovetrains.ios"
 
 
-def scenarios(workshop):
-    script = ("const fs=require('fs');const src=fs.readFileSync(process.argv[1],'utf8');"
-              "process.stdout.write(JSON.stringify(new Function(src+';return SCEN;')()));")
-    out = subprocess.run(["node", "-e", script, os.path.join(workshop, "wdata.js")],
-                         check=True, capture_output=True, text=True).stdout
-    return json.loads(out)
+SCENARIOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "widgets", "scenarios.json")
+
+
+def scenarios(path):
+    with open(path) as handle:
+        return json.load(handle)["scenarios"]
 
 
 def millis(hhmm, seconds=0):
@@ -124,7 +125,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--device", required=True)
     parser.add_argument("--scenario")
-    parser.add_argument("--workshop", default="/private/tmp/ilt-5e0c1f-widget-comps-r1")
+    parser.add_argument("--scenarios", default=SCENARIOS)
     parser.add_argument("--clear", action="store_true")
     parser.add_argument("--no-reload", action="store_true")
     args = parser.parse_args()
@@ -134,7 +135,7 @@ def main():
         if os.path.exists(seed_path):
             os.remove(seed_path)
     else:
-        snapshot, seed = build(scenarios(args.workshop)[args.scenario])
+        snapshot, seed = build(scenarios(args.scenarios)[args.scenario])
         with open(os.path.join(group, "widget-v1.json"), "w") as handle:
             json.dump(snapshot, handle)
         with open(seed_path, "w") as handle:

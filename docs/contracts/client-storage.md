@@ -787,6 +787,57 @@ Serial publication and reconciliation prevent older work from restoring a
 replaced session. The iOS execution limits are in
 [ios-deviations.md](ios-deviations.md#persistent-travel-tracker).
 
+## Home-screen widget snapshot
+
+The native home-screen widget reads one app-written snapshot, `widget-v1.json`:
+on iOS in the App Group container `group.com.ilovetrains.ios` shared by the app
+and its widget extension, on Android in app-private `files/`. Only the app
+writes it, through the existing serialized personal-document owner, two seconds
+after the last change to trips, history, focus, service modes, the transfer cap
+or the station index. The widget never writes it and never writes personal
+state.
+
+```json
+{
+  "schemaVersion": 1,
+  "writtenAt": 1789000000000,
+  "trips": [{"id": "uuid", "from": {"id": "213820", "name": "Rhodes Station",
+             "modes": ["train"]}, "to": {"…": "…"}}],
+  "schedule": [{"at": 1789000000000, "tripId": "uuid", "reverse": false}],
+  "focus": {"…": "the visible focused journey, its pin flag and its expiry"},
+  "modes": ["train", "metro", "ferry"],
+  "transferCap": 2,
+  "boards": [{"…": "the last published board per scheduled directed pair"}]
+}
+```
+
+- `trips` holds only compatible saved trips and their stations' ids, names and
+  modes. `schedule` holds 168 consecutive Sydney hour boundaries from the
+  current hour, each the no-location `predict` answer for that instant, reused
+  while its inputs are unchanged. `boards` keeps at most eight upcoming
+  eligible journeys per pair with the fields the retained-board label needs.
+- The snapshot never contains history, home votes, rides, the home station,
+  recent searches, a location fix or any preference beyond modes and the cap.
+- The widget's answer at time `t`: a visible, unexpired focus (the shared
+  displayed-focus predicate and the final-arrival expiry); otherwise the
+  schedule entry whose hour contains `t`; past the schedule's end, the entry a
+  whole number of weeks earlier at the same local weekday and hour. No
+  compatible trip is the empty state, which opens setup.
+- The widget fetches the answer's departures itself with the app's
+  `/api/v1/departures` request (a focus uses the app's focus request), never
+  the offline planner. A failed or unmatched fetch shows the snapshot's board
+  with the provenance of a retained board. Its lead is the header's
+  recommendation from the shared selection code; the following rows are
+  chronological. iOS fetches no further departure pages in the background.
+- The app asks the system to redraw widgets only when the answer changes
+  (trips, schedule, modes, cap, focus identity, pin or expiry), so a
+  30-second board refresh never spends the widget's fetch budget. Test and
+  UI-test storage domains write their own folder, never the shared snapshot.
+- Debug builds accept seeded scenarios for renderer checks: iOS reads
+  `widget-debug-seed.json` from the App Group and reloads timelines when the
+  app launches with `ILOVETRAINS_WIDGET_RELOAD=1`; Android seeds through the
+  `HomeWidgetScenarios` instrumentation. Release builds ignore both.
+
 ## Where the header starts: `locate`
 
 Outside travel mode the header starts where the user is. The controller passes

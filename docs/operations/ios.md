@@ -91,6 +91,17 @@ TEST_RUNNER_HOME_WIDGET_SMOKE=1 xcodebuild -project ios/ILoveTrains.xcodeproj \
   test CODE_SIGN_IDENTITY=-
 ```
 
+Its other opt-in tests add the lock-screen widget (`testAddsLockScreenWidget`),
+switch the home-screen style (`testSetsHomeScreenStyle` with
+`TEST_RUNNER_HOME_WIDGET_STYLE=Tinted` or `Default`) and capture lock-screen
+scenarios in one run (`testCapturesLockScreenScenarios`). Seed a widget
+scenario from `tools/fixtures/widgets/scenarios.json` with
+`tools/seed-ios-widget.py --device <udid> --scenario late` (Debug builds;
+`--clear` returns it to the network), then terminate the app and capture with
+`xcrun simctl io <udid> screenshot`. Any normal app launch republishes the
+snapshot, and `tools/build-ios.sh` installs an unsigned build that removes the
+App Group container, so reinstall the signed build before capturing.
+
 `ios/releases/ILoveTrains.xcarchive` from `--unsigned-archive` is an **unsigned
 Release archive**, useful for inspection and later signing. It cannot be
 installed on a phone in that form. A simulator `.app` also cannot run on a

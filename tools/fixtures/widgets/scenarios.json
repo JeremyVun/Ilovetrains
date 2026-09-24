@@ -1,0 +1,2058 @@
+{
+ "deltas": [
+  {
+   "id": "W0",
+   "name": "widget fetch time",
+   "text": "the fixtures carry no response time a widget would have seen, so every scenario states a plausible last widget refresh 2 to 3 minutes before its clock (Last updated HH:MM). The times, platforms and lines are the fixture’s."
+  },
+  {
+   "id": "W1",
+   "name": "late lead",
+   "text": "the home exemplar’s own `tight` state: the 09:24 leaves 5 min late (09:29) and reaches Town Hall at 09:56, 2 min before the unchanged 09:58 T4, so the trip still arrives 10:08."
+  },
+  {
+   "id": "W2",
+   "name": "cancelled lead",
+   "text": "the 09:24 is cancelled (home delta D8); the widget answers with the 09:39, the next real service in the same fixture."
+  },
+  {
+   "id": "W3",
+   "name": "offline retained",
+   "text": "the widget’s refresh at 09:20 failed; it shows the app’s last board for the pair, saved 09:02, whose times are the fixture’s."
+  },
+  {
+   "id": "W4",
+   "name": "pinned",
+   "text": "the rider pinned the 09:39 at 09:15 (pinned before departure), and pinned the 09:24 for the under-way frame, shown at 09:33 on the first leg."
+  },
+  {
+   "id": "W5",
+   "name": "evening way home",
+   "text": "home deltas D1-D3: the repo has no Bondi Junction -> Rhodes fixture, so the real outbound shape runs in reverse +9 h at 18:12, with no invented headsign or change platforms."
+  },
+  {
+   "id": "W6",
+   "name": "no services",
+   "text": "at 01:10 the API is taken to have answered with no journeys for the pair, which is when the product prints `No services in the next few hours`."
+  },
+  {
+   "id": "W7",
+   "name": "longest names",
+   "text": "a MEASUREMENT, not a journey: the two widest names in the 423-station index (web/stations.json) replace Rhodes and Bondi Junction on the real 09:24."
+  },
+  {
+   "id": "W8",
+   "name": "widest values",
+   "text": "a MEASUREMENT, not a journey: the widest legal value of every track at once — 99 min, 12 MIN LATE, Platform 12, the longest real headsign (Mount Victoria via Parramatta) — on the Central -> Parramatta pair."
+  },
+  {
+   "id": "W9",
+   "name": "scheduled-only tail",
+   "text": "at 10:18 the fixture holds only two later services (both without realtime); a missing third row is the fixture ending, not the end of service."
+  }
+ ],
+ "scenarios": {
+  "live": {
+   "date": "Wed 23 Sep",
+   "mode": "train",
+   "pin": false,
+   "state": "next",
+   "kicker": "Next train",
+   "kickerWarn": false,
+   "following": [
+    {
+     "dep": "09:39",
+     "depWas": "",
+     "arr": "10:22",
+     "mins": 18,
+     "fig": "18",
+     "unit": "min",
+     "prov": "",
+     "provWarn": false,
+     "late": false,
+     "sched": false,
+     "place": "Platform",
+     "plat": "1",
+     "cap": "Platform 1",
+     "capShort": "1",
+     "code": "T9",
+     "key": "T9",
+     "code2": "T4",
+     "key2": "T4",
+     "head": "Gordon via Lindfield",
+     "arrPlat": "1",
+     "legs": [
+      {
+       "code": "T9",
+       "key": "T9",
+       "mins": 27
+      },
+      {
+       "code": "T4",
+       "key": "T4",
+       "mins": 10
+      }
+     ],
+     "dwells": [
+      {
+       "mins": 6,
+       "tight": false
+      }
+     ],
+     "chg": [
+      {
+       "at": "Town Hall",
+       "pIn": "3",
+       "pOut": "5",
+       "mins": 6,
+       "tight": false
+      }
+     ],
+     "total": 43,
+     "label": "Next train"
+    },
+    {
+     "dep": "09:54",
+     "depWas": "",
+     "arr": "10:42",
+     "mins": 33,
+     "fig": "33",
+     "unit": "min",
+     "prov": "",
+     "provWarn": false,
+     "late": false,
+     "sched": false,
+     "place": "Platform",
+     "plat": "1",
+     "cap": "Platform 1",
+     "capShort": "1",
+     "code": "T9",
+     "key": "T9",
+     "code2": "T4",
+     "key2": "T4",
+     "head": "Gordon via Lindfield",
+     "arrPlat": "1",
+     "legs": [
+      {
+       "code": "T9",
+       "key": "T9",
+       "mins": 27
+      },
+      {
+       "code": "T4",
+       "key": "T4",
+       "mins": 10
+      }
+     ],
+     "dwells": [
+      {
+       "mins": 11,
+       "tight": false
+      }
+     ],
+     "chg": [
+      {
+       "at": "Town Hall",
+       "pIn": "3",
+       "pOut": "5",
+       "mins": 11,
+       "tight": false
+      }
+     ],
+     "total": 48,
+     "label": "Next train"
+    }
+   ],
+   "end": "",
+   "message": "",
+   "title": "Live, next train in 3 min",
+   "now": "09:21",
+   "from": "Rhodes",
+   "to": "Bondi Junction",
+   "src": {
+    "kind": "stale",
+    "updated": "09:18",
+    "text": "Last updated 09:18"
+   },
+   "lead": {
+    "dep": "09:24",
+    "depWas": "",
+    "arr": "10:08",
+    "mins": 3,
+    "fig": "3",
+    "unit": "min",
+    "prov": "",
+    "provWarn": false,
+    "late": false,
+    "sched": false,
+    "place": "Platform",
+    "plat": "1",
+    "cap": "Platform 1",
+    "capShort": "1",
+    "code": "T9",
+    "key": "T9",
+    "code2": "T4",
+    "key2": "T4",
+    "head": "Gordon via Lindfield",
+    "arrPlat": "2",
+    "legs": [
+     {
+      "code": "T9",
+      "key": "T9",
+      "mins": 27
+     },
+     {
+      "code": "T4",
+      "key": "T4",
+      "mins": 10
+     }
+    ],
+    "dwells": [
+     {
+      "mins": 7,
+      "tight": false
+     }
+    ],
+    "chg": [
+     {
+      "at": "Town Hall",
+      "pIn": "3",
+      "pOut": "5",
+      "mins": 7,
+      "tight": false
+     }
+    ],
+    "total": 44,
+    "instruction": "Gordon via Lindfield",
+    "tracker": {
+     "lead": "T9 leaves in ",
+     "emph": "3 min.",
+     "instr": [
+      {
+       "t": "Go to "
+      },
+      {
+       "t": "Platform 1",
+       "b": true
+      },
+      {
+       "t": " for Gordon via Lindfield."
+      }
+     ],
+     "connection": "Departs 09:24",
+     "eta": "about 10:08"
+    }
+   }
+  },
+  "late": {
+   "date": "Wed 23 Sep",
+   "mode": "train",
+   "pin": false,
+   "state": "next",
+   "kicker": "Next train",
+   "kickerWarn": false,
+   "following": [
+    {
+     "dep": "09:39",
+     "depWas": "",
+     "arr": "10:22",
+     "mins": 18,
+     "fig": "18",
+     "unit": "min",
+     "prov": "",
+     "provWarn": false,
+     "late": false,
+     "sched": false,
+     "place": "Platform",
+     "plat": "1",
+     "cap": "Platform 1",
+     "capShort": "1",
+     "code": "T9",
+     "key": "T9",
+     "code2": "T4",
+     "key2": "T4",
+     "head": "Gordon via Lindfield",
+     "arrPlat": "1",
+     "legs": [
+      {
+       "code": "T9",
+       "key": "T9",
+       "mins": 27
+      },
+      {
+       "code": "T4",
+       "key": "T4",
+       "mins": 10
+      }
+     ],
+     "dwells": [
+      {
+       "mins": 6,
+       "tight": false
+      }
+     ],
+     "chg": [
+      {
+       "at": "Town Hall",
+       "pIn": "3",
+       "pOut": "5",
+       "mins": 6,
+       "tight": false
+      }
+     ],
+     "total": 43,
+     "label": "Next train"
+    },
+    {
+     "dep": "09:54",
+     "depWas": "",
+     "arr": "10:42",
+     "mins": 33,
+     "fig": "33",
+     "unit": "min",
+     "prov": "",
+     "provWarn": false,
+     "late": false,
+     "sched": false,
+     "place": "Platform",
+     "plat": "1",
+     "cap": "Platform 1",
+     "capShort": "1",
+     "code": "T9",
+     "key": "T9",
+     "code2": "T4",
+     "key2": "T4",
+     "head": "Gordon via Lindfield",
+     "arrPlat": "1",
+     "legs": [
+      {
+       "code": "T9",
+       "key": "T9",
+       "mins": 27
+      },
+      {
+       "code": "T4",
+       "key": "T4",
+       "mins": 10
+      }
+     ],
+     "dwells": [
+      {
+       "mins": 11,
+       "tight": false
+      }
+     ],
+     "chg": [
+      {
+       "at": "Town Hall",
+       "pIn": "3",
+       "pOut": "5",
+       "mins": 11,
+       "tight": false
+      }
+     ],
+     "total": 48,
+     "label": "Next train"
+    }
+   ],
+   "end": "",
+   "message": "",
+   "title": "5 min late, change now tight",
+   "now": "09:21",
+   "from": "Rhodes",
+   "to": "Bondi Junction",
+   "src": {
+    "kind": "stale",
+    "updated": "09:19",
+    "text": "Last updated 09:19"
+   },
+   "lead": {
+    "dep": "09:29",
+    "depWas": "09:24",
+    "arr": "10:08",
+    "mins": 8,
+    "fig": "8",
+    "unit": "min",
+    "prov": "5 MIN LATE",
+    "provWarn": true,
+    "late": true,
+    "sched": false,
+    "place": "Platform",
+    "plat": "1",
+    "cap": "Platform 1",
+    "capShort": "1",
+    "code": "T9",
+    "key": "T9",
+    "code2": "T4",
+    "key2": "T4",
+    "head": "Gordon via Lindfield",
+    "arrPlat": "2",
+    "legs": [
+     {
+      "code": "T9",
+      "key": "T9",
+      "mins": 27
+     },
+     {
+      "code": "T4",
+      "key": "T4",
+      "mins": 10
+     }
+    ],
+    "dwells": [
+     {
+      "mins": 2,
+      "tight": true
+     }
+    ],
+    "chg": [
+     {
+      "at": "Town Hall",
+      "pIn": "3",
+      "pOut": "5",
+      "mins": 2,
+      "tight": true
+     }
+    ],
+    "total": 39,
+    "instruction": "Gordon via Lindfield",
+    "tracker": {
+     "lead": "T9 leaves in ",
+     "emph": "8 min.",
+     "instr": [
+      {
+       "t": "Go to "
+      },
+      {
+       "t": "Platform 1",
+       "b": true
+      },
+      {
+       "t": " for Gordon via Lindfield."
+      }
+     ],
+     "connection": "Departs 09:29",
+     "eta": "about 10:08"
+    }
+   }
+  },
+  "cxl": {
+   "date": "Wed 23 Sep",
+   "mode": "train",
+   "pin": false,
+   "state": "next",
+   "kicker": "Next train",
+   "kickerWarn": false,
+   "following": [
+    {
+     "dep": "09:54",
+     "depWas": "",
+     "arr": "10:42",
+     "mins": 33,
+     "fig": "33",
+     "unit": "min",
+     "prov": "",
+     "provWarn": false,
+     "late": false,
+     "sched": false,
+     "place": "Platform",
+     "plat": "1",
+     "cap": "Platform 1",
+     "capShort": "1",
+     "code": "T9",
+     "key": "T9",
+     "code2": "T4",
+     "key2": "T4",
+     "head": "Gordon via Lindfield",
+     "arrPlat": "1",
+     "legs": [
+      {
+       "code": "T9",
+       "key": "T9",
+       "mins": 27
+      },
+      {
+       "code": "T4",
+       "key": "T4",
+       "mins": 10
+      }
+     ],
+     "dwells": [
+      {
+       "mins": 11,
+       "tight": false
+      }
+     ],
+     "chg": [
+      {
+       "at": "Town Hall",
+       "pIn": "3",
+       "pOut": "5",
+       "mins": 11,
+       "tight": false
+      }
+     ],
+     "total": 48,
+     "label": "Next train"
+    },
+    {
+     "dep": "10:09",
+     "depWas": "",
+     "arr": "10:52",
+     "mins": 48,
+     "fig": "48",
+     "unit": "min",
+     "prov": "",
+     "provWarn": false,
+     "late": false,
+     "sched": false,
+     "place": "Platform",
+     "plat": "1",
+     "cap": "Platform 1",
+     "capShort": "1",
+     "code": "T9",
+     "key": "T9",
+     "code2": "T4",
+     "key2": "T4",
+     "head": "Gordon via Lindfield",
+     "arrPlat": "2",
+     "legs": [
+      {
+       "code": "T9",
+       "key": "T9",
+       "mins": 27
+      },
+      {
+       "code": "T4",
+       "key": "T4",
+       "mins": 10
+      }
+     ],
+     "dwells": [
+      {
+       "mins": 6,
+       "tight": false
+      }
+     ],
+     "chg": [
+      {
+       "at": "Town Hall",
+       "pIn": "3",
+       "pOut": "5",
+       "mins": 6,
+       "tight": false
+      }
+     ],
+     "total": 43,
+     "label": "Next train"
+    }
+   ],
+   "end": "",
+   "message": "",
+   "title": "Next train cancelled",
+   "now": "09:21",
+   "from": "Rhodes",
+   "to": "Bondi Junction",
+   "src": {
+    "kind": "stale",
+    "updated": "09:19",
+    "text": "Last updated 09:19"
+   },
+   "lead": {
+    "dep": "09:39",
+    "depWas": "",
+    "arr": "10:22",
+    "mins": 18,
+    "fig": "18",
+    "unit": "min",
+    "prov": "",
+    "provWarn": false,
+    "late": false,
+    "sched": false,
+    "place": "Platform",
+    "plat": "1",
+    "cap": "Platform 1",
+    "capShort": "1",
+    "code": "T9",
+    "key": "T9",
+    "code2": "T4",
+    "key2": "T4",
+    "head": "Gordon via Lindfield",
+    "arrPlat": "1",
+    "legs": [
+     {
+      "code": "T9",
+      "key": "T9",
+      "mins": 27
+     },
+     {
+      "code": "T4",
+      "key": "T4",
+      "mins": 10
+     }
+    ],
+    "dwells": [
+     {
+      "mins": 6,
+      "tight": false
+     }
+    ],
+    "chg": [
+     {
+      "at": "Town Hall",
+      "pIn": "3",
+      "pOut": "5",
+      "mins": 6,
+      "tight": false
+     }
+    ],
+    "total": 43,
+    "cxlNote": "09:24 CANCELLED · NEXT TRAIN",
+    "cxlSentence": "09:24 cancelled · next train",
+    "cxlWas": "09:24",
+    "instruction": "Gordon via Lindfield",
+    "tracker": {
+     "lead": "T9 leaves in ",
+     "emph": "18 min.",
+     "instr": [
+      {
+       "t": "Go to "
+      },
+      {
+       "t": "Platform 1",
+       "b": true
+      },
+      {
+       "t": " for Gordon via Lindfield."
+      }
+     ],
+     "connection": "Departs 09:39",
+     "eta": "about 10:22"
+    }
+   },
+   "cancelled": {
+    "dep": "09:24",
+    "arr": "10:08",
+    "plat": "1",
+    "key": "T9",
+    "key2": "T4"
+   }
+  },
+  "sched": {
+   "date": "Wed 23 Sep",
+   "mode": "train",
+   "pin": false,
+   "state": "next",
+   "kicker": "Next train",
+   "kickerWarn": false,
+   "following": [
+    {
+     "dep": "10:39",
+     "depWas": "",
+     "arr": "11:22",
+     "mins": 21,
+     "fig": "21",
+     "unit": "min",
+     "prov": "",
+     "provWarn": false,
+     "late": false,
+     "sched": true,
+     "place": "Platform",
+     "plat": "1",
+     "cap": "Platform 1",
+     "capShort": "1",
+     "code": "T9",
+     "key": "T9",
+     "code2": "T4",
+     "key2": "T4",
+     "head": "Gordon via Lindfield",
+     "arrPlat": "1",
+     "legs": [
+      {
+       "code": "T9",
+       "key": "T9",
+       "mins": 29
+      },
+      {
+       "code": "T4",
+       "key": "T4",
+       "mins": 10
+      }
+     ],
+     "dwells": [
+      {
+       "mins": 4,
+       "tight": true
+      }
+     ],
+     "chg": [
+      {
+       "at": "Town Hall",
+       "pIn": "3",
+       "pOut": "5",
+       "mins": 4,
+       "tight": true
+      }
+     ],
+     "total": 43,
+     "label": "Next train"
+    }
+   ],
+   "end": "Nothing scheduled after 10:39.",
+   "message": "",
+   "title": "Scheduled only, no realtime",
+   "now": "10:18",
+   "from": "Rhodes",
+   "to": "Bondi Junction",
+   "src": {
+    "kind": "stale",
+    "updated": "10:15",
+    "text": "Last updated 10:15"
+   },
+   "lead": {
+    "dep": "10:24",
+    "depWas": "",
+    "arr": "11:12",
+    "mins": 6,
+    "fig": "6",
+    "unit": "min",
+    "prov": "",
+    "provWarn": false,
+    "late": false,
+    "sched": true,
+    "place": "Platform",
+    "plat": "1",
+    "cap": "Platform 1",
+    "capShort": "1",
+    "code": "T9",
+    "key": "T9",
+    "code2": "T4",
+    "key2": "T4",
+    "head": "Gordon via Lindfield",
+    "arrPlat": "2",
+    "legs": [
+     {
+      "code": "T9",
+      "key": "T9",
+      "mins": 27
+     },
+     {
+      "code": "T4",
+      "key": "T4",
+      "mins": 10
+     }
+    ],
+    "dwells": [
+     {
+      "mins": 11,
+      "tight": false
+     }
+    ],
+    "chg": [
+     {
+      "at": "Town Hall",
+      "pIn": "3",
+      "pOut": "5",
+      "mins": 11,
+      "tight": false
+     }
+    ],
+    "total": 48,
+    "instruction": "Gordon via Lindfield",
+    "tracker": {
+     "lead": "T9 leaves in ",
+     "emph": "6 min.",
+     "instr": [
+      {
+       "t": "Go to "
+      },
+      {
+       "t": "Platform 1",
+       "b": true
+      },
+      {
+       "t": " for Gordon via Lindfield."
+      }
+     ],
+     "connection": "Departs 10:24",
+     "eta": "about 11:12"
+    }
+   }
+  },
+  "stale": {
+   "date": "Wed 23 Sep",
+   "mode": "train",
+   "pin": false,
+   "state": "next",
+   "kicker": "Next train",
+   "kickerWarn": false,
+   "following": [
+    {
+     "dep": "09:39",
+     "depWas": "",
+     "arr": "10:22",
+     "mins": 18,
+     "fig": "18",
+     "unit": "min",
+     "prov": "",
+     "provWarn": false,
+     "late": false,
+     "sched": false,
+     "place": "Platform",
+     "plat": "1",
+     "cap": "Platform 1",
+     "capShort": "1",
+     "code": "T9",
+     "key": "T9",
+     "code2": "T4",
+     "key2": "T4",
+     "head": "Gordon via Lindfield",
+     "arrPlat": "1",
+     "legs": [
+      {
+       "code": "T9",
+       "key": "T9",
+       "mins": 27
+      },
+      {
+       "code": "T4",
+       "key": "T4",
+       "mins": 10
+      }
+     ],
+     "dwells": [
+      {
+       "mins": 6,
+       "tight": false
+      }
+     ],
+     "chg": [
+      {
+       "at": "Town Hall",
+       "pIn": "3",
+       "pOut": "5",
+       "mins": 6,
+       "tight": false
+      }
+     ],
+     "total": 43,
+     "label": "Next train"
+    },
+    {
+     "dep": "09:54",
+     "depWas": "",
+     "arr": "10:42",
+     "mins": 33,
+     "fig": "33",
+     "unit": "min",
+     "prov": "",
+     "provWarn": false,
+     "late": false,
+     "sched": false,
+     "place": "Platform",
+     "plat": "1",
+     "cap": "Platform 1",
+     "capShort": "1",
+     "code": "T9",
+     "key": "T9",
+     "code2": "T4",
+     "key2": "T4",
+     "head": "Gordon via Lindfield",
+     "arrPlat": "1",
+     "legs": [
+      {
+       "code": "T9",
+       "key": "T9",
+       "mins": 27
+      },
+      {
+       "code": "T4",
+       "key": "T4",
+       "mins": 10
+      }
+     ],
+     "dwells": [
+      {
+       "mins": 11,
+       "tight": false
+      }
+     ],
+     "chg": [
+      {
+       "at": "Town Hall",
+       "pIn": "3",
+       "pOut": "5",
+       "mins": 11,
+       "tight": false
+      }
+     ],
+     "total": 48,
+     "label": "Next train"
+    }
+   ],
+   "end": "",
+   "message": "",
+   "title": "Offline, retained board from 09:02",
+   "now": "09:21",
+   "from": "Rhodes",
+   "to": "Bondi Junction",
+   "src": {
+    "kind": "offline",
+    "updated": "09:02",
+    "text": "Offline · Last updated 09:02"
+   },
+   "lead": {
+    "dep": "09:24",
+    "depWas": "",
+    "arr": "10:08",
+    "mins": 3,
+    "fig": "3",
+    "unit": "min",
+    "prov": "",
+    "provWarn": false,
+    "late": false,
+    "sched": false,
+    "place": "Platform",
+    "plat": "1",
+    "cap": "Platform 1",
+    "capShort": "1",
+    "code": "T9",
+    "key": "T9",
+    "code2": "T4",
+    "key2": "T4",
+    "head": "Gordon via Lindfield",
+    "arrPlat": "2",
+    "legs": [
+     {
+      "code": "T9",
+      "key": "T9",
+      "mins": 27
+     },
+     {
+      "code": "T4",
+      "key": "T4",
+      "mins": 10
+     }
+    ],
+    "dwells": [
+     {
+      "mins": 7,
+      "tight": false
+     }
+    ],
+    "chg": [
+     {
+      "at": "Town Hall",
+      "pIn": "3",
+      "pOut": "5",
+      "mins": 7,
+      "tight": false
+     }
+    ],
+    "total": 44,
+    "instruction": "Gordon via Lindfield",
+    "tracker": {
+     "lead": "T9 leaves in ",
+     "emph": "3 min.",
+     "instr": [
+      {
+       "t": "Go to "
+      },
+      {
+       "t": "Platform 1",
+       "b": true
+      },
+      {
+       "t": " for Gordon via Lindfield."
+      }
+     ],
+     "connection": "Departs 09:24",
+     "eta": "about 10:08"
+    }
+   }
+  },
+  "pinned": {
+   "date": "Wed 23 Sep",
+   "mode": "train",
+   "pin": true,
+   "state": "pinned",
+   "kicker": "Pinned",
+   "kickerWarn": false,
+   "following": [
+    {
+     "dep": "09:24",
+     "depWas": "",
+     "arr": "10:08",
+     "mins": 3,
+     "fig": "3",
+     "unit": "min",
+     "prov": "",
+     "provWarn": false,
+     "late": false,
+     "sched": false,
+     "place": "Platform",
+     "plat": "1",
+     "cap": "Platform 1",
+     "capShort": "1",
+     "code": "T9",
+     "key": "T9",
+     "code2": "T4",
+     "key2": "T4",
+     "head": "Gordon via Lindfield",
+     "arrPlat": "2",
+     "legs": [
+      {
+       "code": "T9",
+       "key": "T9",
+       "mins": 27
+      },
+      {
+       "code": "T4",
+       "key": "T4",
+       "mins": 10
+      }
+     ],
+     "dwells": [
+      {
+       "mins": 7,
+       "tight": false
+      }
+     ],
+     "chg": [
+      {
+       "at": "Town Hall",
+       "pIn": "3",
+       "pOut": "5",
+       "mins": 7,
+       "tight": false
+      }
+     ],
+     "total": 44,
+     "label": "Earlier train"
+    },
+    {
+     "dep": "09:54",
+     "depWas": "",
+     "arr": "10:42",
+     "mins": 33,
+     "fig": "33",
+     "unit": "min",
+     "prov": "",
+     "provWarn": false,
+     "late": false,
+     "sched": false,
+     "place": "Platform",
+     "plat": "1",
+     "cap": "Platform 1",
+     "capShort": "1",
+     "code": "T9",
+     "key": "T9",
+     "code2": "T4",
+     "key2": "T4",
+     "head": "Gordon via Lindfield",
+     "arrPlat": "1",
+     "legs": [
+      {
+       "code": "T9",
+       "key": "T9",
+       "mins": 27
+      },
+      {
+       "code": "T4",
+       "key": "T4",
+       "mins": 10
+      }
+     ],
+     "dwells": [
+      {
+       "mins": 11,
+       "tight": false
+      }
+     ],
+     "chg": [
+      {
+       "at": "Town Hall",
+       "pIn": "3",
+       "pOut": "5",
+       "mins": 11,
+       "tight": false
+      }
+     ],
+     "total": 48,
+     "label": "Next train"
+    }
+   ],
+   "end": "",
+   "message": "",
+   "title": "Pinned before departure",
+   "now": "09:21",
+   "from": "Rhodes",
+   "to": "Bondi Junction",
+   "src": {
+    "kind": "stale",
+    "updated": "09:19",
+    "text": "Last updated 09:19"
+   },
+   "lead": {
+    "dep": "09:39",
+    "depWas": "",
+    "arr": "10:22",
+    "mins": 18,
+    "fig": "18",
+    "unit": "min",
+    "prov": "",
+    "provWarn": false,
+    "late": false,
+    "sched": false,
+    "place": "Platform",
+    "plat": "1",
+    "cap": "Platform 1",
+    "capShort": "1",
+    "code": "T9",
+    "key": "T9",
+    "code2": "T4",
+    "key2": "T4",
+    "head": "Gordon via Lindfield",
+    "arrPlat": "1",
+    "legs": [
+     {
+      "code": "T9",
+      "key": "T9",
+      "mins": 27
+     },
+     {
+      "code": "T4",
+      "key": "T4",
+      "mins": 10
+     }
+    ],
+    "dwells": [
+     {
+      "mins": 6,
+      "tight": false
+     }
+    ],
+    "chg": [
+     {
+      "at": "Town Hall",
+      "pIn": "3",
+      "pOut": "5",
+      "mins": 6,
+      "tight": false
+     }
+    ],
+    "total": 43,
+    "instruction": "Gordon via Lindfield",
+    "tracker": {
+     "lead": "T9 leaves in ",
+     "emph": "18 min.",
+     "instr": [
+      {
+       "t": "Go to "
+      },
+      {
+       "t": "Platform 1",
+       "b": true
+      },
+      {
+       "t": " for Gordon via Lindfield."
+      }
+     ],
+     "connection": "Departs 09:39",
+     "eta": "about 10:22"
+    }
+   }
+  },
+  "riding": {
+   "date": "Wed 23 Sep",
+   "mode": "train",
+   "pin": true,
+   "state": "riding",
+   "kicker": "Running · Pinned",
+   "kickerWarn": false,
+   "following": [],
+   "end": "",
+   "message": "",
+   "title": "Pinned and under way (first leg)",
+   "now": "09:33",
+   "from": "Rhodes",
+   "to": "Bondi Junction",
+   "src": {
+    "kind": "stale",
+    "updated": "09:30",
+    "text": "Last updated 09:30"
+   },
+   "lead": {
+    "dep": "09:24",
+    "depWas": "",
+    "arr": "10:08",
+    "mins": 18,
+    "fig": "18",
+    "unit": "min",
+    "prov": "TO CHANGE",
+    "provWarn": false,
+    "late": false,
+    "sched": false,
+    "place": "Platform",
+    "plat": "1",
+    "cap": "Platform 1",
+    "capShort": "1",
+    "code": "T9",
+    "key": "T9",
+    "code2": "T4",
+    "key2": "T4",
+    "head": "Gordon via Lindfield",
+    "arrPlat": "2",
+    "legs": [
+     {
+      "code": "T9",
+      "key": "T9",
+      "mins": 27
+     },
+     {
+      "code": "T4",
+      "key": "T4",
+      "mins": 10
+     }
+    ],
+    "dwells": [
+     {
+      "mins": 7,
+      "tight": false
+     }
+    ],
+    "chg": [
+     {
+      "at": "Town Hall",
+      "pIn": "3",
+      "pOut": "5",
+      "mins": 7,
+      "tight": false
+     }
+    ],
+    "total": 44,
+    "phase": "ride",
+    "progress": 0.20454545454545456,
+    "instruction": "Get off at Town Hall · Platform 3",
+    "act": true,
+    "boarded": true,
+    "tracker": {
+     "lead": "Town Hall in ",
+     "emph": "18 min.",
+     "instr": [
+      {
+       "t": "Get off at "
+      },
+      {
+       "t": "Platform 3",
+       "b": true
+      },
+      {
+       "t": ", then take T4 from "
+      },
+      {
+       "t": "Platform 5",
+       "b": true
+      },
+      {
+       "t": "."
+      }
+     ],
+     "connection": "7 min to change",
+     "eta": "about 10:08"
+    }
+   }
+  },
+  "home": {
+   "date": "Wed 23 Sep",
+   "mode": "train",
+   "pin": false,
+   "state": "next",
+   "kicker": "Next train",
+   "kickerWarn": false,
+   "following": [
+    {
+     "dep": "18:39",
+     "depWas": "",
+     "arr": "19:22",
+     "mins": 27,
+     "fig": "27",
+     "unit": "min",
+     "prov": "",
+     "provWarn": false,
+     "late": false,
+     "sched": false,
+     "place": "Platform",
+     "plat": "1",
+     "cap": "Platform 1",
+     "capShort": "1",
+     "code": "T4",
+     "key": "T4",
+     "code2": "T9",
+     "key2": "T9",
+     "head": "",
+     "arrPlat": "",
+     "legs": [
+      {
+       "code": "T4",
+       "key": "T4",
+       "mins": 10
+      },
+      {
+       "code": "T9",
+       "key": "T9",
+       "mins": 27
+      }
+     ],
+     "dwells": [
+      {
+       "mins": 6,
+       "tight": false
+      }
+     ],
+     "chg": [
+      {
+       "at": "Town Hall",
+       "pIn": "",
+       "pOut": "",
+       "mins": 6,
+       "tight": false
+      }
+     ],
+     "total": 43,
+     "label": "Next train"
+    },
+    {
+     "dep": "18:54",
+     "depWas": "",
+     "arr": "19:42",
+     "mins": 42,
+     "fig": "42",
+     "unit": "min",
+     "prov": "",
+     "provWarn": false,
+     "late": false,
+     "sched": false,
+     "place": "Platform",
+     "plat": "1",
+     "cap": "Platform 1",
+     "capShort": "1",
+     "code": "T4",
+     "key": "T4",
+     "code2": "T9",
+     "key2": "T9",
+     "head": "",
+     "arrPlat": "",
+     "legs": [
+      {
+       "code": "T4",
+       "key": "T4",
+       "mins": 10
+      },
+      {
+       "code": "T9",
+       "key": "T9",
+       "mins": 27
+      }
+     ],
+     "dwells": [
+      {
+       "mins": 11,
+       "tight": false
+      }
+     ],
+     "chg": [
+      {
+       "at": "Town Hall",
+       "pIn": "",
+       "pOut": "",
+       "mins": 11,
+       "tight": false
+      }
+     ],
+     "total": 48,
+     "label": "Next train"
+    }
+   ],
+   "end": "",
+   "message": "",
+   "title": "Evening, the way home",
+   "now": "18:12",
+   "from": "Bondi Junction",
+   "to": "Rhodes",
+   "src": {
+    "kind": "stale",
+    "updated": "18:10",
+    "text": "Last updated 18:10"
+   },
+   "lead": {
+    "dep": "18:24",
+    "depWas": "",
+    "arr": "19:08",
+    "mins": 12,
+    "fig": "12",
+    "unit": "min",
+    "prov": "",
+    "provWarn": false,
+    "late": false,
+    "sched": false,
+    "place": "Platform",
+    "plat": "2",
+    "cap": "Platform 2",
+    "capShort": "2",
+    "code": "T4",
+    "key": "T4",
+    "code2": "T9",
+    "key2": "T9",
+    "head": "",
+    "arrPlat": "",
+    "legs": [
+     {
+      "code": "T4",
+      "key": "T4",
+      "mins": 10
+     },
+     {
+      "code": "T9",
+      "key": "T9",
+      "mins": 27
+     }
+    ],
+    "dwells": [
+     {
+      "mins": 7,
+      "tight": false
+     }
+    ],
+    "chg": [
+     {
+      "at": "Town Hall",
+      "pIn": "",
+      "pOut": "",
+      "mins": 7,
+      "tight": false
+     }
+    ],
+    "total": 44,
+    "instruction": "",
+    "tracker": {
+     "lead": "T4 leaves in ",
+     "emph": "12 min.",
+     "instr": [
+      {
+       "t": "Go to "
+      },
+      {
+       "t": "Platform 2",
+       "b": true
+      },
+      {
+       "t": " for Rhodes."
+      }
+     ],
+     "connection": "Departs 18:24",
+     "eta": "about 19:08"
+    }
+   }
+  },
+  "ferry": {
+   "date": "Wed 23 Sep",
+   "mode": "ferry",
+   "pin": false,
+   "state": "next",
+   "kicker": "Next ferry",
+   "kickerWarn": false,
+   "following": [
+    {
+     "dep": "15:45",
+     "depWas": "",
+     "arr": "16:07",
+     "mins": 9,
+     "fig": "9",
+     "unit": "min",
+     "prov": "",
+     "provWarn": false,
+     "late": false,
+     "sched": false,
+     "place": "Wharf",
+     "plat": "Wharf 3, Side A",
+     "cap": "Wharf 3, Side A",
+     "capShort": "3A",
+     "code": "F1",
+     "key": "FERRY",
+     "code2": "",
+     "key2": "",
+     "head": "Manly",
+     "arrPlat": "Wharf 1",
+     "legs": [
+      {
+       "code": "F1",
+       "key": "FERRY",
+       "mins": 22
+      }
+     ],
+     "dwells": [],
+     "chg": [],
+     "total": 22,
+     "label": "Next ferry"
+    },
+    {
+     "dep": "15:50",
+     "depWas": "",
+     "arr": "16:20",
+     "mins": 14,
+     "fig": "14",
+     "unit": "min",
+     "prov": "",
+     "provWarn": false,
+     "late": false,
+     "sched": false,
+     "place": "Wharf",
+     "plat": "Wharf 3, Side B",
+     "cap": "Wharf 3, Side B",
+     "capShort": "3B",
+     "code": "F1",
+     "key": "FERRY",
+     "code2": "",
+     "key2": "",
+     "head": "Manly",
+     "arrPlat": "Wharf 1",
+     "legs": [
+      {
+       "code": "F1",
+       "key": "FERRY",
+       "mins": 30
+      }
+     ],
+     "dwells": [],
+     "chg": [],
+     "total": 30,
+     "label": "Next ferry"
+    }
+   ],
+   "end": "",
+   "message": "",
+   "title": "Ferry, scheduled-only lead then live",
+   "now": "15:36",
+   "from": "Circular Quay",
+   "to": "Manly",
+   "src": {
+    "kind": "stale",
+    "updated": "15:34",
+    "text": "Last updated 15:34"
+   },
+   "lead": {
+    "dep": "15:40",
+    "depWas": "",
+    "arr": "16:00",
+    "mins": 4,
+    "fig": "4",
+    "unit": "min",
+    "prov": "",
+    "provWarn": false,
+    "late": false,
+    "sched": true,
+    "place": "Wharf",
+    "plat": "Wharf 2, Side A",
+    "cap": "Wharf 2, Side A",
+    "capShort": "2A",
+    "code": "MFF",
+    "key": "FERRY",
+    "code2": "",
+    "key2": "",
+    "head": "Manly",
+    "arrPlat": "Wharf 2",
+    "legs": [
+     {
+      "code": "MFF",
+      "key": "FERRY",
+      "mins": 20
+     }
+    ],
+    "dwells": [],
+    "chg": [],
+    "total": 20,
+    "instruction": "Manly",
+    "tracker": {
+     "lead": "MFF leaves in ",
+     "emph": "4 min.",
+     "instr": [
+      {
+       "t": "Go to "
+      },
+      {
+       "t": "Wharf 2, Side A",
+       "b": true
+      },
+      {
+       "t": " for Manly."
+      }
+     ],
+     "connection": "Departs 15:40",
+     "eta": "about 16:00"
+    }
+   },
+   "ferryTable": [
+    {
+     "dep": "15:40",
+     "line": "MFF",
+     "head": "Manly",
+     "arr": "16:00",
+     "rt": false,
+     "plat": "Wharf 2, Side A",
+     "arrPlat": "Wharf 2"
+    },
+    {
+     "dep": "15:45",
+     "line": "F1",
+     "head": "Manly",
+     "arr": "16:07",
+     "rt": true,
+     "plat": "Wharf 3, Side A",
+     "arrPlat": "Wharf 1"
+    },
+    {
+     "dep": "15:50",
+     "line": "F1",
+     "head": "Manly",
+     "arr": "16:20",
+     "rt": true,
+     "plat": "Wharf 3, Side B",
+     "arrPlat": "Wharf 1"
+    },
+    {
+     "dep": "16:00",
+     "line": "MFF",
+     "head": "Manly",
+     "arr": "16:20",
+     "rt": false,
+     "plat": "Wharf 2, Side A",
+     "arrPlat": "Wharf 2"
+    },
+    {
+     "dep": "16:15",
+     "line": "F1",
+     "head": "Manly",
+     "arr": "16:37",
+     "rt": true,
+     "plat": "Wharf 3, Side A",
+     "arrPlat": "Wharf 1"
+    },
+    {
+     "dep": "16:20",
+     "line": "MFF",
+     "head": "Manly",
+     "arr": "16:40",
+     "rt": false,
+     "plat": "Wharf 2, Side A",
+     "arrPlat": "Wharf 2"
+    }
+   ]
+  },
+  "long": {
+   "date": "Wed 23 Sep",
+   "mode": "train",
+   "pin": false,
+   "state": "next",
+   "kicker": "Next train",
+   "kickerWarn": false,
+   "following": [
+    {
+     "dep": "09:39",
+     "depWas": "",
+     "arr": "10:22",
+     "mins": 18,
+     "fig": "18",
+     "unit": "min",
+     "prov": "",
+     "provWarn": false,
+     "late": false,
+     "sched": false,
+     "place": "Platform",
+     "plat": "1",
+     "cap": "Platform 1",
+     "capShort": "1",
+     "code": "T9",
+     "key": "T9",
+     "code2": "T4",
+     "key2": "T4",
+     "head": "Gordon via Lindfield",
+     "arrPlat": "1",
+     "legs": [
+      {
+       "code": "T9",
+       "key": "T9",
+       "mins": 27
+      },
+      {
+       "code": "T4",
+       "key": "T4",
+       "mins": 10
+      }
+     ],
+     "dwells": [
+      {
+       "mins": 6,
+       "tight": false
+      }
+     ],
+     "chg": [
+      {
+       "at": "Town Hall",
+       "pIn": "3",
+       "pOut": "5",
+       "mins": 6,
+       "tight": false
+      }
+     ],
+     "total": 43,
+     "label": "Next train"
+    },
+    {
+     "dep": "09:54",
+     "depWas": "",
+     "arr": "10:42",
+     "mins": 33,
+     "fig": "33",
+     "unit": "min",
+     "prov": "",
+     "provWarn": false,
+     "late": false,
+     "sched": false,
+     "place": "Platform",
+     "plat": "1",
+     "cap": "Platform 1",
+     "capShort": "1",
+     "code": "T9",
+     "key": "T9",
+     "code2": "T4",
+     "key2": "T4",
+     "head": "Gordon via Lindfield",
+     "arrPlat": "1",
+     "legs": [
+      {
+       "code": "T9",
+       "key": "T9",
+       "mins": 27
+      },
+      {
+       "code": "T4",
+       "key": "T4",
+       "mins": 10
+      }
+     ],
+     "dwells": [
+      {
+       "mins": 11,
+       "tight": false
+      }
+     ],
+     "chg": [
+      {
+       "at": "Town Hall",
+       "pIn": "3",
+       "pOut": "5",
+       "mins": 11,
+       "tight": false
+      }
+     ],
+     "total": 48,
+     "label": "Next train"
+    }
+   ],
+   "end": "",
+   "message": "",
+   "title": "Longest names in the station index",
+   "now": "09:21",
+   "from": "Sydney Olympic Park Wharf",
+   "to": "Southern Cross (Melbourne)",
+   "src": {
+    "kind": "stale",
+    "updated": "09:18",
+    "text": "Last updated 09:18"
+   },
+   "lead": {
+    "dep": "09:24",
+    "depWas": "",
+    "arr": "10:08",
+    "mins": 3,
+    "fig": "3",
+    "unit": "min",
+    "prov": "",
+    "provWarn": false,
+    "late": false,
+    "sched": false,
+    "place": "Platform",
+    "plat": "1",
+    "cap": "Platform 1",
+    "capShort": "1",
+    "code": "T9",
+    "key": "T9",
+    "code2": "T4",
+    "key2": "T4",
+    "head": "Gordon via Lindfield",
+    "arrPlat": "2",
+    "legs": [
+     {
+      "code": "T9",
+      "key": "T9",
+      "mins": 27
+     },
+     {
+      "code": "T4",
+      "key": "T4",
+      "mins": 10
+     }
+    ],
+    "dwells": [
+     {
+      "mins": 7,
+      "tight": false
+     }
+    ],
+    "chg": [
+     {
+      "at": "Town Hall",
+      "pIn": "3",
+      "pOut": "5",
+      "mins": 7,
+      "tight": false
+     }
+    ],
+    "total": 44,
+    "instruction": "Gordon via Lindfield",
+    "tracker": {
+     "lead": "T9 leaves in ",
+     "emph": "3 min.",
+     "instr": [
+      {
+       "t": "Go to "
+      },
+      {
+       "t": "Platform 1",
+       "b": true
+      },
+      {
+       "t": " for Gordon via Lindfield."
+      }
+     ],
+     "connection": "Departs 09:24",
+     "eta": "about 10:08"
+    }
+   },
+   "measurement": true,
+   "longest": [
+    "Southern Cross (Melbourne)",
+    "Sydney Olympic Park Wharf",
+    "Cockatoo Island Wharf",
+    "International Airport",
+    "Blackwattle Bay Wharf",
+    "Greenwich Point Wharf",
+    "Newcastle Interchange",
+    "Shellharbour Junction",
+    "McMahons Point Wharf",
+    "Cremorne Point Wharf",
+    "Huntleys Point Wharf",
+    "Macquarie University"
+   ]
+  },
+  "none": {
+   "date": "Wed 23 Sep",
+   "mode": "train",
+   "pin": false,
+   "state": "none",
+   "kicker": "Next train",
+   "kickerWarn": false,
+   "following": [],
+   "end": "",
+   "message": "No services in the next few hours",
+   "title": "No more services tonight",
+   "now": "01:10",
+   "from": "Rhodes",
+   "to": "Bondi Junction",
+   "src": {
+    "kind": "stale",
+    "updated": "01:08",
+    "text": "Last updated 01:08"
+   },
+   "lead": null
+  },
+  "nodata": {
+   "date": "Wed 23 Sep",
+   "mode": "train",
+   "pin": false,
+   "state": "none",
+   "kicker": "Next train",
+   "kickerWarn": false,
+   "following": [],
+   "end": "",
+   "message": "No board saved for this trip yet",
+   "title": "Nothing fetched, nothing saved",
+   "now": "09:21",
+   "from": "Rhodes",
+   "to": "Bondi Junction",
+   "src": {
+    "kind": "offline",
+    "updated": "",
+    "text": "Offline"
+   },
+   "lead": null
+  },
+  "empty": {
+   "date": "Wed 23 Sep",
+   "mode": "train",
+   "pin": false,
+   "state": "empty",
+   "kicker": "New trip",
+   "kickerWarn": false,
+   "following": [],
+   "end": "",
+   "message": "Choose where you start",
+   "title": "No saved trips",
+   "now": "09:21",
+   "from": "",
+   "to": "",
+   "src": null,
+   "lead": null
+  },
+  "wide": {
+   "date": "Wed 23 Sep",
+   "mode": "train",
+   "pin": false,
+   "state": "next",
+   "kicker": "Next train",
+   "kickerWarn": false,
+   "following": [
+    {
+     "dep": "23:03",
+     "depWas": "",
+     "arr": "23:34",
+     "mins": 110,
+     "fig": "2",
+     "unit": "H",
+     "prov": "",
+     "provWarn": false,
+     "late": false,
+     "sched": false,
+     "place": "Platform",
+     "plat": "8",
+     "cap": "Platform 8",
+     "capShort": "8",
+     "code": "T1",
+     "key": "T1",
+     "code2": "",
+     "key2": "",
+     "head": "Penrith via Parramatta",
+     "arrPlat": "",
+     "legs": [
+      {
+       "code": "T1",
+       "key": "T1",
+       "mins": 31
+      }
+     ],
+     "dwells": [],
+     "chg": [],
+     "total": 31,
+     "label": "Next train"
+    },
+    {
+     "dep": "23:12",
+     "depWas": "",
+     "arr": "23:36",
+     "mins": 119,
+     "fig": "2",
+     "unit": "H",
+     "prov": "",
+     "provWarn": false,
+     "late": false,
+     "sched": false,
+     "place": "Platform",
+     "plat": "7",
+     "cap": "Platform 7",
+     "capShort": "7",
+     "code": "BMT",
+     "key": "BMT",
+     "code2": "",
+     "key2": "",
+     "head": "Mount Victoria via Parramatta",
+     "arrPlat": "",
+     "legs": [
+      {
+       "code": "BMT",
+       "key": "BMT",
+       "mins": 24
+      }
+     ],
+     "dwells": [],
+     "chg": [],
+     "total": 24,
+     "label": "Next train"
+    }
+   ],
+   "end": "",
+   "message": "",
+   "title": "Widest legal values",
+   "now": "21:13",
+   "from": "Central",
+   "to": "Parramatta",
+   "measurement": true,
+   "src": {
+    "kind": "offline",
+    "updated": "21:10",
+    "text": "Offline · Last updated 21:10"
+   },
+   "lead": {
+    "dep": "22:52",
+    "depWas": "22:40",
+    "arr": "23:36",
+    "mins": 99,
+    "fig": "99",
+    "unit": "min",
+    "prov": "12 MIN LATE",
+    "provWarn": true,
+    "late": true,
+    "sched": false,
+    "place": "Platform",
+    "plat": "12",
+    "cap": "Platform 12",
+    "capShort": "12",
+    "code": "BMT",
+    "key": "BMT",
+    "code2": "",
+    "key2": "",
+    "head": "Mount Victoria via Parramatta",
+    "arrPlat": "",
+    "legs": [
+     {
+      "code": "BMT",
+      "key": "BMT",
+      "mins": 44
+     }
+    ],
+    "dwells": [],
+    "chg": [],
+    "total": 44,
+    "instruction": "Mount Victoria via Parramatta",
+    "tracker": {
+     "lead": "BMT leaves in ",
+     "emph": "99 min.",
+     "instr": [
+      {
+       "t": "Go to "
+      },
+      {
+       "t": "Platform 12",
+       "b": true
+      },
+      {
+       "t": " for Mount Victoria via Parramatta."
+      }
+     ],
+     "connection": "Departs 22:52",
+     "eta": "about 23:36"
+    }
+   }
+  }
+ }
+}

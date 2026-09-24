@@ -262,6 +262,16 @@
   No npm dependencies; kills Chrome in a `finally`.
 - `shoot-states.js` — drive the real client into every board state and shoot
   it, checking the board's invariants in the browser as it goes.
+- `seed-ios-widget.py` — seed one of the widget scenarios in
+  `fixtures/widgets/scenarios.json` into the iOS home-screen widget on a
+  locally signed Debug simulator build (`docs/operations/ios.md`). Android
+  seeds the same scenario names through the `HomeWidgetScenarios`
+  instrumentation: `adb shell am instrument -w -e class
+  com.ilovetrains.app.HomeWidgetScenarios -e scenario <name>
+  com.ilovetrains.app.test/androidx.test.runner.AndroidJUnitRunner` (`refresh`
+  returns it to live data; install with `:app:installDebug
+  :app:installDebugAndroidTest`, never `connectedDebugAndroidTest`, which
+  uninstalls the app and its placed widgets).
 - `check-analytics-browser.js` — verify analytics enablement and privacy in a
   real browser on the production hostname while serving and capturing locally.
 - `measure-open.js` — the experience bar in milliseconds, from the page's own

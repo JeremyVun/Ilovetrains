@@ -171,6 +171,24 @@ simulator builds carry no App Group, so widget verification needs the
 locally signed simulator build in `docs/operations/ios.md`; signed device
 builds need the group registered to the team on the next signed build.
 
+Owner rulings at the real-render verdict, 2026-09-24 (sheets
+`/private/tmp/ilt-5e0c1f-3-ios/index.html` and
+`/private/tmp/ilt-5e0c1f-3-android/index.html`):
+
+- **Lock screen freshness:** the three-line lock widget shows "Last updated"
+  only when the data warns (offline, retained, timetable), replacing its third
+  line; live data keeps the arrival line. This is the one exception to
+  "always Last updated".
+- **Tight change in monochrome:** tinted and lock renderings, which lose the
+  warning colour, carry the product's existing words "Tight change" for a
+  tight change still ahead. Colour renderings keep paint only.
+- **Android early drop:** a departed train leaves the widget up to about 15
+  seconds before its departure, because Android runs the redraw late and a
+  countdown must never go negative.
+- **iOS small arrival:** with 14 pt platform chips, the small shows the
+  arrival only when a state has room (live, home); the medium always shows
+  arrivals.
+
 ## Open questions
 
-None for the build. The design locks at the real-render verdict.
+None.

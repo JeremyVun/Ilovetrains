@@ -13,6 +13,25 @@ This file records deliberate differences between the native Android app and the 
 - A journey whose first leg departs on the timetable while a later leg carries a realtime estimate paints in the live register on Android, where `journey.realtime` is true for an estimate on any leg, and reads `SCHEDULED` on web, which looks only at the departure the rider acts on. The 40 minute live horizon rule in [ui.md](ui.md#past-stale-and-exceptional-data) does not close the gap: its predicate reads the first leg's departure estimate, so such a row is left exactly as it is today at any lead (owner ruling, 2026-09-11).
 - Android stores user state in app-private atomic files and excludes it from cloud backup and device transfer. The native trip list is not capped at the web client’s ten-trip LRU, and each trip has the explicit native deletion menu described above.
 
+## Home-screen widget
+
+- A Jetpack Glance widget (`SizeMode.Exact`, so names are fitted and bars
+  drawn to scale) whose text is drawn by RemoteViews layouts for
+  letter-spacing, the thin clock weight and tabular figures. Content is
+  computed by `HomeWidgetWorker` and stored in Glance state;
+  `provideGlance` only renders it. Minimum height 130 dp.
+- The countdown is a RemoteViews `Chronometer`, which prints MM:SS, so it
+  sits inside the tracker's sentence (`T9 leaves in 02:24`).
+- WorkManager runs the redraw that removes a departed train late (18–104 s
+  measured on an idle emulator), so redraws step toward each boundary at
+  (time left − 5 s) / 1.75, and a run within 15 s of a departure draws the
+  widget as it will be after it. A train therefore leaves the widget up to
+  15 s before it departs; a countdown never goes negative while the device is
+  awake. Doze and standby quotas can still defer the redraw; unmeasured on a
+  phone on battery.
+- On Android 8–11 platform caps have square corners and text colours are
+  fixed when drawn, so a dark/light switch waits for the next redraw.
+
 ## Foreground arrival evidence
 
 While a stored focus is under way, the existing foreground location owner can

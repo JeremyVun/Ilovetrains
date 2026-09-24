@@ -841,6 +841,52 @@ is the only value that clears 3:1 on T4 and HUN. In the dark scheme, T4, T5,
 T9, CCN and HUN use light ink; the remaining fills use the dark ground,
 including ferry green at 7.21:1.
 
+## Home-screen widgets
+
+Android and iOS offer one home-screen widget, "Next train" ("The next train for
+the trip you usually take at this time."), a glance at the smart header with
+no receipt, control or configuration. Its answer and data are in
+[client-storage.md](client-storage.md#home-screen-widget-snapshot). The
+calibration frames are in `assets/comps/latest/widgets/`, shot on the real
+WidgetKit and Pixel launcher renderers.
+
+- **Small (iOS) and 2×2 (Android):** the trip on top, the lead train's
+  departure clock as the large figure, its countdown, the boarding platform
+  cap, the arrival when the state has room, and the freshness line at the
+  foot. iOS prints the product's `3 min` beside the clock, advanced by
+  per-minute timeline entries. Android cannot count whole minutes without the
+  app, so it prints the tracker's sentence around a system timer:
+  `T9 leaves in 02:24`.
+- **Medium (iOS) and 4×2 (Android):** a miniature board: the lead row, then
+  the following departures in departure order, each with its clock, minutes
+  (iOS), journey bar with platform numerals, and arrival. A cancelled lead
+  stays above its replacement, struck and labelled `CANCELLED`; late rows
+  carry `N MIN LATE`; scheduled-only rows carry `SCHEDULED`.
+- **Lock screen (iOS, rectangular):** the tracker's three lines,
+  `T9 leaves in 2:24`, `Go to Platform 1`, `<destination> about 10:08`.
+- **Pinned and under way:** the status line reads `PINNED` or
+  `RUNNING · PINNED`; once under way the widget shows journey detail's steps
+  (`GET OFF`, `BOARD T4`, `ARRIVE`). A widget never shows `RUNNING LATE` or
+  `Trip over`: its data is never fresh enough to claim either.
+- **Freshness:** every home-screen widget always shows the Live Activity's
+  wording, `Last updated HH:MM` as an absolute time, `Offline · Last updated
+  HH:MM`, or `Offline · timetable`. The three-line lock widget shows it only
+  when the data warns, in place of its arrival line.
+- **Type and colour:** the app's ground, palettes, line colours and type. No
+  text is below 11 pt (sp); text on a line-colour fill is at least 14 pt bold,
+  as everywhere else. Station names are shortened by the header's rule, then
+  step down to 11 pt, then wrap; never ellipsised. The large clock steps down
+  before any name does.
+- **Monochrome renderings** (the tinted home screen and the lock screen)
+  name the line in text (`T9`), draw platform caps as cut-outs, and carry the
+  words `Tight change` for a tight change still ahead, because the warning
+  colour is gone.
+- **Tap** opens the app on Home (the empty state opens setup), whichever
+  screen the app was last on.
+- Measured tiles: iPhone 17 Pro small 164.3 pt square and medium
+  349.7 × 164.3 pt, iPhone SE small 146 pt; Pixel launcher 2×2
+  179.4 × 203.8 dp and 4×2 373.7 × 203.8 dp, taller than the iOS square.
+
 ## Anonymous instrumentation
 
 The fixed event vocabulary and assignment rules are in

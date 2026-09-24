@@ -113,7 +113,7 @@ the last and make the ports mechanical. Still to build:
 
 ## Native Android and iOS
 Both apps exist (`android/`, `ios/`) and lag the web by one round. Remaining:
-- Home-screen widgets, background ride detection and notifications.
+- Background ride detection and notifications.
   OS-rendered artifacts (icons, widgets) pass through the real renderer
   before a verdict.
 - **Sleepers icon delivery**: the artwork, `tools/make-icons.sh` and the
