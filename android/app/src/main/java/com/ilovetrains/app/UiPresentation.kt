@@ -98,6 +98,33 @@ fun focusStatus(focus: FocusedJourney, now: Long, complete: Boolean, arrival: Ar
     return FocusStatus("Running", false)
 }
 
+/** The smart header's train, shared with the home widget so the two never name different services. */
+data class HomeAnswer(val journey: Journey, val board: BoardData, val cancelledLead: Journey?) {
+    val cancelledLeadTime get() = cancelledLead?.effectiveDeparture
+}
+
+fun homeAnswer(board: BoardData?, focus: FocusedJourney?, now: Long, modes: Set<String>, maxTransfers: Int?): HomeAnswer? {
+    val focusJourney = focus?.composed
+    val alternatives = focus?.alternatives ?: board
+    val constraint = TransferConstraint(maxTransfers)
+    val retainedJourney = retainedHomeJourney(board, now)
+    val firstFuture = retainedJourney ?: board?.journeys?.firstOrNull { journeyAllowed(it, modes) && it.effectiveDeparture >= now }
+    val recommendation = board?.let { selectRecommendation(it.recommendationCandidates(now, constraint), now, modes, maxTransfers) }
+    val firstRunning = retainedJourney?.takeUnless { it.cancelled } ?: recommendation?.journey
+    val replacement = focusJourney?.takeIf { it.cancelled && now < it.effectiveDeparture }?.let {
+        alternatives?.let { candidates -> selectRecommendation(candidates.recommendationCandidates(now, constraint), now, modes, maxTransfers) }
+    }
+    val journey = replacement?.journey ?: focusJourney ?: firstRunning ?: return null
+    val displayBoard = replacement?.source ?: focus?.board
+        ?: recommendation?.takeIf { it.journey.key == journey.key }?.source ?: board ?: return null
+    val cancelledLead = when {
+        replacement != null -> focusJourney
+        focusJourney == null && firstFuture?.cancelled == true && firstRunning != null -> firstFuture
+        else -> null
+    }
+    return HomeAnswer(journey, displayBoard, cancelledLead)
+}
+
 fun figureToken(figure: Figure): String = figure.value + if (figure.unit == "H") "H" else ""
 
 fun wideFigure(figure: Figure): Boolean = figureToken(figure).length >= 3
