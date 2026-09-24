@@ -1,0 +1,4 @@
+<resources>
+    <string name="widget_name">Next train</string>
+    <string name="widget_description">The next train for the trip you usually take at this time.</string>
+</resources>

@@ -57,6 +57,8 @@ class MainActivity : ComponentActivity() {
         captureAnalytics(intent)
         model.attachActivity(this, locationRequest, silentLocation, locationDisabled, arrivalMonitoring, notificationPermissionRequest)
         handleTrackerIntent(intent)
+        // A recreated activity still carries the tap that first opened it.
+        if (savedInstanceState == null) handleWidgetIntent(intent)
         setContent {
             val state = model.state.collectAsStateWithLifecycle().value
             val dark = when (state.appearance) { Appearance.Dark -> true; Appearance.Light -> false; Appearance.System -> isSystemInDarkTheme() }
@@ -95,6 +97,7 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         captureAnalytics(intent)
         handleTrackerIntent(intent)
+        handleWidgetIntent(intent)
     }
     private fun captureAnalytics(intent: Intent?) {
         if (!BuildConfig.DEBUG) return
@@ -102,6 +105,10 @@ class MainActivity : ComponentActivity() {
     }
     private fun handleTrackerIntent(intent: Intent?) {
         if (intent?.action == TravelTrackerService.ActionOpen) intent.trackerRevision()?.let(model::openTrackedJourney)
+    }
+    private fun handleWidgetIntent(intent: Intent?) {
+        if (intent == null || intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
+        intent.getStringExtra(WidgetOpenExtra)?.let { model.openFromWidget(setup = it == WidgetOpenSetup) }
     }
     private fun requestLocationFromSystem() {
         if (hasLocation() && !locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) && !locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {

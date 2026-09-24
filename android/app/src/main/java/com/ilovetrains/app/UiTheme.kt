@@ -23,14 +23,14 @@ data class TrainColors(
     val dark: Boolean,
 )
 
-private val DarkColors = TrainColors(
+internal val DarkColors = TrainColors(
     ground = Color(0xFF0A0B0D), ink = Color(0xFFF4F5F7), ink2 = Color(0xFFF4F5F7).copy(alpha = .66f),
     ink3 = Color(0xFFF4F5F7).copy(alpha = .46f), rule = Color(0xFFF4F5F7).copy(alpha = .10f),
     rule2 = Color(0xFFF4F5F7).copy(alpha = .20f),
     warning = Color(0xFFFF7A5C), live = Color(0xFF4ADE80), dark = true,
 )
 
-private val LightColors = TrainColors(
+internal val LightColors = TrainColors(
     ground = Color(0xFFFAF9F5), ink = Color(0xFF14120E), ink2 = Color(0xFF14120E).copy(alpha = .75f),
     ink3 = Color(0xFF14120E).copy(alpha = .60f), rule = Color(0xFF14120E).copy(alpha = .11f),
     rule2 = Color(0xFF14120E).copy(alpha = .25f),

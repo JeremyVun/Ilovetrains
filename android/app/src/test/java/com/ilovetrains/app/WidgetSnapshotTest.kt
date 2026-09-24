@@ -250,7 +250,7 @@ class WidgetSnapshotTest {
         assertTrue(snapshot.schedule.isEmpty())
         assertNull(widgetAnswer(snapshot, now))
         assertNull(widgetContent(snapshot, emptyMap(), now).answer)
-        assertEquals(listOf("New trip"), homeWidgetLines(widgetContent(snapshot, emptyMap(), now), wide = false))
+        assertTrue(widgetView(widgetContent(snapshot, emptyMap(), now), 179.4f, 203.8f, FakeWidgetMeasure) is WidgetEmpty)
         assertNull(widgetNextBoundary(snapshot, emptyMap(), now, now + 86_400_000))
 
         val none = widgetSnapshot(UserData(), widgetSchedule(UserData(), emptyList(), now), emptyList(), now)
@@ -298,7 +298,7 @@ class WidgetSnapshotTest {
         val request = widgetRequest(widgetAnswer(first, now)!!, first, now)
         val content = widgetContent(first, mapOf(request.key to widgetSource(request, board)!!), now)
         assertEquals(content, WidgetWire.content(JSONObject(WidgetWire.content(content).toString())))
-        assertEquals(listOf("Rhodes → Central", clockTime(now + 300_000), "Last updated 08:00"), homeWidgetLines(content, wide = true))
+        assertEquals("Rhodes\u00A0→ Central", (widgetView(content, 373.7f, 203.8f, FakeWidgetMeasure) as WidgetBoard).route?.text)
     }
 
     private fun service(from: Station, to: Station, departs: Long, minutes: Int, mode: String = "train", line: String = "T9") =
