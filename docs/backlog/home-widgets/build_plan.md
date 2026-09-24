@@ -91,4 +91,11 @@ exemplars in `assets/comps/latest/` and a `ui.md` widget section at close.
 ## Phase 2 done markers
 
 - 2a iOS: [ ]
-- 2b Android: [ ]
+- 2b Android: [x] 2026-09-24. 231/231 unit, full gate and lint green;
+  `UiCalibrationTest` 17/17 and `ControllerParityInstrumentedTest` 12/12 on
+  the emulator after the header's lead selection moved to a shared
+  `homeAnswer`. Deviations accepted: `SizeMode.Exact` (names are fitted and
+  bars drawn to scale); 14 sp chips, the contract's size for text on a line
+  colour; late and cancelled words under the 4×2 bar; riding shows three
+  steps (no ageing past row); minimum height 130 dp. Sweep seeder:
+  `HomeWidgetScenarios` (instrumentation, `-e scenario <name>`).
