@@ -880,7 +880,9 @@ WidgetKit and Pixel launcher renderers.
 - **Monochrome renderings** (the tinted home screen and the lock screen)
   name the line in text (`T9`), draw platform caps as cut-outs, and carry the
   words `Tight change` for a tight change still ahead, because the warning
-  colour is gone.
+  colour is gone: on the small's note line, after a medium row's note
+  (`5 MIN LATE · TIGHT CHANGE`), and as the lock widget's third line in place
+  of the arrival, joined with any data warning.
 - **Tap** opens the app on Home (the empty state opens setup), whichever
   screen the app was last on.
 - Measured tiles: iPhone 17 Pro small 164.3 pt square and medium
