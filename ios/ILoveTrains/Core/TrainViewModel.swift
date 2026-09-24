@@ -291,7 +291,8 @@ final class TrainViewModel: ObservableObject {
                 self.settleFocus()
                 if ticks % 30 == 0, self.state.ready {
                     self.refreshFlags()
-                    if !self.refreshSharedData(), self.realtimeTask == nil { self.refresh() }
+                    // A restart would cancel an offline plan that takes longer than one tick, so it could never finish.
+                    if !self.refreshSharedData(), self.realtimeTask == nil, !self.state.refreshing { self.refresh() }
                 }
             }
         }
@@ -675,7 +676,7 @@ final class TrainViewModel: ObservableObject {
                 if sharedRequest == sharedGeneration {
                     realtimeTask = nil
                     // Restarting the board on a failed fetch would cancel the followed journey's request every tick.
-                    if refreshBoard, fetched, active { refresh() }
+                    if refreshBoard, fetched, active, !state.refreshing { refresh() }
                 }
             }
             try? await bootstrap?.value
