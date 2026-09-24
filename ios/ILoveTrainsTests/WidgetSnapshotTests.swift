@@ -137,7 +137,7 @@ final class WidgetSnapshotTests: XCTestCase {
             service(rhodes, central, departs: now - 300_000, minutes: 25),
             service(rhodes, central, departs: now + 240_000, minutes: 25),
             service(rhodes, central, departs: now + 840_000, minutes: 25),
-        ], generatedAt: now - 600_000, source: "live")
+        ], generatedAt: at("2026-09-28T07:50:00+10:00"), source: "live")
         let snapshot = widgetSnapshot(data: data, schedule: schedule, boards: [cached], now: now)
         XCTAssertEqual(snapshot.boards.first?.journeys.count, 2)
 
@@ -147,34 +147,39 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssertNil(request.transferLimit)
         XCTAssertNil(request.at)
 
-        let failed = widgetContent(snapshot, sources: [request.key: widgetSource(request, fetched: nil)!], at: now)
+        let failed = widgetContent(snapshot, sources: [request.key: widgetSource(request, fetched: nil)], at: now)
         XCTAssertEqual(failed.board?.offline, true)
-        XCTAssertEqual(failed.next?.retained, true)
-        XCTAssertEqual(failed.next?.effectiveDeparture, now + 240_000)
-        XCTAssertEqual(failed.provenance, "Offline · last updated 10m ago")
+        XCTAssertEqual(failed.lead?.retained, true)
+        XCTAssertEqual(failed.lead?.effectiveDeparture, now + 240_000)
+        XCTAssertEqual(failed.freshness?.text, "Offline · Last updated 07:50")
+        XCTAssertEqual(failed.freshness?.warns, true)
 
         var live = cached
-        live.generatedAt = now - 20_000
-        let fetched = widgetContent(snapshot, sources: [request.key: widgetSource(request, fetched: live)!], at: now)
-        XCTAssertEqual(fetched.provenance, "Live")
+        live.generatedAt = at("2026-09-28T07:59:40+10:00")
+        let fetched = widgetContent(snapshot, sources: [request.key: widgetSource(request, fetched: live)], at: now)
+        XCTAssertEqual(fetched.freshness?.text, "Last updated 07:59")
         XCTAssertEqual(fetched.board?.offline, false)
+        // An absolute clock time never goes stale the way a relative age does.
+        XCTAssertEqual(widgetContent(snapshot, sources: [request.key: live], at: now + 1_800_000).freshness?.text, "Last updated 07:59")
 
         var scheduled = cached
         scheduled.source = "schedule"
         var timetable = snapshot
         timetable.boards = [scheduled]
         let timetableRequest = widgetRequest(for: answer, in: timetable, now: now)
-        XCTAssertEqual(widgetContent(timetable, sources: [timetableRequest.key: widgetSource(timetableRequest, fetched: nil)!], at: now).provenance,
-                       "Offline · timetable")
+        XCTAssertEqual(widgetContent(timetable, sources: [timetableRequest.key: widgetSource(timetableRequest, fetched: nil)], at: now)
+            .freshness?.text, "Offline · timetable")
 
         var noBoard = snapshot
         noBoard.boards = []
         let bare = widgetRequest(for: answer, in: noBoard, now: now)
-        XCTAssertNil(widgetSource(bare, fetched: nil))
-        let empty = widgetContent(noBoard, sources: [:], at: now)
-        XCTAssertEqual(empty.answer?.trip.id, "commute")
-        XCTAssertNil(empty.next)
-        XCTAssertNil(empty.provenance)
+        let nothing = widgetContent(noBoard, sources: [bare.key: widgetSource(bare, fetched: nil)], at: now)
+        XCTAssertEqual(nothing.answer?.trip.id, "commute")
+        XCTAssertNil(nothing.lead)
+        XCTAssertEqual(nothing.freshness?.text, "Offline")
+        XCTAssertEqual(widgetNoServiceText(nothing), "No saved board for this trip yet")
+        let unasked = widgetContent(noBoard, sources: [:], at: now)
+        XCTAssertNil(unasked.freshness)
     }
 
     func testFocusedFetchFollowsTheServiceAndRetainsItWhenUnmatched() {
@@ -185,7 +190,8 @@ final class WidgetSnapshotTests: XCTestCase {
         data.flags = [transferLimitFlagKey: true]
         data.transferLimit = .direct
         data.focus = FocusedJourney(tripId: "commute", reverse: false, journey: journey,
-                                    board: BoardData(from: rhodes, to: central, journeys: [journey], generatedAt: now - 120_000, source: "live"))
+                                    board: BoardData(from: rhodes, to: central, journeys: [journey],
+                                                     generatedAt: at("2026-09-28T08:18:00+10:00"), source: "live"))
         let snapshot = widgetSnapshot(data: data, schedule: widgetSchedule(data: data, stations: [], now: now), boards: [], now: now)
         let request = widgetRequest(for: widgetAnswer(snapshot, at: now)!, in: snapshot, now: now)
         XCTAssertEqual(request.modes, allModes)
@@ -195,21 +201,24 @@ final class WidgetSnapshotTests: XCTestCase {
         var delayed = journey
         delayed.legs[0].estimatedDeparture = journey.departure + 120_000
         let board = BoardData(from: rhodes, to: central, journeys: [service(rhodes, central, departs: now, minutes: 25), delayed],
-                              generatedAt: now - 10_000, source: "live")
-        let matched = widgetContent(snapshot, sources: [request.key: widgetSource(request, fetched: board)!], at: now)
-        XCTAssertEqual(matched.next, delayed)
-        XCTAssertEqual(matched.provenance, "Live")
+                              generatedAt: at("2026-09-28T08:19:50+10:00"), source: "live")
+        let matched = widgetContent(snapshot, sources: [request.key: widgetSource(request, fetched: board)], at: now)
+        XCTAssertEqual(matched.lead, delayed)
+        XCTAssertEqual(matched.freshness?.text, "Last updated 08:19")
+        XCTAssertEqual(widgetStatus(matched), WidgetStatus(text: "Running", pinned: true, warns: false))
 
         var gone = board
         gone.journeys = [service(rhodes, central, departs: now, minutes: 25)]
-        let unmatched = widgetContent(snapshot, sources: [request.key: widgetSource(request, fetched: gone)!], at: now)
-        XCTAssertEqual(unmatched.next?.key, journey.key)
-        XCTAssertEqual(unmatched.next?.retained, true)
-        XCTAssertEqual(unmatched.provenance, "Offline · last updated 2m ago")
+        let unmatched = widgetContent(snapshot, sources: [request.key: widgetSource(request, fetched: gone)], at: now)
+        XCTAssertEqual(unmatched.lead?.key, journey.key)
+        XCTAssertEqual(unmatched.lead?.retained, true)
+        XCTAssertEqual(unmatched.freshness?.text, "Last known · Last updated 08:18")
+        let failed = widgetContent(snapshot, sources: [request.key: widgetSource(request, fetched: nil)], at: now)
+        XCTAssertEqual(failed.freshness?.text, "Offline · Last updated 08:18")
     }
 
-    func testCappedPairRequestAndTimelineBoundaries() {
-        let now = at("2026-09-28T08:00:00+10:00")
+    func testCappedPairRequestAndMinuteTimeline() {
+        let now = at("2026-09-28T08:00:20+10:00")
         var data = habits()
         data.modes = ["train", "metro"]
         data.flags = [transferLimitFlagKey: true]
@@ -222,19 +231,75 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot.transferCap, 2)
         XCTAssertEqual(snapshot.modes, ["train", "metro"])
 
-        let departures = [4, 11, 19, 26].map { service(rhodes, central, departs: now + Millis($0) * 60_000, minutes: 25) }
+        let minute = at("2026-09-28T08:00:00+10:00")
+        let departures = [4, 11, 19, 26].map { service(rhodes, central, departs: minute + Millis($0) * 60_000, minutes: 25) }
         var cancelled = departures[0]
         cancelled.legs[0].cancelled = true
-        let board = BoardData(from: rhodes, to: central, journeys: [cancelled] + Array(departures.dropFirst()), generatedAt: now - 30_000, source: "live")
+        let board = BoardData(from: rhodes, to: central, journeys: [cancelled] + Array(departures.dropFirst()),
+                              generatedAt: now - 30_000, source: "live")
         let timeline = widgetTimeline(snapshot, sources: [request.key: board], from: now, until: now + 1_800_000)
 
-        XCTAssertEqual(timeline.map(\.date), [now, now + 60_001, now + 240_000, now + 660_000, now + 1_140_000, now + 1_560_000])
-        XCTAssertEqual(timeline[0].next?.effectiveDeparture, now + 660_000)
-        XCTAssertEqual(timeline[0].following.map(\.effectiveDeparture), [now + 1_140_000, now + 1_560_000])
-        XCTAssertEqual(timeline[0].provenance, "Live")
-        XCTAssertEqual(timeline[1].provenance, "Last updated 1m ago")
-        XCTAssertEqual(timeline[3].next?.effectiveDeparture, now + 1_140_000)
-        XCTAssertNil(timeline[5].next)
+        XCTAssertEqual(timeline.first?.date, now)
+        let minutes = timeline.map(\.date).filter { $0 > now && $0.truncatingRemainder(dividingBy: 60_000) == 0 }
+        XCTAssertEqual(minutes, (1...30).map { minute + Millis($0) * 60_000 })
+        XCTAssertTrue(timeline.map(\.date).contains(minute + 660_001), "the lead moves on the moment it leaves")
+        XCTAssertEqual(timeline.map(\.date), timeline.map(\.date).sorted())
+
+        let first = timeline[0]
+        XCTAssertEqual(first.lead?.effectiveDeparture, minute + 660_000)
+        XCTAssertEqual(first.replaced?.key, cancelled.key)
+        XCTAssertEqual(first.following.map(\.effectiveDeparture), [minute + 1_140_000, minute + 1_560_000])
+        XCTAssertEqual(first.rows.map(\.effectiveDeparture), [minute + 240_000, minute + 660_000, minute + 1_140_000])
+        XCTAssertEqual(widgetCountdown(to: first.lead!.effectiveDeparture, now: first.date), WidgetCountdown(value: "11", unit: "min"))
+
+        let atEight03 = timeline.first { $0.date == minute + 180_000 }!
+        XCTAssertEqual(widgetCountdown(to: atEight03.lead!.effectiveDeparture, now: atEight03.date).value, "8")
+        let afterLead = timeline.first { $0.date == minute + 660_001 }!
+        XCTAssertEqual(afterLead.lead?.effectiveDeparture, minute + 1_140_000)
+        XCTAssertNil(afterLead.replaced)
+        XCTAssertNil(timeline.last?.lead)
+    }
+
+    func testLeadIsTheHeadersRecommendationAndFollowingRowsStayChronological() {
+        let now = at("2026-09-28T08:00:00+10:00")
+        let data = habits()
+        let snapshot = widgetSnapshot(data: data, schedule: widgetSchedule(data: data, stations: [], now: now), boards: [], now: now)
+        let answer = widgetAnswer(snapshot, at: now)!
+        let request = widgetRequest(for: answer, in: snapshot, now: now)
+        let allStops = service(rhodes, central, departs: now + 180_000, minutes: 40)
+        let express = service(rhodes, central, departs: now + 360_000, minutes: 20)
+        let later = service(rhodes, central, departs: now + 540_000, minutes: 40)
+        let last = service(rhodes, central, departs: now + 900_000, minutes: 20)
+        let board = BoardData(from: rhodes, to: central, journeys: [allStops, express, later, last], generatedAt: now, source: "live")
+
+        let content = widgetContent(snapshot, sources: [request.key: board], at: now)
+        let recommended = selectRecommendation(recommendationCandidates(board), now: now, modes: allModes, maxTransfers: nil)?.journey
+        XCTAssertEqual(recommended?.key, express.key)
+        XCTAssertEqual(content.lead?.key, express.key)
+        XCTAssertNil(content.replaced, "an earlier running train is not a cancellation")
+        XCTAssertEqual(content.rows.map(\.key), [express.key, later.key, last.key])
+    }
+
+    func testCancelledPinnedServiceNamesItsReplacement() {
+        let now = at("2026-09-28T08:00:00+10:00")
+        var pinned = service(rhodes, central, departs: now + 300_000, minutes: 25)
+        var data = habits()
+        data.focus = FocusedJourney(tripId: "commute", reverse: false, journey: pinned,
+                                    board: BoardData(from: rhodes, to: central, journeys: [pinned], generatedAt: now, source: "live"))
+        let snapshot = widgetSnapshot(data: data, schedule: widgetSchedule(data: data, stations: [], now: now), boards: [], now: now)
+        let request = widgetRequest(for: widgetAnswer(snapshot, at: now)!, in: snapshot, now: now)
+        pinned.legs[0].cancelled = true
+        let next = service(rhodes, central, departs: now + 1_200_000, minutes: 25)
+        let board = BoardData(from: rhodes, to: central, journeys: [pinned, next], generatedAt: now, source: "live")
+
+        let content = widgetContent(snapshot, sources: [request.key: widgetSource(request, fetched: board)], at: now)
+        XCTAssertEqual(content.lead?.key, next.key)
+        XCTAssertEqual(content.replaced?.key, pinned.key)
+        XCTAssertEqual(widgetStatus(content), WidgetStatus(text: "Cancelled", pinned: false, warns: true))
+        let lock = widgetLockSentence(content)
+        XCTAssertEqual(lock.subject, "T9 leaves in ")
+        XCTAssertEqual(lock.deadline, next.effectiveDeparture)
+        XCTAssertEqual(lock.instruction.map(\.text).joined(), "08:05 cancelled · next train")
     }
 
     func testNoCompatibleTripIsTheEmptyState() {

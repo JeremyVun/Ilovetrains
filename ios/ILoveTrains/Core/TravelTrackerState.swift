@@ -395,26 +395,6 @@ private func trackerMissedConnection(_ legs: [Leg], index: Int) -> TravelTracker
     )
 }
 
-private func trackerPlacePreposition(_ mode: String) -> String {
-    mode.lowercased() == "ferry" ? "at" : "on"
-}
-
-private func trackerPlatform(_ raw: String?, mode: String) -> String? {
-    guard let value = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return nil }
-    let place = mode.lowercased() == "ferry" ? "Wharf" : "Platform"
-    if value.range(of: "\\b\(place)\\b", options: [.regularExpression, .caseInsensitive]) != nil { return value }
-    if place == "Wharf", value.lowercased().hasPrefix("side") { return value }
-    return "\(place) \(value)"
-}
-
-func trackerVehicle(_ mode: String) -> String {
-    switch mode.lowercased() {
-    case "ferry": "Ferry"
-    case "metro": "Metro"
-    default: "Train"
-    }
-}
-
 private func trackerSegments(_ legs: [Leg], projectionEnd: Millis) -> [TravelTrackerSegment] {
     let start = legs[0].effectiveDeparture
     let duration = max(1, projectionEnd - start)

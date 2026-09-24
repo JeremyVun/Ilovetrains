@@ -24,7 +24,7 @@ struct ILoveTrainsApp: App {
                     }
                 }
                 .onAppear { if scenePhase == .active { model.resume() } }
-                .onOpenURL { model.openTracker($0) }
+                .onOpenURL { model.openURL($0) }
         }
     }
 }

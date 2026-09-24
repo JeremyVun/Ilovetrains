@@ -465,17 +465,6 @@ private struct TrackerPalette {
     }
 }
 
-private extension Color {
-    init(hex: UInt) {
-        self.init(
-            .sRGB,
-            red: Double((hex >> 16) & 0xff) / 255,
-            green: Double((hex >> 8) & 0xff) / 255,
-            blue: Double(hex & 0xff) / 255
-        )
-    }
-}
-
 private extension UIColor {
     convenience init(hex: UInt) {
         self.init(

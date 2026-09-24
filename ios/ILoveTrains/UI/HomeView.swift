@@ -563,7 +563,6 @@ struct TrainTextButtonStyle: ButtonStyle {
     }
 }
 
-func genericModeName(_ mode: String) -> String { mode == "ferry" ? "ferry" : "train" }
 func serviceModeName(_ mode: String) -> String { allModes.contains(mode) ? mode : "service" }
 func nextServiceFigure(_ journey: Journey, board: BoardData, now: Millis) -> String {
     let figure = figureFor(journey, board: board, now: now)

@@ -77,6 +77,27 @@ rulings. 2a owns `ios/TravelTrackerWidget/HomeTripWidget.swift` and
 Code plus unit verify plus one smoke frame per size; the empirical sweep is
 phase 3. Verify: each platform's unit suite and full build.
 
+## Phase 2a results (iOS, 2026-09-24)
+
+`tools/build-ios.sh --unit` 272/272 and `--simulator` green. The lead is
+`selectRecommendation` over the board, now in `ios/Shared/Recommendation.swift`
+with the platform wording, change states and palette (`JourneyRules.swift`,
+`TrainPalette.swift`); the medium prints the cancelled departure the lead
+replaces, the lead, then what leaves after it, chronologically. Entries fall on
+every minute, freshness prints `Last updated HH:MM`, and the lock screen's
+`<line> leaves in` timer is system text. Real-renderer smoke frames of the
+`live` scenario in dark, beside B and C: `/private/tmp/ilt-5e0c1f-widgets-ios-smoke/`.
+Tinted, riding and cancelled were also checked once on the renderer.
+
+Seeding for phase 3 (Debug builds only): `seed-widget.py --device <udid>
+--scenario <name>` writes a round-1 scenario's snapshot and
+`widget-debug-seed.json` into the App Group and relaunches the app with
+`ILOVETRAINS_WIDGET_RELOAD=1`, which only reloads timelines; `--clear`
+returns the widget to the network. `HomeWidgetSmokeTests` also places the
+lock screen widget (`testAddsLockScreenWidget`), sets the home screen style
+(`testSetsHomeScreenStyle`, `HOME_WIDGET_STYLE=Tinted|Default`) and wakes
+either screen for `simctl io` (`testShowsHomeScreen`, `testShowsLockScreen`).
+
 ## Phase 3: real-renderer verification and owner verdict (Opus + lead) — done marker: [ ]
 
 One agent shoots every size on the real renderers (iOS home and lock
@@ -90,7 +111,17 @@ exemplars in `assets/comps/latest/` and a `ui.md` widget section at close.
 
 ## Phase 2 done markers
 
-- 2a iOS: [ ]
+- 2a iOS: [x] 2026-09-24. 272/272 unit, `--simulator` green; real
+  WidgetKit smoke frames match B (small, medium) and C (lock). The lead's
+  selection moved to `ios/Shared/Recommendation.swift`; taps route through
+  `ilovetrains://home` and `ilovetrains://setup`; debug-only seeding through
+  `widget-debug-seed.json` and `seed-widget.py`. Accepted: the medium's top
+  row is always the lead; no `RUNNING LATE` or `Trip over` on a widget (its
+  data is never fresh enough to warrant them); no extra departure pages
+  fetched in the background, so a recommendation found only on a later page
+  can differ. To fix in phase 3: platform chips at 11 pt must be 14 pt bold
+  per `ui.md` (the 11 pt ruling is a floor). To rule: the lock screen shows
+  "Last updated" only when the data warns.
 - 2b Android: [x] 2026-09-24. 231/231 unit, full gate and lint green;
   `UiCalibrationTest` 17/17 and `ControllerParityInstrumentedTest` 12/12 on
   the emulator after the header's lead selection moved to a shared

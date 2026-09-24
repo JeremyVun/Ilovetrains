@@ -2,6 +2,11 @@ import Foundation
 
 let transferPenaltyMillis: Millis = 300_000
 
+struct JourneyRecommendation: Equatable, Sendable {
+    var journey: Journey
+    var board: BoardData
+}
+
 private struct RecommendationTuple {
     var cost: Millis
     var changes: Int
@@ -45,23 +50,6 @@ func selectRecommendation(
 
 func recommendationIsFresh(_ value: JourneyRecommendation, now: Millis, maxTransfers: Int?) -> Bool {
     value.board.requestMaxTransfers == maxTransfers && value.board.isLive(now) && value.journey.retained != true
-}
-
-/// What the shown lead was observed in: fresh live data, or this refresh's own timetable plan when offline.
-func shownLeadEvidence(
-    _ shown: JourneyRecommendation,
-    timetable: OfflinePlanResult?,
-    now: Millis,
-    maxTransfers: Int?
-) -> JourneyRecommendation? {
-    if recommendationIsFresh(shown, now: now, maxTransfers: maxTransfers) { return shown }
-    guard let timetable, !shown.journey.cancelled else { return nil }
-    if let planned = timetable.recommendation, planned.journey.key == shown.journey.key, planned.journey.retained != true {
-        return planned
-    }
-    return timetable.board.journeys
-        .first { $0.key == shown.journey.key && $0.retained != true && !$0.cancelled }
-        .map { JourneyRecommendation(journey: $0, board: timetable.board) }
 }
 
 func selectRecommendation(

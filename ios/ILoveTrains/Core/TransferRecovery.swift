@@ -1,9 +1,5 @@
 import Foundation
 
-enum ConnectionState: String, Codable, Equatable, Sendable {
-    case ordinary, tight, lost, broken
-}
-
 struct RecoverySource: Codable, Equatable, Sendable {
     var generatedAt: Millis
     var degraded: Bool
@@ -61,26 +57,6 @@ struct RecoveryPlan: Equatable, Sendable {
 }
 
 let recoveryConnectionFloor = 3
-
-/// Printed clock minutes, so a window agrees with the two times printed beside it.
-func connectionWindow(_ before: Leg, _ after: Leg) -> Int {
-    minutesBetween(before.effectiveArrival, after.effectiveDeparture)
-}
-
-func connectionState(_ before: Leg, _ after: Leg, recovery: Bool = false) -> ConnectionState {
-    if before.cancelled || after.cancelled { return .broken }
-    let window = connectionWindow(before, after)
-    if window <= 0 { return .lost }
-    // A recovery pair was never printed together, so only the window decides it.
-    let printed = recovery ? window : minutesBetween(before.arrival, after.departure)
-    return window < 5 || window < printed ? .tight : .ordinary
-}
-
-func connectionStates(_ legs: [Leg], recoveryFrom changeIndex: Int? = nil) -> [ConnectionState] {
-    legs.indices.dropLast().map { index in
-        connectionState(legs[index], legs[index + 1], recovery: changeIndex.map { index >= $0 } ?? false)
-    }
-}
 
 func recoveryCandidate(
     _ journeys: [Journey],
