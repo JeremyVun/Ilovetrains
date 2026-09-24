@@ -207,11 +207,9 @@ function main() {
   const exemplarDir = path.join(dir, 'exemplars');
   fs.rmSync(exemplarDir, { recursive: true, force: true });
   fs.mkdirSync(exemplarDir, { recursive: true });
-  let exemplars = 0;
-  for (const file of fs.readdirSync(EXEMPLARS)) {
-    fs.copyFileSync(path.join(EXEMPLARS, file), path.join(exemplarDir, file));
-    exemplars++;
-  }
+  fs.cpSync(EXEMPLARS, exemplarDir, { recursive: true });
+  const exemplars = fs.readdirSync(exemplarDir, { recursive: true })
+    .filter((file) => fs.statSync(path.join(exemplarDir, file)).isFile()).length;
 
   console.log(dir);
   if (inherited.length) console.log(`  inherited ${inherited.length} files from ${from}`);
