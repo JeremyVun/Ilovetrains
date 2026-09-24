@@ -2,7 +2,7 @@ import Foundation
 
 let widgetLiveHorizonMinutes = 40
 
-/// The contract's shortening ladder, applied to both names one rule at a time, longest form first.
+/// Both names shorten one rule at a time, so a long pair never breaks the first name before trying the second.
 func widgetRouteForms(from: String, to: String) -> [(from: String, to: String)] {
     let rules: [(String) -> String] = [
         { $0.replacingOccurrences(of: "\\s+Station$", with: "", options: [.regularExpression, .caseInsensitive]) },
@@ -38,7 +38,7 @@ func widgetLateMinutes(_ journey: Journey) -> Int {
     minutesBetween(journey.departure, journey.effectiveDeparture)
 }
 
-/// Scheduled-only as the board prints it; `includesHorizon` adds the board's 40 minute live-estimate edge.
+/// Board rows take the 40 minute live-estimate horizon; the header, and so the small, never does.
 func widgetScheduledOnly(_ journey: Journey, now: Millis, includesHorizon: Bool) -> Bool {
     guard !journey.cancelled, let first = journey.legs.first else { return false }
     if !journey.realtime { return true }
@@ -56,7 +56,6 @@ struct WidgetStep: Equatable, Sendable {
     var platform: String?
 }
 
-/// Journey detail's steps: board, then get off and board at every change, then arrive.
 func widgetSteps(_ journey: Journey) -> [WidgetStep] {
     guard let first = journey.legs.first, let last = journey.legs.last else { return [] }
     var steps = [WidgetStep(kind: .board, time: first.effectiveDeparture, station: first.from.shortName, leg: first, platform: first.fromPlatform)]
@@ -68,7 +67,6 @@ func widgetSteps(_ journey: Journey) -> [WidgetStep] {
     return steps
 }
 
-/// The step still ahead of the rider, or nil once the journey has arrived.
 func widgetNextStep(_ steps: [WidgetStep], now: Millis) -> Int? {
     steps.firstIndex { now < $0.time }
 }
@@ -85,7 +83,6 @@ func trackerVehicle(_ mode: String) -> String {
     }
 }
 
-/// The Live Activity's name for a boarding or alighting place: `Platform 1`, `Wharf 2, Side A`.
 func trackerPlatform(_ raw: String?, mode: String) -> String? {
     guard let value = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return nil }
     let place = mode.lowercased() == "ferry" ? "Wharf" : "Platform"
@@ -103,7 +100,6 @@ struct WidgetSentenceRun: Equatable, Sendable {
     var strong = false
 }
 
-/// The Live Activity's sentence at rest: who leaves or arrives and when, where to stand, and the destination's time.
 struct WidgetLockSentence: Equatable, Sendable {
     var subject: String
     var deadline: Millis?
@@ -165,7 +161,6 @@ private extension WidgetLockSentence {
     }
 }
 
-/// The header's status words for a followed journey; unfocused answers carry none.
 struct WidgetStatus: Equatable, Sendable {
     var text: String?
     var pinned: Bool

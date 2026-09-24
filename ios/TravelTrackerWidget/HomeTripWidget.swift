@@ -674,7 +674,6 @@ private struct LeadNote: View {
     }
 }
 
-/// The boarding cap and the arrival clock, sharing a line when both fit.
 private struct PlaceLine: View {
     let lead: Journey
     let style: WidgetStyle
@@ -743,7 +742,7 @@ private struct RowRule: View {
     }
 }
 
-/// A filled platform label; monochrome renderings punch its text out of the fill so it survives the loss of colour.
+/// Monochrome renderings cut the text out of the fill, because text on a fill is otherwise the same colour as it.
 private struct WidgetChip: View {
     let text: String
     let leg: Leg
@@ -772,7 +771,6 @@ private struct WidgetChip: View {
     }
 }
 
-/// Each row's journey on its own time axis: rides in line colour, changes as gaps, platforms as numeral chips.
 private struct JourneyBar: View {
     let journey: Journey
     let style: WidgetStyle

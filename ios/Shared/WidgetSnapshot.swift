@@ -85,14 +85,12 @@ struct WidgetContent: Equatable, Sendable {
     var date: Millis
     var answer: WidgetAnswer?
     var board: BoardData?
-    /// The header's answer: the followed service, or the recommendation among the board's eligible departures.
     var lead: Journey?
     /// The cancelled departure the lead stands in for, as the header's `<time> cancelled · next train`.
     var replaced: Journey?
     var following: [Journey] = []
     var freshness: WidgetFreshness?
 
-    /// A board, as the medium prints it: the replaced departure, the lead, then what leaves after it.
     var rows: [Journey] { Array(([replaced, lead].compactMap { $0 } + following).prefix(3)) }
 }
 
