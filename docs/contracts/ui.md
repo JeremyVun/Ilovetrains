@@ -189,6 +189,13 @@ When the flag is off, the trip line remains unchanged and does no animation work
   empty rather than carrying a claim about data that has not arrived; the
   instruction line says `Getting the next trains…`, or
   `No saved board for this trip yet` with nothing cached and no network.
+- A board still in the post is not offline. From opening the app, returning
+  it to the foreground or changing trip until the first request for that trip
+  (and for a followed journey, its own refresh) answers or fails, every
+  freshness indicator rests: its dot in the resting ink and no words, even
+  while a saved or timetable board is painted beneath it. A board that is
+  still live keeps `Live`. The answer, a failure or the request's timeout ends
+  the wait; later refreshes never return the indicator to rest.
 - A tight change still ahead paints the header's dwell segment in the warning
   colour in every phase, including before the train has left. The paint alone
   carries the warning there: the instruction line stays the headsign before
@@ -349,7 +356,7 @@ When the flag is off, the trip line remains unchanged and does no animation work
   known to be askable; a denied or granted permission never shows it, and it
   never flashes before the query answers.
 - While the first board for the selected trip is still in the post, the
-  freshness pill is empty with its resting dot, as on the board; `OFFLINE`
+  freshness pill rests as described under the smart header; `OFFLINE`
   appears only once a request has failed. `Not now`
   is remembered: the panel stays away for 30 days across reloads, and a
   permission the browser already reports as `granted` or `denied` suppresses

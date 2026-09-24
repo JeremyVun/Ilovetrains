@@ -23,6 +23,7 @@ final class TrainViewModel: ObservableObject {
     private var fix: Fix?
     private var explicit = false
     private var generation = 0
+    private var answeredPair: String?
     private var sharedGeneration = 0
     private var boardTask: Task<Void, Never>?
     private var supplementTask: Task<TransitAPI.DeparturePage, Never>?
@@ -325,6 +326,7 @@ final class TrainViewModel: ObservableObject {
         realtimeTask?.cancel(); realtimeTask = nil
         clearArrivalMonitoring()
         generation += 1; sharedGeneration += 1; state.refreshing = false; state.distanceMetres = nil
+        answeredPair = nil
         state.earlierLoading = false
         state.nearestStation = nil; fix = nil; location.stop()
     }
@@ -379,13 +381,20 @@ final class TrainViewModel: ObservableObject {
         let request = generation; let modes = data.modes; let now = state.now
         let transferLimit = data.requestTransferLimit; let bound = data.offlineTransferBound
         guard let pair = ends(), !modes.isEmpty else {
-            state.board = nil; state.recommendation = nil; state.refreshing = false
+            state.board = nil; state.recommendation = nil; state.refreshing = false; state.boardAnswerPending = false
             syncPersonal(); refreshFocus(); return
         }
         let id = state.selectedTripId; let reverse = state.reverse
         let recordLastAnswer = !suppressNextLastAnswer
         suppressNextLastAnswer = false
         state.refreshing = true
+        // The first request after opening or changing trips owns the freshness claim until it answers.
+        let pairKey = "\(pair.0.id)\u{0}\(pair.1.id)"
+        if canNetwork, pairKey != answeredPair || state.board == nil {
+            state.boardAnswerPending = true
+            if data.focus != nil { state.focusAnswerPending = true }
+        }
+        answeredPair = pairKey
         boardTask = Task {
             let cached = await cachedBoard(from: pair.0, to: pair.1)
             guard request == generation, !Task.isCancelled else { return }
@@ -395,6 +404,7 @@ final class TrainViewModel: ObservableObject {
             if state.board == nil, let cached { publish(retainedOfflineBoard(cached), request: request) }
             var localPlan: OfflinePlanResult?
             var onlinePage: TransitAPI.DeparturePage?
+            var onlineAnswered = false
             await withTaskGroup(of: BoardFetch.self) { group in
                 let planner = self.planner, api = self.api, bootstrap = self.bootstrap, network = self.canNetwork
                 group.addTask {
@@ -424,6 +434,7 @@ final class TrainViewModel: ObservableObject {
                         }
                     case let .online(value):
                         onlinePage = value
+                        onlineAnswered = true
                         let completedAt = epochNow()
                         if let value, state.screen == .home, data.focus == nil,
                            shouldPageRecommendations(from: pair.0, to: pair.1, modes: modes, maxTransfers: transferLimit, now: completedAt) {
@@ -455,6 +466,7 @@ final class TrainViewModel: ObservableObject {
                         )
                         publish(merged, request: request)
                     }
+                    if onlineAnswered { state.boardAnswerPending = false }
                 }
             }
             guard request == generation, !Task.isCancelled else { return }
@@ -471,7 +483,7 @@ final class TrainViewModel: ObservableObject {
             result.recommendation = chosen.map {
                 recommendationPage(for: $0, in: result, firstBody: onlinePage?.body ?? Data())
             }
-            publish(result, request: request); state.refreshing = false
+            publish(result, request: request); state.refreshing = false; state.boardAnswerPending = false
             try? await store.cache(result, modes: modes)
             guard request == generation, !Task.isCancelled else { return }
             resolveRedirect(result)
@@ -718,6 +730,7 @@ final class TrainViewModel: ObservableObject {
                 current.board = result; current.alternatives = nil; current.journey = match; data.focus = current
             } else if let demoted = current.demotedForUnmatchedBoard() { data.focus = demoted }
             settleFocus(matchingRefresh: matched); persist(); syncPersonal()
+            state.focusAnswerPending = false
             recover(focus)
         }
     }

@@ -49,7 +49,7 @@ fun DetailScreen(state: AppState, actions: UiActions) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 BackButton("${first.from.shortName} departures", actions::back)
                 Spacer(Modifier.weight(1f))
-                Freshness(board, state.now, Modifier.testTag("detail-freshness"))
+                Freshness(board, state.now, state.awaitingAnswer, Modifier.testTag("detail-freshness"))
             }
             Label("Journey", Modifier.padding(top = 2.dp))
             Text(buildAnnotatedString {

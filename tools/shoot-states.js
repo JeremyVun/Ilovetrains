@@ -1985,6 +1985,9 @@ function pageScript(state) {
     t.state.recommendationPages = [];
     t.state.offline = ${state.offline ? 'true' : 'false'};
     t.state.serverStale = false;
+    // The seeded body stands in for the first answer.
+    t.state.boardAnswerPending = false;
+    t.state.focusAnswerPending = false;
     t.rerender();
   }
 
