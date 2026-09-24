@@ -146,7 +146,7 @@ struct HomeTripView: View {
         Group {
             switch family {
             case .accessoryRectangular:
-                TripLockView(content: content, clockOffset: clockOffset)
+                TripLockView(content: content, clockOffset: clockOffset, monochrome: style.monochrome)
             case .systemMedium:
                 TripMediumView(content: content, style: style)
                     .padding(EdgeInsets(top: 13, leading: 16, bottom: 12, trailing: 16))
@@ -213,13 +213,19 @@ private struct SmallLeadView: View {
             stack(showsArrival: false, lineName: .withNote, clockSize: 40)
             stack(showsArrival: false, lineName: .withCap, clockSize: 34)
             stack(showsArrival: false, lineName: .withNote, clockSize: 34)
+            // The tight change's own line closes the gaps, as the riding small's following step does.
+            if widgetNamesTightChange(lead, now: content.date, monochrome: style.monochrome) {
+                stack(showsArrival: false, lineName: .withCap, clockSize: 40, closeGaps: true)
+                stack(showsArrival: false, lineName: .withCap, clockSize: 34, closeGaps: true)
+                stack(showsArrival: false, lineName: .withNote, clockSize: 34, closeGaps: true)
+            }
         }
     }
 
     /// Monochrome renderings name the line beside the cap, or beside the lead's note where a wide cap leaves it no room.
     enum LineNamePlace { case withCap, withNote }
 
-    private func stack(showsArrival: Bool, lineName: LineNamePlace, clockSize: CGFloat) -> some View {
+    private func stack(showsArrival: Bool, lineName: LineNamePlace, clockSize: CGFloat, closeGaps: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             if let status = widgetStatus(content) {
                 StatusLine(status: status, style: style).padding(.bottom, 5)
@@ -242,11 +248,11 @@ private struct SmallLeadView: View {
                 }
             }
             .monospacedDigit()
-            .padding(.top, content.replaced == nil ? 6 : 2)
+            .padding(.top, content.replaced == nil && !closeGaps ? 6 : 2)
             LeadNote(journey: lead, now: content.date, style: style, namesLine: lineName == .withNote && style.monochrome)
-            Spacer(minLength: 4)
+            Spacer(minLength: closeGaps ? 2 : 4)
             PlaceLine(lead: lead, style: style, showsArrival: showsArrival, namesLine: lineName == .withCap && style.monochrome)
-            FreshnessLine(freshness: content.freshness, style: style).padding(.top, 7)
+            FreshnessLine(freshness: content.freshness, style: style).padding(.top, closeGaps ? 3 : 7)
         }
     }
 }
@@ -401,6 +407,7 @@ private struct BoardRowView: View {
     var body: some View {
         let late = widgetLateMinutes(journey)
         let scheduled = widgetScheduledOnly(journey, now: now, includesHorizon: true)
+        let tight = widgetNamesTightChange(journey, now: now, monochrome: style.monochrome)
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: 9) {
                 Text(clockTime(journey.effectiveDeparture))
@@ -435,7 +442,7 @@ private struct BoardRowView: View {
                     .frame(minWidth: 40, alignment: .trailing)
             }
             .monospacedDigit()
-            if journey.cancelled || late > 0 || scheduled {
+            if journey.cancelled || late > 0 || scheduled || tight {
                 HStack(alignment: .firstTextBaseline, spacing: 9) {
                     Group {
                         if late > 0, !journey.cancelled {
@@ -446,11 +453,16 @@ private struct BoardRowView: View {
                         }
                     }
                     .frame(width: 58, alignment: .leading)
-                    WidgetLabel(
-                        text: journey.cancelled ? "Cancelled" : late > 0 ? "\(late) min late" : "Scheduled",
-                        color: journey.cancelled || late > 0 ? colors.warning : colors.ink3
-                    )
-                    .lineLimit(1)
+                    if tight {
+                        TightChangeNote(note: late > 0 ? "\(late) min late" : scheduled ? "Scheduled" : nil,
+                                        noteColor: late > 0 ? colors.warning : colors.ink3, style: style)
+                    } else {
+                        WidgetLabel(
+                            text: journey.cancelled ? "Cancelled" : late > 0 ? "\(late) min late" : "Scheduled",
+                            color: journey.cancelled || late > 0 ? colors.warning : colors.ink3
+                        )
+                        .lineLimit(1)
+                    }
                 }
             }
         }
@@ -528,10 +540,11 @@ private struct StepWords: View {
 private struct TripLockView: View {
     let content: WidgetContent
     let clockOffset: Millis
+    let monochrome: Bool
 
     var body: some View {
         let sentence = widgetLockSentence(content)
-        let footer = content.freshness.flatMap { $0.warns ? $0.text : nil } ?? sentence.arrival
+        let footer = widgetLockFooter(content, sentence: sentence, monochrome: monochrome)
         VStack(alignment: .leading, spacing: 1) {
             headline(sentence)
                 .font(.system(size: 15, weight: .semibold))
@@ -697,24 +710,57 @@ private struct LeadNote: View {
     var namesLine = false
 
     var body: some View {
-        let colors = style.colors
         let late = widgetLateMinutes(journey)
         let scheduled = widgetScheduledOnly(journey, now: now, includesHorizon: false)
-        if namesLine || journey.cancelled || late > 0 || scheduled {
-            HStack(alignment: .firstTextBaseline, spacing: 7) {
-                if namesLine { LineName(leg: journey.legs[0], style: style) }
-                if journey.cancelled {
-                    WidgetLabel(text: "Cancelled", color: colors.warning)
-                } else if late > 0 {
-                    Text(clockTime(journey.departure)).font(.system(size: 12, weight: .light))
-                        .foregroundStyle(colors.ink3).strikethrough().monospacedDigit()
-                    WidgetLabel(text: "\(late) min late", color: colors.warning)
-                } else if scheduled {
-                    WidgetLabel(text: "Scheduled", color: colors.ink3)
-                }
+        let noted = journey.cancelled || late > 0 || scheduled
+        let tight = widgetNamesTightChange(journey, now: now, monochrome: style.monochrome)
+        // A small tile has no width for both notes on one line, so the tight change takes its own.
+        if noted && tight {
+            VStack(alignment: .leading, spacing: 2) {
+                words(late: late, scheduled: scheduled, tight: false)
+                WidgetLabel(text: widgetTightChangeText, color: style.colors.warning)
             }
             .padding(.top, 4)
+        } else if namesLine || noted || tight {
+            words(late: late, scheduled: scheduled, tight: tight).padding(.top, 4)
         }
+    }
+
+    private func words(late: Int, scheduled: Bool, tight: Bool) -> some View {
+        let colors = style.colors
+        return HStack(alignment: .firstTextBaseline, spacing: 7) {
+            if namesLine { LineName(leg: journey.legs[0], style: style) }
+            if journey.cancelled {
+                WidgetLabel(text: "Cancelled", color: colors.warning)
+            } else if late > 0 {
+                Text(clockTime(journey.departure)).font(.system(size: 12, weight: .light))
+                    .foregroundStyle(colors.ink3).strikethrough().monospacedDigit()
+                WidgetLabel(text: "\(late) min late", color: colors.warning)
+            } else if scheduled {
+                WidgetLabel(text: "Scheduled", color: colors.ink3)
+            } else if tight {
+                WidgetLabel(text: widgetTightChangeText, color: colors.warning)
+            }
+        }
+    }
+}
+
+/// A row's own note, then the tight change it can no longer paint, joined as the status line joins its words.
+private struct TightChangeNote: View {
+    let note: String?
+    let noteColor: Color
+    let style: WidgetStyle
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            if let note {
+                WidgetLabel(text: note, color: noteColor)
+                Text("·").font(.system(size: 11)).foregroundStyle(style.colors.ink3)
+            }
+            WidgetLabel(text: widgetTightChangeText, color: style.colors.warning)
+        }
+        .lineLimit(1)
+        .fixedSize()
     }
 }
 

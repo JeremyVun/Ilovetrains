@@ -84,17 +84,44 @@ final class WidgetPresentationTests: XCTestCase {
                        "No services on the last board we could load")
     }
 
+    func testOnlyMonochromeNamesATightChangeStillAhead() {
+        let tight = changing(changeMinutes: 2)
+        XCTAssertEqual(connectionStates(tight.legs), [.tight])
+        XCTAssertTrue(widgetNamesTightChange(tight, now: now, monochrome: true))
+        XCTAssertFalse(widgetNamesTightChange(tight, now: now, monochrome: false), "full colour keeps the paint only")
+        XCTAssertFalse(widgetNamesTightChange(changing(), now: now, monochrome: true), "an ordinary change")
+        XCTAssertTrue(widgetNamesTightChange(tight, now: tight.legs[0].effectiveArrival + 60_000, monochrome: true), "waiting at the change")
+        XCTAssertFalse(widgetNamesTightChange(tight, now: tight.legs[1].effectiveDeparture, monochrome: true), "a change already made")
+        var broken = tight
+        broken.legs[1].cancelled = true
+        XCTAssertFalse(widgetNamesTightChange(broken, now: now, monochrome: true), "a cancelled connection is broken, never tight")
+
+        let lock = content(tight, at: now)
+        let sentence = widgetLockSentence(lock)
+        XCTAssertEqual(widgetLockFooter(lock, sentence: sentence, monochrome: true), "Tight change")
+        XCTAssertEqual(widgetLockFooter(lock, sentence: sentence, monochrome: false), "Bondi Junction about 10:03")
+        let ordinary = content(changing(), at: now)
+        XCTAssertEqual(widgetLockFooter(ordinary, sentence: widgetLockSentence(ordinary), monochrome: true), "Bondi Junction about 10:08")
+        var offline = lock
+        offline.freshness = .offline(now - 19 * 60_000)
+        let nbsp = "\u{00A0}"
+        XCTAssertEqual(widgetLockFooter(offline, sentence: sentence, monochrome: true),
+                       "Tight\(nbsp)change · Offline · Last\(nbsp)updated\(nbsp)09:02", "the line breaks only between clauses")
+        XCTAssertEqual(widgetLockFooter(offline, sentence: sentence, monochrome: false), "Offline · Last updated 09:02")
+    }
+
     private func trip(departs minutes: Double) -> Journey {
         Journey(legs: [Leg(line: "T9", mode: "train", headsign: "Hornsby", from: rhodes, to: townHall,
                            departure: now + minutes * 60_000, arrival: now + (minutes + 27) * 60_000)])
     }
 
-    private func changing() -> Journey {
+    private func changing(changeMinutes: Double = 7) -> Journey {
         Journey(legs: [
             Leg(line: "T9", mode: "train", headsign: "Gordon via Lindfield", from: rhodes, to: townHall,
                 departure: now + 3 * 60_000, arrival: now + 30 * 60_000, fromPlatform: "1", toPlatform: "3"),
             Leg(line: "T4", mode: "train", headsign: "Bondi Junction", from: townHall, to: bondi,
-                departure: now + 37 * 60_000, arrival: now + 47 * 60_000, fromPlatform: "5", toPlatform: "2"),
+                departure: now + (30 + changeMinutes) * 60_000, arrival: now + (40 + changeMinutes) * 60_000,
+                fromPlatform: "5", toPlatform: "2"),
         ])
     }
 
