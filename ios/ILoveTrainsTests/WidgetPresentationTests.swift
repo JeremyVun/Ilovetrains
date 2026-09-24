@@ -104,7 +104,10 @@ final class WidgetPresentationTests: XCTestCase {
         XCTAssertEqual(widgetLockFooter(ordinary, sentence: widgetLockSentence(ordinary), monochrome: true), "Bondi Junction about 10:08")
         var offline = lock
         offline.freshness = .offline(now - 19 * 60_000)
-        XCTAssertEqual(widgetLockFooter(offline, sentence: sentence, monochrome: true), "Tight change · Offline · Last updated 09:02")
+        let nbsp = "\u{00A0}"
+        XCTAssertEqual(widgetLockFooter(offline, sentence: sentence, monochrome: true),
+                       "Tight\(nbsp)change · Offline · Last\(nbsp)updated\(nbsp)09:02", "the line breaks only between clauses")
+        XCTAssertEqual(widgetLockFooter(offline, sentence: sentence, monochrome: false), "Offline · Last updated 09:02")
     }
 
     private func trip(departs minutes: Double) -> Journey {

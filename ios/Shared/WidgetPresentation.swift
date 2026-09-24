@@ -162,7 +162,11 @@ func widgetLockFooter(_ content: WidgetContent, sentence: WidgetLockSentence, mo
     guard let lead = content.lead, widgetNamesTightChange(lead, now: content.date, monochrome: monochrome) else {
         return warning ?? sentence.arrival
     }
-    return warning.map { "\(widgetTightChangeText) · \($0)" } ?? widgetTightChangeText
+    guard let warning else { return widgetTightChangeText }
+    // The joined line wraps on a lock tile, so it may break only between clauses, never inside "Last updated".
+    return ([widgetTightChangeText] + warning.components(separatedBy: " · "))
+        .map { $0.replacingOccurrences(of: " ", with: "\u{00A0}") }
+        .joined(separator: " · ")
 }
 
 func widgetNoServiceText(_ content: WidgetContent) -> String {
