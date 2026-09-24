@@ -253,7 +253,8 @@ private fun WText(text: WidgetText, modifier: GlanceModifier = GlanceModifier, c
         setInt(R.id.widget_text, "setMaxLines", text.maxLines)
         color(context, R.id.widget_text, colors)
     }
-    AndroidRemoteViews(views, modifier)
+    // Bare RemoteViews filled the main axis of any exactly sized parent, so each sits in a wrapping Glance box.
+    Box(text.width?.let { modifier.width(it.dp) } ?: modifier) { AndroidRemoteViews(views) }
 }
 
 @Composable
@@ -271,7 +272,7 @@ private fun WSentence(sentence: WidgetSentence, modifier: GlanceModifier = Glanc
         setChronometer(R.id.widget_sentence_timer, SystemClock.elapsedRealtime() + sentence.deadline - System.currentTimeMillis(), null, true)
         setChronometerCountDown(R.id.widget_sentence_timer, true)
     }
-    AndroidRemoteViews(views, modifier)
+    Box(modifier) { AndroidRemoteViews(views) }
 }
 
 @Composable
@@ -345,7 +346,10 @@ private fun SmallWidget(view: WidgetSmall) {
             }
             view.sentence?.let { WSentence(it, GlanceModifier.padding(top = ((if (view.meta.isEmpty() && view.step.isEmpty()) d.SentenceGap else d.MetaGap) * g).dp)) }
             if (view.step.isNotEmpty()) Row(GlanceModifier.padding(top = (d.StepGap * g).dp), verticalAlignment = Alignment.CenterVertically) {
-                view.step.forEachIndexed { i, text -> WText(text, if (i > 0) GlanceModifier.padding(start = 6.dp) else GlanceModifier) }
+                view.step.forEachIndexed { i, text ->
+                    if (i > 0) Spacer(GlanceModifier.width(d.StepNameGap.dp))
+                    WText(text)
+                }
             }
         }
         Spacer(GlanceModifier.defaultWeight())
@@ -379,10 +383,9 @@ private fun CapAndArrival(view: WidgetSmall) {
             }
         }
     } else {
-        Row(GlanceModifier.fillMaxWidth().padding(top = (d.CapGap * g).dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(GlanceModifier.fillMaxWidth().padding(top = (d.CapGap * g).dp), contentAlignment = Alignment.CenterStart) {
             WChip(cap)
-            Spacer(GlanceModifier.defaultWeight())
-            WText(arrival)
+            Box(GlanceModifier.fillMaxWidth().height(d.CapHeight.dp), contentAlignment = Alignment.CenterEnd) { WText(arrival) }
         }
     }
 }
@@ -392,12 +395,11 @@ private fun BoardWidget(view: WidgetBoard) {
     val d = WidgetDimens
     val side = GlanceModifier.padding(horizontal = d.BoardPadSide.dp)
     Column(GlanceModifier.fillMaxSize().padding(top = d.BoardPadTop.dp, bottom = d.BoardPadBottom.dp)) {
-        Row(side.fillMaxWidth().padding(bottom = d.HeadGap.dp), verticalAlignment = Alignment.Top) {
-            Box(GlanceModifier.defaultWeight()) {
-                view.kicker?.let { Kicker(it) }
-                view.route?.let { WText(it) }
-            }
-            view.sentence?.let { WSentence(it, GlanceModifier.padding(start = d.ColumnGap.dp)) }
+        // Layered at measured widths, so a long route wraps before it reaches the countdown.
+        Box(side.fillMaxWidth().padding(bottom = d.HeadGap.dp)) {
+            view.kicker?.let { Kicker(it, GlanceModifier.width(view.routeWidth.dp)) }
+            view.route?.let { WText(it, GlanceModifier.width(view.routeWidth.dp)) }
+            view.sentence?.let { Box(GlanceModifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) { WSentence(it) } }
         }
         if (view.rows.isNotEmpty()) Column(GlanceModifier.fillMaxWidth()) {
             view.rows.forEachIndexed { i, row ->
@@ -469,13 +471,16 @@ private fun Lane(lane: WidgetLane, width: Float) {
 @Composable
 private fun StepRow(row: WidgetStepRow, view: WidgetBoard, modifier: GlanceModifier) {
     val d = WidgetDimens
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Box(GlanceModifier.width(view.clockWidth.dp)) { WText(row.clock) }
-        Spacer(GlanceModifier.width(d.ColumnGap.dp))
-        Row(GlanceModifier.defaultWeight(), verticalAlignment = Alignment.CenterVertically) {
+    Box(modifier, contentAlignment = Alignment.CenterStart) {
+        Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(GlanceModifier.width(view.clockWidth.dp)) { WText(row.clock) }
+            Spacer(GlanceModifier.width(d.ColumnGap.dp))
             WText(row.action)
-            row.station?.let { WText(it, GlanceModifier.padding(start = 6.dp)) }
+            row.station?.let {
+                Spacer(GlanceModifier.width(d.StepNameGap.dp))
+                WText(it)
+            }
         }
-        row.chip?.let { WChip(it, height = d.LaneHeight + 2, pad = d.LaneChipPad) }
+        row.chip?.let { Box(GlanceModifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) { WChip(it, height = d.LaneHeight + 2, pad = d.LaneChipPad) } }
     }
 }

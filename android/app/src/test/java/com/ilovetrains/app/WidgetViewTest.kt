@@ -160,6 +160,8 @@ class WidgetViewTest {
         assertEquals(listOf("SCHEDULED"), v.meta.map { it.text })
         assertEquals("MFF leaves in ", v.sentence?.lead)
 
+        assertEquals("Circular\u00A0Quay\u00A0→ Manly\u00A0Wharf", v.route?.text)
+        assertEquals(2, v.route?.maxLines)
         val names = fitRoute("Sydney Olympic Park Wharf", "Southern Cross (Melbourne)", WidgetType.Route, 147.4f, FakeWidgetMeasure, WidgetTone.Ink2)
         assertTrue(names.maxLines > 1)
         assertFalse(names.text.contains('…'))

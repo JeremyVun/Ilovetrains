@@ -17,6 +17,7 @@ data class WidgetText(
     val tone: WidgetTone,
     val maxLines: Int = 1,
     val struck: Boolean = false,
+    val width: Float? = null,
 )
 
 /** A line-colour fill carrying a platform or wharf; [faded] is a cancelled service's. */
@@ -68,6 +69,7 @@ data class WidgetBoard(
     val clockWidth: Float = 0f,
     val arrivalWidth: Float = 0f,
     val laneWidth: Float = 0f,
+    val routeWidth: Float = 0f,
     val end: List<WidgetText> = emptyList(),
     val message: WidgetText? = null,
     val foot: WidgetText? = null,
@@ -81,6 +83,8 @@ interface WidgetMeasure {
 
 object WidgetDimens {
     const val BoardMinWidth = 260f
+    // The Pixel launcher reports a widget about 11 dp taller than the view it hosts.
+    const val ReportedHeightSlack = 12f
     const val SmallPadTop = 16f
     const val SmallPadSide = 16f
     const val SmallPadBottom = 15f
@@ -110,6 +114,7 @@ object WidgetDimens {
     const val HeadGap = 4f
     const val BoardFootGap = 6f
     const val StepGap = 6f
+    const val StepNameGap = 6f
 }
 
 object WidgetType {
@@ -156,7 +161,20 @@ internal fun fitRoute(from: String, to: String, font: WidgetFont, width: Float, 
         a = next.first; b = next.second
         if (measure.width(text(), font) <= width) return WidgetText(text(), font, tone)
     }
-    return WidgetText(text(), font, tone, maxLines = maxLines.coerceAtMost(wrappedLines(text(), font, width, measure)))
+    // When each name fits a line of its own, the pair breaks after the arrow rather than inside a name.
+    val whole = measure.width("$a\u00A0→", font) <= width && measure.width(b, font) <= width
+    val wrapped = if (whole) "${a.replace(' ', '\u00A0')}\u00A0→ ${b.replace(' ', '\u00A0')}" else text()
+    return WidgetText(wrapped, font, tone, maxLines = maxLines.coerceAtMost(wrappedLines(wrapped, font, width, measure)))
+}
+
+/** A single name in a measured track: shortened by rule, then wrapped onto a second line, never ellipsised. */
+internal fun fitName(name: String, font: WidgetFont, width: Float, measure: WidgetMeasure, tone: WidgetTone): WidgetText {
+    var shown = name
+    for (shorten in Shortenings) {
+        if (measure.width(shown, font) <= width) break
+        shown = shorten(shown)
+    }
+    return WidgetText(shown, font, tone, maxLines = wrappedLines(shown, font, width, measure).coerceAtMost(2), width = width)
 }
 
 internal fun wrappedLines(text: String, font: WidgetFont, width: Float, measure: WidgetMeasure): Int {
@@ -277,7 +295,8 @@ fun widgetView(content: WidgetContent?, width: Float, height: Float, measure: Wi
     if (content.answer == null) {
         return WidgetEmpty(label("+ New trip", WidgetTone.Ink2), WidgetText("Choose where you start", WidgetType.Message, WidgetTone.Ink, 3))
     }
-    return if (width >= WidgetDimens.BoardMinWidth) boardView(content, width, height, measure) else smallView(content, width, height, measure)
+    val usable = height - WidgetDimens.ReportedHeightSlack
+    return if (width >= WidgetDimens.BoardMinWidth) boardView(content, width, usable, measure) else smallView(content, width, usable, measure)
 }
 
 private fun smallView(content: WidgetContent, width: Float, height: Float, measure: WidgetMeasure): WidgetSmall {
@@ -316,7 +335,9 @@ private fun smallView(content: WidgetContent, width: Float, height: Float, measu
         val (clockSp, gap) = fitted ?: clockLadder(texts, gaps, h, measure) ?: (WidgetType.Clocks.last() to .5f)
         return WidgetSmall(kicker = kicker, clock = WidgetText(clockTime(step.time), WidgetFont(WidgetFace.Thin, clockSp), WidgetTone.Ink),
             sentence = sentence,
-            step = listOfNotNull(label(step.short, WidgetTone.Ink2), step.station?.let { WidgetText(it, WidgetType.Station, WidgetTone.Ink) }),
+            step = listOfNotNull(label(step.short, WidgetTone.Ink2), step.station?.let {
+                fitName(it, WidgetType.Station, w - measure.width(label(step.short).text, WidgetType.Label) - d.StepNameGap, measure, WidgetTone.Ink)
+            }),
             cap = cap, nextStep = next.takeIf { fitted != null }, foot = foot, gap = gap)
     }
     val first = lead.legs.first()
@@ -365,7 +386,8 @@ private fun boardView(content: WidgetContent, width: Float, height: Float, measu
     val headHeight = maxOf(route?.let { wrappedLines(it.text, it.font, w - sentenceWidth, measure).coerceAtMost(it.maxLines) * lh(it.font) }
         ?: lh(WidgetType.Label), sentence?.let { lh(WidgetFont(WidgetFace.Regular, it.sp)) } ?: 0f) + d.HeadGap
     val body = h - headHeight - footHeight
-    if (lead == null) return WidgetBoard(route = route, message = label(message(content), maxLines = 3), foot = foot)
+    val routeWidth = w - sentenceWidth
+    if (lead == null) return WidgetBoard(route = route, routeWidth = routeWidth, message = label(message(content), maxLines = 3), foot = foot)
     val capacity = floor(body / d.RowMin).toInt().coerceIn(1, d.MaxRows)
     val rowHeight = minOf(body / capacity, d.RowMax)
     if (riding) {
@@ -373,16 +395,23 @@ private fun boardView(content: WidgetContent, width: Float, height: Float, measu
         val next = steps.indexOfFirst { it.time > content.date }.let { if (it < 0) steps.lastIndex else it }
         val start = maxOf(0, minOf(next, steps.size - capacity))
         val shown = steps.drop(start).take(capacity)
+        val clocks = shown.mapIndexed { i, s ->
+            WidgetText(clockTime(s.time), WidgetFont(if (start + i == next) WidgetFace.Light else WidgetFace.Thin, WidgetType.RowClock),
+                if (start + i < next) WidgetTone.Ink3 else WidgetTone.Ink)
+        }
+        val clockWidth = clocks.maxOf { measure.width(it.text, it.font) }
         val rows = shown.mapIndexed { i, s ->
             val done = start + i < next
-            WidgetStepRow(WidgetText(clockTime(s.time), WidgetFont(if (start + i == next) WidgetFace.Light else WidgetFace.Thin, WidgetType.RowClock),
-                if (done) WidgetTone.Ink3 else WidgetTone.Ink),
-                label(s.action, if (done) WidgetTone.Ink3 else WidgetTone.Ink2),
-                s.station?.let { WidgetText(it, WidgetType.Station, if (done) WidgetTone.Ink3 else WidgetTone.Ink) },
-                s.platform?.let { platformText(it, s.leg.mode) }?.let { chip(it, s.leg, faded = done) })
+            val action = label(s.action, if (done) WidgetTone.Ink3 else WidgetTone.Ink2)
+            val chip = s.platform?.let { platformText(it, s.leg.mode) }?.let { chip(it, s.leg, faded = done) }
+            val chipWidth = chip?.let { measure.width(it.text, WidgetType.Chip) + 2 * d.LaneChipPad + d.ColumnGap } ?: 0f
+            WidgetStepRow(clocks[i], action, s.station?.let {
+                fitName(it, WidgetType.Station, w - clockWidth - d.ColumnGap - measure.width(action.text, action.font) - d.StepNameGap - chipWidth,
+                    measure, if (done) WidgetTone.Ink3 else WidgetTone.Ink)
+            }, chip)
         }
-        return WidgetBoard(kicker = kicker, sentence = sentence, rows = rows, rowHeight = rowHeight,
-            clockWidth = rows.maxOf { measure.width(it.clock.text, it.clock.font) }, foot = foot)
+        return WidgetBoard(kicker = kicker, sentence = sentence, rows = rows, rowHeight = rowHeight, routeWidth = routeWidth,
+            clockWidth = clockWidth, foot = foot)
     }
     val pinned = content.answer.focus?.takeIf { it.pinned && it.journey.key == lead.key } != null
     val services = listOfNotNull(content.cancelled?.let { it to false }, lead to true) + content.following.map { it to false }
@@ -404,7 +433,7 @@ private fun boardView(content: WidgetContent, width: Float, height: Float, measu
     val end = if (services.size < capacity) listOf(label("— End of board"),
         WidgetText("Nothing scheduled after ${clockTime(services.last().first.effectiveDeparture)}.", WidgetType.EndNote, WidgetTone.Ink3))
         else emptyList()
-    return WidgetBoard(route = route, sentence = sentence, rows = rows, rowHeight = rowHeight, clockWidth = clockWidth,
+    return WidgetBoard(route = route, sentence = sentence, rows = rows, rowHeight = rowHeight, clockWidth = clockWidth, routeWidth = routeWidth,
         arrivalWidth = arrivalWidth, laneWidth = laneWidth, end = end, foot = foot)
 }
 
