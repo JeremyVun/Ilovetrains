@@ -3,6 +3,7 @@ package com.ilovetrains.app
 import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.os.Build
@@ -41,7 +42,6 @@ import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.appwidget.updateAll
 import androidx.glance.background
 import androidx.glance.color.ColorProvider as dayNight
-import androidx.glance.color.isNightMode
 import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
@@ -224,7 +224,8 @@ private val ArrowGrey = lerp(lerp(DarkColors.ground, DarkColors.ink3.copy(alpha 
 
 private fun RemoteViews.color(context: Context, id: Int, colors: DayNight) {
     if (Build.VERSION.SDK_INT >= 31) setColorInt(id, "setTextColor", colors.day.toArgb(), colors.night.toArgb())
-    else setTextColor(id, (if (context.isNightMode) colors.night else colors.day).toArgb())
+    else setTextColor(id, (if ((context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES)
+        colors.night else colors.day).toArgb())
 }
 
 private fun layoutOf(face: WidgetFace) = when (face) {
@@ -309,9 +310,9 @@ private fun openIntent(context: Context, setup: Boolean) = Intent(context, MainA
 @Composable
 internal fun HomeTripWidgetContent(view: WidgetView) {
     val context = LocalContext.current
-    Box(GlanceModifier.fillMaxSize().appWidgetBackground().background(Ground.provider)
-        .cornerRadius(android.R.dimen.system_app_widget_background_radius)
-        .clickable(actionStartActivity(openIntent(context, setup = view is WidgetEmpty)))) {
+    val ground = GlanceModifier.fillMaxSize().appWidgetBackground().background(Ground.provider)
+    val rounded = if (Build.VERSION.SDK_INT >= 31) ground.cornerRadius(android.R.dimen.system_app_widget_background_radius) else ground
+    Box(rounded.clickable(actionStartActivity(openIntent(context, setup = view is WidgetEmpty)))) {
         when (view) {
             WidgetBlank -> Unit
             is WidgetEmpty -> EmptyWidget(view)
