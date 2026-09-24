@@ -114,6 +114,12 @@ final class TrainViewModel: ObservableObject {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--offline") { networkDisabled = true }
         if configureTrackerCase() { seeded = true; return }
+        // Lets a widget renderer check reload a seeded scenario without the app publishing over it.
+        if ProcessInfo.processInfo.environment["ILOVETRAINS_WIDGET_RELOAD"] == "1" {
+            seeded = true
+            WidgetCenter.shared.reloadAllTimelines()
+            return
+        }
         if configureCalibration() { seeded = true; return }
         #endif
         bootstrap = Task {

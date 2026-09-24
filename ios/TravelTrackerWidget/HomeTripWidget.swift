@@ -4,6 +4,8 @@ import WidgetKit
 struct HomeTripEntry: TimelineEntry {
     let date: Date
     let content: WidgetContent
+    /// Real time minus the content's clock; nonzero only for a seeded debug scenario.
+    var clockOffset: Millis = 0
 }
 
 struct HomeTripProvider: TimelineProvider {
@@ -19,6 +21,12 @@ struct HomeTripProvider: TimelineProvider {
         Task {
             let now = Date().millis
             let snapshot = readWidgetSnapshot(directory: widgetContainerURL()) ?? emptyWidgetSnapshot(now: now)
+            #if DEBUG
+            if let seed = WidgetDebugSeed.read() {
+                completion(seed.entries(snapshot, realNow: now).first!)
+                return
+            }
+            #endif
             // The gallery must answer at once, so its preview shows the app's own last board without asking the network.
             let sources = await widgetSources(snapshot, from: now, until: now, api: context.isPreview ? nil : api)
             completion(HomeTripEntry(date: Date(millis: now), content: widgetContent(snapshot, sources: sources, at: now)))
@@ -30,6 +38,12 @@ struct HomeTripProvider: TimelineProvider {
         Task {
             let now = Date().millis
             let snapshot = readWidgetSnapshot(directory: widgetContainerURL()) ?? emptyWidgetSnapshot(now: now)
+            #if DEBUG
+            if let seed = WidgetDebugSeed.read() {
+                completion(Timeline(entries: seed.entries(snapshot, realNow: now), policy: .never))
+                return
+            }
+            #endif
             let until = now + widgetTimelineHorizon
             let sources = await widgetSources(snapshot, from: now, until: until, api: api)
             let entries = widgetTimeline(snapshot, sources: sources, from: now, until: until)
@@ -61,6 +75,31 @@ private func widgetSources(_ snapshot: WidgetSnapshot, from now: Millis, until: 
     }
 }
 
+#if DEBUG
+/// A renderer check's scenario: its boards answer in place of the network, and its clock is mapped onto real time.
+private struct WidgetDebugSeed: Decodable {
+    var now: Millis
+    var boards: [BoardData]
+
+    static func read() -> WidgetDebugSeed? {
+        guard let url = widgetContainerURL()?.appendingPathComponent("widget-debug-seed.json"),
+              let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(WidgetDebugSeed.self, from: data)
+    }
+
+    func entries(_ snapshot: WidgetSnapshot, realNow: Millis) -> [HomeTripEntry] {
+        let until = now + widgetTimelineHorizon
+        let sources = Dictionary(widgetRequests(snapshot, from: now, until: until).map { request in
+            let fetched = boards.first { $0.from.id == request.from.id && $0.to.id == request.to.id }
+            return (request.key, widgetSource(request, fetched: fetched))
+        }, uniquingKeysWith: { first, _ in first })
+        let offset = realNow - now
+        return widgetTimeline(snapshot, sources: sources, from: now, until: until)
+            .map { HomeTripEntry(date: Date(millis: $0.date + offset), content: $0, clockOffset: offset) }
+    }
+}
+#endif
+
 private func emptyWidgetSnapshot(now: Millis) -> WidgetSnapshot {
     WidgetSnapshot(writtenAt: now, trips: [], schedule: [], modes: [], boards: [])
 }
@@ -73,7 +112,7 @@ private extension Date {
 struct HomeTripWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: homeWidgetKind, provider: HomeTripProvider()) { entry in
-            HomeTripView(content: entry.content)
+            HomeTripView(content: entry.content, clockOffset: entry.clockOffset)
                 .widgetURL(entry.content.answer == nil ? widgetSetupURL : widgetHomeURL)
         }
         .configurationDisplayName("Next train")
@@ -97,6 +136,7 @@ struct WidgetStyle {
 
 struct HomeTripView: View {
     let content: WidgetContent
+    var clockOffset: Millis = 0
     @Environment(\.widgetFamily) private var family
     @Environment(\.colorScheme) private var scheme
     @Environment(\.widgetRenderingMode) private var renderingMode
@@ -106,7 +146,7 @@ struct HomeTripView: View {
         Group {
             switch family {
             case .accessoryRectangular:
-                TripLockView(content: content)
+                TripLockView(content: content, clockOffset: clockOffset)
             case .systemMedium:
                 TripMediumView(content: content, style: style)
                     .padding(EdgeInsets(top: 13, leading: 16, bottom: 12, trailing: 16))
@@ -464,6 +504,7 @@ private struct StepWords: View {
 
 private struct TripLockView: View {
     let content: WidgetContent
+    let clockOffset: Millis
 
     var body: some View {
         let sentence = widgetLockSentence(content)
@@ -495,8 +536,8 @@ private struct TripLockView: View {
 
     private func headline(_ sentence: WidgetLockSentence) -> Text {
         guard let deadline = sentence.deadline else { return Text(sentence.subject) }
-        let end = Date(timeIntervalSince1970: deadline / 1_000)
-        let start = min(Date(timeIntervalSince1970: content.date / 1_000), end)
+        let end = Date(timeIntervalSince1970: (deadline + clockOffset) / 1_000)
+        let start = min(Date(timeIntervalSince1970: (content.date + clockOffset) / 1_000), end)
         return Text(sentence.subject) + Text(timerInterval: start...end, countsDown: true)
     }
 }
@@ -632,7 +673,8 @@ private struct PlaceLine: View {
     var body: some View {
         let first = lead.legs[0]
         let place = departurePlatformText(first.fromPlatform, mode: first.mode)
-        let arrival = Text("→ \(clockTime(lead.effectiveArrival))")
+        // A thin space keeps the cap and the arrival on one line of a 164 pt tile at the 11 pt floor.
+        let arrival = Text("→\u{2009}\(clockTime(lead.effectiveArrival))")
             .font(.system(size: 13, weight: .light))
             .foregroundStyle(lead.cancelled ? style.colors.ink3 : style.colors.ink2)
             .strikethrough(lead.cancelled)
@@ -640,12 +682,11 @@ private struct PlaceLine: View {
             .lineLimit(1)
             .fixedSize()
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: 6) {
+            HStack(spacing: 0) {
                 cap(place, first)
-                Spacer(minLength: 4)
+                Spacer(minLength: 5)
                 arrival
             }
-            .fixedSize(horizontal: true, vertical: false)
             VStack(alignment: .leading, spacing: 5) {
                 cap(place, first)
                 arrival.frame(maxWidth: .infinity, alignment: .trailing)
@@ -657,7 +698,7 @@ private struct PlaceLine: View {
         HStack(spacing: 6) {
             if style.monochrome { LineName(leg: leg, style: style) }
             if let place {
-                WidgetChip(text: place, leg: leg, style: style, height: 17, padding: 5)
+                WidgetChip(text: place, leg: leg, style: style, height: 17)
             }
         }
     }
