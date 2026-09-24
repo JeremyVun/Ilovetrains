@@ -20,10 +20,8 @@ data class WidgetText(
     val width: Float? = null,
 )
 
-/** A line-colour fill carrying a platform or wharf; [faded] is a cancelled service's. */
 data class WidgetChip(val text: String, val line: String, val mode: String, val faded: Boolean = false)
 
-/** The tracker's sentence around a system-ticking countdown to [deadline]. */
 data class WidgetSentence(val lead: String, val deadline: Long, val sp: Float, val maxLines: Int = 1)
 
 /** The header's status line; a null part is the pin icon. */
@@ -136,7 +134,7 @@ object WidgetType {
 
 private val Sentences = listOf(WidgetType.Sentence, 12f, 11f)
 
-/** The largest clock that fits, closing the gaps before stepping the clock down; null when even the smallest cannot. */
+/** Gaps close before the clock steps down, because the departure clock is the glance. */
 private fun clockLadder(texts: Float, gaps: Float, height: Float, measure: WidgetMeasure): Pair<Float, Float>? =
     WidgetType.Clocks.firstNotNullOfOrNull { sp ->
         listOf(1f, .5f).firstOrNull { g -> texts + g * gaps + measure.lineHeight(WidgetFont(WidgetFace.Thin, sp)) <= height }?.let { sp to it }
@@ -207,7 +205,6 @@ internal fun widgetScheduled(journey: Journey, board: BoardData?): Boolean {
 
 private fun delay(journey: Journey) = minutesBetween(journey.departure, journey.effectiveDeparture)
 
-/** The provenance beside a departure: a struck printed time with its delay, CANCELLED or SCHEDULED. */
 private fun provenance(journey: Journey, board: BoardData?): List<WidgetText> = when {
     journey.cancelled -> listOf(label("Cancelled", WidgetTone.Warn))
     delay(journey) > 0 -> listOf(WidgetText(clockTime(journey.departure), WidgetType.Struck, WidgetTone.Ink3, struck = true),
@@ -256,7 +253,6 @@ private fun riding(content: WidgetContent): Boolean {
 internal data class WidgetStep(val time: Long, val action: String, val short: String, val station: String?, val leg: Leg,
                                val platform: String?, val boards: Boolean)
 
-/** Journey detail's steps: board, get off and board at each change, arrive. */
 internal fun widgetSteps(journey: Journey): List<WidgetStep> {
     val first = journey.legs.first()
     val steps = mutableListOf(WidgetStep(first.effectiveDeparture, "Board ${vehicle(first)}", "Board ${vehicle(first)}",
@@ -437,7 +433,6 @@ private fun boardView(content: WidgetContent, width: Float, height: Float, measu
         arrivalWidth = arrivalWidth, laneWidth = laneWidth, end = end, foot = foot)
 }
 
-/** The journey axis at row scale: the boarding numeral, rides and changes in proportion, change pins where they fit. */
 internal fun widgetLane(journey: Journey, width: Float, measure: WidgetMeasure): WidgetLane {
     val d = WidgetDimens
     val unit = 10f
