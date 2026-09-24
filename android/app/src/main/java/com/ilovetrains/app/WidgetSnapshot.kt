@@ -176,10 +176,7 @@ fun widgetContent(snapshot: WidgetSnapshot, sources: Map<String, BoardData>, t: 
 
 data class WidgetDraw(val at: Long, val redraw: Long?)
 
-/**
- * The next boundary is approached in redraws that each land before it however late the job runs, and one within
- * [WidgetRedrawLead] draws the widget as it stands after the boundary, so a countdown never passes zero.
- */
+/** Every redraw lands before the next boundary however late its job runs, so no countdown passes zero. */
 fun widgetDraw(snapshot: WidgetSnapshot, sources: Map<String, BoardData>, now: Long, until: Long): WidgetDraw {
     var at = now
     while (true) {
