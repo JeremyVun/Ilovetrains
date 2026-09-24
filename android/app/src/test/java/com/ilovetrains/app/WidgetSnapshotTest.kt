@@ -134,11 +134,11 @@ class WidgetSnapshotTest {
         assertEquals(true, failed.board?.offline)
         assertEquals(true, failed.next?.retained)
         assertEquals(now + 240_000, failed.next?.effectiveDeparture)
-        assertEquals("Offline · last updated 10m ago", failed.provenance)
+        assertEquals("Offline · Last updated 07:50", failed.provenance)
 
         val live = cached.copy(generatedAt = now - 20_000)
         val fetched = widgetContent(snapshot, mapOf(request.key to widgetSource(request, live)!!), now)
-        assertEquals("Live", fetched.provenance)
+        assertEquals("Last updated 07:59", fetched.provenance)
         assertEquals(false, fetched.board?.offline)
 
         val timetable = snapshot.copy(boards = listOf(cached.copy(source = "schedule")))
@@ -151,7 +151,7 @@ class WidgetSnapshotTest {
         val empty = widgetContent(noBoard, emptyMap(), now)
         assertEquals("commute", empty.answer?.trip?.id)
         assertNull(empty.next)
-        assertNull(empty.provenance)
+        assertEquals("Offline", empty.provenance)
     }
 
     @Test fun focusedFetchFollowsTheServiceAndRetainsItWhenUnmatched() {
@@ -169,13 +169,13 @@ class WidgetSnapshotTest {
         val board = BoardData(rhodes, central, listOf(service(rhodes, central, now, 25), delayed), now - 10_000, source = "live")
         val matched = widgetContent(snapshot, mapOf(request.key to widgetSource(request, board)!!), now)
         assertEquals(delayed, matched.next)
-        assertEquals("Live", matched.provenance)
+        assertEquals("Last updated 08:19", matched.provenance)
 
         val gone = board.copy(journeys = listOf(service(rhodes, central, now, 25)))
         val unmatched = widgetContent(snapshot, mapOf(request.key to widgetSource(request, gone)!!), now)
         assertEquals(journey.key, unmatched.next?.key)
         assertEquals(true, unmatched.next?.retained)
-        assertEquals("Offline · last updated 2m ago", unmatched.provenance)
+        assertEquals("Offline · Last updated 08:18", unmatched.provenance)
     }
 
     @Test fun cappedPairRequestAndRedrawBoundaries() {
@@ -198,10 +198,48 @@ class WidgetSnapshotTest {
         assertEquals(listOf(now, now + 60_001, now + 240_000, now + 660_000, now + 1_140_000, now + 1_560_000), dates)
         assertEquals(now + 660_000, contents[0].next?.effectiveDeparture)
         assertEquals(listOf(now + 1_140_000, now + 1_560_000), contents[0].following.map { it.effectiveDeparture })
-        assertEquals("Live", contents[0].provenance)
-        assertEquals("Last updated 1m ago", contents[1].provenance)
+        assertEquals("Last updated 07:59", contents[0].provenance)
+        assertEquals("Last updated 07:59", contents[1].provenance)
+        assertEquals(now + 240_000, contents[0].cancelled?.effectiveDeparture)
+        assertNull(contents[2].cancelled)
         assertEquals(now + 1_140_000, contents[3].next?.effectiveDeparture)
         assertNull(contents[5].next)
+    }
+
+    @Test fun leadIsTheHeadersRecommendationAndTheBoardFollowsItInDepartureOrder() {
+        val now = at("2026-09-28T08:00:00+10:00")
+        val data = habits()
+        val snapshot = widgetSnapshot(data, widgetSchedule(data, emptyList(), now), emptyList(), now)
+        val request = widgetRequest(widgetAnswer(snapshot, now)!!, snapshot, now)
+        val slow = service(rhodes, central, now + 180_000, 70)
+        val fast = service(rhodes, central, now + 360_000, 25)
+        val later = listOf(9, 14, 21, 30, 38).map { service(rhodes, central, now + it * 60_000L, 25) }
+        val cancelled = later[1].copy(legs = listOf(later[1].legs[0].copy(cancelled = true)))
+        val board = BoardData(rhodes, central, listOf(slow, fast, later[0], cancelled) + later.drop(2), now - 30_000, source = "live")
+        val content = widgetContent(snapshot, mapOf(request.key to board), now)
+
+        assertEquals(homeAnswer(board, null, now, AllModes, null)?.journey, content.next)
+        assertEquals(fast, content.next)
+        assertNull(content.cancelled)
+        assertEquals(listOf(later[0], cancelled, later[2], later[3]), content.following)
+    }
+
+    @Test fun pinnedServiceLeadsWithTheBoardAfterItAndRidesThroughItsLegs() {
+        val now = at("2026-09-28T08:00:00+10:00")
+        val pinned = service(rhodes, central, now + 600_000, 25)
+        val earlier = service(rhodes, central, now + 300_000, 25)
+        val after = service(rhodes, central, now + 900_000, 25)
+        val data = habits().copy(focus = FocusedJourney("commute", false, pinned, BoardData(rhodes, central, listOf(pinned), now, source = "live")))
+        val snapshot = widgetSnapshot(data, widgetSchedule(data, emptyList(), now), emptyList(), now)
+        val request = widgetRequest(widgetAnswer(snapshot, now)!!, snapshot, now)
+        val board = BoardData(rhodes, central, listOf(earlier, pinned, after), now - 20_000, source = "live")
+        val content = widgetContent(snapshot, mapOf(request.key to widgetSource(request, board)!!), now)
+
+        assertEquals(pinned, content.next)
+        assertEquals(listOf(after), content.following)
+        assertEquals(now + 600_000, widgetNextBoundary(snapshot, mapOf(request.key to board), now + 80_000, now + 3_600_000))
+        assertEquals(pinned.effectiveArrival, widgetNextBoundary(snapshot, mapOf(request.key to board), now + 600_000, now + 3_600_000))
+        assertEquals(pinned, widgetContent(snapshot, mapOf(request.key to board), now + 700_000).next)
     }
 
     @Test fun noCompatibleTripIsTheEmptyState() {
@@ -212,7 +250,7 @@ class WidgetSnapshotTest {
         assertTrue(snapshot.schedule.isEmpty())
         assertNull(widgetAnswer(snapshot, now))
         assertNull(widgetContent(snapshot, emptyMap(), now).answer)
-        assertEquals(listOf("New trip"), homeWidgetLines(widgetContent(snapshot, emptyMap(), now), wide = false))
+        assertTrue(widgetView(widgetContent(snapshot, emptyMap(), now), 179.4f, 203.8f, FakeWidgetMeasure) is WidgetEmpty)
         assertNull(widgetNextBoundary(snapshot, emptyMap(), now, now + 86_400_000))
 
         val none = widgetSnapshot(UserData(), widgetSchedule(UserData(), emptyList(), now), emptyList(), now)
@@ -260,7 +298,7 @@ class WidgetSnapshotTest {
         val request = widgetRequest(widgetAnswer(first, now)!!, first, now)
         val content = widgetContent(first, mapOf(request.key to widgetSource(request, board)!!), now)
         assertEquals(content, WidgetWire.content(JSONObject(WidgetWire.content(content).toString())))
-        assertEquals(listOf("Rhodes → Central", clockTime(now + 300_000), "Live"), homeWidgetLines(content, wide = true))
+        assertEquals("Rhodes\u00A0→ Central", (widgetView(content, 373.7f, 203.8f, FakeWidgetMeasure) as WidgetBoard).route?.text)
     }
 
     private fun service(from: Station, to: Station, departs: Long, minutes: Int, mode: String = "train", line: String = "T9") =

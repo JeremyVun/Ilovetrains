@@ -46,34 +46,10 @@ private val DismissRed = Color(0xFFD93025)
 fun HomeScreen(state: AppState, actions: UiActions) {
     val c = LocalTrainColors.current
     val board = state.homeBoard ?: state.board
-    val focusJourney = state.focus?.composed
     val alternatives = state.focus?.alternatives ?: board
-    val maxTransfers = state.transferLimit?.maxTransfers
-    val retainedJourney = retainedHomeJourney(board, state.now)
-    val firstFuture = retainedJourney ?: board?.journeys?.firstOrNull {
-        journeyAllowed(it, state.enabledModes) && it.effectiveDeparture >= state.now
-    }
-    val recommendation = board?.let {
-        selectRecommendation(it.recommendationCandidates(state.now, TransferConstraint(maxTransfers)), state.now, state.enabledModes, maxTransfers)
-            ?.let { candidate -> RecommendationResult(candidate.journey, candidate.source) }
-    }
-    val firstRunning = retainedJourney?.takeUnless { it.cancelled } ?: recommendation?.journey
-    val replacement = focusJourney?.takeIf { it.cancelled && state.now < it.effectiveDeparture }?.let {
-        alternatives?.let { candidateBoard -> selectRecommendation(
-            candidateBoard.recommendationCandidates(state.now, TransferConstraint(maxTransfers)),
-            state.now, state.enabledModes, maxTransfers) }
-    }
-    val focusReplacement = replacement?.journey
-    val journey = focusReplacement ?: focusJourney ?: firstRunning
-    val displayBoard = if (focusReplacement != null) replacement.source else state.focus?.board
-        ?: recommendation?.takeIf { it.journey.key == journey?.key }?.source ?: board
-    val cancelledLeadTime = when {
-        focusReplacement != null -> focusJourney?.effectiveDeparture
-        focusJourney == null && firstFuture?.cancelled == true && firstRunning != null -> firstFuture.effectiveDeparture
-        else -> null
-    }
+    val answer = homeAnswer(board, state.focus, state.now, state.enabledModes, state.transferLimit?.maxTransfers)
     Column(Modifier.fillMaxSize()) {
-        if (journey != null && displayBoard != null) SmartHeader(state, displayBoard, alternatives, journey, cancelledLeadTime, actions)
+        if (answer != null) SmartHeader(state, answer.board, alternatives, answer.journey, answer.cancelledLeadTime, actions)
         else if (state.trips.isNotEmpty()) SmartLoadingHeader(state, board, actions)
         else if (state.totalTrips > 0) {
             Column(Modifier.fillMaxWidth().padding(horizontal = PagePadding, vertical = 28.dp)) {

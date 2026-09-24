@@ -8,6 +8,7 @@ const val WidgetSnapshotFile = "widget-v1.json"
 const val WidgetScheduleHours = 168
 const val WidgetBoardLimit = 8
 const val WidgetLiveRefresh = 15 * 60_000L
+const val WidgetFollowingLimit = 4
 private const val HourMillis = 3_600_000L
 
 data class WidgetStop(val id: String, val name: String, val modes: List<String>) {
@@ -49,6 +50,7 @@ data class WidgetRequest(
     val fallback: BoardData? = null,
 )
 
+/** [next] is the header's train; [cancelled] the struck service it replaced; [following] the board after it, in departure order. */
 data class WidgetContent(
     val date: Long,
     val answer: WidgetAnswer?,
@@ -56,6 +58,7 @@ data class WidgetContent(
     val next: Journey?,
     val following: List<Journey>,
     val provenance: String?,
+    val cancelled: Journey? = null,
 )
 
 data class WidgetScheduleInputs(val trips: List<SavedTrip>, val history: List<ViewEvent>, val modes: Set<String>,
@@ -137,23 +140,33 @@ fun widgetNextAnswerChange(snapshot: WidgetSnapshot, after: Long, until: Long): 
 fun widgetSource(request: WidgetRequest, fetched: BoardData?): BoardData? {
     if (fetched != null) {
         val key = request.focusJourneyKey ?: return fetched
-        fetched.journeys.find { it.key == key }?.let { return fetched.copy(journeys = listOf(it)) }
+        if (fetched.journeys.any { it.key == key }) return fetched
     }
     return request.fallback?.lastKnown()
 }
 
+/** The tracker's wording, never LIVE: a widget's data is minutes old for nearly all of its life. */
+fun widgetFreshness(board: BoardData): String = when {
+    board.offline && board.source != "live" -> "Offline · timetable"
+    board.offline -> "Offline · Last updated ${clockTime(board.generatedAt)}"
+    else -> "Last updated ${clockTime(board.generatedAt)}"
+}
+
+internal fun widgetFocused(focus: WidgetFocus, board: BoardData?) = FocusedJourney(focus.tripId, focus.reverse,
+    board?.journeys?.find { it.key == focus.journey.key } ?: focus.journey, board ?: focus.board, focus.pinned)
+
 fun widgetContent(snapshot: WidgetSnapshot, sources: Map<String, BoardData>, t: Long): WidgetContent {
     val answer = widgetAnswer(snapshot, t) ?: return WidgetContent(t, null, null, null, emptyList(), null)
     val board = sources[widgetRequest(answer, snapshot, t).key]
-    val provenance = board?.let { freshnessText(it, t) }
-    answer.focus?.let { focus ->
-        return WidgetContent(t, answer, board, board?.journeys?.firstOrNull() ?: focus.journey, emptyList(), provenance)
-    }
-    val upcoming = board?.journeys.orEmpty().filter { snapshot.eligible(it) && it.effectiveDeparture > t }
-        .sortedBy { it.effectiveDeparture }
-    val lead = upcoming.indexOfFirst { !it.cancelled }.takeIf { it >= 0 } ?: upcoming.indices.firstOrNull()
-    return WidgetContent(t, answer, board, lead?.let { upcoming[it] },
-        lead?.let { upcoming.drop(it + 1).take(2) } ?: emptyList(), provenance)
+    val provenance = board?.let(::widgetFreshness) ?: "Offline"
+    // A service leaving at the redraw instant has gone for a view that cannot redraw each minute.
+    val lead = homeAnswer(board, answer.focus?.let { widgetFocused(it, board) }, t + 1, snapshot.modes.toSet(), snapshot.transferCap)
+        ?: return WidgetContent(t, answer, board, null, emptyList(), provenance)
+    val following = board?.journeys.orEmpty().filter {
+        snapshot.eligible(it) && it.key != lead.journey.key && it.key != lead.cancelledLead?.key &&
+            it.effectiveDeparture > maxOf(t, lead.journey.effectiveDeparture - 1)
+    }.sortedBy { it.effectiveDeparture }.take(WidgetFollowingLimit)
+    return WidgetContent(t, answer, board, lead.journey, following, provenance, lead.cancelledLead)
 }
 
 fun widgetNextBoundary(snapshot: WidgetSnapshot, sources: Map<String, BoardData>, after: Long, until: Long): Long? {
@@ -162,9 +175,9 @@ fun widgetNextBoundary(snapshot: WidgetSnapshot, sources: Map<String, BoardData>
     val answer = widgetAnswer(snapshot, after)
     val board = answer?.let { sources[widgetRequest(it, snapshot, after).key] }
     if (answer != null && board != null) {
-        val departures = if (answer.focus == null) board.journeys.filter(snapshot::eligible).map { it.effectiveDeparture }
-            else board.journeys.take(1).map { it.effectiveDeparture }
-        departures.filter { it > after }.minOrNull()?.let(candidates::add)
+        val times = answer.focus?.let { focus -> widgetFocused(focus, board).journey.legs.flatMap { listOf(it.effectiveDeparture, it.effectiveArrival) } }
+            ?: board.journeys.filter(snapshot::eligible).map { it.effectiveDeparture }
+        times.filter { it > after }.minOrNull()?.let(candidates::add)
         if (board.isLive(after)) candidates.add(board.generatedAt + 90_001)
     }
     return candidates.filter { it in (after + 1)..until }.minOrNull()
@@ -233,10 +246,12 @@ object WidgetWire {
         .put("answer", c.answer?.let { a -> JSONObject().put("trip", trip(a.trip)).put("reverse", a.reverse).put("focus", a.focus?.let(::focus)) })
         .put("board", c.board?.let(Wire::board)).put("next", c.next?.let(Wire::journey))
         .put("following", c.following.jsonEach(Wire::journey)).put("provenance", c.provenance)
+        .put("cancelled", c.cancelled?.let(Wire::journey))
 
     fun content(o: JSONObject) = WidgetContent(o.getLong("date"),
         o.optJSONObject("answer")?.let { a -> WidgetAnswer(trip(a.getJSONObject("trip")), a.getBoolean("reverse"),
             a.optJSONObject("focus")?.let(::focus)) },
         o.optJSONObject("board")?.let(Wire::board), o.optJSONObject("next")?.let(Wire::journey),
-        o.getJSONArray("following").readEach(Wire::journey), o.stringOrNull("provenance"))
+        o.getJSONArray("following").readEach(Wire::journey), o.stringOrNull("provenance"),
+        o.optJSONObject("cancelled")?.let(Wire::journey))
 }

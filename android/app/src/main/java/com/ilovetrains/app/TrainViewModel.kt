@@ -72,6 +72,7 @@ class TrainViewModel private constructor(
     private var trackerRefreshJob: Job? = null
     private var activityCallbacksOwner: Any? = null
     private var pendingTrackerOpen: TravelTrackerRevision? = null
+    private var pendingWidgetOpen: Boolean? = null
     private var activityForeground = false
     private var arrivalWindow: ArrivalWindow? = null
     private var arrivalResult: ArrivalResult? = null
@@ -115,6 +116,7 @@ class TrainViewModel private constructor(
             mutable.value = mutable.value.copy(ready = true, screen = if (data.trips.isEmpty()) Screen.Setup else Screen.Home, stations = stations)
             syncTracker()
             pendingTrackerOpen?.let { revision -> pendingTrackerOpen = null; openTrackedJourney(revision) }
+            pendingWidgetOpen?.let { setup -> pendingWidgetOpen = null; openFromWidget(setup) }
             if (activityForeground) startForegroundWork()
         }
         viewModelScope.launch {
@@ -328,6 +330,19 @@ class TrainViewModel private constructor(
         )
         recordHistory()
         refreshFocus()
+    }
+
+    /** A widget tap lands on Home whatever screen the app was left on, or on setup when the widget had no trip. */
+    fun openFromWidget(setup: Boolean) {
+        if (!mutable.value.ready) { pendingWidgetOpen = setup; return }
+        val screen = mutable.value.screen
+        if (setup || data.trips.isEmpty()) { if (screen != Screen.Setup) newTrip(); return }
+        if (screen == Screen.Home) return
+        if (screen == Screen.Setup) { cancelSetupLocation(); redirect = null; redirectTargetId = null }
+        historyJob?.cancel()
+        mutable.value = mutable.value.copy(screen = Screen.Home, selectingHome = false, detail = null,
+            feedbackSucceeded = if (screen == Screen.Settings) false else mutable.value.feedbackSucceeded)
+        historyRecorded = false; choosePrediction(); syncPersonal(); onSilentLocation?.invoke(); refresh()
     }
 
     internal fun dismissTracker(revision: TravelTrackerRevision): Boolean = tracker.dismiss(revision)
