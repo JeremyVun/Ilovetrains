@@ -12,3 +12,4 @@ web/downloads/index.html
 !site/assets/apple-touch-icon-180.png
 !assets/comps/latest/site/*.png
 !assets/comps/latest/commute-feedback/**/*.png
+!assets/comps/latest/widgets/**/*.png
