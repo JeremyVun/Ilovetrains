@@ -11,6 +11,8 @@ Stage: ready for build. Execution: [build_plan.md](build_plan.md).
   train match at pin time, completed rides).
 - 2026-09-23: phones get no opt-out control. The privacy page discloses the
   counts, as it does for the web; debug and test builds never send.
+- 2026-09-24: the privacy paragraph ships as written (Astra's draft, now in
+  `site/privacy/index.html`).
 
 ## What changes and why
 
