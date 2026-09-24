@@ -1,6 +1,6 @@
 # Home-screen widgets on iOS and Android
 
-Stage: design. Visual direction: comps round 1 pending. No build plan yet.
+Stage: build. Visual direction ruled (B · Timetable, round 1); data layer built.
 
 ## Owner's words (the spec)
 
@@ -101,12 +101,76 @@ limits: no location, refresh budget), `docs/operations/ios.md` (App Group
 entitlement for signing). The privacy page already covers station-pair
 departure requests; the build confirms no other wording changes.
 
-## Comps round 1
+## Comps round 1 (2026-09-23/24)
 
-Pending: see `comps/` once the round runs.
+Workshop `/private/tmp/ilt-5e0c1f-widget-comps-r1` (sheet `index.html`,
+report `OPTIONS.md`; exemplar frames copied to `comps/round1/`). Four
+directions: A · Header (countdown leads), B · Timetable (departure clock
+leads, the medium is a miniature board), C · Tracker (the Live Activity's
+sentence), D · Ruler (time ruler).
+
+Owner rulings, 2026-09-24:
+
+- **B · Timetable is the exemplar** for iOS small and medium and Android 2×2
+  and 4×2, with C's tracker sentence on the iOS lock screen, as recommended.
+- **Android countdown:** a system-ticking timer wrapped in the tracker's
+  words, "T9 leaves in 02:24", because no Android widget view can count down
+  in whole minutes by itself. iOS keeps the product's "3 min" through
+  per-minute timeline entries.
+- **Freshness:** every widget always shows "Last updated HH:MM" (offline:
+  "Offline · Last updated HH:MM"), the Live Activity's wording, because a
+  widget is almost never live.
+
+Findings carried forward as build invariants (measured in the round):
+iOS 26 widget sizes differ from Apple's published table (iPhone 17 Pro small
+164.3 pt square, medium 349.7 × 164.3 pt; iPhone SE small 146 pt); the Pixel
+launcher 2×2 is 179.4 × 203.8 dp and 4×2 373.7 × 203.8 dp, taller than the
+iOS square; tinted, clear and lock-screen renderings drop line and warning
+colour, so a line is named in text there and filled platform labels are drawn
+as cut-outs; the two widest names in the station index overflow the SE small
+in every direction.
+
+Owner rulings, 2026-09-24, second set:
+
+- **The lead train is the header's recommendation**, not simply the next
+  departure, so the widget never names a different train from the app. The
+  recommendation selection is shared with the widget on both platforms; the
+  medium's following rows stay chronological, as a board is.
+- **Text is at least 11 pt** everywhere (Apple's widget floor), including the
+  platform label, SCHEDULED and "Last updated".
+- **Gallery copy:** name "Next train"; description "The next train for the
+  trip you usually take at this time."
+
+Lead decisions on the round's remaining open points (the owner may overrule
+at the real-render verdict):
+
+- The medium labels scheduled-only rows `SCHEDULED`, as board rows do; the
+  small follows the B frames.
+- Monochrome renderings (tinted home screen, lock screen) name the line in
+  text (`T9`), because colour is gone there.
+- The empty state reuses setup's existing "New trip" / "Choose where you
+  start"; no new copy.
+- The lock screen offers the rectangular widget only (the owner chose it);
+  no inline variant.
+- The widget background is the app's own ground colour, as comped.
+- A name too wide for the SE small is shortened by the contract's rule
+  first; if it still does not fit, the origin line may scale down, never
+  ellipsise.
+- Tap opens the app on Home (the empty state opens setup), not whatever
+  screen the app was last on.
+
+## Data layer as built (phase 1, 2026-09-24)
+
+Built and verified on both platforms (see build_plan.md). Deviations the
+lead accepted: the widget redraws only when its answer changes (not on every
+fresher board), so a 30-second app refresh never spends the widget's fetch
+budget; Android computes content in a WorkManager worker and stores it in
+Glance state; a focus uses the app's own focus request; stored boards keep up
+to eight journeys with the fields the retained label needs. Unsigned
+simulator builds carry no App Group, so widget verification needs the
+locally signed simulator build in `docs/operations/ios.md`; signed device
+builds need the group registered to the team on the next signed build.
 
 ## Open questions
 
-- Visual composition of every size (comps round 1, owner verdict).
-- Any new copy the comps need (empty state, no more services tonight) is
-  drafted by Astra and ruled by the owner before the build.
+None for the build. The design locks at the real-render verdict.

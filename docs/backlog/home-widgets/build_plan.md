@@ -1,9 +1,8 @@
 # Build plan: home-screen widgets
 
 Design: [design.md](design.md). Branch `home-widgets` (based on
-`header-ride-metrics`, because both touch the native view models). Not ready
-to execute until comps round 1 has an owner verdict; the visual phases are
-written against the exemplar that verdict produces.
+`header-ride-metrics`, because both touch the native view models). Comps
+round 1 is ruled (B · Timetable); phases 2a and 2b build against its frames.
 
 Every agent: comments are rare and short, one line of *why* where the reason
 is non-obvious, never narrating what the code does. Commit after every step.
@@ -38,7 +37,7 @@ into both the app and the widget extension.
   personal-document owner, debounced, after trips, history, focus, service
   modes, cap or the station index change.
 
-## Phase 1: data layer, both platforms (Opus) — done marker: [ ]
+## Phase 1: data layer, both platforms (Opus) — done marker: [x] 2026-09-24
 
 Nonvisual. iOS: App Group entitlement on app and extension (update the
 generator and `docs/operations/ios.md`), `ios/Shared/WidgetSnapshot.swift`
@@ -52,12 +51,44 @@ weekly fallback, fetch-failure fallback labelling, empty state. Verify:
 `tools/build-ios.sh --unit`, `tools/build-android.sh --unit`, and one smoke
 install on the session simulator and emulator showing the placeholder widget.
 
-## Phase 2: visual build (Opus) — done marker: [ ]
+## Phase 1 results (2026-09-24)
 
-Against the round-1 exemplar. To be written after the verdict.
+`tools/build-ios.sh --unit` 265/265, `tools/build-android.sh --unit` 221/221,
+full Android gate and `tools/build-ios.sh --simulator` green; 11 new
+snapshot tests per platform, each platform's bitten once. Placeholder widgets
+answered on the real iOS home screen (small, medium) and the Pixel launcher
+(2×2, 4×2); smoke frames in `/private/tmp/ilt-5e0c1f-widgets-smoke/`.
 
-## Phase 3: real-renderer verification and owner verdict (lead + Opus) — done marker: [ ]
+## Phases 2a and 2b: visual build (Opus, one agent per platform, in parallel)
 
-To be written after the verdict: widget screenshots from the real iOS home
-and lock screens and the Android launcher, both schemes, every stress
-scenario the comps used.
+Exemplar: the B · Timetable frames in the round-1 workshop
+(`/private/tmp/ilt-5e0c1f-widget-comps-r1/shots/b-timetable-*.png`, the
+lock screen `c-tracker-ios-l-*.png`), its `OPTIONS.md`, and design.md's
+rulings. 2a owns `ios/TravelTrackerWidget/HomeTripWidget.swift` and
+`ios/Shared/` changes, worktree `/private/tmp/ilt-widgets-ios`, simulator
+`9972F6A9-…`. 2b owns `android/…/HomeWidget.kt` and its resources, worktree
+`/private/tmp/ilt-widgets-android`, emulator `emulator-5570`. Each also:
+- makes the lead the header's recommendation (share the selection code with
+  the widget; the following rows stay chronological);
+- routes a tap to Home (the empty state to setup);
+- sets the gallery name and description from design.md;
+- keeps every text at 11 pt or larger and names the line in monochrome
+  renderings.
+Code plus unit verify plus one smoke frame per size; the empirical sweep is
+phase 3. Verify: each platform's unit suite and full build.
+
+## Phase 3: real-renderer verification and owner verdict (Opus + lead) — done marker: [ ]
+
+One agent shoots every size on the real renderers (iOS home and lock
+screens with the locally signed simulator build; the Pixel launcher) in dark,
+light and, on iOS, tinted, across the round's scenarios: live, late,
+cancelled, scheduled-only, stale/offline, pinned, riding, one change, ferry,
+longest names, no more services, empty. It builds a sheet beside the B
+frames with measured captions (text sizes, overflow, contrast). The lead
+checks a handful of frames, then the owner rules. Findings become the
+exemplars in `assets/comps/latest/` and a `ui.md` widget section at close.
+
+## Phase 2 done markers
+
+- 2a iOS: [ ]
+- 2b Android: [ ]
