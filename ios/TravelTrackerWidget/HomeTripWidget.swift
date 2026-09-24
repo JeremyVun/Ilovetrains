@@ -263,14 +263,16 @@ private struct SmallRidingView: View {
                 }
             }
             .monospacedDigit()
-            .padding(.top, 5)
+            // Figures have no descenders, so the clock's line gives back the space a text line reserves for them.
+            .frame(height: 40)
+            .padding(.top, 2)
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 WidgetLabel(text: stepWord(step, headsign: false), color: colors.ink2)
                 Text(step.station).font(.system(size: 14, weight: .light)).foregroundStyle(colors.ink)
                     .lineLimit(1).minimumScaleFactor(0.8)
             }
-            .padding(.top, 3)
-            Spacer(minLength: 4)
+            .padding(.top, 2)
+            Spacer(minLength: 3)
             if let place = stepPlace(step) {
                 HStack(spacing: 6) {
                     if style.monochrome { LineName(leg: step.leg, style: style) }
@@ -286,9 +288,9 @@ private struct SmallRidingView: View {
                         WidgetChip(text: chip, leg: next.leg, style: style)
                     }
                 }
-                .padding(.top, 5)
+                .padding(.top, 4)
             }
-            FreshnessLine(freshness: content.freshness, style: style).padding(.top, 6)
+            FreshnessLine(freshness: content.freshness, style: style).padding(.top, 4)
         }
     }
 }
@@ -589,18 +591,27 @@ private struct StatusLine: View {
     let style: WidgetStyle
 
     var body: some View {
+        // Where the words do not fit, the pin stands alone, as the header's does beside a lost connection.
+        ViewThatFits(in: .horizontal) {
+            line(pinWord: true)
+            line(pinWord: false)
+        }
+    }
+
+    private func line(pinWord: Bool) -> some View {
         let colors = style.colors
-        HStack(spacing: 5) {
+        return HStack(spacing: 4) {
             if let text = status.text {
                 WidgetLabel(text: text, color: status.warns ? colors.warning : colors.ink2)
                 if status.pinned { Text("·").font(.system(size: 11)).foregroundStyle(colors.ink3) }
             }
             if status.pinned {
                 Image(systemName: "pin.fill").font(.system(size: 11)).foregroundStyle(colors.ink2)
-                WidgetLabel(text: "Pinned", color: colors.ink2)
+                if pinWord || status.text == nil { WidgetLabel(text: "Pinned", color: colors.ink2) }
             }
         }
         .lineLimit(1)
+        .fixedSize()
     }
 }
 
