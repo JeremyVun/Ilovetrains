@@ -1013,3 +1013,13 @@ and any milestone due for that profile. Compute new-user hit rate, returning
 answer acceptance, milestone reach and A2/A3 strip correction with the exact
 ratios and caveats in [the analytics contract](../docs/contracts/analytics.md#reading-the-counters).
 Never put the read key in a URL.
+
+The phones send only from release builds. To see a native payload before a
+release, run a local server that answers `POST /e` with 204 and records the
+body, then launch a debug build pointed at it: Android with `adb shell am
+start -n com.ilovetrains.app/.MainActivity --es ILOVETRAINS_ANALYTICS_URL
+http://10.0.2.2:<port>/e`, iOS with
+`SIMCTL_CHILD_ILOVETRAINS_ANALYTICS_URL=http://127.0.0.1:<port>/e xcrun simctl
+launch --terminate-running-process <udid> com.ilovetrains.ios`. A fresh
+install's first open posts `opened` with `m: "1"` about 10 seconds later;
+backgrounding the app flushes anything else.

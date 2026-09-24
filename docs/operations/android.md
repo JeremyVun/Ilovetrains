@@ -88,6 +88,10 @@ journeys, calendars, midnight/DST and bounded planning. The UI calibration
 test renders controlled states using the same Compose entry point as the
 application. Screenshot and real-client verification commands are indexed in
 `tools/README.md`. Test hooks live in `androidTest`, outside release code.
+Debug builds also permit cleartext to loopback hosts only (`src/debug`
+network-security config), so the analytics capture override in
+[analytics.md](../contracts/analytics.md) can reach a local server; release
+keeps cleartext off.
 The measured release checks and reviewed captures are recorded in
 [android-verification.md](android-verification.md).
 

@@ -22,7 +22,8 @@ the anonymous counters in `docs/contracts/analytics.md`.
   best alternative. Recovery lives in the header, never as a control in the
   cancelled journey detail (`docs/contracts/ui.md`).
 - Known accepted gap to watch: right trip, wrong service (missed the 09:24,
-  caught the 09:39). Revisit only if it bites.
+  caught the 09:39). The `service` share of `pinned_<kind>` measures it
+  (`docs/contracts/analytics.md`); revisit if that share bites.
 
 ## Usability hardening
 Every item is a measured complaint from a real phone, not a hypothesis.

@@ -93,6 +93,10 @@ Xcode 26.4 successfully archived through version 1.8.0 (9), signing
 both the app and Live Activity extension. TestFlight requires an active paid membership.
 
 The App Store Connect record is [ilovetrains, Apple ID 6809801045](https://appstoreconnect.apple.com/apps/6809801045/testflight).
+`PrivacyInfo.xcprivacy` declares the anonymous counters as product
+interaction, not linked, not used for tracking, for analytics
+([analytics.md](../contracts/analytics.md)); the App Store Connect privacy
+answers must say the same before an App Store release.
 Both explicit identifiers are registered on the paid team. The record uses
 English (Australia), SKU `ilovetrains-ios`, and Full Access.
 The latest internal-only upload succeeded on 2026-09-23 at 23:29 AEST from
