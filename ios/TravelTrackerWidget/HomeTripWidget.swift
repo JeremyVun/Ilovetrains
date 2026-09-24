@@ -205,6 +205,21 @@ private struct SmallLeadView: View {
     private var colors: TrainColors { style.colors }
 
     var body: some View {
+        // A 14 pt cap leaves the arrival no room beside it on a small tile, so it takes a line of its own where the height
+        // allows; the widest names then take a smaller clock, as round 1's ladder did.
+        ViewThatFits(in: .vertical) {
+            stack(showsArrival: true, lineName: .withCap, clockSize: 40)
+            stack(showsArrival: false, lineName: .withCap, clockSize: 40)
+            stack(showsArrival: false, lineName: .withNote, clockSize: 40)
+            stack(showsArrival: false, lineName: .withCap, clockSize: 34)
+            stack(showsArrival: false, lineName: .withNote, clockSize: 34)
+        }
+    }
+
+    /// Monochrome renderings name the line beside the cap, or beside the lead's note where a wide cap leaves it no room.
+    enum LineNamePlace { case withCap, withNote }
+
+    private func stack(showsArrival: Bool, lineName: LineNamePlace, clockSize: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             if let status = widgetStatus(content) {
                 StatusLine(status: status, style: style).padding(.bottom, 5)
@@ -215,8 +230,8 @@ private struct SmallLeadView: View {
             }
             HStack(alignment: .lastTextBaseline, spacing: 4) {
                 Text(clockTime(lead.effectiveDeparture))
-                    .font(.system(size: 40, weight: widgetScheduledOnly(lead, now: content.date, includesHorizon: false) ? .ultraLight : .thin))
-                    .tracking(-1.4)
+                    .font(.system(size: clockSize, weight: widgetScheduledOnly(lead, now: content.date, includesHorizon: false) ? .ultraLight : .thin))
+                    .tracking(-clockSize * 0.035)
                     .foregroundStyle(style.clock(lead, now: content.date, includesHorizon: false))
                     .strikethrough(lead.cancelled)
                     .lineLimit(1)
@@ -228,9 +243,9 @@ private struct SmallLeadView: View {
             }
             .monospacedDigit()
             .padding(.top, content.replaced == nil ? 6 : 2)
-            LeadNote(journey: lead, now: content.date, style: style)
+            LeadNote(journey: lead, now: content.date, style: style, namesLine: lineName == .withNote && style.monochrome)
             Spacer(minLength: 4)
-            PlaceLine(lead: lead, style: style)
+            PlaceLine(lead: lead, style: style, showsArrival: showsArrival, namesLine: lineName == .withCap && style.monochrome)
             FreshnessLine(freshness: content.freshness, style: style).padding(.top, 7)
         }
     }
@@ -272,11 +287,12 @@ private struct SmallRidingView: View {
                     .lineLimit(1).minimumScaleFactor(0.8)
             }
             .padding(.top, 2)
-            Spacer(minLength: 3)
+            // Tight gaps keep the following step on a 164 pt tile now that both chips are 20 pt tall.
+            Spacer(minLength: 2)
             if let place = stepPlace(step) {
                 HStack(spacing: 6) {
                     if style.monochrome { LineName(leg: step.leg, style: style) }
-                    WidgetChip(text: place, leg: step.leg, style: style, height: 17, padding: 5)
+                    WidgetChip(text: place, leg: step.leg, style: style)
                 }
             }
             if showsFollowingStep, let index, index + 1 < steps.count {
@@ -288,9 +304,9 @@ private struct SmallRidingView: View {
                         WidgetChip(text: chip, leg: next.leg, style: style)
                     }
                 }
-                .padding(.top, 4)
+                .padding(.top, 2)
             }
-            FreshnessLine(freshness: content.freshness, style: style).padding(.top, 4)
+            FreshnessLine(freshness: content.freshness, style: style).padding(.top, 3)
         }
     }
 }
@@ -305,13 +321,13 @@ private struct TripMediumView: View {
         Group {
             if let answer = content.answer {
                 VStack(alignment: .leading, spacing: 0) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline, spacing: 0) {
                         if riding(content), let status = widgetStatus(content) {
                             StatusLine(status: status, style: style)
                         } else {
                             WidgetRoute(answer: answer, size: 13, color: colors.ink, style: style)
                         }
-                        Spacer(minLength: 6)
+                        Spacer(minLength: 10)
                         if let freshness = content.freshness {
                             WidgetLabel(text: freshness.text, color: freshness.warns ? colors.warning : colors.ink3)
                                 .lineLimit(1).fixedSize()
@@ -341,8 +357,15 @@ private struct MediumBoard: View {
     let style: WidgetStyle
 
     var body: some View {
+        GeometryReader { proxy in
+            board(rowHeight: min(mediumRowHeight, (proxy.size.height - 2) / 3))
+        }
+    }
+
+    // A route that wraps to a second line takes its height from the rows, never from the bottom margin.
+    private func board(rowHeight: CGFloat) -> some View {
         let rows = content.rows
-        VStack(alignment: .leading, spacing: 0) {
+        return VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(rows.enumerated()), id: \.offset) { index, journey in
                 if index > 0 { RowRule(style: style) }
                 BoardRowView(
@@ -351,7 +374,7 @@ private struct MediumBoard: View {
                     pinned: journey.key == content.lead?.key && content.answer?.focus?.pinned == true && content.replaced == nil,
                     style: style
                 )
-                .frame(height: mediumRowHeight)
+                .frame(height: rowHeight)
             }
             // A board that ran out says so; a followed service or a saved board may simply not know what comes next.
             if rows.count < 3, content.answer?.focus == nil, content.board?.offline == false, let last = rows.last {
@@ -516,17 +539,16 @@ private struct TripLockView: View {
                 .lineLimit(2)
                 .minimumScaleFactor(0.8)
             if !sentence.instruction.isEmpty {
-                sentence.instruction.reduce(Text("")) { text, run in
-                    text + Text(run.text).fontWeight(run.strong ? .bold : .regular)
+                LockLine { size in
+                    sentence.instruction.reduce(Text("")) { text, run in
+                        text + Text(run.text).fontWeight(run.strong ? .bold : .regular)
+                    }
+                    .font(.system(size: size))
                 }
-                .font(.system(size: 13))
                 .foregroundStyle(.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
             }
             if let footer {
-                Text(footer).font(.system(size: 13)).foregroundStyle(.secondary)
-                    .lineLimit(1).minimumScaleFactor(0.85)
+                LockLine { size in Text(footer).font(.system(size: size)) }.foregroundStyle(.secondary)
             }
         }
         .monospacedDigit()
@@ -539,6 +561,20 @@ private struct TripLockView: View {
         let end = Date(timeIntervalSince1970: (deadline + clockOffset) / 1_000)
         let start = min(Date(timeIntervalSince1970: (content.date + clockOffset) / 1_000), end)
         return Text(sentence.subject) + Text(timerInterval: start...end, countsDown: true)
+    }
+}
+
+/// Steps down to the 11 pt floor on one line, then wraps a wide name or the offline note rather than ellipsise it.
+private struct LockLine: View {
+    let text: (CGFloat) -> Text
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            ForEach([13, 12, 11] as [CGFloat], id: \.self) { size in
+                text(size).lineLimit(1).fixedSize()
+            }
+            text(11).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 
@@ -621,14 +657,17 @@ private struct WidgetRoute: View {
 
     var body: some View {
         let forms = widgetRouteForms(from: answer.from.station.shortName, to: answer.to.station.shortName)
+        let floorSizes = stride(from: size - 1, to: 11, by: -1).map { $0 } + [11]
         ViewThatFits(in: .horizontal) {
             ForEach(forms.indices, id: \.self) { index in
-                line(forms[index]).lineLimit(1).fixedSize()
+                line(forms[index]).font(.system(size: size, weight: .light)).lineLimit(1).fixedSize()
             }
-            // Past the last rule the names scale toward the floor and may wrap between words, never ellipsise.
-            line(forms[forms.count - 1]).lineLimit(2).minimumScaleFactor(11 / size)
+            // Past the last rule the names scale toward the floor, then wrap between words; they never ellipsise.
+            ForEach(floorSizes, id: \.self) { smaller in
+                line(forms[forms.count - 1]).font(.system(size: smaller, weight: .light)).lineLimit(1).fixedSize()
+            }
+            line(forms[forms.count - 1]).font(.system(size: 11, weight: .light)).lineLimit(3)
         }
-        .font(.system(size: size, weight: .light))
         .foregroundStyle(color)
     }
 
@@ -655,21 +694,26 @@ private struct LeadNote: View {
     let journey: Journey
     let now: Millis
     let style: WidgetStyle
+    var namesLine = false
 
     var body: some View {
         let colors = style.colors
         let late = widgetLateMinutes(journey)
-        if journey.cancelled {
-            WidgetLabel(text: "Cancelled", color: colors.warning).padding(.top, 4)
-        } else if late > 0 {
+        let scheduled = widgetScheduledOnly(journey, now: now, includesHorizon: false)
+        if namesLine || journey.cancelled || late > 0 || scheduled {
             HStack(alignment: .firstTextBaseline, spacing: 7) {
-                Text(clockTime(journey.departure)).font(.system(size: 12, weight: .light))
-                    .foregroundStyle(colors.ink3).strikethrough().monospacedDigit()
-                WidgetLabel(text: "\(late) min late", color: colors.warning)
+                if namesLine { LineName(leg: journey.legs[0], style: style) }
+                if journey.cancelled {
+                    WidgetLabel(text: "Cancelled", color: colors.warning)
+                } else if late > 0 {
+                    Text(clockTime(journey.departure)).font(.system(size: 12, weight: .light))
+                        .foregroundStyle(colors.ink3).strikethrough().monospacedDigit()
+                    WidgetLabel(text: "\(late) min late", color: colors.warning)
+                } else if scheduled {
+                    WidgetLabel(text: "Scheduled", color: colors.ink3)
+                }
             }
             .padding(.top, 4)
-        } else if widgetScheduledOnly(journey, now: now, includesHorizon: false) {
-            WidgetLabel(text: "Scheduled", color: colors.ink3).padding(.top, 4)
         }
     }
 }
@@ -677,11 +721,12 @@ private struct LeadNote: View {
 private struct PlaceLine: View {
     let lead: Journey
     let style: WidgetStyle
+    let showsArrival: Bool
+    let namesLine: Bool
 
     var body: some View {
         let first = lead.legs[0]
         let place = departurePlatformText(first.fromPlatform, mode: first.mode)
-        // A thin space keeps the cap and the arrival on one line of a 164 pt tile at the 11 pt floor.
         let arrival = Text("→\u{2009}\(clockTime(lead.effectiveArrival))")
             .font(.system(size: 13, weight: .light))
             .foregroundStyle(lead.cancelled ? style.colors.ink3 : style.colors.ink2)
@@ -690,23 +735,32 @@ private struct PlaceLine: View {
             .lineLimit(1)
             .fixedSize()
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: 0) {
-                cap(place, first)
-                Spacer(minLength: 5)
-                arrival
+            HStack(spacing: 6) {
+                if namesLine { LineName(leg: first, style: style) }
+                if let place { WidgetChip(text: place, leg: first, style: style) }
+                if showsArrival {
+                    Spacer(minLength: 0)
+                    arrival
+                }
+            }
+            if showsArrival {
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 6) {
+                        if namesLine { LineName(leg: first, style: style) }
+                        if let place { WidgetChip(text: place, leg: first, style: style) }
+                    }
+                    arrival.frame(maxWidth: .infinity, alignment: .trailing)
+                }
             }
             VStack(alignment: .leading, spacing: 5) {
-                cap(place, first)
-                arrival.frame(maxWidth: .infinity, alignment: .trailing)
-            }
-        }
-    }
-
-    private func cap(_ place: String?, _ leg: Leg) -> some View {
-        HStack(spacing: 6) {
-            if style.monochrome { LineName(leg: leg, style: style) }
-            if let place {
-                WidgetChip(text: place, leg: leg, style: style, height: 17)
+                if let place { WidgetChip(text: place, leg: first, style: style) }
+                HStack(spacing: 6) {
+                    if namesLine { LineName(leg: first, style: style) }
+                    if showsArrival {
+                        Spacer(minLength: 0)
+                        arrival
+                    }
+                }
             }
         }
     }
@@ -742,19 +796,18 @@ private struct RowRule: View {
     }
 }
 
-/// Monochrome renderings cut the text out of the fill, because text on a fill is otherwise the same colour as it.
+/// Text on a line colour is 14 pt bold (ui.md). Monochrome renderings cut it out of the fill, because text on a fill is otherwise the same colour as it.
 private struct WidgetChip: View {
     let text: String
     let leg: Leg
     let style: WidgetStyle
-    var height: CGFloat = 16
-    var padding: CGFloat = 4
+    var height: CGFloat = widgetChipHeight
 
     var body: some View {
-        let label = Text(text.uppercased()).font(.system(size: 11, weight: .bold)).lineLimit(1).fixedSize()
+        let label = Text(text.uppercased()).font(.system(size: 14, weight: .bold)).lineLimit(1).fixedSize()
         if style.monochrome {
             label.hidden()
-                .padding(.horizontal, padding)
+                .padding(.horizontal, 5)
                 .frame(minWidth: height, minHeight: height, maxHeight: height)
                 .background(RoundedRectangle(cornerRadius: lineChipCornerRadius).fill(style.colors.ink))
                 .overlay(label.blendMode(.destinationOut))
@@ -763,7 +816,7 @@ private struct WidgetChip: View {
         } else {
             label
                 .foregroundStyle(chipInk(leg.line, mode: leg.mode, colors: style.colors))
-                .padding(.horizontal, padding)
+                .padding(.horizontal, 5)
                 .frame(minWidth: height, minHeight: height, maxHeight: height)
                 .background(lineColor(leg.line, mode: leg.mode, colors: style.colors, fill: true),
                             in: RoundedRectangle(cornerRadius: lineChipCornerRadius))
@@ -771,11 +824,13 @@ private struct WidgetChip: View {
     }
 }
 
+private let widgetChipHeight: CGFloat = 20
+
 private struct JourneyBar: View {
     let journey: Journey
     let style: WidgetStyle
 
-    private let height: CGFloat = 16
+    private let height = widgetChipHeight
 
     var body: some View {
         GeometryReader { proxy in
@@ -841,7 +896,7 @@ private struct JourneyBarLayout {
         var edge: CGFloat = 0
         func place(_ raw: String?, _ leg: Leg, at anchor: CGFloat, trailing: Bool) {
             guard let text = transferPlatformText(raw, mode: leg.mode) else { return }
-            let chipWidth = max(16, CGFloat(text.count) * 7 + 8)
+            let chipWidth = max(widgetChipHeight, CGFloat(text.count) * 9.6 + 10)
             let x = min(max(trailing ? anchor - chipWidth : anchor, edge), max(0, width - chipWidth))
             chips.append(Chip(text: text, leg: leg, x: x, width: chipWidth))
             edge = x + chipWidth + 1

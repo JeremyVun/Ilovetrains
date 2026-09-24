@@ -124,6 +124,39 @@ final class HomeWidgetSmokeTests: XCTestCase {
         Thread.sleep(forTimeInterval: 3)
     }
 
+    /// Shoots the lock screen for each scenario folder in HOME_WIDGET_SEEDS, copied into HOME_WIDGET_GROUP, into HOME_WIDGET_CAPTURES.
+    /// Seeding and locking alternate inside one run because launching the app unlocks the phone.
+    @MainActor
+    func testCapturesLockScreenScenarios() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let seeds = environment["HOME_WIDGET_SEEDS"], let group = environment["HOME_WIDGET_GROUP"],
+              let captures = environment["HOME_WIDGET_CAPTURES"] else {
+            throw XCTSkip("Set HOME_WIDGET_SEEDS, HOME_WIDGET_GROUP and HOME_WIDGET_CAPTURES")
+        }
+        let suffix = environment["HOME_WIDGET_SUFFIX"] ?? "dark"
+        let files = FileManager.default
+        let scenarios = try files.contentsOfDirectory(atPath: seeds).filter { !$0.hasPrefix(".") }.sorted()
+        let lock = NSSelectorFromString("pressLockButton")
+        for scenario in scenarios {
+            for name in ["widget-v1.json", "widget-debug-seed.json"] {
+                let target = URL(fileURLWithPath: group).appendingPathComponent(name)
+                try? files.removeItem(at: target)
+                try files.copyItem(at: URL(fileURLWithPath: seeds).appendingPathComponent(scenario).appendingPathComponent(name), to: target)
+            }
+            let app = XCUIApplication()
+            app.launchEnvironment["ILOVETRAINS_WIDGET_RELOAD"] = "1"
+            app.launch()
+            Thread.sleep(forTimeInterval: 3)
+            app.terminate()
+            XCUIDevice.shared.perform(lock)
+            Thread.sleep(forTimeInterval: 2)
+            XCUIDevice.shared.perform(lock)
+            Thread.sleep(forTimeInterval: 6)
+            try XCUIScreen.main.screenshot().pngRepresentation
+                .write(to: URL(fileURLWithPath: captures).appendingPathComponent("lock-\(scenario)-\(suffix).png"))
+        }
+    }
+
     /// Unlocks to the home screen for `simctl io screenshot`.
     @MainActor
     func testShowsHomeScreen() {
