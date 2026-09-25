@@ -20,7 +20,7 @@ version = File.read(File.join(root, 'web/js/version.js'))[/VERSION = '([^']+)'/,
       'SWIFT_VERSION' => '5.0', 'IPHONEOS_DEPLOYMENT_TARGET' => '17.0',
       'TARGETED_DEVICE_FAMILY' => '1,2', 'CODE_SIGN_STYLE' => 'Automatic',
       'DEVELOPMENT_TEAM' => '8QYAPRZLHG', 'MARKETING_VERSION' => version,
-      'CURRENT_PROJECT_VERSION' => '9', 'ENABLE_USER_SCRIPT_SANDBOXING' => 'YES',
+      'CURRENT_PROJECT_VERSION' => '10', 'ENABLE_USER_SCRIPT_SANDBOXING' => 'YES',
       'SWIFT_EMIT_LOC_STRINGS' => 'YES'
     })
     config.build_settings['SWIFT_ACTIVE_COMPILATION_CONDITIONS'] = 'DEBUG' if config.name == 'Debug'
