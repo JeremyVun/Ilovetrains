@@ -1,15 +1,29 @@
+import ActivityKit
 import XCTest
 @testable import ILoveTrains
 
 @MainActor
 final class ControllerTests: XCTestCase {
+    private var models: [TrainViewModel] = []
+
+    override func tearDown() async throws {
+        for model in models { model.stopForTests() }
+        models = []
+        try await super.tearDown()
+    }
+
+    private func track(_ model: TrainViewModel) -> TrainViewModel {
+        models.append(model)
+        return model
+    }
+
     func testColdLoadWaitsForPermissionThenArmsBeforeOfflineSettlement() async throws {
         let (data, _) = departedFocus()
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let store = DeviceStore(directory: directory)
         try await store.save(data)
         let location = ControlledLocation()
-        let model = TrainViewModel(store: store, location: location)
+        let model = track(TrainViewModel(store: store, location: location))
         model.networkDisabled = true
         model.resume()
         defer { model.pause() }
@@ -36,7 +50,7 @@ final class ControllerTests: XCTestCase {
         let location = ControlledLocation()
         location.granted = true
         location.immediatePermission = true
-        let model = TrainViewModel(store: store, location: location)
+        let model = track(TrainViewModel(store: store, location: location))
         model.networkDisabled = true
         model.resume()
         defer { model.pause() }
@@ -76,7 +90,7 @@ final class ControllerTests: XCTestCase {
         let store = DeviceStore(directory: directory)
         try await store.save(data)
         let location = ControlledLocation()
-        let model = TrainViewModel(store: store, location: location)
+        let model = track(TrainViewModel(store: store, location: location))
         model.networkDisabled = true
         model.resume()
         defer { model.pause() }
@@ -146,7 +160,7 @@ final class ControllerTests: XCTestCase {
         let store = DeviceStore(directory: directory)
         fixture.focus = nil
         try await store.save(fixture)
-        let model = TrainViewModel(store: store, api: api)
+        let model = track(TrainViewModel(store: store, api: api))
         model.resume()
         defer { model.pause() }
         for _ in 0..<500 {
@@ -184,7 +198,7 @@ final class ControllerTests: XCTestCase {
         configuration.protocolClasses = [StubbedDepartures.self]
         StubbedDepartures.delay = .seconds(20)
         var api = TransitAPI(); api.baseURL = "http://departures.invalid"; api.session = URLSession(configuration: configuration)
-        let model = TrainViewModel(store: store, api: api)
+        let model = track(TrainViewModel(store: store, api: api))
         defer { model.pause(); StubbedDepartures.delay = .zero }
         for _ in 0..<300 where !model.state.ready { try await Task.sleep(for: .milliseconds(10)) }
         XCTAssertTrue(model.state.ready)
@@ -799,7 +813,7 @@ final class ControllerTests: XCTestCase {
         let keepalive = FakeKeepalive()
         let store = DeviceStore(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
         try await store.save(data)
-        let model = TrainViewModel(store: store, location: location, keepalive: keepalive)
+        let model = track(TrainViewModel(store: store, tracker: stillTracker(), location: location, keepalive: keepalive))
         model.networkDisabled = true
         model.resume()
         try await settled { model.state.focus != nil }
@@ -819,7 +833,7 @@ final class ControllerTests: XCTestCase {
         let keepalive = FakeKeepalive()
         let store = DeviceStore(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
         try await store.save(data)
-        let model = TrainViewModel(store: store, location: denied, keepalive: keepalive)
+        let model = track(TrainViewModel(store: store, tracker: stillTracker(), location: denied, keepalive: keepalive))
         model.networkDisabled = true
         model.resume()
         try await settled { model.state.focus != nil }
@@ -834,7 +848,7 @@ final class ControllerTests: XCTestCase {
         let offStore = DeviceStore(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
         try await offStore.save(permitted)
         let offKeepalive = FakeKeepalive()
-        let offModel = TrainViewModel(store: offStore, location: granted, keepalive: offKeepalive)
+        let offModel = track(TrainViewModel(store: offStore, tracker: stillTracker(), location: granted, keepalive: offKeepalive))
         offModel.networkDisabled = true
         offModel.resume()
         try await settled { offModel.state.focus != nil }
@@ -850,7 +864,7 @@ final class ControllerTests: XCTestCase {
         let keepalive = FakeKeepalive()
         let store = DeviceStore(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
         try await store.save(data)
-        let model = TrainViewModel(store: store, location: location, keepalive: keepalive)
+        let model = track(TrainViewModel(store: store, tracker: stillTracker(), location: location, keepalive: keepalive))
         model.networkDisabled = true
         model.resume()
         try await settled { model.state.focus != nil }
@@ -870,7 +884,7 @@ final class ControllerTests: XCTestCase {
         let keepalive = FakeKeepalive()
         let store = DeviceStore(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
         try await store.save(data)
-        let model = TrainViewModel(store: store, location: location, keepalive: keepalive)
+        let model = track(TrainViewModel(store: store, tracker: stillTracker(), location: location, keepalive: keepalive))
         model.networkDisabled = true
         model.resume()
         try await settled { model.state.focus != nil }
@@ -888,12 +902,18 @@ final class ControllerTests: XCTestCase {
         model.resume()
     }
 
-    private func settled(_ condition: @escaping () -> Bool) async throws {
+    /// The live tracker shares one session file and the simulator's Live Activities with every earlier test's models.
+    private func stillTracker() -> TravelTrackerController {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        return TravelTrackerController(store: TravelTrackerSessionFileStore(directory: directory), driver: StillActivities())
+    }
+
+    private func settled(_ condition: @escaping () -> Bool, file: StaticString = #filePath, line: UInt = #line) async throws {
         for _ in 0..<300 {
             if condition() { return }
             try await Task.sleep(for: .milliseconds(10))
         }
-        XCTFail("The controller never reached the expected state")
+        XCTFail("The controller never reached the expected state", file: file, line: line)
     }
 
     private func travellingFocus() -> (data: UserData, arrival: Millis) {
@@ -953,7 +973,7 @@ final class ControllerTests: XCTestCase {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [StubbedDepartures.self]
         var api = TransitAPI(); api.baseURL = "http://departures.invalid"; api.session = URLSession(configuration: configuration)
-        let model = TrainViewModel(store: store, api: api, location: location)
+        let model = track(TrainViewModel(store: store, api: api, location: location))
         for _ in 0..<300 {
             if model.state.ready { return (store, model) }
             try await Task.sleep(for: .milliseconds(10))
@@ -1097,7 +1117,7 @@ final class ControllerTests: XCTestCase {
         let store = DeviceStore(directory: directory)
         if let cached { try await store.cache(cached, modes: data.modes) }
         try await store.save(data)
-        let model = TrainViewModel(store: store, location: location, undoWindow: undoWindow)
+        let model = track(TrainViewModel(store: store, location: location, undoWindow: undoWindow))
         model.networkDisabled = true
         for _ in 0..<200 {
             if model.state.ready { return (store, model) }
@@ -1146,6 +1166,18 @@ final class StubbedDepartures: URLProtocol {
         }
     }
     override func stopLoading() {}
+}
+
+private struct StillActivities: TravelTrackerActivityDriving {
+    let activitiesEnabled = true
+    func activities() async -> [TravelTrackerActivityRecord] { [] }
+    func request(
+        attributes: TravelTrackerActivityAttributes,
+        content: ActivityContent<TravelTrackerActivityAttributes.ContentState>
+    ) async throws -> String { UUID().uuidString }
+    func update(id: String, content: ActivityContent<TravelTrackerActivityAttributes.ContentState>, alert: TravelTrackerAlert?) async {}
+    func end(id: String) async {}
+    func stateUpdates(id: String) -> AsyncStream<TravelTrackerSystemActivityState> { AsyncStream { $0.finish() } }
 }
 
 @MainActor

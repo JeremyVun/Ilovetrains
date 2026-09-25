@@ -75,6 +75,8 @@ actor OfflinePlanner {
     }
 
     func initialize() async throws {
+        // A second caller must not reopen the database: that drops the schedule cache and cancels plans in flight.
+        guard activePackage == nil else { return }
         try packageStore.prepareDirectory()
         for manifestData in packageStore.manifests() {
             guard let info = try? parseManifest(manifestData),

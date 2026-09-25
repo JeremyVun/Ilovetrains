@@ -31,7 +31,11 @@ drive its own simulator when running concurrently. Reuse build output and a
 warm simulator between checks; shut down session-owned simulators afterward.
 The helper prints elapsed time and a complete log path; `TEST_VERBOSE=1`
 streams output and `TEST_LOG_DIR` selects the artifact directory.
-Tests disable parallel execution because they drive real app state. Core tests
+Tests disable parallel execution because they drive real app state. Controller
+tests stop each model in `tearDown`; a model left running plans routes and
+publishes the widget for seconds after its test returns, and `-test-iterations`
+piles that up until the host starves (a 12-minute hang at ten cores). Loop
+`xcodebuild test` only under `taskpolicy -b` and never unattended. Core tests
 cover the bundled timetable, calendars/DST, realtime identities and expiry,
 package recovery, persistent state and web-generated conformance. UI tests
 create and reopen a new Mascot–Kellyville trip with network transport disabled,

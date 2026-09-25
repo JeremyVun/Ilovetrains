@@ -364,6 +364,15 @@ final class TrainViewModel: ObservableObject {
         return keepalive.start()
     }
 
+    #if DEBUG
+    /// A test's model keeps planning, reconciling and publishing for seconds after the test returns; iterated tests pile that up until the host starves.
+    func stopForTests() {
+        background = false
+        suspend()
+        trackerTask?.cancel(); trackerTask = nil
+        widgetTask?.cancel(); widgetTask = nil
+    }
+    #endif
     private func suspend() {
         keepalive.stop()
         active = false; loop?.cancel(); loop = nil
@@ -903,10 +912,11 @@ final class TrainViewModel: ObservableObject {
         arrivalResumeWaitUntil = state.now + 15_000
         arrivalPermissionPending = true
         settleFocus()
+        // The permission answer may never come; holding the model across the wait would keep it ticking after it is dropped.
+        let location = self.location
         arrivalTask = Task { [weak self] in
-            guard let self else { return }
-            let permitted = await self.location.monitoringPermitted()
-            guard request == self.arrivalGeneration,
+            let permitted = await location.monitoringPermitted()
+            guard let self, request == self.arrivalGeneration,
                   self.active,
                   self.data.useLocation,
                   self.data.focus.map({ self.arrivalIdentity($0) }) == identity else { return }
