@@ -176,9 +176,14 @@ read-only container probe verified the actual environment key `prod` and a true
 `tiny_train` evaluation (`FALLTHROUGH`). No `.env` files were read or credentials
 printed; the probe used the container's existing process environment.
 
-Version `1.9.0` (source `afeae4e5f678`, service worker `v70`) is built and gated
-on the final sources; its image push, infra pin and TestFlight upload are the
-owner's publish step and are recorded here once they run. It adds the
+Version `1.9.0` (source `734e649cba18`, gated at `afeae4e5f678` with only docs
+changed since, service worker `v70`) deployed on 2026-09-26 in job
+`744e0f9ba3787d32a83ffb044e882fe8`, infra pin `ec180b3`. Image digest:
+`sha256:39d17fec6da2a323f33e955610f12d8a02dafb5340f22705884ff5b7af70421e`.
+Public health, all 34 shell paths (`/index.html` is a 301 to `/`) and the
+downloads page and APK matched the release bytes; `/js/main.js` and `/sw.js`
+keep `no-store`. The production open probe met the bar: warm cached paint
+156 ms, live data 105 ms, worker controlling; cold live data 888 ms. It adds the
 home-screen widgets on iOS (small, medium and lock screen) and Android (2×2 and
 4×2), sharing the header's answer through an App Group file and a widget
 snapshot store, and stops each iOS controller test's model at teardown so
@@ -192,8 +197,11 @@ the two setup-location keyboard-inset frames and the uncommitted tracker frames
 excepted as at 1.8.0. iOS passed 274 core tests and 22 UI tests (the tiny-train
 timing test passed on an unthrottled rerun); its 35 app frames matched and the
 20 tracker crops remain uncommitted. The signed Android 1.9.0/code 10 APK is
-staged at `/downloads/`; its SHA-256 is
+published at `/downloads/`; its SHA-256 is
 `117e7391d32c964a445f504c2fb561e1a52c8cba06c84c13f6ee155359173f21`.
+iOS 1.9.0 (10) was archived, signed and uploaded to internal TestFlight at
+01:59 AEST on 2026-09-26. Processing and group assignment need App Store
+Connect sign-in and have not been confirmed.
 
 Version `1.8.0` (source `e0e2ddb284d8`, service worker `v68`) deployed on
 2026-09-23 in job `e1247c5262b6da07442ca374819d73c2`, infra pin `20b0c36`.
