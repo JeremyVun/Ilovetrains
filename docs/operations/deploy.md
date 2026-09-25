@@ -176,6 +176,25 @@ read-only container probe verified the actual environment key `prod` and a true
 `tiny_train` evaluation (`FALLTHROUGH`). No `.env` files were read or credentials
 printed; the probe used the container's existing process environment.
 
+Version `1.9.0` (source `afeae4e5f678`, service worker `v70`) is built and gated
+on the final sources; its image push, infra pin and TestFlight upload are the
+owner's publish step and are recorded here once they run. It adds the
+home-screen widgets on iOS (small, medium and lock screen) and Android (2×2 and
+4×2), sharing the header's answer through an App Group file and a widget
+snapshot store, and stops each iOS controller test's model at teardown so
+iterated test runs no longer starve the host.
+
+Go, 518 web tests, both recorded web journeys and the web visual regression
+(39 frames matching; the seven Settings frames re-accepted for the version
+string) passed. Android Debug and signed Release gates passed (233 JVM tests);
+its visual regression matched 41 frames on a dark-mode API 36.1 emulator, with
+the two setup-location keyboard-inset frames and the uncommitted tracker frames
+excepted as at 1.8.0. iOS passed 274 core tests and 22 UI tests (the tiny-train
+timing test passed on an unthrottled rerun); its 35 app frames matched and the
+20 tracker crops remain uncommitted. The signed Android 1.9.0/code 10 APK is
+staged at `/downloads/`; its SHA-256 is
+`117e7391d32c964a445f504c2fb561e1a52c8cba06c84c13f6ee155359173f21`.
+
 Version `1.8.0` (source `e0e2ddb284d8`, service worker `v68`) deployed on
 2026-09-23 in job `e1247c5262b6da07442ca374819d73c2`, infra pin `20b0c36`.
 Image digest:
