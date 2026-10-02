@@ -39,10 +39,14 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-// The web narrows its page margin at max-width 375px, and the 360 exemplars assume it.
+// The web narrows its page at max-width 375px, and the 360 exemplars assume it.
+val NarrowPhone: Boolean
+    @Composable @ReadOnlyComposable
+    get() = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() } <= 375.dp
+
 val PagePadding: Dp
     @Composable @ReadOnlyComposable
-    get() = if (with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() } <= 375.dp) 18.dp else 22.dp
+    get() = if (NarrowPhone) 18.dp else 22.dp
 
 @Composable
 fun Label(text: String, modifier: Modifier = Modifier, color: Color = LocalTrainColors.current.ink3,
@@ -123,10 +127,10 @@ fun ActionRail(text: String, onClick: () -> Unit, enabled: Boolean = true, minHe
 
 @Composable
 fun LineChip(line: String, mode: String, text: String = line, modifier: Modifier = Modifier,
-             height: Dp = 22.dp, horizontalPadding: Dp = 7.dp, dimmed: Boolean = false) {
+             height: Dp = 22.dp, horizontalPadding: Dp = 7.dp, minWidth: Dp = 0.dp, dimmed: Boolean = false) {
     val c = LocalTrainColors.current
     // The chip is sized in text units: enlarged text grows it instead of being clipped by it.
-    Box(modifier.height(height * LocalDensity.current.fontScale).clip(RoundedCornerShape(LineChipCornerRadius))
+    Box(modifier.height(height * LocalDensity.current.fontScale).widthIn(min = minWidth).clip(RoundedCornerShape(LineChipCornerRadius))
         .background(lineColor(line, mode, c, fill = true)).testTag("chip-$text"),
         contentAlignment = Alignment.Center) {
         Text(text.uppercase(), modifier = Modifier.padding(horizontal = horizontalPadding), color = chipInk(line, mode, c), fontSize = 14.sp,
@@ -370,12 +374,16 @@ fun JourneyAxis(journey: Journey, modifier: Modifier = Modifier, large: Boolean 
     val fontScale = LocalDensity.current.fontScale
     val first = journey.legs.first()
     val cap = departureCapText(first.fromPlatform, first.mode).takeIf { showCap }
+    val narrowRow = NarrowPhone && !large
+    val capPadding = if (large) 10.dp else if (narrowRow) 6.dp else 7.dp
+    val pinPadding = if (narrowRow) 4.dp else 5.dp
+    val pinMinWidth = if (narrowRow) 17.dp else 0.dp
     Layout(modifier = modifier.semantics {
         contentDescription = "Journey from ${first.from.shortName} to ${journey.legs.last().to.shortName}"
     }, content = {
         cap?.let {
             LineChip(first.line, first.mode, it, Modifier.layoutId(AxisElement.Cap),
-                height = if (large) 24.dp else 22.dp, horizontalPadding = if (large) 10.dp else 7.dp)
+                height = if (large) 24.dp else 22.dp, horizontalPadding = capPadding)
         }
         journey.legs.forEachIndexed { index, leg ->
             Box(Modifier.layoutId(AxisElement.Ride(index)).background(lineColor(leg.line, leg.mode, c, fill = true),
@@ -404,14 +412,14 @@ fun JourneyAxis(journey: Journey, modifier: Modifier = Modifier, large: Boolean 
                 platformText(leg.toPlatform, leg.mode)?.let {
                     LineChip(leg.line, leg.mode, it,
                         Modifier.layoutId(AxisElement.Alight(index)).testTag("axis-alight-$index"),
-                        height = if (large) 24.dp else 22.dp, horizontalPadding = 5.dp,
+                        height = if (large) 24.dp else 22.dp, horizontalPadding = pinPadding, minWidth = pinMinWidth,
                         dimmed = travelledAt?.let { at -> at >= next.effectiveDeparture } == true)
                 }
             }
             platformText(next.fromPlatform, next.mode)?.let {
                 LineChip(next.line, next.mode, it,
                     Modifier.layoutId(AxisElement.Board(index)).testTag("axis-board-$index"),
-                    height = if (large) 24.dp else 22.dp, horizontalPadding = 5.dp,
+                    height = if (large) 24.dp else 22.dp, horizontalPadding = pinPadding, minWidth = pinMinWidth,
                     dimmed = travelledAt?.let { at -> at >= next.effectiveDeparture } == true)
             }
             StationLabelText(changeLabel(journey, index, recoveryFrom), AxisElement.StationLabel(index), c.ink2)

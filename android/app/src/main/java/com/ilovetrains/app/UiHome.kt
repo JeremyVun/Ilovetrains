@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
@@ -38,7 +39,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
@@ -131,6 +134,7 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
         directionFigureFor(journey, state.now) ?: fig
     } else fig
     val directionFigure = homeHeaderFigure(header, departed, boardFigure)
+    val sizes = if (NarrowPhone) NarrowHeader else RegularHeader
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().heightIn(min = 22.dp).padding(horizontal = PagePadding), verticalAlignment = Alignment.CenterVertically) {
             val status = when {
@@ -147,42 +151,43 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
         }
         Row(Modifier.fillMaxWidth().clickable(role = Role.Button) { actions.openJourney(journey) }
             .testTag("home-journey").padding(horizontal = PagePadding, vertical = 10.dp), verticalAlignment = Alignment.Top) {
-            Column(Modifier.width(104.dp)) {
+            Column(Modifier.width(sizes.figureColumn)) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(directionFigure.value, color = if (warnFigure) c.warning else c.ink,
                         modifier = Modifier.testTag("home-primary-figure"),
-                        fontSize = when {
-                            wideFigure(directionFigure) -> 50.sp
-                            else -> 64.sp
-                        },
+                        fontSize = if (wideFigure(directionFigure)) sizes.wideFigure else sizes.figure,
                         lineHeight = 58.sp, fontWeight = FontWeight(250), letterSpacing = (-2).sp,
                         maxLines = 1, softWrap = false)
-                    Text(directionFigure.unit, color = c.ink2, fontSize = 16.sp, fontWeight = FontWeight.Normal,
+                    Text(directionFigure.unit, color = c.ink2, fontSize = sizes.unit, fontWeight = FontWeight.Normal,
                         modifier = Modifier.padding(start = 2.dp, bottom = 7.dp))
                 }
                 val homeProvenance = directionFigure.provenance.takeUnless { it.equals("Scheduled", true) }.orEmpty()
-                if (homeProvenance.isNotEmpty()) Label(homeProvenance, Modifier.padding(top = 5.dp),
+                // As the web's nowrap .hm-st, a long provenance runs on past the narrow column instead of wrapping.
+                if (homeProvenance.isNotEmpty()) Label(homeProvenance,
+                    Modifier.padding(top = 5.dp).wrapContentWidth(Alignment.Start, unbounded = true),
                     color = if (late || journey.cancelled) c.warning else c.ink3)
             }
             Spacer(Modifier.width(14.dp))
-            Row(Modifier.weight(1f)) {
-                Column(Modifier.weight(1f)) {
-                    Text(first.from.shortName, color = c.ink, fontSize = 16.sp, fontWeight = FontWeight.Light,
+            HeaderEnds(Modifier.weight(1f)) {
+                Column {
+                    Text(first.from.shortName, color = c.ink, fontSize = sizes.station, fontWeight = FontWeight.Light,
                         maxLines = 2, overflow = TextOverflow.Clip)
                     Text(clockTime(journey.effectiveDeparture), color = if (late) c.warning else c.ink,
                         fontSize = 25.sp, fontWeight = FontWeight.Normal, modifier = Modifier.padding(top = 3.dp))
                 }
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                    Text(journey.legs.last().to.shortName, color = c.ink2, fontSize = 16.sp, fontWeight = FontWeight.Light,
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(journey.legs.last().to.shortName, color = c.ink2, fontSize = sizes.station, fontWeight = FontWeight.Light,
                         textAlign = TextAlign.End, maxLines = 2, overflow = TextOverflow.Clip)
                     val clocks = header?.arrival
-                    Row(Modifier.padding(top = 7.dp), verticalAlignment = Alignment.Bottom) {
+                    Row(Modifier.padding(top = 7.dp).width(IntrinsicSize.Max), verticalAlignment = Alignment.Bottom) {
                         if (clocks?.struck != null && clocks.shown != null) {
                             Text(clocks.struck, color = c.ink3, fontSize = 20.sp, fontWeight = FontWeight.Light,
-                                textDecoration = TextDecoration.LineThrough, modifier = Modifier.padding(end = 9.dp))
+                                textDecoration = TextDecoration.LineThrough,
+                                modifier = Modifier.padding(end = 9.dp).testTag("home-arrival-struck"))
                         }
                         val shown = clocks?.shown ?: clocks?.struck ?: clocks?.planned ?: clockTime(journey.effectiveArrival)
                         Text(shown, color = c.ink2, fontSize = 20.sp, fontWeight = FontWeight.Light,
+                            modifier = Modifier.testTag("home-arrival"),
                             textDecoration = if (clocks?.shown == null && clocks?.struck != null) TextDecoration.LineThrough else null)
                     }
                     if (clocks?.planned != null) Label("Planned", Modifier.padding(top = 4.dp), color = c.ink3, size = 10)
@@ -260,6 +265,31 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
         }
         Rule(heavy = true)
         tripLine(focus, completed && focus != null, state.startableJourney)?.let { TripControlLine(it, actions) }
+    }
+}
+
+// The web's Home header sizes, which it narrows with the page at max-width 375px.
+private class HeaderSizes(val figureColumn: Dp, val figure: TextUnit, val wideFigure: TextUnit, val unit: TextUnit,
+                          val station: TextUnit)
+private val RegularHeader = HeaderSizes(104.dp, 64.sp, 50.sp, 16.sp, 16.sp)
+private val NarrowHeader = HeaderSizes(92.dp, 56.sp, 44.sp, 14.sp, 15.sp)
+
+// Each end takes half the row unless that would break a word, as a replaced arrival clock beside the struck one would.
+@Composable
+private fun HeaderEnds(modifier: Modifier, ends: @Composable () -> Unit) {
+    Layout(ends, modifier) { measurables, constraints ->
+        val (from, to) = measurables
+        val width = constraints.maxWidth
+        val room = width - 12.dp.roundToPx()
+        val fromWord = from.minIntrinsicWidth(Constraints.Infinity)
+        val toWord = to.minIntrinsicWidth(Constraints.Infinity)
+        val toWidth = if (fromWord + toWord > room) width / 2 else (width / 2).coerceIn(toWord, room - fromWord)
+        val fromPlaced = from.measure(Constraints.fixedWidth(width - toWidth))
+        val toPlaced = to.measure(Constraints.fixedWidth(toWidth))
+        layout(width, maxOf(fromPlaced.height, toPlaced.height)) {
+            fromPlaced.place(0, 0)
+            toPlaced.place(width - toWidth, 0)
+        }
     }
 }
 
