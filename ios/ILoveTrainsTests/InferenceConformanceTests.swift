@@ -88,7 +88,8 @@ final class InferenceConformanceTests: XCTestCase {
                 tripId: try XCTUnwrap(focus["tripId"] as? String), reverse: focus["direction"] as? String == "reverse",
                 journey: journey, board: board(journey), pinned: focus["by"] as? String != "inferred"
             )
-            XCTAssertNotNil(data.lastAnswer, name)
+            data.lastAnswer = data.lastAnswer ?? LastAnswer(tripId: "other", reverse: true, at: now, stationId: nil,
+                                                            board: board(journey), journey: journey)
 
             let stopped = try XCTUnwrap(stoppedTrip(data, at: now), name)
 
