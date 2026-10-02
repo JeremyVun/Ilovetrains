@@ -12,7 +12,8 @@ import { journeyDetail, journeyKey, departureKey, arrivalMs, departureMs } from 
 import {
   focusOf, visibleFocus, setFocus, clearFocus, isFocused, focusExpired, matchJourney,
   applyFocusSnapshot, applyArrivalResult, composedJourney, recoveryModel, recoveryOf,
-  inferFromRecords, journeyCancelled, pinResult, rideAdded, rideRecorded, tickNeedsFix, writeLastOpen,
+  inferFromRecords, inferOnBoard, journeyCancelled, onBoardRequests, pinResult, rideAdded, rideRecorded,
+  tickNeedsFix, writeLastOpen,
   TRAVEL_LATE_MS
 } from './focus.js';
 import * as Board from './board.js';
@@ -188,6 +189,7 @@ let pastInflight = null;
 let focusInflight = null;
 let recoveryInflight = null;
 let recommendationInflight = null;
+let onBoardInflight = null;
 let requestGeneration = 0;
 let answeredKey = null;
 let preserveSelection = false;
@@ -814,22 +816,86 @@ function useFix() {
     if (voted !== state.doc) ctx.update(voted);
   }
   const entered = inferFromRecords(state.doc, state.previousOpen, now(), fix);
-  if (entered) {
-    stopArrivalMonitoring();
-    state.arrivalDecision = null;
-    ctx.update(setFocus(state.doc, entered, entered.journey, now(), 'inferred'));
-    state.predicted = false;
-    state.leap = null;
-    state.selection = { tripId: entered.tripId, direction: entered.direction };
-    openForAnalytics();
-    analytics.track('entered_inferred');
-  } else if (state.predicted && !moving) {
+  if (entered) enterInferred(entered);
+  else if (state.predicted && !moving) {
     const answer = locateSelection();
     state.selection = answer;
     if (!answer) { state.body = null; renderHome(); return; }
   }
   settleArrival({ sample: fix });
   loadSelectedCache();
+  renderHome();
+  fetchLive();
+  if (!entered && moving) void enterOnBoard(fix);
+}
+
+function enterInferred(focus) {
+  stopArrivalMonitoring();
+  state.arrivalDecision = null;
+  ctx.update(setFocus(state.doc, focus, focus.journey, now(), 'inferred'));
+  state.predicted = false;
+  state.leap = null;
+  state.selection = { tripId: focus.tripId, direction: focus.direction };
+  openForAnalytics();
+  analytics.track('entered_inferred');
+}
+
+function cachedJourneys(doc) {
+  const cached = {};
+  for (const trip of doc.trips) {
+    for (const direction of ['forward', 'reverse']) {
+      const ends = leg(trip, direction);
+      const entry = getCache(doc, cacheKey(ends.from.id, ends.to.id, enabledModes()))
+        || getCache(doc, cacheKey(ends.from.id, ends.to.id));
+      cached[`${trip.id}|${direction}`] = entry?.body?.journeys || [];
+    }
+  }
+  return cached;
+}
+
+/* A fix at train speed that no sighted record explains: look for the running
+   service that matches where the phone is along a saved trip (client-storage.md,
+   On-board entry). One request per candidate, at most three. */
+async function enterOnBoard(fix) {
+  const at = now();
+  const current = focusOf(state.doc);
+  if (current && !focusExpired(current, at)) return;
+  const previous = state.previousFix;
+  const doc = tripsForModes(state.doc, state.stations);
+  const cached = cachedJourneys(doc);
+  const requests = onBoardRequests(doc, at, fix, previous, cached);
+  if (!requests.length) return;
+  onBoardInflight?.abort();
+  const controller = new AbortController();
+  onBoardInflight = controller;
+  const generation = geoGeneration;
+  const boards = {};
+  const bodies = {};
+  await Promise.all(requests.map(async (request) => {
+    try {
+      const { body } = await getDepartures(request.from, request.to, {
+        at: request.at, limit: request.limit, modes: enabledModes(), transferLimit: transferLimit(),
+        signal: controller.signal
+      });
+      bodies[request.key] = body;
+      boards[request.key] = body.journeys || [];
+    } catch (_) {
+      // A candidate whose board failed simply cannot match this fix.
+    }
+  }));
+  if (onBoardInflight !== controller) return;
+  onBoardInflight = null;
+  if (controller.signal.aborted || generation !== geoGeneration || state.view !== 'home') return;
+  const focus = inferOnBoard(tripsForModes(state.doc, state.stations), at, fix, previous, boards, cached);
+  if (!focus) return;
+  enterInferred(focus);
+  const body = bodies[`${focus.tripId}|${focus.direction}`];
+  state.focusBody = body;
+  state.focusIdentity = identityOfFocus(focusOf(state.doc));
+  state.focusOffline = false;
+  state.focusServerStale = false;
+  loadSelectedCache();
+  syncArrivalMonitoring();
   renderHome();
   fetchLive();
 }

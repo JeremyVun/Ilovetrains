@@ -2,8 +2,8 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { predict, locate, scoreCandidate, historyEvidence, automaticHomeOf } from '../web/js/predict.js';
-import { here, sightingOf } from '../web/js/stations.js';
-import { inferFromRecords, replacesLastOpen, writeLastOpen } from '../web/js/focus.js';
+import { here, sightingOf, trainSpeed } from '../web/js/stations.js';
+import { inferFromRecords, inferOnBoard, onBoardRequests, replacesLastOpen, writeLastOpen } from '../web/js/focus.js';
 import { readFileSync } from 'node:fs';
 import { boardModel } from '../web/js/rowmodel.js';
 import { NOW, departuresBody, TRANSFER_NOW, TRANSFER_DEPARTED_NOW, transferBody,
@@ -175,14 +175,15 @@ const STRATHFIELD = place('213510', 'Strathfield Station', -33.87181, 151.094427
 const stop = ({ id, name }) => ({ id, name });
 const clockOf = (millis) => new Date(millis + 10 * 3_600_000).toISOString().slice(0, 19) + '+10:00';
 
-/* An on-time T9 from Rhodes: Redfern 22 minutes on, Town Hall 27. */
-function t9(departure, to = TOWN_HALL, { line = 'T9', lateMinutes = 0, cancelled = false } = {}) {
+/* An on-time T9 from Rhodes: Redfern 22 minutes on, Town Hall 27. `from`
+   turns it round for the evening run home. */
+function t9(departure, to = TOWN_HALL, { from = RHODES, rideMinutes = null, lateMinutes = 0, cancelled = false } = {}) {
   const leave = ms(departure);
-  const ride = to.id === REDFERN.id ? 22 : 27;
+  const ride = rideMinutes ?? ([to.id, from.id].includes(REDFERN.id) ? 22 : 27);
   const times = (at) => ({ scheduled: clockOf(at), estimated: clockOf(at + lateMinutes * 60_000) });
   const leg = {
-    line: { name: line, mode: 'train' }, headsign: 'Hornsby via Strathfield',
-    from: { ...stop(RHODES), platform: 'Platform 1' }, to: { ...stop(to), platform: 'Platform 3' },
+    line: { name: 'T9', mode: 'train' }, headsign: 'Hornsby via Strathfield',
+    from: { ...stop(from), platform: 'Platform 1' }, to: { ...stop(to), platform: 'Platform 3' },
     departure: times(leave), arrival: times(leave + ride * 60_000), cancelled
   };
   return {
@@ -274,14 +275,107 @@ const entryCases = [
   { name: 'a journey whose mode is turned off cannot be entered', snapshot: SEEN,
     doc: commuteDoc({ lastOpen: SEEN, preferences: { useLocation: true, enabledModes: ['metro', 'ferry'] } }),
     nowMs: ms('08:10'), fix: fixAtPlace(STRATHFIELD, '08:10'), expected: null },
-].map((value) => ({ writes: [], previousFix: null, boards: {}, ...value }));
+].map((value) => ({ writes: [], previousFix: null, boards: {}, cached: {}, ...value }));
 
 function enteredBy(value) {
   let doc = value.doc;
   for (const write of value.writes) doc = writeLastOpen(doc, write.record, write.nowMs, write.sightingAt);
-  const focus = inferFromRecords(doc, value.snapshot, value.nowMs, value.fix);
-  return focus && { via: 'platform', tripId: focus.tripId, direction: focus.direction, journeyKey: keyOf(focus.journey) };
+  const described = (via, focus) => focus && { via, tripId: focus.tripId, direction: focus.direction, journeyKey: keyOf(focus.journey) };
+  const platformEntry = inferFromRecords(doc, value.snapshot, value.nowMs, value.fix);
+  if (platformEntry) return described('platform', platformEntry);
+  if (value.expectedRequests) {
+    const asked = onBoardRequests(doc, value.nowMs, value.fix, value.previousFix, value.cached)
+      .map(({ tripId, direction, from, to, at, limit }) => ({ tripId, direction, from, to, at, limit }));
+    assert.deepEqual(asked, value.expectedRequests, value.name);
+  }
+  return trainSpeed(value.fix, value.previousFix)
+    ? described('onBoard', inferOnBoard(doc, value.nowMs, value.fix, value.previousFix, value.boards, value.cached)) : null;
 }
+/* On board at Strathfield, 4.64 km from Rhodes: position progress is 0.309 toward
+   Town Hall and 0.320 toward Redfern. At 08:10 the 08:00 T9 has 0.370 of its
+   ride behind it (gap 0.062 to Town Hall, 0.135 to Redfern), the 08:08 has 0.074
+   (0.235 and 0.229) and the 07:52 0.667 (0.358, and 0.818 to Redfern). */
+const BURWOOD = place('213410', 'Burwood Station', -33.877315, 151.104762);
+const ASHFIELD = place('213610', 'Ashfield Station', -33.887917, 151.125688);
+const NORTH_STRATHFIELD = place('213710', 'North Strathfield Station', -33.858688, 151.087986);
+const EPPING = place('212110', 'Epping Station', -33.772636, 151.082027);
+const onBoardFix = (at, extra = {}) => fixAtPlace(STRATHFIELD, at, { speed: 14, ...extra });
+const cameFrom = (at) => fixAtPlace(NORTH_STRATHFIELD, at);
+const morningBoards = () => ({
+  'rt|forward': ['07:52', '08:00', '08:08'].map((at) => t9(at)),
+  'rr|forward': ['07:52', '08:00', '08:08'].map((at) => t9(at, REDFERN))
+});
+const onBoard = (journey, tripId = 'rt', direction = 'forward') => ({ via: 'onBoard', tripId, direction, journeyKey: keyOf(journey) });
+const extraTrips = [
+  { id: 'rb', from: RHODES, to: BURWOOD, createdAt: '2026-09-01T00:00:00+10:00' },
+  { id: 'ra', from: RHODES, to: ASHFIELD, createdAt: '2026-09-01T00:00:00+10:00' }
+];
+const ask = (tripId, at, direction = 'forward') => {
+  const trip = [...commuteTrips, ...extraTrips].find((item) => item.id === tripId);
+  const ends = direction === 'forward' ? [trip.from, trip.to] : [trip.to, trip.from];
+  return { tripId, direction, from: ends[0].id, to: ends[1].id, at: ms(at), limit: 10 };
+};
+const rtOnly = { trips: [commuteTrips[0]] };
+const rrHabit = ['2026-09-28', '2026-09-29', '2026-09-30'].map((day) => ({ tripId: 'rr', direction: 'forward', t: `${day}T08:05:00+10:00` }));
+const ride = (tripId, journey) => ({ tripId, direction: 'forward', scheduledDeparture: journey.departure.scheduled,
+  departedAt: journey.departure.scheduled, arrivedAt: journey.arrival.scheduled, from: stop(RHODES), to: stop(journey.legDetail[0].to) });
+const onBoardCases = [
+  { name: 'on board: a heading toward the city decides forward and the closest progress wins',
+    fix: onBoardFix('08:10', { heading: 90 }), boards: morningBoards(),
+    expectedRequests: [ask('rr', '07:00'), ask('rt', '07:00')], expected: onBoard(t9('08:00')) },
+  { name: 'on board: a heading back toward Rhodes decides reverse', doc: commuteDoc(rtOnly),
+    nowMs: ms('18:10'), fix: onBoardFix('18:10', { heading: 350 }),
+    boards: { 'rt|reverse': ['17:52', '18:00'].map((at) => t9(at, RHODES, { from: TOWN_HALL })) },
+    expectedRequests: [ask('rt', '17:00', 'reverse')], expected: onBoard(t9('17:52', RHODES, { from: TOWN_HALL }), 'rt', 'reverse') },
+  { name: 'on board: without a heading the previous fix decides', fix: onBoardFix('08:10'),
+    previousFix: cameFrom('08:09'), boards: morningBoards(),
+    expectedRequests: [ask('rr', '07:00'), ask('rt', '07:00')], expected: onBoard(t9('08:00')) },
+  { name: 'on board: a derived train speed is enough, and the previous fix decides', fix: fixAtPlace(STRATHFIELD, '08:10'),
+    previousFix: cameFrom('08:09'), boards: morningBoards(),
+    expectedRequests: [ask('rr', '07:00'), ask('rt', '07:00')], expected: onBoard(t9('08:00')) },
+  { name: 'on board: a heading with both destinations within 90 degrees leaves it to the previous fix',
+    doc: commuteDoc(rtOnly), fix: onBoardFix('08:10', { heading: 40 }), previousFix: fixAtPlace(BURWOOD, '08:09'),
+    boards: { 'rt|reverse': ['07:52', '08:00'].map((at) => t9(at, RHODES, { from: TOWN_HALL })) },
+    expectedRequests: [ask('rt', '07:00', 'reverse')], expected: onBoard(t9('07:52', RHODES, { from: TOWN_HALL }), 'rt', 'reverse') },
+  { name: 'on board: with neither a heading nor a previous fix the direction waits',
+    fix: onBoardFix('08:10'), boards: morningBoards(), expectedRequests: [], expected: null },
+  { name: 'on board: a fix below train speed is not on board', fix: onBoardFix('08:10', { speed: 3, heading: 90 }),
+    boards: morningBoards(), expectedRequests: [], expected: null },
+  { name: 'on board: no running service within 0.25 of the position', fix: onBoardFix('08:10', { heading: 90 }),
+    boards: { 'rt|forward': [t9('07:52'), t9('08:16')], 'rr|forward': [t9('07:52', REDFERN), t9('08:16', REDFERN)] },
+    expectedRequests: [ask('rr', '07:00'), ask('rt', '07:00')], expected: null },
+  { name: 'on board: history breaks the tie between saved trips sharing a train', doc: commuteDoc({ history: rrHabit }),
+    fix: onBoardFix('08:10', { heading: 90 }), boards: morningBoards(),
+    expectedRequests: [ask('rr', '07:00'), ask('rt', '07:00')], expected: onBoard(t9('08:00', REDFERN), 'rr') },
+  { name: 'on board: a recorded ride excludes its journey', doc: commuteDoc({ rides: [ride('rt', t9('08:00'))] }),
+    fix: onBoardFix('08:10', { heading: 90 }), boards: morningBoards(),
+    expectedRequests: [ask('rr', '07:00'), ask('rt', '07:00')], expected: onBoard(t9('08:00', REDFERN), 'rr') },
+  { name: 'on board: a cancelled service is not a match', doc: commuteDoc(rtOnly),
+    fix: onBoardFix('08:10', { heading: 90 }), boards: { 'rt|forward': [t9('08:00', TOWN_HALL, { cancelled: true }), t9('08:08')] },
+    expectedRequests: [ask('rt', '07:00')], expected: onBoard(t9('08:08')) },
+  { name: 'on board: outside the 1.5 corridor there is no candidate', fix: fixAtPlace(EPPING, '08:10', { speed: 14, heading: 80 }),
+    boards: morningBoards(), expectedRequests: [], expected: null },
+  { name: 'on board: within 1 km of the origin there is no candidate',
+    fix: { lat: -33.838, lon: 151.0864, at: ms('08:02'), accuracy: 10, speed: 14, heading: 180 }, nowMs: ms('08:02'),
+    boards: morningBoards(), expectedRequests: [], expected: null },
+  { name: 'on board: within 1 km of the destination there is no candidate', doc: commuteDoc(rtOnly),
+    fix: { lat: -33.879, lon: 151.2066, at: ms('08:25'), accuracy: 10, speed: 14, heading: 60 }, nowMs: ms('08:25'),
+    boards: morningBoards(), expectedRequests: [], expected: null },
+  { name: 'on board: at most three candidates, smallest corridor ratio first, so Town Hall is never evaluated',
+    doc: commuteDoc({ trips: [...commuteTrips, ...extraTrips] }), fix: onBoardFix('08:10', { heading: 90 }),
+    boards: morningBoards(), expectedRequests: [ask('rb', '07:00'), ask('ra', '07:00'), ask('rr', '07:00')],
+    expected: onBoard(t9('08:00', REDFERN), 'rr') },
+  { name: 'on board: the cached board\'s longest ride sets how far back to look',
+    cached: { 'rt|forward': [t9('07:30'), t9('07:38', TOWN_HALL, { rideMinutes: 31 })] },
+    fix: onBoardFix('08:10', { heading: 90 }), boards: morningBoards(),
+    expectedRequests: [ask('rr', '07:00'), ask('rt', '07:29')], expected: onBoard(t9('08:00')) },
+  { name: 'on board: a platform-sighted record enters first', snapshot: SEEN,
+    fix: onBoardFix('08:10', { heading: 90 }), boards: morningBoards(), expected: platform(t9('08:00')) },
+  { name: 'on board: an unexpired focus blocks entry',
+    doc: commuteDoc({ focus: { tripId: 'rr', direction: 'forward', focusedAt: sydney('07:50'), by: 'focus', journey: t9('08:08', REDFERN) } }),
+    fix: onBoardFix('08:10', { heading: 90 }), boards: morningBoards(), expected: null },
+].map((value) => ({ doc: commuteDoc(), snapshot: null, writes: [], previousFix: null, cached: {}, nowMs: ms('08:10'), ...value }));
+entryCases.push(...onBoardCases);
 for (const value of entryCases) assert.deepEqual(enteredBy(value), value.expected, value.name);
 
 const inference = {
@@ -301,7 +395,12 @@ const inference = {
   entryCases: {
     run: 'Apply each write in order through the hold rule (a write that replaces sets lastOpen = {at: its nowMs '
       + 'as ISO, ...record}). Then evaluate a Home fix at nowMs: platform-sighted inference from snapshot, then from '
-      + 'the stored doc.lastOpen. expected is null or the entered focus: via, tripId, direction and journeyKey.',
+      + 'the stored doc.lastOpen. Only when neither enters and the fix is at train speed (given previousFix), '
+      + 'on-board entry: expectedRequests, when present, is the ordered list of departures requests '
+      + '(from and to are station ids, at is epoch ms, limit the journey count) built from doc, fix, previousFix and '
+      + 'cached (each pair\'s cached journeys, keyed <tripId>|<direction>); boards answers each request by the same '
+      + 'key with the journeys it returned. expected is null or the entered focus: via (platform or onBoard), '
+      + 'tripId, direction and journeyKey.',
     cases: entryCases
   }
 };

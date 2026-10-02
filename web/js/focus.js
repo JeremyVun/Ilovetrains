@@ -16,9 +16,11 @@ import {
   modeWords, withLegs, RECOVERY_FLOOR_MIN
 } from './journey.js';
 import { shortName } from './dom.js';
-import { distanceKm, trainSpeed, TRAIN_SPEED_MPS } from './stations.js';
-import { correctRide, findTrip, leg, recordLastOpen, recordRide } from './storage.js';
+import { distanceKm, previousFixUsable, trainSpeed, TRAIN_SPEED_MPS } from './stations.js';
+import { correctRide, DIRECTIONS, findTrip, leg, recordLastOpen, recordRide } from './storage.js';
 import { effectiveCap, journeyAllowed, preferencesOf, tripAllowed } from './preferences.js';
+import { scoreCandidate } from './predict.js';
+import { compareJourneyIdentity } from './recommendation.js';
 
 /* Half an hour past arrival the journey is over and directions are clutter
    (client-storage.md). Clearing is automatic so nobody has to remember to. */
@@ -38,6 +40,17 @@ export const HOLD_SIGHTING_AFTER_MS = 60_000;
    speed or finds the rider still on the platform. */
 export const SHOWN_DEPARTURE_FIX_MS = 5 * 60_000;
 export const MOVING_FIX_FRESH_MS = 2 * 60_000;
+/* On-board entry (client-storage.md). The corridor bounds how far a route may
+   bend: Rhodes → Redfern and Town Hall → Rhodes measure 1.27 and 1.2. */
+export const CORRIDOR_RATIO = 1.5;
+export const HEADING_WINDOW_DEG = 90;
+export const CLOSING_KM = 0.2;
+export const ON_BOARD_CANDIDATES = 3;
+export const ON_BOARD_LIMIT = 10;
+export const ON_BOARD_LOOKBACK_MARGIN_MS = 10 * 60_000;
+export const ON_BOARD_DEFAULT_RIDE_MS = 60 * 60_000;
+/* Eight-minute headways on a 25-minute ride put neighbouring services 0.32 apart. */
+export const PROGRESS_WINDOW = 0.25;
 /* Exit: at the destination, the trip is over as the rider steps off. */
 export const ARRIVED_KM = 0.2;
 export const ARRIVED_EARLY_MS = 5 * 60_000;
@@ -111,6 +124,10 @@ export function inferTravel(doc, nowMs, fix) {
   };
 }
 
+function inferenceDeclinedFor() {
+  return false;
+}
+
 /** A ride already recorded for this trip, direction and scheduled departure. */
 export function rideRecorded(doc, selection) {
   if (!selection || !selection.journey) return false;
@@ -177,6 +194,110 @@ export function inferFromRecords(doc, snapshot, nowMs, fix) {
     if (entered) return entered;
   }
   return null;
+}
+
+function bearingDegrees(from, to) {
+  const rad = Math.PI / 180;
+  const dLon = (to.lon - from.lon) * rad;
+  const y = Math.sin(dLon) * Math.cos(to.lat * rad);
+  const x = Math.cos(from.lat * rad) * Math.sin(to.lat * rad)
+    - Math.sin(from.lat * rad) * Math.cos(to.lat * rad) * Math.cos(dLon);
+  return (Math.atan2(y, x) / rad + 360) % 360;
+}
+
+const turn = (a, b) => Math.abs(((a - b) % 360 + 540) % 360 - 180);
+
+/* The one direction the evidence singles out, or null while it is undecided. */
+function directionOf(trip, fix, previousFix) {
+  const destination = { forward: trip.to.location, reverse: trip.from.location };
+  const pick = (test) => {
+    const chosen = DIRECTIONS.filter((direction) => test(destination[direction]));
+    return chosen.length === 1 ? chosen[0] : null;
+  };
+  const byHeading = Number.isFinite(fix.heading)
+    ? pick((point) => turn(fix.heading, bearingDegrees(fix, point)) <= HEADING_WINDOW_DEG) : null;
+  if (byHeading) return byHeading;
+  return previousFixUsable(fix, previousFix)
+    ? pick((point) => distanceKm(previousFix, point) - distanceKm(fix, point) >= CLOSING_KM) : null;
+}
+
+const durationOf = (journey) => {
+  const departure = departureMs(journey);
+  const arrival = arrivalMs(journey);
+  return departure !== null && arrival !== null && arrival >= departure ? arrival - departure : null;
+};
+
+/**
+ * The departure requests on-board entry makes for a fix at train speed: at most
+ * three decided candidates, smallest corridor ratio first. `doc` holds only
+ * compatible trips; `cached` maps `<tripId>|<direction>` to that pair's cached
+ * journeys, whose longest effective duration sets how far back to look.
+ */
+export function onBoardRequests(doc, nowMs, fix, previousFix = null, cached = {}) {
+  if (!fix || !trainSpeed(fix, previousFix)) return [];
+  const candidates = [];
+  (doc.trips || []).forEach((trip, index) => {
+    const origin = trip.from.location;
+    const destination = trip.to.location;
+    const fromOrigin = distanceKm(fix, origin);
+    const toDestination = distanceKm(fix, destination);
+    const span = distanceKm(origin, destination);
+    if (fromOrigin === null || toDestination === null || !span) return;
+    if (fromOrigin < TRAVEL_MOVED_KM || toDestination < TRAVEL_MOVED_KM) return;
+    const ratio = (fromOrigin + toDestination) / span;
+    if (ratio > CORRIDOR_RATIO || inferenceDeclinedFor(doc, trip.id, nowMs)) return;
+    const direction = directionOf(trip, fix, previousFix);
+    if (direction) candidates.push({ trip, index, direction, ratio });
+  });
+  return candidates.sort((a, b) => a.ratio - b.ratio || a.index - b.index)
+    .slice(0, ON_BOARD_CANDIDATES).map(({ trip, direction }) => {
+      const key = `${trip.id}|${direction}`;
+      const longest = Math.max(-Infinity, ...(cached[key] || []).map(durationOf).filter((value) => value !== null));
+      const ride = Number.isFinite(longest) ? longest : ON_BOARD_DEFAULT_RIDE_MS;
+      const ends = leg(trip, direction);
+      return {
+        key, tripId: trip.id, direction, from: ends.from.id, to: ends.to.id,
+        at: nowMs - (ride + ON_BOARD_LOOKBACK_MARGIN_MS), limit: ON_BOARD_LIMIT
+      };
+    });
+}
+
+/**
+ * On-board entry (client-storage.md, Travel mode): the running journey whose
+ * time progress matches the fix's position along its trip, from the boards
+ * fetched for `onBoardRequests`. History breaks a tie between saved trips that
+ * share a train.
+ */
+export function inferOnBoard(doc, nowMs, fix, previousFix, boards, cached = {}) {
+  const focus = focusOf(doc);
+  if (focus && !focusExpired(focus, nowMs)) return null;
+  const modes = preferencesOf(doc).enabledModes;
+  const cap = effectiveCap(doc);
+  const matches = [];
+  for (const request of onBoardRequests(doc, nowMs, fix, previousFix, cached)) {
+    const trip = findTrip(doc, request.tripId);
+    const ends = leg(trip, request.direction);
+    const fromOrigin = distanceKm(ends.from.location, fix);
+    const position = fromOrigin / (fromOrigin + distanceKm(fix, ends.to.location));
+    const score = scoreCandidate(doc.history, trip.id, request.direction, nowMs);
+    for (const journey of boards[request.key] || []) {
+      const departure = departureMs(journey);
+      const arrival = arrivalMs(journey);
+      if (departure === null || arrival === null || !(departure <= nowMs && nowMs <= arrival && departure < arrival)) continue;
+      if (journeyCancelled(journey) || !journeyAllowed(journey, modes, cap)) continue;
+      const selection = { tripId: trip.id, direction: request.direction, journey };
+      if (rideRecorded(doc, selection) || inferenceDeclinedFor(doc, trip.id, nowMs, journey)) continue;
+      const gap = Math.abs((nowMs - departure) / (arrival - departure) - position);
+      if (gap <= PROGRESS_WINDOW) matches.push({ ...selection, score, gap, order: doc.trips.indexOf(trip) });
+    }
+  }
+  const best = matches.sort((a, b) => b.score - a.score || a.gap - b.gap
+    || compareJourneyIdentity(a.journey, b.journey) || a.order - b.order
+    || DIRECTIONS.indexOf(a.direction) - DIRECTIONS.indexOf(b.direction))[0];
+  return best ? {
+    tripId: best.tripId, direction: best.direction, focusedAt: new Date(nowMs).toISOString(),
+    by: 'inferred', journey: best.journey
+  } : null;
 }
 
 /** The journey snapshot carries no coordinates, so the destination station

@@ -928,8 +928,8 @@ test('every departures request carries the cap except the focus refresh', () => 
   const main = readFileSync(join(import.meta.dirname, '..', 'js', 'main.js'), 'utf8');
   const calls = main.match(/getDepartures\([\s\S]*?\n?\s*\}\);/g);
 
-  assert.equal(calls.length, 6);
-  assert.equal(calls.filter((call) => call.includes('transferLimit:')).length, 5);
+  assert.equal(calls.length, 7, 'including the on-board entry search');
+  assert.equal(calls.filter((call) => call.includes('transferLimit:')).length, 6);
   const refresh = /async function refreshFollowed\(\) \{([\s\S]*?)\n\}/.exec(main)[1];
   assert.match(refresh, /modes: SUPPORTED_MODES/);
   assert.doesNotMatch(refresh, /transferLimit/);

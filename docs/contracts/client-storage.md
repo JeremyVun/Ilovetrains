@@ -630,6 +630,48 @@ Inference attaches to the journey that was SHOWN, so a rider who missed it and
 took the next one gets directions one service off. That is a known and accepted
 gap, not a defect.
 
+**On-board entry** (owner rulings 5 and 6, 2026-10-01) is evaluated on every
+Home fix when nothing is focused, after platform-sighted inference from both
+records has not entered, and only for a fix at train speed. Let `P` be the fix.
+
+1. *Candidate trips*: compatible saved trips whose endpoints both have
+   coordinates, with `d(P, O) ≥ 1 km`, `d(P, Z) ≥ 1 km` and
+   `d(P, O) + d(P, Z) ≤ 1.5 × d(O, Z)`. The corridor ratio bounds how far off
+   the straight line a route may bend. A trip under an active decline (below)
+   is not a candidate.
+2. *Direction*, per candidate trip. With a finite heading (Android `bearing`,
+   iOS `course ≥ 0`, web `coords.heading`), the direction whose destination
+   bears within 90° of the heading, when exactly one does. Otherwise the
+   previous Home fix taken 15-120 s earlier decides: the direction whose
+   destination came at least 200 m closer, when exactly one did. Otherwise the
+   candidate is undecided and waits for the next fix (the refresh-tick fixes
+   keep coming).
+3. *Running journeys*: the three decided candidates with the smallest corridor
+   ratio (saved-trip order breaks a tie) each make one departures request
+   `O → Z` with `at = now − (Δ + 10 min)`, where `Δ` is the longest effective
+   duration in that pair's cached board (else 60 min), limit 10, under the
+   current modes and cap. Native also plans the same window from the offline
+   timetable (limit 30) and merges by journey key, online first. Keep journeys
+   with `D ≤ now ≤ A`, not cancelled, modes and cap allowed.
+4. *Match*: time progress `f_t = (now − D) / (A − D)` and position progress
+   `f_p = d(O, P) / (d(O, P) + d(P, Z))`; a journey matches when
+   `|f_t − f_p| ≤ 0.25`. With trains eight minutes apart on a 25-minute ride,
+   neighbouring services differ by about 0.32 in `f_t`.
+5. *Choice*: among matching (trip, direction, journey) triples, the highest base
+   history score for that trip and direction (the no-location score), then the
+   smallest `|f_t − f_p|`, then the stable journey identity of "Journey
+   recommendation", then saved-trip order, then `forward` before `reverse`.
+   History separates two saved trips that share a train.
+6. *Exclusions*: a recorded ride for the same trip, direction and scheduled
+   departure, and an active decline.
+7. *Entry* is the inferred entry: `focus` with `by: "inferred"`, that journey,
+   and its source board as the followed source.
+
+Very frequent services can match one service off, the gap trip mode already
+accepts. `Change destination` corrects a wrong destination among overlapping
+trips; Stop trip corrects everything else. `inference.json` carries the
+on-board cases, including the ordered requests each fix makes.
+
 **Exits** use the shared final-arrival reducer below. One nearby fix no longer
 ends a journey. A recorded ride for the same trip, direction and scheduled
 departure cannot be inferred again from an older `lastOpen`.

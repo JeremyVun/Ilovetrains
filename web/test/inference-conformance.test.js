@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { inferFromRecords, replacesLastOpen, writeLastOpen } from '../js/focus.js';
+import { inferFromRecords, inferOnBoard, onBoardRequests, replacesLastOpen, writeLastOpen } from '../js/focus.js';
+import { trainSpeed } from '../js/stations.js';
 
 process.env.TZ = 'Australia/Sydney';
 const fixture = JSON.parse(readFileSync(new URL('../../tools/fixtures/conformance/inference.json', import.meta.url)));
@@ -20,8 +21,15 @@ for (const value of fixture.holdCases.cases) {
 function entered(value) {
   let doc = value.doc;
   for (const write of value.writes) doc = writeLastOpen(doc, write.record, write.nowMs, write.sightingAt);
-  const focus = inferFromRecords(doc, value.snapshot, value.nowMs, value.fix);
-  return focus && { via: 'platform', tripId: focus.tripId, direction: focus.direction, journeyKey: keyOf(focus.journey) };
+  const described = (via, focus) => focus && { via, tripId: focus.tripId, direction: focus.direction, journeyKey: keyOf(focus.journey) };
+  const platform = inferFromRecords(doc, value.snapshot, value.nowMs, value.fix);
+  if (platform) return described('platform', platform);
+  if (value.expectedRequests) {
+    assert.deepEqual(onBoardRequests(doc, value.nowMs, value.fix, value.previousFix, value.cached)
+      .map(({ tripId, direction, from, to, at, limit }) => ({ tripId, direction, from, to, at, limit })), value.expectedRequests);
+  }
+  return trainSpeed(value.fix, value.previousFix)
+    ? described('onBoard', inferOnBoard(doc, value.nowMs, value.fix, value.previousFix, value.boards, value.cached)) : null;
 }
 
 for (const value of fixture.entryCases.cases) {
