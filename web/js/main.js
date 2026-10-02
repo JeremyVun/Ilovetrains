@@ -12,7 +12,7 @@ import { journeyDetail, journeyKey, departureKey, arrivalMs, departureMs } from 
 import {
   focusOf, visibleFocus, setFocus, clearFocus, isFocused, focusExpired, matchJourney,
   applyFocusSnapshot, applyArrivalResult, composedJourney, recoveryModel, recoveryOf,
-  inferFromRecords, journeyCancelled, pinResult, rideAdded, rideRecorded, writeLastOpen,
+  inferFromRecords, journeyCancelled, pinResult, rideAdded, rideRecorded, tickNeedsFix, writeLastOpen,
   TRAVEL_LATE_MS
 } from './focus.js';
 import * as Board from './board.js';
@@ -136,6 +136,7 @@ state.arrivalWindow = null;
 state.arrivalResumeWaitUntil = null;
 state.evidenceWaitFor = null;
 state.foregroundVisit = 0;
+state.shownDepartures = new Map();
 state.arrivalPermissionPending = false;
 state.focusRefreshPending = null;
 state.recovery = null;
@@ -1076,6 +1077,7 @@ function renderHome() {
     stripVariant: activeVariant('strip-placement')
   });
   lastHome = home;
+  if (!home.focus && home.journey) state.shownDepartures.set(journeyKey(home.journey), departureMs(home.journey));
   if (kind) trackShown(kind, home.selected, home.journey);
   if (askLocation && !state.askedPanel) {
     state.askedPanel = true;
@@ -1833,11 +1835,29 @@ function startTimers(recordBoardView) {
   timers.tick = setInterval(tickCurrent, TICK_MS);
   timers.refresh = setInterval(() => {
     if (!document.hidden) {
-      fetchLive({ independent: true });
+      if (!tickFix()) fetchLive({ independent: true });
       loadFlags();
     }
   }, REFRESH_MS);
   if (recordBoardView) timers.view = setTimeout(qualifyView, VIEW_QUALIFIES_MS);
+}
+
+/* The fix's own handling refreshes the board, so a tick that takes one makes
+   no second request. */
+function tickFix() {
+  const focus = focusOf(state.doc);
+  if (state.view !== 'home' || (focus && !focusExpired(focus, now()))
+      || !preferencesOf(state.doc).useLocation || state.geoPermission !== 'granted'
+      || !tickNeedsFix(state.doc, now(), [...state.shownDepartures.values()], validFix(), state.previousFix)) return false;
+  const generation = ++geoGeneration;
+  takeFix({ enableHighAccuracy: true, maximumAge: 0 }).then((fix) => {
+    if (generation !== geoGeneration || state.view !== 'home') return;
+    suppressPreferenceEvents = false;
+    if (!fix) return fetchLive({ independent: true });
+    setHomeFix(fix);
+    useFix();
+  });
+  return true;
 }
 
 function stopTimers() {
@@ -1888,6 +1908,7 @@ document.addEventListener('visibilitychange', () => {
   }
   loadFlags();
   state.foregroundVisit += 1;
+  state.shownDepartures = new Map();
   if (!onLiveView() && state.view !== 'settings') return;
   if (state.selection) awaitFirstAnswers();
   suppressPreferenceEvents = false;

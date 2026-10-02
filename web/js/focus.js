@@ -16,7 +16,7 @@ import {
   modeWords, withLegs, RECOVERY_FLOOR_MIN
 } from './journey.js';
 import { shortName } from './dom.js';
-import { distanceKm, TRAIN_SPEED_MPS } from './stations.js';
+import { distanceKm, trainSpeed, TRAIN_SPEED_MPS } from './stations.js';
 import { correctRide, findTrip, leg, recordLastOpen, recordRide } from './storage.js';
 import { effectiveCap, journeyAllowed, preferencesOf, tripAllowed } from './preferences.js';
 
@@ -34,6 +34,10 @@ export const TRAVEL_SPEED_MOVED_KM = 0.2;
 /* A train pulling out is still within 300 m of the platform for its first
    20-30 s, so only a later sighting shows the rider stayed. */
 export const HOLD_SIGHTING_AFTER_MS = 60_000;
+/* By then a departed train is kilometres out, so a fix either reads train
+   speed or finds the rider still on the platform. */
+export const SHOWN_DEPARTURE_FIX_MS = 5 * 60_000;
+export const MOVING_FIX_FRESH_MS = 2 * 60_000;
 /* Exit: at the destination, the trip is over as the rider steps off. */
 export const ARRIVED_KM = 0.2;
 export const ARRIVED_EARLY_MS = 5 * 60_000;
@@ -145,6 +149,18 @@ export function replacesLastOpen(doc, incoming, nowMs, sightingAtMs = null) {
 
 export function writeLastOpen(doc, record, nowMs, sightingAtMs = null) {
   return replacesLastOpen(doc, record, nowMs, sightingAtMs) ? recordLastOpen(doc, record, nowMs) : doc;
+}
+
+/**
+ * Whether a refresh tick on an unfocused Home takes a fix (client-storage.md,
+ * Fixes while Home stays open). `shownDepartures` are the effective departures
+ * of the leads Home displayed during this foreground visit.
+ */
+export function tickNeedsFix(doc, nowMs, shownDepartures, fix, previousFix) {
+  if (shownDepartures.some((departure) => nowMs >= departure && nowMs - departure <= SHOWN_DEPARTURE_FIX_MS)) return true;
+  const stored = doc && doc.lastOpen;
+  if (lastOpenInferable(doc, stored, nowMs) && departureMs(stored.journey) <= nowMs) return true;
+  return Boolean(fix) && nowMs - fix.at <= MOVING_FIX_FRESH_MS && trainSpeed(fix, previousFix);
 }
 
 /**

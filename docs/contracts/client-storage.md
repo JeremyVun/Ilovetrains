@@ -579,6 +579,27 @@ station index or fix arrives late. `tools/fixtures/conformance/inference.json`
 carries the hold-rule cases and today's passing automatic starts as
 regression cases.
 
+**Fixes while Home stays open.** While the app is foreground on Home,
+nothing is focused, the location preference is on and permission is granted,
+each 30-second refresh tick takes one fix when any of these holds (owner
+ruling 2, 2026-10-01):
+
+- a journey Home displayed as its lead during this foreground visit departed
+  within the last 5 minutes (kept in memory, sighted or not);
+- the stored record is inferable and its journey has departed (`D ≤ now`); or
+- the most recent Home fix, taken within the last 2 minutes, was at train
+  speed.
+
+Five minutes after a departure the train is well clear of the platform, so the
+first or second fix in that window either sees train speed or sees the rider
+still standing there; a rider who waits for the next train gets a fresh window
+when that one leaves. The fix is handled like any Home fix, and a tick
+produces at most one board refresh: the fix's handling replaces the tick's own
+refresh. Web requests these fixes with high accuracy and `maximumAge: 0`.
+Location use is therefore bounded to five minutes after each shown departure,
+the under-way window of a sighted record, and the time the phone moves at
+train speed with Home on screen.
+
 Native clients record it after each refresh from a lead that was observed:
 in fresh live data, or, without that, in the refresh's own offline timetable
 plan, whose matching non-cancelled service becomes the snapshot. A saved row
@@ -1031,7 +1052,8 @@ time+history. Declining writes `locationAsk.declinedAt`,
 which suppresses the panel for 30 days across reloads; a Permissions API state
 of `granted` or `denied` suppresses it outright, because the question has
 already been answered. A client whose permission is already granted takes one
-silent fix when home opens, without a prompt. Wherever trips are
+silent fix when home opens, without a prompt, and the refresh-tick fixes under
+"Fixes while Home stays open". Wherever trips are
 listed (switcher, trip management), they are ordered by current score with the
 predicted one visually highlighted at the top.
 
