@@ -90,7 +90,7 @@ struct ActionRail: View {
             Button(action: action) {
                 TrainLabel(text: text, color: enabled ? colors.ink : colors.ink3, size: 13)
                     .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .leading)
-                    .padding(.horizontal, pagePadding)
+                    .pagePadding()
                     .contentShape(Rectangle())
             }
             .disabled(!enabled)

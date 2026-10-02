@@ -4,8 +4,11 @@ struct TrainAppView: View {
     @ObservedObject var model: TrainViewModel
 
     var body: some View {
-        TrainTheme(appearance: model.state.appearance) {
-            TrainAppContent(model: model)
+        GeometryReader { window in
+            TrainTheme(appearance: model.state.appearance) {
+                TrainAppContent(model: model)
+            }
+            .environment(\.pageMargin, pageMargin(windowWidth: window.size.width))
         }
     }
 }
@@ -25,7 +28,7 @@ private struct TrainAppContent: View {
                             .foregroundStyle(colors.ink2)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                    .padding(pagePadding)
+                    .pagePadding(.all)
                     .accessibilityIdentifier("loading-screen")
                 } else {
                     switch model.state.screen {
@@ -77,7 +80,7 @@ private struct TrainAppContent: View {
                         TrainLabel(text: undo ? "Undo" : "Dismiss", color: colors.ground)
                     }
                     .foregroundStyle(colors.ground)
-                    .padding(.horizontal, pagePadding)
+                    .pagePadding()
                     .frame(maxWidth: .infinity, minHeight: 52)
                     .background(colors.ink)
                 }

@@ -29,7 +29,7 @@ struct DetailView: View {
                         .padding(.top, 7).padding(.bottom, 18)
                     TrainRule(heavy: true)
                 }
-                .padding(.horizontal, pagePadding)
+                .pagePadding()
                 .fixedSize(horizontal: false, vertical: true)
                 .layoutPriority(1)
                 GeometryReader { geometry in
@@ -44,7 +44,7 @@ struct DetailView: View {
                             ) {
                                 Text(instruction).font(.system(size: 15, weight: .regular)).foregroundStyle(colors.ink)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, pagePadding).padding(.vertical, 10)
+                                    .pagePadding().padding(.vertical, 10)
                             }
                             JourneySteps(journey: shown, now: model.state.now, arrival: focused ? model.state.arrival : nil)
                             Spacer().frame(height: 12)
@@ -66,7 +66,7 @@ struct DetailView: View {
                                    color: last.cancelled ? colors.warning : colors.ink3, lines: 2)
                     }.frame(minHeight: 52)
                 }
-                .padding(.horizontal, pagePadding)
+                .pagePadding()
                 .fixedSize(horizontal: false, vertical: true)
                 .layoutPriority(1)
                 if pinned || (!focused && !shown.cancelled) {
@@ -82,7 +82,7 @@ struct DetailView: View {
                 BackControl(label: "Departures", action: model.back)
                 Text("Journey unavailable").font(.system(size: 18)).foregroundStyle(colors.ink2)
                 Spacer()
-            }.padding(.horizontal, pagePadding)
+            }.pagePadding()
         }
     }
 
@@ -140,8 +140,8 @@ private struct ChangeStep: View {
                         TrainLabel(text: boardingCopy, color: wait < 5 ? colors.warning : colors.ink3, lines: 3)
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
-            }.padding(.horizontal, pagePadding).padding(.vertical, 10).frame(minHeight: 82)
-            TrainRule(heavy: true).padding(.horizontal, pagePadding)
+            }.pagePadding().padding(.vertical, 10).frame(minHeight: 82)
+            TrainRule(heavy: true).pagePadding()
         }
     }
     private var boardingCopy: String {
@@ -170,7 +170,7 @@ private struct DetailStep: View {
                     TrainLabel(text: action, color: leg.cancelled ? colors.warning : colors.ink3, lines: 3)
                 }
             }.frame(maxWidth: .infinity, alignment: .leading)
-        }.padding(.horizontal, pagePadding).frame(minHeight: 72)
-        TrainRule(heavy: heavyDivider).padding(.horizontal, pagePadding)
+        }.pagePadding().frame(minHeight: 72)
+        TrainRule(heavy: heavyDivider).pagePadding()
     }
 }

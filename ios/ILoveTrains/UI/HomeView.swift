@@ -65,20 +65,20 @@ struct HomeView: View {
                     Button("Change settings", action: model.openSettings)
                         .buttonStyle(TrainTextButtonStyle(colors: colors)).accessibilityIdentifier("change-settings")
                 }
-                .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, pagePadding).padding(.vertical, 28)
+                .frame(maxWidth: .infinity, alignment: .leading).pagePadding().padding(.vertical, 28)
                 TrainRule(heavy: true)
             }
 
             List {
                 TrainLabel(text: "My trips", color: colors.ink, size: 11)
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 22).padding(.bottom, 10)
-                    .padding(.horizontal, pagePadding).tripListRow(colors)
+                    .pagePadding().tripListRow(colors)
                 ForEach(model.state.trips, id: \.id) { trip in
                     SavedTripRow(trip: trip, state: model.state, model: model).tripListRow(colors)
                 }
                 TrainLabel(text: "— End of trips")
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 14).padding(.bottom, 6)
-                    .padding(.horizontal, pagePadding).tripListRow(colors)
+                    .pagePadding().tripListRow(colors)
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
@@ -112,7 +112,7 @@ private struct SmartLoadingHeader: View {
             HStack {
                 TrainLabel(text: "Next train", color: colors.ink2, size: 11)
                 Spacer(); FreshnessView(board: board, now: model.state.now, awaiting: model.state.awaitingAnswer)
-            }.padding(.horizontal, pagePadding).frame(minHeight: 22)
+            }.pagePadding().frame(minHeight: 22)
             HStack {
                 Text(copy).font(.system(size: 15, weight: .light)).foregroundStyle(colors.ink2)
                 Spacer()
@@ -121,7 +121,7 @@ private struct SmartLoadingHeader: View {
                 } else if model.state.enabledModes.isEmpty {
                     Button("Settings", action: model.openSettings).buttonStyle(TrainTextButtonStyle(colors: colors))
                 }
-            }.padding(.horizontal, pagePadding).frame(minHeight: 126)
+            }.pagePadding().frame(minHeight: 126)
             TrainRule(heavy: true)
         }
     }
@@ -184,7 +184,7 @@ private struct SmartHeader: View {
             HStack(spacing: 6) {
                 TrainLabel(text: status, color: statusWarning ? colors.warning : colors.ink2, size: 11)
                 Spacer(); FreshnessView(board: board, now: model.state.now, awaiting: model.state.awaitingAnswer)
-            }.padding(.horizontal, pagePadding).frame(minHeight: 22)
+            }.pagePadding().frame(minHeight: 22)
 
             Button { model.openJourney(journey) } label: {
             HStack(alignment: .top, spacing: 14) {
@@ -202,7 +202,7 @@ private struct SmartHeader: View {
                     endpoint(first.from.shortName, clockTime(rendered.effectiveDeparture), arrival: false)
                     arrivalEndpoint
                 }
-            }.padding(.horizontal, pagePadding).padding(.vertical, 10)
+            }.pagePadding().padding(.vertical, 10)
             }.buttonStyle(.plain).accessibilityIdentifier("open-recommended-journey")
 
             JourneyAxis(
@@ -214,7 +214,7 @@ private struct SmartHeader: View {
                 tinyTrain: model.state.tinyTrain,
                 recoveryChangeIndex: plan?.recoveryChangeIndex
             )
-                .padding(.horizontal, pagePadding)
+                .pagePadding()
 
             Group {
                 if instructionWarns {
@@ -223,20 +223,20 @@ private struct SmartHeader: View {
                     Text(instruction).font(.system(size: 15, weight: departed ? .regular : .light))
                         .foregroundStyle(departed ? colors.ink : colors.ink2).lineLimit(2)
                 }
-            }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, pagePadding).padding(.vertical, 8)
+            }.frame(maxWidth: .infinity, alignment: .leading).pagePadding().padding(.vertical, 8)
 
             if let receipt, !receipt.isEmpty {
                 Text(receipt).font(.system(size: 15, weight: .light)).foregroundStyle(colors.ink2)
-                    .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, pagePadding).padding(.vertical, 4)
+                    .frame(maxWidth: .infinity, alignment: .leading).pagePadding().padding(.vertical, 4)
             }
             if complete && focused {
                 HStack(spacing: 20) {
                     TrainLabel(text: "Need to get back?")
                     Button("Show the way back", action: model.showReturn).buttonStyle(TrainTextButtonStyle(colors: colors))
-                }.frame(maxWidth: .infinity, minHeight: 50, alignment: .leading).padding(.horizontal, pagePadding)
+                }.frame(maxWidth: .infinity, minHeight: 50, alignment: .leading).pagePadding()
             }
             if !departed, let next = nextJourney {
-                TrainRule().padding(.horizontal, pagePadding)
+                TrainRule().pagePadding()
                 Button { model.openJourney(next.journey) } label: {
                     HStack(spacing: 8) {
                         TrainLabel(text: "Next \(serviceModeName(next.journey.mode))", size: 9).frame(width: 96, alignment: .leading)
@@ -246,7 +246,7 @@ private struct SmartHeader: View {
                             .font(.system(size: 15, weight: .light)).foregroundStyle(colors.ink3).tabular()
                         Image(systemName: "chevron.right").foregroundStyle(colors.ink3)
                     }.frame(minHeight: 44).contentShape(Rectangle())
-                }.buttonStyle(.plain).padding(.horizontal, pagePadding).accessibilityIdentifier("next-service")
+                }.buttonStyle(.plain).pagePadding().accessibilityIdentifier("next-service")
             }
             TrainRule(heavy: true)
             if let tripLine { TripControlLineView(line: tripLine, model: model) }
@@ -400,7 +400,7 @@ private struct SavedTripRow: View {
         .accessibilityIdentifier("trip-\(trip.id)")
         TrainRule()
         }
-        .padding(.horizontal, pagePadding)
+        .pagePadding()
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button("Delete", role: .destructive) { model.deleteTrip(id: trip.id) }
         }
@@ -462,16 +462,14 @@ private struct TripControlLineView: View {
                     action("Start trip", glyph: .start, id: "start-trip-home") { model.startTrip(lead) }
                 }
             }
-            .padding(.horizontal, pagePadding)
+            .pagePadding()
             .frame(height: 48)
             TrainRule()
         }
     }
 
     private func question(_ text: String) -> some View {
-        // iOS keeps its 22 pt margin at 375 pt, where the guessed question needs 6 pt it does not have.
-        Text(text).font(.system(size: 15, weight: .light)).foregroundStyle(colors.ink2)
-            .lineLimit(1).minimumScaleFactor(0.9)
+        Text(text).font(.system(size: 15, weight: .light)).foregroundStyle(colors.ink2).lineLimit(1)
     }
 
     private func action(_ word: String, glyph: TripLineGlyph? = nil, ink: Color? = nil, id: String,
@@ -598,7 +596,7 @@ private struct HomeFooter: View {
             HStack(spacing: 0) {
                 footerButton("plus", "New trip", "new-trip", model.newTrip)
                 footerButton("gearshape", "Settings", "settings", model.openSettings)
-            }.padding(.horizontal, pagePadding)
+            }.pagePadding()
         }
     }
     private func footerButton(_ icon: String, _ label: String, _ id: String, _ action: @escaping () -> Void) -> some View {
