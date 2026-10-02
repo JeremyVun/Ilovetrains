@@ -29,10 +29,12 @@ struct OfflinePackageStore {
     func activate(candidateDatabase: URL, manifest: Data, sha256: String) throws {
         try prepareDirectory()
         let installed = database(sha256)
-        // rename(2) replaces atomically, so a second installer in the process cannot fail between a check and a move.
-        if candidateDatabase.standardizedFileURL != installed.standardizedFileURL,
-           rename(candidateDatabase.path, installed.path) != 0 {
-            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        if candidateDatabase.standardizedFileURL != installed.standardizedFileURL {
+            if FileManager.default.fileExists(atPath: installed.path) {
+                _ = try FileManager.default.replaceItemAt(installed, withItemAt: candidateDatabase)
+            } else {
+                try FileManager.default.moveItem(at: candidateDatabase, to: installed)
+            }
         }
         try manifest.write(
             to: directory.appendingPathComponent("manifest-\(sha256).json"),

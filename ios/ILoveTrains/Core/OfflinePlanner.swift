@@ -2,6 +2,23 @@ import CryptoKit
 import Foundation
 import SQLite3
 
+/// One planner opens or installs at a time in a process. The unit-test host installs the bundled timetable as it
+/// launches, and a test's own planner on the same directory would otherwise extract over its files.
+private actor BundledInstall {
+    static let shared = BundledInstall()
+    private var tail: Task<Void, Never>?
+
+    func alone(_ work: @escaping @Sendable () async throws -> Void) async throws {
+        let previous = tail
+        let turn = Task {
+            await previous?.value
+            try await work()
+        }
+        tail = Task { _ = try? await turn.value }
+        try await turn.value
+    }
+}
+
 actor OfflinePlanner {
     private struct PackageInfo: Decodable, Sendable {
         var source: String
@@ -75,6 +92,11 @@ actor OfflinePlanner {
     }
 
     func initialize() async throws {
+        guard activePackage == nil else { return }
+        try await BundledInstall.shared.alone { try await self.openOrInstall() }
+    }
+
+    private func openOrInstall() throws {
         // A second caller must not reopen the database: that drops the schedule cache and cancels plans in flight.
         guard activePackage == nil else { return }
         try packageStore.prepareDirectory()
@@ -381,8 +403,7 @@ actor OfflinePlanner {
         let manifestData = try Data(contentsOf: manifestURL)
         let info = try parseManifest(manifestData)
         guard try Self.sha256(archiveURL) == info.sha256 else { throw OfflineCoreError.invalidPackage }
-        // The unit-test host installs as it launches while a test's planner may install too; neither writes the other's file.
-        let extracted = directory.appendingPathComponent("candidate-\(info.sha256)-\(UUID().uuidString).sqlite3")
+        let extracted = directory.appendingPathComponent("candidate-\(info.sha256).sqlite3")
         defer { try? FileManager.default.removeItem(at: extracted) }
         try OfflineZip.extractDatabase(from: archiveURL, to: extracted)
         guard validateDatabase(extracted, info: info) else { throw OfflineCoreError.invalidDatabase }
