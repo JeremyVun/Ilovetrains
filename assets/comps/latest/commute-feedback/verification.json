@@ -1,10 +1,24 @@
 {
-  "date": "2026-09-23",
-  "version": "1.7.1",
-  "serviceWorker": "v67",
+  "date": "2026-10-02",
+  "version": "1.9.0",
+  "serviceWorker": "v73",
   "builtCommand": "node tools/check-commute-feedback.js --url http://localhost:<port> --out <tmp-dir>",
   "fixtures": "tools/check-commute-feedback.js",
   "frames": [
+    {
+      "file": "c1-fade-390x844-checking-arrival-light.png",
+      "kind": "built web client",
+      "width": 780,
+      "height": 1688,
+      "sha256": "03670f8ce086d46fa8bb1f018afc60675c5e063cf94057b7e516bac242c745c6"
+    },
+    {
+      "file": "c1-fade-390x844-checking-arrival.png",
+      "kind": "built web client",
+      "width": 780,
+      "height": 1688,
+      "sha256": "ac4be37dc5911572167fcc34d00e0c94d46e415e785e7a491efb92ae7674fe1d"
+    },
     {
       "file": "c1-fade-390x844-direct-light.png",
       "kind": "illustrative target",
@@ -18,20 +32,6 @@
       "width": 780,
       "height": 1688,
       "sha256": "d34d9e45916eca6cc923f7b59c0fdc667754c08ed3a32b5dad39e7a152061b21"
-    },
-    {
-      "file": "c1-fade-390x844-missing-telemetry-light.png",
-      "kind": "built web client",
-      "width": 780,
-      "height": 1688,
-      "sha256": "416e420054d0158c62d911b4030dc039834d0c992153d7924e8a9ddb60712ed7"
-    },
-    {
-      "file": "c1-fade-390x844-missing-telemetry.png",
-      "kind": "built web client",
-      "width": 780,
-      "height": 1688,
-      "sha256": "d0e0d623c1f8c63afa816ffe681d42539e1f2ee5841f6e545ae6c3e6b2d3927a"
     },
     {
       "file": "c1-fade-390x844-overdue-moving-light.png",
@@ -52,42 +52,56 @@
       "kind": "built web client",
       "width": 780,
       "height": 1688,
-      "sha256": "96852b19d28607032e8ec2e7dde4d962765195474e15b09b0b3ba2af831494be"
+      "sha256": "d2b1570d8b94cc4768bf6e29c96324f305ba9e6e00c0887996df11f4d95530aa"
     },
     {
       "file": "c1-fade-390x844-transfer-after.png",
       "kind": "built web client",
       "width": 780,
       "height": 1688,
-      "sha256": "9e1f7cf310e83d57b870c27e88878c5bde7a9c175fd0a31e50e2118e4597b865"
+      "sha256": "a8add9b455d8d851c94b0b032a159888e0682f520b4b0a4263e021a7e4709a92"
     },
     {
       "file": "c1-fade-390x844-transfer-before-light.png",
       "kind": "built web client",
       "width": 780,
       "height": 1688,
-      "sha256": "d57b03db3c6f3511ee9dafdd022709e19db94a6090b1483c82cc552634756291"
+      "sha256": "4ea0d0472ecada5e2c2b7ef9e412e4adcea048858644655456220a3b7e8c3ccd"
     },
     {
       "file": "c1-fade-390x844-transfer-before.png",
       "kind": "built web client",
       "width": 780,
       "height": 1688,
-      "sha256": "7920b23dfa952a3bd63094a2c4aa482a2dd128e0cdd1845b073dc014ef245eba"
+      "sha256": "10c3e348663845276d2eeef01238a3217fd8f95aecc9fb8e3e3598d3572ea880"
     },
     {
       "file": "c1-fade-390x844-transfer-during-light.png",
       "kind": "built web client",
       "width": 780,
       "height": 1688,
-      "sha256": "1e64061e55fcd10f298b59d5f36822626a8d7c303d56e6c81c62d624a507597c"
+      "sha256": "a1563632e90d9429f554a9d1559ab9f822c3f62f21850a71af0fb908542da86d"
     },
     {
       "file": "c1-fade-390x844-transfer-during.png",
       "kind": "built web client",
       "width": 780,
       "height": 1688,
-      "sha256": "cb85ac302c0c25e89c595fc25a179a9d3ed803b354f5806e185a4053b0ff27da"
+      "sha256": "8301deb09eb3ce359e3cc973549a322cc8b3abae2d600d2b51e0533fe6bf1857"
+    },
+    {
+      "file": "c1-fade-412x732-checking-arrival-light.png",
+      "kind": "built web client",
+      "width": 824,
+      "height": 1464,
+      "sha256": "acaf7fae9c2b09b007065923e907e000241b3492922c30586b9a12cf8240b306"
+    },
+    {
+      "file": "c1-fade-412x732-checking-arrival.png",
+      "kind": "built web client",
+      "width": 824,
+      "height": 1464,
+      "sha256": "cf52b21a0f497575acf49ba845849ef64aea088af77844557eaab2d032af4822"
     },
     {
       "file": "c1-fade-412x732-direct-light.png",
@@ -102,20 +116,6 @@
       "width": 824,
       "height": 1464,
       "sha256": "51e435769a68081fad45d8b06d97faaf1553ea146e1fc81ebd20cf1117e461da"
-    },
-    {
-      "file": "c1-fade-412x732-missing-telemetry-light.png",
-      "kind": "built web client",
-      "width": 824,
-      "height": 1464,
-      "sha256": "b72772ab7814b1ff64108fe40b38b702bcdc2c5ec775e0bbb81789a81e1f2bba"
-    },
-    {
-      "file": "c1-fade-412x732-missing-telemetry.png",
-      "kind": "built web client",
-      "width": 824,
-      "height": 1464,
-      "sha256": "99c0dd53cc20344cf5c2d59625b4dc22009251ab036e95f0ed55f94d44ee8e9b"
     },
     {
       "file": "c1-fade-412x732-overdue-moving-light.png",
@@ -136,42 +136,42 @@
       "kind": "built web client",
       "width": 824,
       "height": 1464,
-      "sha256": "8059b0cd6a33abb5dc03f65be9afe99d7ade8f383013c2b108522524a107f8bc"
+      "sha256": "698fe535ede2fbfc44e9b0edbd6470605520abdf96ad1bdd71e947937d44b626"
     },
     {
       "file": "c1-fade-412x732-transfer-after.png",
       "kind": "built web client",
       "width": 824,
       "height": 1464,
-      "sha256": "dd7b4c1b4d60090026a12038311f15d192931462ca39cdcde7fadcb8cf6b713a"
+      "sha256": "d7bfa869f699302c4a8ffbcecf176948a048dcb0df18ec4161931211f7de303b"
     },
     {
       "file": "c1-fade-412x732-transfer-before-light.png",
       "kind": "built web client",
       "width": 824,
       "height": 1464,
-      "sha256": "54ce55f2efe79e9399cced8e16efd2a956077fbb597f7d586c44b8b3bb483e84"
+      "sha256": "15d472cd6d79c0970162c5c91cbfb3ee64a7dfcf0fd0fe413f0380f371fdb7d6"
     },
     {
       "file": "c1-fade-412x732-transfer-before.png",
       "kind": "built web client",
       "width": 824,
       "height": 1464,
-      "sha256": "8800fffc7501abe53db191e5ed88ee3741092081f57cda541452d10f4e712e49"
+      "sha256": "fa2152bc3fddca975a6c6be4e208f6ca4e7617cd0b1b2bcb22c710cb342307e4"
     },
     {
       "file": "c1-fade-412x732-transfer-during-light.png",
       "kind": "built web client",
       "width": 824,
       "height": 1464,
-      "sha256": "c11dd1d28f9c9a669141e2302261bf22a19d3ff960c4dfb921725ba9d484d97d"
+      "sha256": "83127d4059ccdd32df0f9dc8292abf3d9341b1b5b1fa7fb57c6164d7644dc861"
     },
     {
       "file": "c1-fade-412x732-transfer-during.png",
       "kind": "built web client",
       "width": 824,
       "height": 1464,
-      "sha256": "6ccb33659eb0508e1f34eda0f5d56df7ddf56b952543d1c8842d9c9e0a8713a7"
+      "sha256": "aea66ca170820c613f9aa580d5e0dc7c09b6e11718e7d5dd9813fc37d4ed1201"
     }
   ]
 }
