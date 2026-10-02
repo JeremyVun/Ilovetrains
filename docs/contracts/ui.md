@@ -851,7 +851,12 @@ hairlines (owner ruling, 2026-09-05).
 
 A phone's page margin is 22px. On phones 375px wide and narrower it is 18px on
 every screen and every client (owner ruling 25, 2026-10-03), which is what lets
-the guessed trip-control line print whole at 360px.
+the guessed trip-control line print whole at 360px. The rest of the web's
+narrow-phone sizes apply on every client too (owner ruling 26): the Home
+header's 92px figure column, 56px figure (44px wide) and 15px station names,
+so a replaced arrival prints on one line beside the struck one; the board title
+at 24px with a 22px arrow and 7px gaps; and, outside the Home header, 6px
+boarding-cap padding and 4px platform pins at least 17px wide.
 
 Dark is the primary scheme; light is a warm-paper printing of the same contrast
 hierarchy, not a colour inversion.

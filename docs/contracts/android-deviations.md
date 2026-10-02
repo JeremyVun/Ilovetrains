@@ -23,15 +23,25 @@ This file records deliberate differences between the native Android app and the 
   slot because Material fills about half its box. The stop square is the
   exemplar's 8 dp mark; the play triangle keeps Material's shape, 1 dp
   narrower than the exemplar's. Both sit on the cap height.
-- At 375 dp and narrower every screen takes the web's 18 dp page margin
-  (owner ruling 25, 2026-10-03). At 360 dp the guessed question then prints
-  whole, 155.4 dp of text in a 157.3 dp box, 14.9 dp before `STOP TRIP`;
-  `UiCalibrationTest` fails if it ellipsizes at font scale 1. Android does not
-  take the rest of the web's narrow-phone rule: the Home header keeps its
-  104 dp figure column, 64 sp figure and 16 sp station names, which the web
-  narrows to 92, 56 and 15 px. So at 360 dp a struck arrival clock pushes its
-  replacement onto two lines (`10:1` over `8`). This is open for an owner
-  ruling.
+- At 375 dp and narrower Android takes the web's whole narrow-phone rule
+  (owner rulings 25 and 26, 2026-10-03), read from the window width
+  (`NarrowPhone`): the 18 dp page margin on every screen; the Home header's
+  92 dp figure column, 56 sp figure (44 sp wide) and 15 sp station names; the
+  board title at 24 sp with a 36 dp connector; and, on board and detail rows,
+  6 dp boarding-cap padding and 4 dp platform pins at least 17 dp wide. The
+  Home figure's `min` scales with it, 16 to 14 sp, as the web's .24em does. At
+  360 dp the guessed question prints whole, 155.4 dp of text in a 157.3 dp
+  box, 14.9 dp before `STOP TRIP`, and a replaced arrival clock prints on one
+  line beside the struck one; `UiCalibrationTest` fails if either breaks at
+  font scale 1.
+- The Home header's two ends each take half the row, where the web sizes them
+  to their content. An end whose longest word, or arrival clock pair, is wider
+  than half takes the room from the other, keeping 12 dp between them. At
+  360 dp the struck and replaced clocks span 111 dp of a 109 dp half, about
+  7 dp wider than the web's, from the 0.5 sp body tracking and a 9 dp gap
+  where the web has 7. A provenance label wider than the figure
+  column (`LAST ESTIMATE` at 360 dp) runs on past it, as the web's nowrap
+  label does.
 - The trip-over offer keeps the native `Need to get back?  SHOW THE WAY BACK`
   composition, which iOS shares, in place of the web's `Trip over` block. It
   never claims `You’ve arrived`, so ruling 21 changes no Android copy. A
