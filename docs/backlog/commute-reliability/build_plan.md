@@ -440,6 +440,45 @@ The fix agents base on `cr-review`, keep its probes as permanent regressions
 (renaming or moving them into the suites they belong to is fine) and make them
 pass.
 
+Web fix done: `74e224b` on `cr-fix-web` (based on `cr-review`, not yet merged).
+633 web tests pass, the exporter is byte-stable, the playtest exits 0, and
+`check-commute-reliability.js` passes all 7 checks, including the new
+`snapshot` check that replaced the review's stack probe. The native fixes
+match this:
+- Snapshot retirement runs at every `lastAnswer` write attempt in the
+  refresh, before the hold rule decides, and applies even when the write is
+  skipped. It compares the incoming record's sighting station with the origin
+  of `leg(saved trip snapshot.tripId, snapshot.direction)`; the record's own
+  trip does not matter. The clock is the sighting fix's time, and the rule is
+  `sightingAt ≥ D + 60 s` inclusive, with `D` the snapshot journey's effective
+  first-leg departure. An unsighted record, or a snapshot whose trip is gone,
+  never retires it. A retired snapshot stays null until the next open, return
+  or back-to-Home. The review's Android and iOS probes must apply retirement at
+  the write step, as the web's does.
+- Platform entry rejects `D − at < 0` and `D − at > 15 min`.
+- Median `Δ` is `durations[floor((n − 1) / 2)]` over effective durations
+  `A − D ≥ 0`, sorted, with 60 min when there are none.
+- Ruling 23: a guessed focus declines its own trip and direction. A started
+  focus looks up the saved trip whose `from → to` equals
+  `focus.board.from → focus.board.to` (forward) or its reverse (reverse), and
+  declines nothing when none matches, leaving any older decline in place. The
+  record holds that trip and direction, the first service leg's departure key,
+  the composed effective arrival and the stop time. Only a guessed stop sends
+  `declined_inferred`, and lock-screen stops take the same path. Android's
+  `withTripStopped` and iOS's `declineInferred` skip pinned focuses today.
+- `inference.json`: `entryCases` 35 → 47 (median, two cases; snapshot
+  retirement, five; lower bound, three including the review's
+  re-recorded-departed-train case; progress 0.24/0.26; the decline held by
+  the hour alone). The `run` text adds the retirement step and the median
+  request time. The new `stopCases` (6) has the shape `{name, doc, focus,
+  nowMs, expectedDecline: null | {tripId, direction, departure, arrival, at},
+  expectedEvent}`, with the focus pair as its journey's first-leg `from` to
+  last-leg `to`. Native harnesses apply retirement on each write and run
+  `stopCases`.
+- Native expiry clears `lastAnswer` only on a trip, direction and journey-key
+  match.
+- `web/sw.js` is at v73; reconcile it with 4a's bump at merge.
+
 ## Phase 4 — The trip-control line, new words and the removed state, on screen (visual)
 
 Needs: the round 3 verdict (design.md rulings 17-20) and the round 3b
