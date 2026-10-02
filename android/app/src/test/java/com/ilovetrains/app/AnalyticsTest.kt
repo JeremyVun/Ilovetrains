@@ -58,8 +58,12 @@ class AnalyticsTest {
     @Test fun theNativeVocabularyIsClosedAndCarriesNoExperiment() {
         val kinds = listOf("predicted", "focus", "usual", "home", "pair", "inferred")
         val expected = kinds.flatMap { k -> listOf("shown_$k", "hit_$k", "miss_$k", "pinned_$k") }.toSet() +
-            setOf("opened", "rode_pin", "rode_auto")
+            setOf("opened", "rode_pin", "rode_auto", "entered_inferred", "declined_inferred")
         assertEquals(expected, AnalyticsEventNames)
+        assertTrue(validAnalyticsEvent("entered_inferred", dims("1")))
+        assertFalse(validAnalyticsEvent("entered_inferred", dims("1", "b" to "location")))
+        assertTrue(validAnalyticsEvent("declined_inferred", dims("1")))
+        assertFalse(validAnalyticsEvent("declined_inferred", dims("1", "r" to "same", "pl.r" to "android.same")))
         assertTrue(validAnalyticsEvent("shown_home", dims("6-10")))
         assertTrue(validAnalyticsEvent("shown_pair", dims("6-10")))
         assertFalse(validAnalyticsEvent("shown_setup", dims("1") + ("f" to "empty")))

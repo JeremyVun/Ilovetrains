@@ -18,7 +18,8 @@ data class UserData(
     val appearance: Appearance = Appearance.System, val modes: Set<String> = AllModes,
     val useLocation: Boolean = true, val journeyAlerts: Boolean = true, val home: Station? = null,
     val recentFrom: List<Station> = emptyList(), val recentTo: List<Station> = emptyList(),
-    val transferLimit: TransferLimit = TransferLimit.Two, val flags: Map<String, Boolean> = emptyMap()
+    val transferLimit: TransferLimit = TransferLimit.Two, val flags: Map<String, Boolean> = emptyMap(),
+    val inferenceDeclined: InferenceDecline? = null,
 )
 
 internal fun JSONObject.stringOrNull(key: String): String? = if (isNull(key)) null else optString(key).takeIf { it.isNotBlank() }
@@ -144,6 +145,14 @@ object Wire {
         o.optJSONObject("alternatives")?.let { runCatching { board(it) }.getOrNull() },
         o.optJSONObject("arrivalGuard")?.let(::guard),
         o.optJSONObject("recovery")?.let { runCatching { recovery(it) }.getOrNull() })
+    private fun decline(d: InferenceDecline) = JSONObject().put("tripId", d.tripId).put("reverse", d.reverse)
+        .put("at", d.at).put("departure", d.departure).put("arrival", d.arrival)
+    private fun decline(o: JSONObject): InferenceDecline? {
+        val tripId = (o.opt("tripId") as? String)?.takeIf { it.isNotEmpty() } ?: return null
+        val departure = (o.opt("departure") as? String)?.takeIf { it.isNotEmpty() } ?: return null
+        return InferenceDecline(tripId, o.opt("reverse") as? Boolean ?: return null, epoch(o, "at") ?: return null,
+            departure, epoch(o, "arrival") ?: return null)
+    }
     fun user(d: UserData) = JSONObject().put("schemaVersion", 1).put("trips", d.trips.jsonEach(::trip))
         .put("history", d.history.jsonEach { JSONObject().put("tripId", it.tripId).put("reverse", it.reverse).put("at", it.at) })
         .put("rides", d.rides.jsonEach { ride -> JSONObject().put("tripId", ride.tripId).put("reverse", ride.reverse)
@@ -154,6 +163,7 @@ object Wire {
         .put("journeyAlerts", d.journeyAlerts)
         .put("home", d.home?.let(::station)).put("recentFrom", d.recentFrom.jsonEach(::station)).put("recentTo", d.recentTo.jsonEach(::station))
         .put("transferLimit", d.transferLimit.wire).put("flags", JSONObject(d.flags))
+        .put("inferenceDeclined", d.inferenceDeclined?.let(::decline))
         .put("lastAnswer", d.lastAnswer?.let { JSONObject().put("tripId", it.tripId).put("reverse", it.reverse).put("at", it.at).put("stationId", it.stationId).put("board", board(it.board)).put("journey", journey(it.journey)) })
     fun user(o: JSONObject): UserData {
         require(o.optInt("schemaVersion", 1) == 1)
@@ -169,7 +179,8 @@ object Wire {
             o.optBoolean("useLocation", true), o.opt("journeyAlerts") as? Boolean ?: true,
             o.optJSONObject("home")?.let { runCatching { station(it) }.getOrNull() },
             o.optJSONArray("recentFrom").readEach(::station).take(3), o.optJSONArray("recentTo").readEach(::station).take(3),
-            transferLimitOf(o.stringOrNull("transferLimit")), flagsOf(o.optJSONObject("flags")))
+            transferLimitOf(o.stringOrNull("transferLimit")), flagsOf(o.optJSONObject("flags")),
+            inferenceDeclined = o.optJSONObject("inferenceDeclined")?.let(::decline))
     }
 }
 

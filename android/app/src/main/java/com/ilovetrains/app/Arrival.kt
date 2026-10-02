@@ -15,6 +15,8 @@ object ArrivalConstants {
     const val MaxSamples = 24
     const val MaxGap = 30_000L
     const val Checking = 180_000L
+    // Sustained movement needs three speed samples spanning 30 s, and the first provider fix can take 15 s.
+    const val EvidenceWait = 45_000L
     const val Retention = 7_200_000L
     const val Expiry = 1_800_000L
 }
@@ -116,13 +118,13 @@ fun reduceArrival(input: ArrivalInput): ArrivalResult {
     val fresh = last != null && input.nowMs - last.at <= ArrivalConstants.MaxAge
     val distance = if (fresh) distance(last, input.destination) else null
     val away = distance != null && distance - last!!.accuracy >= 300
-    val moving = away && (meanSpeed(samples, input.nowMs) ?: -1.0) >= 8
+    val moving = away && (meanSpeed(samples, input.nowMs) ?: -1.0) >= TrainSpeedMps
     fun near(sample: ArrivalSample): Boolean {
         val metres = distance(sample, input.destination) ?: return false
         return sample.accuracy <= 50 && metres + sample.accuracy <= 200
     }
     fun deadline(): Long = guard.let { current ->
-        if (current?.armed == true && !confirmed && !legacy) {
+        if (current?.armed == true && current.basis == null && !legacy) {
             max(input.arrivalMs + ArrivalConstants.Expiry, requireNotNull(current.retainedAt) + ArrivalConstants.Retention)
         } else input.arrivalMs + ArrivalConstants.Expiry
     }
@@ -133,8 +135,8 @@ fun reduceArrival(input: ArrivalInput): ArrivalResult {
         input.nowMs - retainedAt >= 60_000 && input.nowMs <= deadline()) {
         guard = guard.copy(retainedAt = input.nowMs)
     }
-    val expiryDeadline = deadline()
-    val expired = input.nowMs > expiryDeadline && !(input.resumeWaitUntilMs?.let { input.nowMs < it } == true)
+    val waiting = input.resumeWaitUntilMs?.let { input.nowMs < it } == true
+    val expired = input.nowMs > deadline() && !waiting
     if (input.cancelled) return result(if (expired) ArrivalState.ExpiredUnconfirmed else ArrivalState.Travelling,
         action = if (expired) ArrivalAction.Expire else if (input.legacyCompleted) ArrivalAction.Withdraw else ArrivalAction.None)
     if ((confirmed || legacy) && input.nowMs > input.arrivalMs + ArrivalConstants.Expiry) {
@@ -172,15 +174,17 @@ fun reduceArrival(input: ArrivalInput): ArrivalResult {
         return if (input.legacyCompleted) result(ArrivalState.ExpiredUnconfirmed, action = ArrivalAction.Expire)
         else result(ArrivalState.ExpiredUnconfirmed, ArrivalBasis.Estimate, ArrivalAction.RecordAndExpire)
     }
-    if (guard?.armed != true && !input.permissionPending) {
+    fun settle(): ArrivalResult {
         guard = (guard ?: ArrivalGuard()).copy(basis = ArrivalBasis.Estimate)
         return result(ArrivalState.Arrived, ArrivalBasis.Estimate,
             if (input.legacyCompleted) ArrivalAction.Correct else ArrivalAction.Record)
     }
-    val state = if (away || input.nowMs >= input.arrivalMs + ArrivalConstants.Checking) {
-        ArrivalState.ArrivalUnconfirmed
-    } else ArrivalState.CheckingArrival
-    return result(state, away = away, moving = moving)
+    fun checking() = result(ArrivalState.CheckingArrival, away = away, moving = moving)
+    val armed = guard?.takeIf { it.armed == true } ?: return if (input.permissionPending) checking() else settle()
+    if (armed.basis == ArrivalBasis.Estimate) return settle()
+    if (moving) return result(ArrivalState.ArrivalUnconfirmed, away = away, moving = moving)
+    if (input.nowMs < input.arrivalMs + ArrivalConstants.Checking || input.permissionPending || waiting) return checking()
+    return settle()
 }
 
 private fun normalizeArrivalGuard(raw: ArrivalGuard?): ArrivalGuard? {

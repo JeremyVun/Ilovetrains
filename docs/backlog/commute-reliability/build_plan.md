@@ -263,7 +263,7 @@ with `tools/start-android-emulator.sh` and a distinct port.
 Done markers: `Phase 2a done: <commit>`, `Phase 2b done: <commit>`, then
 `Phase 2 done: <commit>`.
 
-Phase 2a done: `473e1f6` on `cr-android` (not yet merged). Beyond its brief it
+Phase 2a done: `473e1f6` on `cr-android`. Beyond its brief it
 made the board's NOW item, future rows and footer one list item at least a
 screen tall (the web's `.sy-fwd { min-height: 100% }`), so NOW stays put as
 past rows arrive. Lead reviewed the before/after frames on 2026-10-02 and
@@ -271,6 +271,12 @@ accepted it. Phase 4 re-accepts the Android `board-transfer`,
 `board-transfer-light` (now opening at NOW), `board-now`, `board-now-light`
 and `board-light` (12 px tuck under the rule gone) baselines on the baseline
 device.
+
+Phase 2b done: `6e83e7e` on `cr-android`. Pure logic for
+rules 2-5 and the decline is in `Inference.kt`; `InferenceConformanceTest`
+runs every hold and entry case, and `CommuteReliabilityControllerTest`
+drives the view model offline on the bundled timetable (Rhodes → Central:
+this package routes Rhodes → Town Hall through Central). Its seams were consumed by 2c, and its findings are folded into design rule 3 and the review suspects.
 
 Phase 2 done: `6fc02d8` on `cr-android` (2c: Start/Stop, the running-row tap,
 the notification Stop action, `declined_inferred`, the 10-minute reopen and the

@@ -45,6 +45,11 @@ class TransitApiTest {
         assertTrue(asked.single().path.contains("at=2026-09-05T22%3A00%3A00Z"))
     }
 
+    @Test fun pastPagesAskForTheirOwnLimit() {
+        val asked = served(board) { api -> api.departures(alpha, bravo, AllModes, 1_788_645_600_000L, limit = 3) }
+        assertTrue(asked.single().path.startsWith("/api/v1/departures?from=a&to=b&limit=3&"))
+    }
+
     @Test fun directOnlyIsSentAsNumericZero() {
         val asked = served(board) { api -> api.departures(alpha, bravo, AllModes, transferLimit = 0) }
         assertTrue(asked.single().path.endsWith("&transferLimit=0"))

@@ -84,6 +84,8 @@ class WidgetSnapshotTest {
         assertEquals(now - 60_000 + 7_200_000, focusExpiry(focus))
         val confirmed = focus.copy(arrivalGuard = ArrivalGuard(true, now - 60_000, ArrivalBasis.Location, now - 30_000))
         assertEquals(journey.effectiveArrival + 1_800_000, focusExpiry(confirmed))
+        val estimated = focus.copy(arrivalGuard = ArrivalGuard(true, now - 60_000, ArrivalBasis.Estimate))
+        assertEquals("a trip settled by its estimate keeps no retention", journey.effectiveArrival + 1_800_000, focusExpiry(estimated))
     }
 
     @Test fun pastTheScheduleEndTheSameWeekdayAndHourAnswers() {

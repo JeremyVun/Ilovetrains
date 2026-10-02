@@ -157,6 +157,26 @@ class HeaderMetricsTest {
         assertEquals(listOf("opened", "shown_inferred", "hit_inferred", "pinned_inferred"), names())
     }
 
+    @Test fun anInferredEntryCountsOnceAfterTheOpenItHappenedIn() {
+        metrics.resumed()
+        metrics.enteredInferred()
+        metrics.enteredInferred()
+        assertEquals(listOf("opened", "entered_inferred", "entered_inferred"), names())
+        assertEquals(mapOf("u" to "1", "pl" to "android", "pl.u" to "android.1"), event("entered_inferred").first().d)
+    }
+
+    @Test fun aStoppedGuessIsOneDeclineWithOnlyTheStandardDimensions() {
+        openOnce(HeaderKind.Inferred)
+        metrics.declinedInferred()
+        assertEquals(listOf("opened", "shown_inferred", "declined_inferred"), names())
+        assertEquals(mapOf("u" to "1", "pl" to "android", "pl.u" to "android.1"), event("declined_inferred").single().d)
+    }
+
+    @Test fun aDeclineFromTheLockScreenCountsWithoutAnOpen() {
+        metrics.declinedInferred()
+        assertEquals(listOf("declined_inferred"), names())
+    }
+
     @Test fun ridesCountByHowTravelStartedAndHowArrivalWasDecided() {
         metrics.rode(pinned = true, basis = ArrivalBasis.Location)
         metrics.rode(pinned = false, basis = ArrivalBasis.Estimate)

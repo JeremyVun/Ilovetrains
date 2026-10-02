@@ -27,6 +27,7 @@ internal object TravelTrackerNotification {
     private const val RetiredChannelId = "current_journey"
     private const val OpeningGroup = "current_journey_opening"
     const val NotificationId = 4108
+    const val StopTripTitle = "Stop trip"
 
     fun createChannel(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
@@ -101,6 +102,7 @@ internal object TravelTrackerNotification {
         if (revision != null) {
             builder.setContentIntent(openIntent(context, revision))
                 .setDeleteIntent(dismissIntent(context, revision))
+                .addAction(Notification.Action.Builder(null as Icon?, StopTripTitle, stopIntent(context, revision)).build())
         }
         return builder
     }
@@ -130,6 +132,14 @@ internal object TravelTrackerNotification {
             .setData(revisionUri("dismiss", revision))
             .putTrackerRevision(revision)
         return PendingIntent.getService(context, revision.requestCode(2), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+    }
+
+    private fun stopIntent(context: Context, revision: TravelTrackerRevision): PendingIntent {
+        val intent = Intent(context, TravelTrackerService::class.java)
+            .setAction(TravelTrackerService.ActionStop)
+            .setData(revisionUri("stop", revision))
+            .putTrackerRevision(revision)
+        return PendingIntent.getService(context, revision.requestCode(3), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
     }
 
     private fun revisionUri(action: String, revision: TravelTrackerRevision) = Uri.Builder()

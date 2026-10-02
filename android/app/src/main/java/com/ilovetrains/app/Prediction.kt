@@ -6,19 +6,25 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.*
 
-data class Fix(val lat: Double, val lon: Double, val at: Long, val speed: Double? = null, val accuracyMetres: Double? = null)
+/** [bearing] is degrees clockwise from true north, null when the provider reported none. */
+data class Fix(val lat: Double, val lon: Double, val at: Long, val speed: Double? = null, val accuracyMetres: Double? = null,
+    val bearing: Double? = null)
 data class Selection(val tripId: String, val reverse: Boolean, val receipt: String? = null, val kind: HeaderKind = HeaderKind.Predicted)
-fun distanceMetres(a: Fix, b: Station): Double {
-    if (b.lat == 0.0 && b.lon == 0.0) return Double.POSITIVE_INFINITY
-    val p = Math.PI / 180; val dLat = (b.lat - a.lat) * p; val dLon = (b.lon - a.lon) * p
-    val h = sin(dLat / 2).pow(2) + cos(a.lat * p) * cos(b.lat * p) * sin(dLon / 2).pow(2)
+fun distanceMetres(a: Fix, b: Station): Double =
+    if (b.lat == 0.0 && b.lon == 0.0) Double.POSITIVE_INFINITY else metresBetween(a.lat, a.lon, b.lat, b.lon)
+fun distanceMetres(a: Fix, b: Fix): Double = metresBetween(a.lat, a.lon, b.lat, b.lon)
+fun distanceMetres(a: Station, b: Station): Double =
+    if (a.lat == 0.0 && a.lon == 0.0 || b.lat == 0.0 && b.lon == 0.0) Double.POSITIVE_INFINITY else metresBetween(a.lat, a.lon, b.lat, b.lon)
+private fun metresBetween(aLat: Double, aLon: Double, bLat: Double, bLon: Double): Double {
+    val p = Math.PI / 180; val dLat = (bLat - aLat) * p; val dLon = (bLon - aLon) * p
+    val h = sin(dLat / 2).pow(2) + cos(aLat * p) * cos(bLat * p) * sin(dLon / 2).pow(2)
     return 6_371_000 * 2 * atan2(sqrt(h.coerceIn(0.0, 1.0)), sqrt((1 - h).coerceIn(0.0, 1.0)))
 }
 fun compatible(trip: SavedTrip, modes: Set<String>) = modes.isNotEmpty() && listOf(trip.from, trip.to).all { s -> s.modes.any { it in modes } }
 fun focusExpiry(focus: FocusedJourney): Long {
     val guard = focus.arrivalGuard
     val arrival = focus.composed.effectiveArrival
-    return if (guard?.armed == true && guard.basis != ArrivalBasis.Location) {
+    return if (guard?.armed == true && guard.basis == null) {
         max(arrival + ArrivalConstants.Expiry, (guard.retainedAt ?: arrival) + ArrivalConstants.Retention)
     } else arrival + ArrivalConstants.Expiry
 }
@@ -55,17 +61,19 @@ fun historyEvidence(events: List<ViewEvent>, tripId: String, reverse: Boolean, n
 }
 fun historyScore(events: List<ViewEvent>, tripId: String, reverse: Boolean, now: Long): Double =
     historyEvidence(events, tripId, reverse, now).score
-fun stationHere(data: UserData, stations: List<Station>, fix: Fix?, now: Long): Station? {
-    if (!data.useLocation || fix == null || now - fix.at !in 0..300_000) return null
-    val saved = data.trips.flatMap { listOf(it.from, it.to) }.map { s -> stations.find { it.id == s.id } ?: s }.distinctBy { it.id }
-        .filter { s -> s.modes.any { it in data.modes } }
-    val eligible = stations.filter { s -> s.modes.any { it in data.modes } }
-    fun nearest(list: List<Station>, within: Double) = list.filter { distanceMetres(fix, it) <= within }.minByOrNull { distanceMetres(fix, it) }
-    return nearest(saved, 200.0) ?: nearest(eligible, 200.0) ?: nearest(saved, 2000.0) ?: nearest(eligible, 2000.0)
+fun stationHere(data: UserData, stations: List<Station>, fix: Fix?, now: Long, previousFix: Fix? = null): Station? =
+    here(data, stations, fix, now, previousFix)?.station
+/** The home end of a trip Home saves when the phone is at a station no saved trip touches. */
+fun homewardPairEnd(data: UserData, here: Station): Station? {
+    val home = data.home ?: automaticHome(data) ?: return null
+    val fromHere = data.trips.filter { compatible(it, data.modes) }.any { it.from.id == here.id || it.to.id == here.id }
+    return home.takeIf { !fromHere && it.id != here.id && it.modes.any { mode -> mode in data.modes } }
 }
-fun predict(data: UserData, stations: List<Station>, fix: Fix?, now: Long): Selection? {
+fun predict(data: UserData, stations: List<Station>, fix: Fix?, now: Long, previousFix: Fix? = null): Selection? {
     val trips = data.trips.filter { compatible(it, data.modes) }
     if (trips.isEmpty()) return null
+    // At train speed a fix says where the train is, not where the rider starts from.
+    val fix = fix?.takeUnless { trainSpeed(it, previousFix) }
     val hasCurrentFix = data.useLocation && fix != null && now - fix.at in 0..300_000
     val here = stationHere(data, stations, fix, now)
     data class Candidate(val trip: SavedTrip, val reverse: Boolean, val score: Double, val days: Int, val factor: Double) { val from get() = if (reverse) trip.to else trip.from; val to get() = if (reverse) trip.from else trip.to }
@@ -102,20 +110,22 @@ fun historyReceipt(history: List<ViewEvent>, id: String, reverse: Boolean, now: 
     if (historyEvidence(history, id, reverse, now).receiptDays < 3) return null
     return if (n.dayOfWeek.value < 6 && n.hour < 12) "You check this trip most weekday mornings." else "You often check this trip around now."
 }
+/** Travel mode from the platform-sighted [UserData.lastAnswer]: under way, seen at its origin, and moved the way it goes. */
 fun inferredFocus(data: UserData, fix: Fix, now: Long): FocusedJourney? {
     if (!data.useLocation || data.focus != null || now - fix.at !in 0..300_000) return null
     val last = data.lastAnswer ?: return null
     val trip = data.trips.find { it.id == last.tripId } ?: return null
     if (!compatible(trip, data.modes) || last.journey.legs.any { it.mode !in data.modes }) return null
-    val from = if (last.reverse) trip.to else trip.from; val to = if (last.reverse) trip.from else trip.to
+    val (from, to) = trip.ends(last.reverse)
     val j = last.journey
-    if (data.rides.any { it.tripId == trip.id && it.reverse == last.reverse && it.departure == j.departure }) return null
-    if (now !in j.effectiveDeparture..(j.effectiveArrival + 1_800_000) || last.stationId != from.id || j.effectiveDeparture - last.at !in 0..900_000) return null
+    if (rideRecorded(data, trip.id, last.reverse, j)) return null
+    if (now !in j.effectiveDeparture..(j.effectiveArrival + TravelLateMillis) || last.stationId != from.id ||
+        j.effectiveDeparture - last.at > TravelSeenMillis) return null
     val left = distanceMetres(fix, from)
-    val span = distanceMetres(Fix(from.lat, from.lon, now), to)
+    val span = distanceMetres(from, to)
     if (!left.isFinite() || !span.isFinite()) return null
-    val toward = left >= 1000 && distanceMetres(fix, to) <= span - 1000
-    val fast = (fix.speed ?: 0.0) >= 8 && left >= 200
+    val toward = left >= TravelMovedMetres && distanceMetres(fix, to) <= span - TravelMovedMetres
+    val fast = (fix.speed ?: 0.0) >= TrainSpeedMps && left >= TravelSpeedMovedMetres
     return if (toward || fast) FocusedJourney(trip.id, last.reverse, j, last.board, false) else null
 }
 

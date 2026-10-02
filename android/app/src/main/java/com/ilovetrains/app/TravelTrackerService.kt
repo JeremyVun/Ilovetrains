@@ -24,8 +24,13 @@ class TravelTrackerService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val dismissal = intent?.action == ActionDismiss
-        if (dismissal && intent?.trackerRevision()?.let(model::dismissTracker) == true) {
+        val revision = intent?.trackerRevision()
+        val ended = when (intent?.action) {
+            ActionDismiss -> revision?.let(model::dismissTracker) == true
+            ActionStop -> revision?.let(model::stopTrackedTrip) == true
+            else -> false
+        }
+        if (ended) {
             end()
             return START_NOT_STICKY
         }
@@ -100,6 +105,7 @@ class TravelTrackerService : Service() {
     companion object {
         const val ActionStart = "com.ilovetrains.app.tracker.START"
         const val ActionDismiss = "com.ilovetrains.app.tracker.DISMISS"
+        const val ActionStop = "com.ilovetrains.app.tracker.STOP"
         const val ActionOpen = "com.ilovetrains.app.tracker.OPEN"
         const val ExtraTripId = "trackerTripId"
         const val ExtraReverse = "trackerReverse"

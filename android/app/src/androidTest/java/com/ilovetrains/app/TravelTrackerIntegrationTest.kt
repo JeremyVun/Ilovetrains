@@ -200,6 +200,44 @@ class TravelTrackerIntegrationTest {
         assertContains(waitForNotification(), "Rouse Hill")
     }
 
+    @Test fun theStopTripActionEndsOnlyTheCurrentRevisionsTrip() {
+        grantNotifications()
+        launchActivity()
+        clearFocus()
+
+        val guessed = fixture("ride", "stop-action")
+        setFocus(guessed)
+        val stale = stopAction(waitForNotification())
+        val staleRevision = requireNotNull(model.trackerActiveRevision())
+        setFocus(replacementFocus("stop-action-replacement", "Rouse Hill Station"))
+        waitForNotification { text(it).contains("Rouse Hill") }
+        setFocus(guessed)
+        waitUntil("the same trip did not return under a new revision") {
+            model.trackerActiveRevision()?.let { it.identity == staleRevision.identity && it.generation > staleRevision.generation } == true
+        }
+        val current = stopAction(waitForNotification { !text(it).contains("Rouse Hill") && stopAction(it).actionIntent != stale.actionIntent })
+        val declinesBefore = app.analytics.ledger.count { it.t == "declined_inferred" }
+
+        shell("input keyevent HOME")
+        stale.actionIntent.send()
+        SystemClock.sleep(1_500)
+        assertEquals("a stale Stop trip ended the current trip", guessed.trackerIdentity, model.state.value.focus?.trackerIdentity)
+        assertTrue(trackerNotification() != null)
+
+        current.actionIntent.send()
+        waitUntil("Stop trip did not end the trip") { model.state.value.focus == null && trackerNotification() == null }
+        assertNull(model.trackerActiveRevision())
+        assertEquals(Screen.Home, model.state.value.screen)
+        waitUntil("the stop did not persist its decline") {
+            runBlocking { DeviceStore(context).load().let { it.focus == null && it.inferenceDeclined?.tripId == guessed.tripId } }
+        }
+        waitUntil("declined_inferred was not sent") { app.analytics.ledger.count { it.t == "declined_inferred" } == declinesBefore + 1 }
+        assertServiceStopped()
+    }
+
+    private fun stopAction(notification: Notification): Notification.Action =
+        requireNotNull(notification.actions?.singleOrNull { it.title.toString() == "Stop trip" }) { "the tracker has no Stop trip action" }
+
     @Test fun systemUiSwipeDismissesAndSuppressesTheFocus() {
         grantNotifications()
         launchActivity()
@@ -1047,7 +1085,7 @@ class TravelTrackerIntegrationTest {
 
     private fun clearFocus() {
         waitReady()
-        onMain { model.unpinJourney() }
+        onMain { model.stopTrip() }
         waitUntil("prior tracker did not stop") { model.trackerActiveRevision() == null && trackerNotification() == null }
     }
 

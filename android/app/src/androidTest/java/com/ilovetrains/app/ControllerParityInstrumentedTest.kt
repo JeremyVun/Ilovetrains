@@ -17,6 +17,8 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -257,7 +259,7 @@ class ControllerParityInstrumentedTest {
             focus = FocusedJourney(primaryTrip.id, false, journey, board, pinned = false),
             useLocation = true,
         ))
-        model.attachActivity(Any(), {}, {}, {}, { beforeStart -> beforeStart(); true }, {})
+        model.attachActivity(Any(), {}, {}, {}, {}, { beforeStart -> beforeStart(); true }, {}, {})
         model.activityResumed()
         model.permission(granted = true, denied = false)
         withTimeout(10_000) { model.state.first { it.ready } }
@@ -279,14 +281,15 @@ class ControllerParityInstrumentedTest {
             useLocation = true,
         ))
         var stopCalls = 0
-        model.attachActivity(Any(), {}, {}, { stopCalls++ }, { beforeStart -> beforeStart(); true }, {})
+        model.attachActivity(Any(), {}, {}, { stopCalls++ }, {}, { beforeStart -> beforeStart(); true }, { stopCalls++ }, {})
         model.activityResumed()
         model.permission(granted = true, denied = false)
         assertTrue(model.state.value.focus?.arrivalGuard?.armed == true)
 
         delay(750)
         model.arrivalLocation(Fix(primaryTrip.from.lat, primaryTrip.from.lon, System.currentTimeMillis(), 12.0, 20.0))
-        assertEquals(ArrivalState.ArrivalUnconfirmed, model.state.value.arrival?.state)
+        assertEquals("one away sample proves no movement, so the trip checks", ArrivalState.CheckingArrival,
+            model.state.value.arrival?.state)
         assertFalse(model.state.value.focusComplete)
 
         model.activityStopped()
@@ -304,12 +307,37 @@ class ControllerParityInstrumentedTest {
         model.setUseLocation(false)
         model.arrivalLocation(Fix(primaryTrip.to.lat, primaryTrip.to.lon, System.currentTimeMillis(), 0.0, 10.0))
         assertTrue(model.state.value.focus?.arrivalGuard?.armed == true)
-        model.unpinJourney()
+        model.stopTrip()
         model.arrivalLocation(Fix(primaryTrip.to.lat, primaryTrip.to.lon, System.currentTimeMillis(), 0.0, 10.0))
         assertNull(model.state.value.focus)
         assertFalse(model.state.value.focusComplete)
         assertTrue(storedAfterWrites().rides.isEmpty())
         assertTrue("provider stop callback was not invoked", stopCalls >= 3)
+    }
+
+    @Test fun cancellingSetupLocationLeavesArrivalMonitoringRunning() = runBlocking {
+        val now = System.currentTimeMillis()
+        val journey = journey(primaryTrip.from, primaryTrip.to, now - 600_000, now + 1_200_000, "T1")
+        val board = BoardData(primaryTrip.from, primaryTrip.to, listOf(journey), now, source = "live")
+        val model = model(UserData(trips = listOf(primaryTrip), useLocation = true,
+            focus = FocusedJourney(primaryTrip.id, false, journey, board, pinned = false)))
+        var listening = false
+        var setupCancels = 0
+        withContext(Dispatchers.Main) {
+            model.attachActivity(Any(), {}, {}, { listening = false }, { setupCancels++ },
+                { beforeStart -> beforeStart(); listening = true; true }, { listening = false }, {})
+            model.activityResumed()
+            model.permission(granted = true, denied = false)
+            assertTrue(listening && model.arrivalMonitoringActive)
+
+            model.newTrip()
+            model.requestLocation()
+            model.setupOriginQueryChanged()
+            model.back()
+        }
+        assertTrue("setup location was never cancelled", setupCancels >= 3)
+        assertTrue("cancelling setup location stopped arrival monitoring", listening)
+        assertEquals(listening, model.arrivalMonitoringActive)
     }
 
     @Test fun expiredGuardWaitsForResumeEvidenceThenCountsTheRideInsteadOfReviving() = runBlocking {
@@ -320,12 +348,12 @@ class ControllerParityInstrumentedTest {
             focus = FocusedJourney(primaryTrip.id, false, journey, board,
                 arrivalGuard = ArrivalGuard(armed = true, retainedAt = now - 10_800_000))))
         assertNotNull("expired focus disappeared before the resume lookup", model.state.value.focus)
-        model.attachActivity(Any(), {}, {}, {}, { beforeStart -> beforeStart(); true }, {})
+        model.attachActivity(Any(), {}, {}, {}, {}, { beforeStart -> beforeStart(); true }, {}, {})
         model.activityResumed()
         model.permission(true, false)
         model.arrivalLocation(Fix(primaryTrip.from.lat, primaryTrip.from.lon, System.currentTimeMillis(), 10.0, 20.0))
         assertNotNull("the resume lookup lost its chance before the overdue expiry", model.state.value.focus)
-        model.arrivalLookupComplete()
+        model.evidenceWaitElapsed()
         assertNull("away evidence revived an overdue focus", model.state.value.focus)
         assertEquals(listOf(primaryTrip.id), storedAfterWrites().rides.map { it.tripId })
     }
@@ -339,7 +367,7 @@ class ControllerParityInstrumentedTest {
                 arrivalGuard = ArrivalGuard(basis = ArrivalBasis.Estimate)),
             rides = listOf(Ride(primaryTrip.id, false, journey.departure, journey.effectiveArrival))))
         var starts = 0
-        model.attachActivity(Any(), {}, {}, {}, { beforeStart -> starts++; beforeStart(); true }, {})
+        model.attachActivity(Any(), {}, {}, {}, {}, { beforeStart -> starts++; beforeStart(); true }, {}, {})
         model.activityResumed()
         model.permission(true, false)
         withTimeout(10_000) { model.state.first { it.ready } }
@@ -370,7 +398,7 @@ class ControllerParityInstrumentedTest {
         assertEquals(Screen.Detail, model.state.value.screen)
         assertEquals(recommendationSource.generatedAt, model.state.value.board?.generatedAt)
         assertEquals(0, model.state.value.board?.fetchConstraint?.maxTransfers)
-        model.pinJourney(direct)
+        model.startTrip(direct)
         assertTrue(model.state.value.focus?.pinned == true)
         assertEquals(recommendationSource.generatedAt, model.state.value.focus?.board?.generatedAt)
 

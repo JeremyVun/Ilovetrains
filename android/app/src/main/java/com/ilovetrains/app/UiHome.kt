@@ -137,7 +137,7 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
                 else -> "Next ${first.modeName()}"
             }
             Row(modifier = if (explicitlyPinned) Modifier.heightIn(min = 44.dp)
-                .clickable(role = Role.Button, onClick = actions::unpinJourney) else Modifier,
+                .clickable(role = Role.Button, onClick = actions::stopTrip) else Modifier,
                 verticalAlignment = Alignment.CenterVertically) {
                 val statusWarns = focusState?.warning == true || journey.cancelled || late && !focused
                 if (explicitlyPinned && status == "Pinned") {

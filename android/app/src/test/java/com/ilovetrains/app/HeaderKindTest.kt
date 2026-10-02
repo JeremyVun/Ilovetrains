@@ -1,13 +1,11 @@
 package com.ilovetrains.app
 
-import org.json.JSONArray
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Instant
 import java.time.ZonedDateTime
 import java.util.TimeZone
 
@@ -53,26 +51,24 @@ class HeaderKindTest {
             "standing at destination chooses real return pair" to "home",
             "relevant origin history outranks home fallback" to "usual",
             "three first-open votes infer home" to "home",
+            "a saved station at 269 m beats an unsaved one at 119 m" to "home",
+            "a saved station at 342 m is here but no sighting" to "home",
+            "an unsaved station within 200 m answers when no saved end is within 400 m" to "pair",
+            "a walking pair of fixes keeps here" to "home",
+            "a previous fix over 120 s old cannot derive train speed" to "home",
         )
         val previous = TimeZone.getDefault()
         TimeZone.setDefault(TimeZone.getTimeZone("Australia/Sydney"))
         try {
-            val cases = JSONArray(requireNotNull(javaClass.getResourceAsStream("/prediction.json")).bufferedReader().use { it.readText() })
             val names = mutableSetOf<String>()
-            for (index in 0 until cases.length()) {
-                val case = cases.getJSONObject(index); val raw = case.getJSONObject("doc")
-                val name = case.getString("name"); names += name
-                val at = Instant.parse(case.getString("now")).toEpochMilli()
-                val data = UserData(
-                    trips = raw.getJSONArray("trips").readEach { SavedTrip(it.getString("id"), Wire.station(it.getJSONObject("from")), Wire.station(it.getJSONObject("to"))) },
-                    history = raw.getJSONArray("history").readEach { ViewEvent(it.getString("tripId"), it.getString("direction") == "reverse", Instant.parse(it.getString("t")).toEpochMilli()) },
-                    votes = raw.getJSONArray("homeVotes").readEach { HomeVote(it.getString("day"), Wire.station(it.getJSONObject("station"))) },
-                    useLocation = raw.getJSONObject("preferences").optBoolean("useLocation", true),
-                    lastTripId = raw.optJSONObject("lastViewed")?.getString("tripId"), lastReverse = raw.optJSONObject("lastViewed")?.getString("direction") == "reverse")
-                val fix = case.optJSONObject("fix")?.let { Fix(it.getDouble("lat"), it.getDouble("lon"), at) }
-                val stations = case.getJSONArray("stations").readEach(Wire::station)
-                assertEquals(name, web[name] ?: "predicted", predict(data, stations, fix, at)?.kind?.wire)
-                assertEquals(name, HeaderKind.Predicted, predict(data.copy(useLocation = false), stations, fix, at)?.kind)
+            for (case in predictionCases()) {
+                names += case.name
+                val kind = if (web[case.name] == "pair") pairedAnswer(case)?.let {
+                    homeAnswerKind(null, browsing = false, it, it.tripId, it.reverse, autoSavedTripId = "pair")
+                } else predict(case.data, case.stations, case.fix, case.now, case.previousFix)?.kind
+                assertEquals(case.name, web[case.name] ?: "predicted", kind?.wire)
+                assertEquals(case.name, HeaderKind.Predicted,
+                    predict(case.data.copy(useLocation = false), case.stations, case.fix, case.now, case.previousFix)?.kind)
             }
             assertTrue(names.containsAll(web.keys))
         } finally { TimeZone.setDefault(previous) }
@@ -102,6 +98,21 @@ class HeaderKindTest {
         assertNull("a board for the other direction is not this answer's", displayedHomeLead(state.copy(reverse = true)))
         assertNull(displayedHomeLead(state.copy(board = null, homeBoard = null)))
         assertNull(displayedHomeLead(state.copy(board = board.copy(journeys = emptyList()), homeBoard = null)))
+    }
+
+    @Test fun homeOffersStartTripForItsLeadOnlyInTheFifteenMinutesBeforeItLeavesAndOnlyOutsideTripMode() {
+        val sooner = Journey(listOf(Leg("T9", "train", "Central", rhodes, central, now + 120_000, now + 1_500_000)))
+        val later = Journey(listOf(Leg("T9", "train", "Central", rhodes, central, now + 600_000, now + 2_000_000)))
+        val board = BoardData(rhodes, central, listOf(later, sooner), now, source = "live")
+        val state = AppState(ready = true, trips = listOf(toCentral), selectedTripId = "a", board = board, homeBoard = board, now = now)
+        assertEquals(sooner.key, state.startableJourney?.key)
+        assertNull("leaves in 15 minutes and a second", state.copy(now = now + 120_000 - 15 * 60_000 - 1_000).startableJourney)
+        assertEquals("once it leaves, the header's next train is the one offered", later.key, state.copy(now = now + 120_001).startableJourney?.key)
+        assertNull(state.copy(focus = FocusedJourney("a", false, sooner, board)).startableJourney)
+        assertNull(state.copy(screen = Screen.Board).startableJourney)
+        val cancelled = sooner.copy(legs = listOf(sooner.legs.single().copy(cancelled = true)))
+        assertEquals("a cancelled lead is never offered", later.key,
+            state.copy(board = board.copy(journeys = listOf(later, cancelled)), homeBoard = null).startableJourney?.key)
     }
 
     @Test fun onlyAWriteThatAppendsTheRideCountsIt() {
