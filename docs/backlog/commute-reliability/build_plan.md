@@ -272,6 +272,23 @@ accepted it. Phase 4 re-accepts the Android `board-transfer`,
 and `board-light` (12 px tuck under the rule gone) baselines on the baseline
 device.
 
+Phase 2 done: `6fc02d8` on `cr-android` (2c: Start/Stop, the running-row tap,
+the notification Stop action, `declined_inferred`, the 10-minute reopen and the
+platform-entry parity fix). Gates: `tools/build-android.sh` passed with 272 JVM
+tests. The instrumented `CommuteReliabilityControllerTest` (11),
+`ControllerParity` (13), `BoardPastPaging` (3) and `SetupLocationController`
+(1) passed; `TravelTrackerIntegrationTest` failed only the two tests known to
+fail at base outside its capture script. Its `systemUiSwipeDismissesAndSuppressesTheFocus`
+failed once in three full runs; the new action row may make it flakier, so
+watch it in phase 5. For phase 4: draw from `state.startableJourney`; the line
+calls `startTrip(it)`/`stopTrip()`; rows already go through
+`boardRowTapped`; the notification action is
+`TravelTrackerNotification.StopTripTitle` with no icon; the Android tracker
+system-surface captures will show the new action row; `PINNED` and the rail
+words are at `UiHome.kt:140` and `UiDetail.kt:97`. Ordering the reviewer should
+attack: rule 7 relies on `onNewIntent` arriving before `onResume` and on
+`activityResumed` running before `resume()`.
+
 ## Phase 3 — iOS
 
 Owns: `ios/ILoveTrains/Core/{Arrival,Prediction,TrainViewModel,
@@ -337,7 +354,53 @@ Found in 3a, for the fix wave:
   runs offline.
 - The bundled timetable has no direct Rhodes → Town Hall service; every
   offline plan changes, often via the M1 (2b saw the same through Central).
-  This is outside this item; it was raised with the owner.
+  Diagnosed as its own item, `docs/backlog/offline-through-running/`.
+
+Phase 3 done: `226c812` on `cr-ios` (3b: Start/Stop, the running-row tap,
+`StopTripIntent` in `ios/Shared/`, `declined_inferred`, the 10-minute reopen,
+the parity fix, and `TravelTrackerFlowTests` updated to Checking arrival, then
+the estimate). Gates: `tools/build-ios.sh --unit` passed with 297 tests, and
+`--ui TravelTrackerFlowTests` passed 6, with one skipped by its own
+`XCTSkip`. For phase 4: the startable line shows when
+`model.state.startableLead != nil` and calls `model.startTrip(lead)`; guessed
+STOP TRIP and started ■ STOP TRIP call `model.stopTrip()`; the Live Activity
+button is `Button(intent: StopTripIntent(session:
+context.attributes.sessionId))` with `import AppIntents`. Found in 3b:
+- Simulator trap: two rebuilt unit runs executed test code one or two edits
+  old. `xcrun simctl uninstall` and deleting the built `ILoveTrainsTests.xctest`
+  before a run fixed it. Fix the instrument or document it in
+  `tools/README.md`.
+- `AppFlowTests.testBoardDetailPinAndSettingsFlow` and the offline setup flow
+  tap the first `service-*` row and expect `pin-this-train`. A running first
+  row now starts the trip, so they probably fail in the full UI suite.
+- 3a's controller tests call `planner.initialize()` right after a fresh install,
+  which races the model's own bootstrap.
+
+## Review and fix wave
+
+Runs after the Android and iOS stacks merge to main. The Fable reviewer (owner
+approval in Execution) attacks the named invariants: the hold rule, the
+ruling-13 auto-start regressions, on-board matching and arrival settlement. It
+also covers the lead's suspects (Execution), rule 7's ordering on both phones
+and the lock-screen stops. It commits probes and reports defects and contract
+contradictions.
+
+Fix work known before the review, all three clients unless named:
+- Rule 5's median `Δ`: the web, the `inference.json` `expectedRequests[].at`
+  cases, Android and iOS.
+- Ruling 23: Stop writes the decline for any trip that belongs to a saved trip;
+  only a guessed stop sends `declined_inferred`. Shared fixture cases plus
+  each client's tests.
+- Ruling 24 (Android and iOS): the offline board plans the next 24 from `now`
+  plus the last 15 minutes, merged.
+- The iOS offline tick refresh check (above), the simulator stale-bundle trap
+  and `AppFlowTests`.
+- The reviewer's confirmed defects, with its probes kept as permanent
+  regressions.
+
+The web and the fixtures go first, as the reference. Then Android and iOS fix
+agents run in parallel through the gate lock. The full `tools/build-ios.sh
+--test` runs once at the end of the iOS fix, on final sources.
 
 ## Phase 4 — The trip-control line, new words and the removed state, on screen (visual)
 

@@ -25,8 +25,8 @@ measurements in [comps/MEASUREMENTS.md](comps/MEASUREMENTS.md).
 
 ## Owner rulings
 
-Rulings 1-7 are from 2026-10-01 and 8-22 from 2026-10-02, answering options
-laid out in the design session (21 and 22 during the build). Quoted text is the option label and
+Rulings 1-7 are from 2026-10-01 and 8-24 from 2026-10-02, answering options
+laid out in the design session (21-24 during the build). Quoted text is the option label and
 description the owner chose, or the owner's own words.
 
 1. Trip end: “End after estimate (Recommended)” — “3 min after the last arrival
@@ -112,6 +112,17 @@ description the owner chose, or the owner's own words.
     setup's “Use my location” keeps picking the nearest station within
     200 m, as before; the 400 m saved-station preference shapes only Home's
     answer and trip-mode inference.
+23. Stop on a started trip, asked during the build after phase 2c showed that a
+    rider who stops a trip they started while still riding is guessed back in
+    by the next train-speed fix: “Always stick (Recommended)” — Stop trip
+    records the decline for any trip that belongs to a saved trip, started or
+    guessed. Guessing stays off for that trip for an hour or until the train's
+    arrival + 30 min, whichever is later. Only a guessed stop sends
+    `declined_inferred`.
+24. Offline board, asked during the build after phase 3b found boards with no
+    upcoming row: “Fix it in this item (Recommended)” — both phones plan the
+    next 24 departures from now plus the last 15 minutes as today, and merge
+    them, so the board always shows upcoming trains.
 
 The owner's regression concern in ruling 13 is binding: automatic trip starts
 that work today must keep working. Every rule below only adds ways in, and the
@@ -454,10 +465,14 @@ a ride, clears a matching `lastOpen`, stops arrival monitoring and the tracker
 session, and returns Home answering from the prediction where the phone is now
 (the explicit selection is not kept). A lock-screen stop is honoured only for
 the still-current tracker identity, like the existing open and dismiss
-intents. On a guessed trip it also persists the decline below and sends
+intents. It persists the decline below for any trip whose journey belongs to
+a saved trip (ruling 23), and on a guessed trip it also sends
 `declined_inferred`.
 
-**The decline**, for guessed trips only. `inferenceDeclined` in the personal
+**The decline**, for every stopped trip that belongs to a saved trip: a
+guessed focus names its trip, and a started focus belongs to the saved trip
+whose endpoints match its pair in either direction. A started trip on an
+unsaved pair writes none. `inferenceDeclined` in the personal
 document: `{"tripId": "uuid", "direction": "forward", "at": "…ISO…",
 "departure": "<departureKey of the declined journey>", "arrival": "…ISO…"}`,
 where `arrival` is the declined journey's composed effective arrival when
@@ -508,6 +523,12 @@ session, as the trip-selection contract says.
   the board. A board refresh never cancels or discards a past page in
   flight; the page merges into the current board for the same pair. The list
   still opens at the `NOW` anchor and keeps it in place as rows arrive above.
+- **Native offline board** (ruling 24): a board's timetable plan is two
+  plans merged by journey key: the next 24 departures from `now`, and the last
+  15 minutes as today. Phase 3b found that the single plan from `now − 15 min`
+  with limit 24 can fill with departed rows on a busy corridor. On Central →
+  Parramatta at 08:00 every row had left between 07:45 and 07:59, so the board
+  offered no train to take.
 - **iOS** keeps pull-to-refresh at the top as its past-paging gesture. It is
   recorded as an iOS deviation, because loading on open would push the
   anchor. Web is unchanged apart from the first-page anchor.
@@ -531,7 +552,8 @@ event `declined_inferred` is sent by all three when `Stop trip` ends a guessed
 trip, from Home or the lock screen. Neither carries a dimension beyond the
 standard ones. The decline rate `declined_inferred / entered_inferred` per
 platform is the measure of wrong entries. Stopping a trip the rider started
-emits nothing, as unpinning does today. `Start trip` on Home and a running-row
+emits nothing, as unpinning does today, though it still writes the decline
+(ruling 23). `Start trip` on Home and a running-row
 tap are explicit starts and emit `pinned_<kind>` under its existing rules (the
 event name stays). The `strip-placement` experiment row and `x.*` dimension
 are removed (rule 6). These are contract changes (`analytics.md`) recorded
