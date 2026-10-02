@@ -1016,6 +1016,12 @@ have never used, and 400 m keeps a rider inside Town Hall's own footprint from
 being handed Gadigal, 152 m from Town Hall's point (owner ruling, 2026-10-01).
 Without the index, or without a fix, there is no `here`.
 
+Setup's location pick is not `here`: adding a trip asks where the user stands,
+not which saved trip they mean (owner ruling, 2026-10-02). It takes the
+nearest saved end within 200 m, else the nearest eligible index station within
+200 m, then `here`'s 2 km tiers, and it has no train-speed rule
+(`setupHere(doc, stations, fix)`).
+
 **Train speed.** A fix is at train speed when its reported speed is finite,
 non-negative and at least 8 m/s. A fix without a usable speed is at train
 speed when the previous Home fix, taken 15-120 s earlier with both accuracies
