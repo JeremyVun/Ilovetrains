@@ -100,6 +100,21 @@ class HeaderKindTest {
         assertNull(displayedHomeLead(state.copy(board = board.copy(journeys = emptyList()), homeBoard = null)))
     }
 
+    @Test fun homeOffersStartTripForItsLeadOnlyInTheFifteenMinutesBeforeItLeavesAndOnlyOutsideTripMode() {
+        val sooner = Journey(listOf(Leg("T9", "train", "Central", rhodes, central, now + 120_000, now + 1_500_000)))
+        val later = Journey(listOf(Leg("T9", "train", "Central", rhodes, central, now + 600_000, now + 2_000_000)))
+        val board = BoardData(rhodes, central, listOf(later, sooner), now, source = "live")
+        val state = AppState(ready = true, trips = listOf(toCentral), selectedTripId = "a", board = board, homeBoard = board, now = now)
+        assertEquals(sooner.key, state.startableJourney?.key)
+        assertNull("leaves in 15 minutes and a second", state.copy(now = now + 120_000 - 15 * 60_000 - 1_000).startableJourney)
+        assertEquals("once it leaves, the header's next train is the one offered", later.key, state.copy(now = now + 120_001).startableJourney?.key)
+        assertNull(state.copy(focus = FocusedJourney("a", false, sooner, board)).startableJourney)
+        assertNull(state.copy(screen = Screen.Board).startableJourney)
+        val cancelled = sooner.copy(legs = listOf(sooner.legs.single().copy(cancelled = true)))
+        assertEquals("a cancelled lead is never offered", later.key,
+            state.copy(board = board.copy(journeys = listOf(later, cancelled)), homeBoard = null).startableJourney?.key)
+    }
+
     @Test fun onlyAWriteThatAppendsTheRideCountsIt() {
         val journey = Journey(listOf(Leg("T9", "train", "Central", rhodes, central, now - 1_500_000, now - 60_000)))
         val focus = FocusedJourney("a", false, journey, BoardData(rhodes, central, listOf(journey), now))
