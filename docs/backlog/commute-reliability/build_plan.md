@@ -172,6 +172,15 @@ with `tools/start-android-emulator.sh` and a distinct port.
 
 Done markers: `Phase 2a done: <commit>`, then `Phase 2 done: <commit>`.
 
+Phase 2a done: `473e1f6` on `cr-android` (not yet merged). Beyond its brief it
+made the board's NOW item, future rows and footer one list item at least a
+screen tall (the web's `.sy-fwd { min-height: 100% }`), so NOW stays put as
+past rows arrive. Lead reviewed the before/after frames on 2026-10-02 and
+accepted it. Phase 4 re-accepts the Android `board-transfer`,
+`board-transfer-light` (now opening at NOW), `board-now`, `board-now-light`
+and `board-light` (12 px tuck under the rule gone) baselines on the baseline
+device.
+
 ## Phase 3 — iOS
 
 Owns: `ios/ILoveTrains/Core/{Arrival,Prediction,TrainViewModel,
