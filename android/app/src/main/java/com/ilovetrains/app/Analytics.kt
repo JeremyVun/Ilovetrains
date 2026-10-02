@@ -34,7 +34,7 @@ private val PinWords = PinResult.entries.map(PinResult::wire).toSet()
 private val BasisWords = setOf("location", "estimate")
 internal val AnalyticsEventNames: Set<String> = HeaderKind.entries.flatMap { kind ->
     listOf("shown_", "hit_", "miss_", "pinned_").map { it + kind.wire }
-}.toSet() + setOf("opened", "rode_pin", "rode_auto")
+}.toSet() + setOf("opened", "rode_pin", "rode_auto", "entered_inferred")
 
 fun usageBand(opens: Int): String = when {
     opens <= 1 -> "1"
@@ -182,6 +182,7 @@ class Analytics internal constructor(
         track("pinned_" + kind.wire, mapOf("r" to result.wire, "pl.r" to "$Platform.${result.wire}"))
     fun rode(pinned: Boolean, basis: ArrivalBasis) =
         track(if (pinned) "rode_pin" else "rode_auto", mapOf("b" to basis.wire, "pl.b" to "$Platform.${basis.wire}"))
+    fun enteredInferred() = track("entered_inferred")
 
     /** A new foreground session: its first event schedules a flush again, and anything left over is sent now. */
     fun foreground() = submit {
@@ -388,6 +389,12 @@ internal class HeaderMetrics(private val analytics: Analytics) {
     @Synchronized fun released() { answer = null; setup = false }
 
     fun rode(pinned: Boolean, basis: ArrivalBasis) = analytics.rode(pinned, basis)
+
+    /** Counted against this open, as the web counts an open before the entry it reached. */
+    @Synchronized fun enteredInferred() {
+        open()
+        analytics.enteredInferred()
+    }
 
     private fun open(): Boolean {
         if (entry != Entry.Foreground) return false

@@ -45,6 +45,8 @@ class TrainViewModel private constructor(
     private var fix: Fix? = null
     private var previousHomeFix: Fix? = null
     private var openSnapshot: LastAnswer? = null
+    private var onBoardJob: Job? = null
+    private var onBoardFix: Fix? = null
     private var explicit = false
     private var generation = 0L
     private var answeredPair: String? = null
@@ -496,6 +498,7 @@ class TrainViewModel private constructor(
     private fun requestHomeFix() { if (data.useLocation) onSilentLocation?.invoke() }
     fun pause() {
         refreshLoop?.cancel(); refreshLoop = null; boardJob?.cancel(); pastPages.cancel(); focusJob?.cancel(); historyJob?.cancel(); realtimeJob?.cancel(); generation++
+        onBoardJob?.cancel()
         answeredPair = null
         mutable.value = mutable.value.copy(refreshing = false, distanceMetres = null, nearestStation = null)
         fix = null
@@ -974,10 +977,54 @@ class TrainViewModel private constructor(
         mutable.value = mutable.value.copy(distanceMetres = origin?.takeUnless { moving }
             ?.let { distanceMetres(value, it).takeIf { d -> d.isFinite() }?.roundToInt() })
         refresh()
+        if (inferred == null && moving) enterOnBoard(value, previous)
+    }
+
+    /** Rule 5: a fix at train speed between a saved trip's ends looks for the running service it matches. */
+    private fun enterOnBoard(value: Fix, previous: Fix?) {
+        val at = mutable.value.now
+        val candidates = onBoardRequests(data, at, value, previous, emptyMap())
+        if (candidates.isEmpty() || data.focus != null || onBoardJob?.isActive == true && onBoardFix == value) return
+        onBoardJob?.cancel()
+        onBoardFix = value
+        val modes = data.modes.toSet()
+        onBoardJob = viewModelScope.launch {
+            val cached = candidates.associate { it.trip to store.cached(it.from, it.to, modes)?.journeys.orEmpty() }
+            val running = supervisorScope {
+                onBoardRequests(data, at, value, previous, cached).map { request -> async { request.trip to runningServices(request, modes) } }.awaitAll()
+            }.toMap()
+            if (data.focus != null || !data.useLocation || mutable.value.screen != Screen.Home) return@launch
+            val match = inferOnBoard(data, at, value, previous, running.mapValues { it.value.journeys }, cached) ?: return@launch
+            val source = running.getValue(match.trip).sourceOf(match.journey) ?: return@launch
+            enterInferred(FocusedJourney(match.trip.tripId, match.trip.reverse, match.journey, source, pinned = false))
+            choosePrediction(); syncPersonal(); refresh()
+        }
+    }
+
+    private class RunningServices(val online: BoardData?, val timetable: BoardData?) {
+        val journeys = LinkedHashMap<String, Journey>().apply {
+            timetable?.journeys?.forEach { put(it.key, it) }
+            online?.journeys?.forEach { put(it.key, it) }
+        }.values.toList()
+        fun sourceOf(journey: Journey) = listOfNotNull(online, timetable).firstOrNull { board -> board.journeys.any { it.key == journey.key } }
+    }
+
+    /** Online first, merged with the offline timetable for the same window; either alone when the other fails. */
+    private suspend fun runningServices(request: OnBoardRequest, modes: Set<String>): RunningServices = supervisorScope {
+        val online = async {
+            try { api.departures(request.from, request.to, modes, request.at, data.maxTransfers, request.limit) }
+            catch (e: CancellationException) { throw e } catch (_: Exception) { null }
+        }
+        val timetable = async {
+            try { initialized.await(); planner.plan(request.from, request.to, request.at, modes, OnBoardTimetableLimit, data.offlineMaxTransfers) }
+            catch (e: CancellationException) { throw e } catch (_: Exception) { null }
+        }
+        RunningServices(online.await(), timetable.await())
     }
     private fun enterInferred(focus: FocusedJourney) {
         data = data.copy(focus = focus)
         resetArrivalTracking(); persist(); ensureArrivalMonitoring()
+        metrics.enteredInferred()
     }
 
     /** Stopping a guessed trip declines it, so the same guess cannot come straight back. */
@@ -1157,7 +1204,7 @@ class TrainViewModel private constructor(
     }
     override fun setUseLocation(enabled: Boolean) {
         data = data.copy(useLocation = enabled)
-        if (!enabled) { cancelSetupLocation(); stopArrivalMonitoring(clearWindow = true); fix = null; previousHomeFix = null; mutable.value = mutable.value.copy(distanceMetres = null, nearestStation = null) }
+        if (!enabled) { cancelSetupLocation(); stopArrivalMonitoring(clearWindow = true); onBoardJob?.cancel(); fix = null; previousHomeFix = null; mutable.value = mutable.value.copy(distanceMetres = null, nearestStation = null) }
         persist(); syncPersonal(); if (enabled) { onLocationRequest?.invoke(); ensureArrivalMonitoring() } else { onLocationDisabled?.invoke(); choosePrediction(); refresh() }
     }
     override fun setJourneyAlerts(enabled: Boolean) {
