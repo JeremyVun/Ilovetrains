@@ -289,6 +289,12 @@ authoritative for future services, including an empty answer, while recent
 departed services remain available for scrolling. Retained past rows are
 bounded to 24 hours and never cross station-pair or enabled-mode cache keys.
 
+A board's local plan is two timetable plans merged by journey key: the next 24
+departures from now, and 24 from 15 minutes earlier for the services that just
+left (owner ruling 24, 2026-10-02). A single plan from 15 minutes earlier
+filled with departed services on a busy corridor, Central–Parramatta at 08:00,
+and offered no train to take.
+
 The native cache stores an optional `homeJourneyKey`. Offline Home preserves
 that answer, even after departure, until its last-known arrival plus 30 minutes.
 This does not pin the train, infer boarding or record a ride. A fresh online
