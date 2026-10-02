@@ -249,9 +249,13 @@ class TravelTrackerIntegrationTest {
         shell("input keyevent HOME")
         stop.actionIntent.send()
         waitUntil("Stop trip did not end the trip") { model.state.value.focus == null && trackerNotification() == null }
+        // Earlier tracker tests leave saved trips on the same pair; the decline names one of them.
         waitUntil("the stop did not persist its decline") {
-            runBlocking { DeviceStore(context).load().inferenceDeclined }?.let {
-                it.tripId == started.tripId && !it.reverse && it.departure == started.journey.departureKey
+            val saved = runBlocking { DeviceStore(context).load() }
+            saved.inferenceDeclined?.let { decline ->
+                !decline.reverse && decline.departure == started.journey.departureKey && saved.trips.any {
+                    it.id == decline.tripId && it.from.id == started.board.from.id && it.to.id == started.board.to.id
+                }
             } == true
         }
         SystemClock.sleep(1_500)
