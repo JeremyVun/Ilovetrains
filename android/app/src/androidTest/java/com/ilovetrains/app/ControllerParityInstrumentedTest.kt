@@ -257,7 +257,7 @@ class ControllerParityInstrumentedTest {
             focus = FocusedJourney(primaryTrip.id, false, journey, board, pinned = false),
             useLocation = true,
         ))
-        model.attachActivity(Any(), {}, {}, {}, { beforeStart -> beforeStart(); true }, {})
+        model.attachActivity(Any(), {}, {}, {}, {}, { beforeStart -> beforeStart(); true }, {}, {})
         model.activityResumed()
         model.permission(granted = true, denied = false)
         withTimeout(10_000) { model.state.first { it.ready } }
@@ -279,7 +279,7 @@ class ControllerParityInstrumentedTest {
             useLocation = true,
         ))
         var stopCalls = 0
-        model.attachActivity(Any(), {}, {}, { stopCalls++ }, { beforeStart -> beforeStart(); true }, {})
+        model.attachActivity(Any(), {}, {}, { stopCalls++ }, {}, { beforeStart -> beforeStart(); true }, { stopCalls++ }, {})
         model.activityResumed()
         model.permission(granted = true, denied = false)
         assertTrue(model.state.value.focus?.arrivalGuard?.armed == true)
@@ -320,7 +320,7 @@ class ControllerParityInstrumentedTest {
             focus = FocusedJourney(primaryTrip.id, false, journey, board,
                 arrivalGuard = ArrivalGuard(armed = true, retainedAt = now - 10_800_000))))
         assertNotNull("expired focus disappeared before the resume lookup", model.state.value.focus)
-        model.attachActivity(Any(), {}, {}, {}, { beforeStart -> beforeStart(); true }, {})
+        model.attachActivity(Any(), {}, {}, {}, {}, { beforeStart -> beforeStart(); true }, {}, {})
         model.activityResumed()
         model.permission(true, false)
         model.arrivalLocation(Fix(primaryTrip.from.lat, primaryTrip.from.lon, System.currentTimeMillis(), 10.0, 20.0))
@@ -339,7 +339,7 @@ class ControllerParityInstrumentedTest {
                 arrivalGuard = ArrivalGuard(basis = ArrivalBasis.Estimate)),
             rides = listOf(Ride(primaryTrip.id, false, journey.departure, journey.effectiveArrival))))
         var starts = 0
-        model.attachActivity(Any(), {}, {}, {}, { beforeStart -> starts++; beforeStart(); true }, {})
+        model.attachActivity(Any(), {}, {}, {}, {}, { beforeStart -> starts++; beforeStart(); true }, {}, {})
         model.activityResumed()
         model.permission(true, false)
         withTimeout(10_000) { model.state.first { it.ready } }

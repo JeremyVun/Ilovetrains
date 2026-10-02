@@ -6,7 +6,9 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.*
 
-data class Fix(val lat: Double, val lon: Double, val at: Long, val speed: Double? = null, val accuracyMetres: Double? = null)
+/** [bearing] is degrees clockwise from true north, null when the provider reported none. */
+data class Fix(val lat: Double, val lon: Double, val at: Long, val speed: Double? = null, val accuracyMetres: Double? = null,
+    val bearing: Double? = null)
 data class Selection(val tripId: String, val reverse: Boolean, val receipt: String? = null, val kind: HeaderKind = HeaderKind.Predicted)
 fun distanceMetres(a: Fix, b: Station): Double {
     if (b.lat == 0.0 && b.lon == 0.0) return Double.POSITIVE_INFINITY

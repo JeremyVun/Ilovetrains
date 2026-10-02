@@ -16,8 +16,10 @@ const val FEEDBACK_ENDPOINT = "https://analytics.jeremyvun.com/feedback"
 
 class TransitApi(baseUrl: String = BuildConfig.API_BASE, private val feedbackUrl: String = FEEDBACK_ENDPOINT) {
     val baseUrl = baseUrl.trimEnd('/')
-    suspend fun departures(from: Station, to: Station, modes: Set<String>, at: Long? = null, transferLimit: Int? = null): BoardData = withContext(Dispatchers.IO) {
-        val args = linkedMapOf("from" to from.id, "to" to to.id, "limit" to "10", "modes" to modes.sorted().joinToString(","))
+    suspend fun departures(from: Station, to: Station, modes: Set<String>, at: Long? = null, transferLimit: Int? = null,
+                           limit: Int = 10): BoardData = withContext(Dispatchers.IO) {
+        require(limit in 1..10)
+        val args = linkedMapOf("from" to from.id, "to" to to.id, "limit" to limit.toString(), "modes" to modes.sorted().joinToString(","))
         at?.let { args["at"] = Instant.ofEpochMilli(it).toString() }
         transferLimit?.let { args["transferLimit"] = it.toString() }
         val query = args.entries.joinToString("&") { "${it.key}=${URLEncoder.encode(it.value, "UTF-8")}" }

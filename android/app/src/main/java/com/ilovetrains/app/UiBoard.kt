@@ -9,12 +9,17 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -45,18 +50,27 @@ fun BoardScreen(state: AppState, actions: UiActions) {
         val past = remember(visibleJourneys, state.now) { visibleJourneys.filter { it.effectiveDeparture < state.now } }
         val future = remember(visibleJourneys, state.now) { visibleJourneys.filter { it.effectiveDeparture >= state.now } }
         val listState = rememberLazyListState(initialFirstVisibleItemIndex = past.size)
-        val hasPast = rememberUpdatedState(past.isNotEmpty())
+        val currentActions by rememberUpdatedState(actions)
         LaunchedEffect(listState, board.from.id, board.to.id) {
-            snapshotFlow { listState.firstVisibleItemIndex to hasPast.value }.distinctUntilChanged()
-                .filter { (index, available) -> index == 0 && available }
-                .collect { actions.earlier() }
+            snapshotFlow { listState.firstVisibleItemIndex == 0 }.distinctUntilChanged()
+                .filter { it }
+                .collect { currentActions.earlier() }
         }
-        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState) {
+        // A drag past the top asks again, so a failed page can be retried where the list already rests.
+        val pullAtTop = remember {
+            object : NestedScrollConnection {
+                override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                    if (available.y > 0f && source == NestedScrollSource.UserInput) currentActions.earlier()
+                    return Offset.Zero
+                }
+            }
+        }
+        LazyColumn(Modifier.weight(1f).fillMaxWidth().nestedScroll(pullAtTop).testTag("board-list"), state = listState) {
             items(past, key = { it.key }) { journey ->
                 BoardRow(journey, board, state.now, onClick = { actions.openJourney(journey) })
             }
             item(key = "now") {
-                Column(Modifier.fillMaxWidth().height(32.dp).padding(horizontal = PagePadding)) {
+                Column(Modifier.fillMaxWidth().height(32.dp).testTag("board-now").padding(horizontal = PagePadding)) {
                     Label("Now · ${clockTime(state.now)}", Modifier.padding(top = 9.dp), color = c.ink, size = 11)
                 }
             }
