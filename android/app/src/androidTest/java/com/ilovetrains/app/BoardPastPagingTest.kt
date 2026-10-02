@@ -30,9 +30,12 @@ import java.lang.reflect.Proxy
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.URLDecoder
+import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.UUID
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -87,6 +90,7 @@ class BoardPastPagingTest {
         HeldPastPages(page).use { server ->
             val model = open(TransitApi("http://127.0.0.1:${server.port}"), gap)
             assertTrue("the online page is held", server.awaitHeld())
+            assertEquals("the first past page starts 30 minutes ago", gap.now - 30 * minute, server.pastWindows.first())
             repeat(3) {
                 instrumentation.runOnMainSync { model.refresh() }
                 compose.waitUntil(5_000) { !model.state.value.refreshing }
@@ -194,6 +198,7 @@ class BoardPastPagingTest {
         private val server = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
         private val held = CountDownLatch(1)
         private val released = CountDownLatch(1)
+        val pastWindows = CopyOnWriteArrayList<Long>()
         val port = server.localPort
         private val acceptor = thread(isDaemon = true) {
             while (!server.isClosed) {
@@ -206,8 +211,13 @@ class BoardPastPagingTest {
             val reader = socket.getInputStream().bufferedReader()
             val request = reader.readLine().orEmpty()
             while (!reader.readLine().isNullOrEmpty()) Unit
-            val past = request.contains("/api/v1/departures?") && request.contains("&at=")
-            if (past) { held.countDown(); released.await(30, TimeUnit.SECONDS) }
+            val at = Regex("[?&]at=([^& ]+)").find(request)?.groupValues?.get(1)
+            val past = request.contains("/api/v1/departures?") && at != null
+            if (past) {
+                pastWindows += Instant.parse(URLDecoder.decode(at, "UTF-8")).toEpochMilli()
+                held.countDown()
+                released.await(30, TimeUnit.SECONDS)
+            }
             val (status, text) = if (past) "200 OK" to body else "503 Service Unavailable" to "{}"
             val bytes = text.toByteArray()
             socket.getOutputStream().write(("HTTP/1.1 $status\r\nContent-Type: application/json\r\n" +
