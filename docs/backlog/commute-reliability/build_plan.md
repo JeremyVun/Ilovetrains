@@ -448,6 +448,13 @@ Gate: the `visual-regression` skill for every affected screen on web,
 Android and iOS, with every reported difference judged from its composite.
 The lead then checks a handful of frames against the exemplar.
 
+Split per client after the context overruns (lead's decision, 2026-10-02).
+4a is the web, run beside the Fable review on `cr-web`: the experiment removal,
+the line, the words, the stopped-state removal, ruling 21, the commute-feedback
+recapture and the line exemplars. 4b (Android) and 4c (iOS, including the
+Live Activity button and its exemplar) follow, briefed from 4a's report and in
+parallel through the gate lock.
+
 Done marker: `Phase 4 done: <commit>`.
 
 ## Phase 5 — Full gates, closeout, release
