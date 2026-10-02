@@ -16,11 +16,20 @@ fun compareRecommendations(first: Journey, second: Journey): Int {
     compareValues(left.changes, right.changes).takeIf { it != 0 }?.let { return it }
     compareValues(left.arrival, right.arrival).takeIf { it != 0 }?.let { return it }
     compareValues(left.departure, right.departure).takeIf { it != 0 }?.let { return it }
-    for (index in 0 until minOf(left.identity.size, right.identity.size)) {
-        compareCodePoints(left.identity[index].first, right.identity[index].first).takeIf { it != 0 }?.let { return it }
-        compareValues(left.identity[index].second, right.identity[index].second).takeIf { it != 0 }?.let { return it }
+    return compareIdentity(left.identity, right.identity)
+}
+
+/** The stable order of journeys by every service leg's line and scheduled departure. */
+fun compareJourneyIdentity(first: Journey, second: Journey): Int = compareIdentity(identity(first), identity(second))
+
+private fun identity(journey: Journey) = journey.legs.map { it.line to it.departure }
+
+private fun compareIdentity(left: List<Pair<String, Long>>, right: List<Pair<String, Long>>): Int {
+    for (index in 0 until minOf(left.size, right.size)) {
+        compareCodePoints(left[index].first, right[index].first).takeIf { it != 0 }?.let { return it }
+        compareValues(left[index].second, right[index].second).takeIf { it != 0 }?.let { return it }
     }
-    return compareValues(left.identity.size, right.identity.size)
+    return compareValues(left.size, right.size)
 }
 
 fun selectRecommendation(
@@ -100,7 +109,7 @@ private fun recommendationTuple(journey: Journey): RecommendationTuple? {
     val changes = journey.legs.size - 1
     val penalty = runCatching { Math.multiplyExact(changes.toLong(), TransferPenaltyMillis) }.getOrNull() ?: return null
     val cost = runCatching { Math.addExact(arrival, penalty) }.getOrNull() ?: return null
-    return RecommendationTuple(cost, changes, arrival, departure, journey.legs.map { it.line to it.departure })
+    return RecommendationTuple(cost, changes, arrival, departure, identity(journey))
 }
 
 private fun firstServiceIdentity(journey: Journey): Pair<String, Long>? = journey.legs.firstOrNull()?.let { it.line to it.departure }

@@ -74,6 +74,17 @@ class TripDeletionTest {
         assertEquals(resaved, resaved.restore(pending))
     }
 
+    @Test fun deletingTheTripDeletesItsDeclineAndUndoRestoresIt() {
+        val decline = InferenceDecline("work", false, now, journey.departureKey, journey.effectiveArrival)
+        val declined = data.copy(inferenceDeclined = decline)
+        val (remaining, pending) = requireNotNull(declined.beginDeletion("work"))
+        assertNull(remaining.inferenceDeclined)
+        assertEquals(decline, remaining.restore(pending).inferenceDeclined)
+        assertEquals(decline, requireNotNull(declined.beginDeletion("beach")).first.inferenceDeclined)
+        val newer = decline.copy(tripId = "shops")
+        assertEquals("a decline written in between stays", newer, remaining.copy(inferenceDeclined = newer).restore(pending).inferenceDeclined)
+    }
+
     @Test fun deletionMessageUsesShortStationNames() {
         assertEquals("Central → Parramatta deleted", deletionMessage(work))
     }

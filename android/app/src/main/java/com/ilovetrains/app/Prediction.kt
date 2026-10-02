@@ -110,20 +110,22 @@ fun historyReceipt(history: List<ViewEvent>, id: String, reverse: Boolean, now: 
     if (historyEvidence(history, id, reverse, now).receiptDays < 3) return null
     return if (n.dayOfWeek.value < 6 && n.hour < 12) "You check this trip most weekday mornings." else "You often check this trip around now."
 }
+/** Travel mode from the platform-sighted [UserData.lastAnswer]: under way, seen at its origin, and moved the way it goes. */
 fun inferredFocus(data: UserData, fix: Fix, now: Long): FocusedJourney? {
     if (!data.useLocation || data.focus != null || now - fix.at !in 0..300_000) return null
     val last = data.lastAnswer ?: return null
     val trip = data.trips.find { it.id == last.tripId } ?: return null
     if (!compatible(trip, data.modes) || last.journey.legs.any { it.mode !in data.modes }) return null
-    val from = if (last.reverse) trip.to else trip.from; val to = if (last.reverse) trip.from else trip.to
+    val (from, to) = trip.ends(last.reverse)
     val j = last.journey
-    if (data.rides.any { it.tripId == trip.id && it.reverse == last.reverse && it.departure == j.departure }) return null
-    if (now !in j.effectiveDeparture..(j.effectiveArrival + 1_800_000) || last.stationId != from.id || j.effectiveDeparture - last.at !in 0..900_000) return null
+    if (rideRecorded(data, trip.id, last.reverse, j)) return null
+    if (now !in j.effectiveDeparture..(j.effectiveArrival + TravelLateMillis) || last.stationId != from.id ||
+        j.effectiveDeparture - last.at !in 0..TravelSeenMillis) return null
     val left = distanceMetres(fix, from)
-    val span = distanceMetres(Fix(from.lat, from.lon, now), to)
+    val span = distanceMetres(from, to)
     if (!left.isFinite() || !span.isFinite()) return null
-    val toward = left >= 1000 && distanceMetres(fix, to) <= span - 1000
-    val fast = (fix.speed ?: 0.0) >= 8 && left >= 200
+    val toward = left >= TravelMovedMetres && distanceMetres(fix, to) <= span - TravelMovedMetres
+    val fast = (fix.speed ?: 0.0) >= TrainSpeedMps && left >= TravelSpeedMovedMetres
     return if (toward || fast) FocusedJourney(trip.id, last.reverse, j, last.board, false) else null
 }
 

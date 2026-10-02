@@ -10,9 +10,12 @@ principles.
 
 Android's `personal-v1.json` is an atomically replaced schema-version-1 file
 in private app storage. It contains saved trips, history, completed rides,
-daily home votes, recent stations, preferences, the last answer and the full
-focused journey with its source evidence. The Kotlin `Wire` adapter owns its
-explicit encoding; it accepts API ISO timestamps and stores epoch milliseconds.
+daily home votes, recent stations, preferences, the last answer, the full
+focused journey with its source evidence and the one `inferenceDeclined`
+record (its direction as `reverse`, like every other Android record, and
+`departure` as the first service leg's `line:scheduledEpochMs`). The Kotlin
+`Wire` adapter owns its explicit encoding; it accepts API ISO timestamps and
+stores epoch milliseconds.
 The focused service and its alternatives retain separate board sources in the
 personal document, so refreshing one cannot renew the other's freshness.
 Older documents without alternatives remain valid.

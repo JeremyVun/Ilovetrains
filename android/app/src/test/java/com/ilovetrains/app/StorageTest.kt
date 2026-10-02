@@ -33,6 +33,20 @@ class StorageTest {
         assertEquals(pageBody, restored.focus.board.recommendation?.source)
         assertTrue(restored.modes.isEmpty())
     }
+    @Test fun theInferenceDeclineSurvivesRestartAndAMalformedOneDropsAlone() {
+        val a = Station("a", "A"); val b = Station("b", "B")
+        val decline = InferenceDecline("t", true, 1_790_806_200_000, "T9:1790805600000", 1_790_807_220_000)
+        val data = UserData(trips = listOf(SavedTrip("t", a, b)), inferenceDeclined = decline)
+        val written = Wire.user(data)
+        assertEquals(setOf("tripId", "reverse", "at", "departure", "arrival"), written.getJSONObject("inferenceDeclined").keys().asSequence().toSet())
+        assertEquals(data, Wire.user(JSONObject(written.toString())))
+        for (field in listOf("tripId", "reverse", "at", "departure", "arrival")) {
+            val broken = JSONObject(written.toString()).apply { getJSONObject("inferenceDeclined").remove(field) }
+            assertEquals(field, data.copy(inferenceDeclined = null), Wire.user(broken))
+        }
+        val wrongType = JSONObject(written.toString()).apply { getJSONObject("inferenceDeclined").put("reverse", "true") }
+        assertNull(Wire.user(wrongType).inferenceDeclined)
+    }
     @Test fun recoveryRecordSurvivesRestartAndAMalformedOneDropsAlone() {
         val a = Station("a", "A"); val b = Station("b", "B"); val c = Station("c", "C")
         val followed = Journey(listOf(
