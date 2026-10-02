@@ -645,3 +645,55 @@ pass on main.
   may be running). Any UI test that stops a started trip and then expects a
   guess will now meet the decline.
 - The median lookback's lower-end limit is accepted (design rule 5).
+
+Phase 4b done: `d3eeb32` on `cr-android4`, merged into main.
+- Gates and visual regression:
+  - `tools/build-android.sh` passes with 283 JVM tests.
+  - `UiCalibrationTest` and `CommuteReliabilityControllerTest` pass on the
+    baseline-matching AVD. That AVD is a no-cutout Pixel profile at 1024×2216
+    and 420 dpi with gesture navigation, documented in `tools/README.md`.
+  - Run `/tmp/ilt-cr-a4b/vr1` accepted 48 frames, each judged.
+  - `setup-location-*` is flaky with keyboard timing at base.
+- The lead checked the 412 line against the exemplar (within about 1 dp,
+  inks exact), the startable and started states, the notification shade's
+  Stop trip action, and the 360 cut-off that became ruling 25.
+- Readings:
+  - Material glyphs are drawn at 16.5/15 dp in an 11 dp slot to match the
+    exemplar's visible size.
+  - The Android trip-over offer never said "You've arrived", so ruling 21
+    needed no copy change. iOS is the same.
+- The widget showed `PINNED`; it now shows the service status.
+- Left stale: `assets/comps/latest/widgets/android/*-riding-*` still show
+  `PINNED`. No Android widget shooter exists, so recapturing means placing the
+  widget by hand. API 35 tracker cards are not recaptured.
+
+Phase 4c done: `1918694` on `cr-ios4`, merged into main as `c564d35`.
+- Gates:
+  - `tools/build-ios.sh --unit` passes with 310 tests.
+  - `--ui AppFlowTests` passes 10, and the pin-row tests now pick an upcoming
+    row on purpose.
+  - `--ui TravelTrackerFlowTests` passes, including the new
+    `testLiveActivityStopTripEndsTheTrip`, which taps the real Notification
+    Center button.
+- Visual regression `/tmp/ilt-cr-ios4-vr1` accepted 15 DIFF and 5 NEW, and
+  `-vr-tracker` accepted 20 cards. The iOS tracker baselines and exemplars are
+  tracked for the first time.
+- The lead checked:
+  - the guessed and startable-light Home frames;
+  - the Live Activity card against `la-card-ride-dark`, a near pixel match;
+  - the expanded island's round stop button.
+- Left stale: `assets/comps/latest/widgets/ios/*-riding-*` still show
+  `PINNED`. They need the signed widget drive (`seed-ios-widget.py`).
+- At merge, the `tools/visual-regression.js` rows were combined across
+  platforms, and `ui.md`'s widget bullet took the iOS wording.
+
+Phase 4d, narrow margins (ruling 25). Android and iOS move to an 18 dp/pt page
+margin at 375 and narrower, on every screen; 390 and above are unchanged.
+- Android `PagePadding` (`UiCommon.kt:40`) becomes width-dependent.
+- iOS gets the same rule, and 4c's `minimumScaleFactor(0.9)` stopgap and its
+  `ios-deviations.md` note go.
+- Each runs on its own branch from main through the gate lock.
+- Verify at 360×780 (Android, the baseline AVD class) and on simulator
+  `ilt-cr-ios-se`, an iPhone SE (3rd generation) at 375×667 on iOS 26.4, UDID
+  `445F55E5-2C4E-441F-849C-BFE6FC73E589`, created for 4d iOS. Compare against
+  the 360 and 375 exemplars. Visual regression at 390/402 must stay unchanged.
