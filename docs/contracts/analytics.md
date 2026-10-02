@@ -107,8 +107,8 @@ Setup is a separate answer kind with setup-specific events.
 Android and iOS send `opened`, `shown_<kind>`, `hit_<kind>`, `miss_<kind>`,
 `pinned_<kind>`, `rode_pin`, `rode_auto`, `entered_inferred` and
 `declined_inferred` under the same rules. Setup, location-panel, `back_*` and
-`change_inferred` events are web-only. Native derives the kind as the web does: a visible focus is
-`inferred` or `focus` by its `by`; a trip home saved automatically from here
+`change_inferred` events are web-only. Native derives the kind as the web does:
+a visible focus is `inferred` or `focus` by its `by`; a trip home saved automatically from here
 during this open is `pair` while it is the answer; with no station here the
 answer is `predicted`; with a station here, the homeward candidate chosen
 without a habit or location winner is `home`, and any other answer is
@@ -124,8 +124,8 @@ an equal identity key (every service leg's line and scheduled departure:
 and direction with another key. A same-trip pin when home displayed no lead
 journey emits nothing. Each start emits at most once; stopping a trip the
 rider started emits nothing, and stopping a guessed trip emits only
-`declined_inferred`. `rode_*` never fires for a correction of an existing ride or a legacy
-ride restored by migration; a withdrawn estimate ride recorded again counts
+`declined_inferred`. `rode_*` never fires for a correction of an existing ride
+or a legacy ride restored by migration; a withdrawn estimate ride recorded again counts
 again.
 
 Explicit selection is browsing and emits no new home `shown_*`. Returning

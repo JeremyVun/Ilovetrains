@@ -46,9 +46,9 @@ zone.
   detail.
 - `Pin this train` on journey detail and a running board row are the controls
   that start a trip on a journey. Each returns home and follows that service
-  in the smart header; directions begin when it departs. Tapping `Pinned` on home or `Unpin this
-  train` in detail clears the explicit pin and returns to the ordinary home
-  answer for that trip. The board never shows a separate focus strip.
+  in the smart header; directions begin when it departs. Tapping `Pinned` on
+  home or `Unpin this train` in detail clears the explicit pin and returns to
+  the ordinary home answer for that trip. The board never shows a separate focus strip.
 - An explicitly pinned journey has an `Unpin this train` (or ferry) action
   rail, including when cancelled. Other cancelled or inferred journeys carry
   no action rail; the back control is the way out.
