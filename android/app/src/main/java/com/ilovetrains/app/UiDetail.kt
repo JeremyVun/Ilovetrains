@@ -135,7 +135,9 @@ private fun JourneySteps(journey: Journey, now: Long, finalDone: Boolean, recove
                         platformText(before.toPlatform, before.mode)?.let { LineChip(before.line, before.mode, it) }
                         Label("Get off  →", Modifier.padding(start = 7.dp, end = 7.dp, top = 3.dp), color = if (wait < 5) c.warning else c.ink3)
                         platformText(after.fromPlatform, after.mode)?.let { LineChip(after.line, after.mode, it) }
+                        // The web keeps a ferry side whole (`.dside` nowrap).
                         val boardingPlace = platformText(after.fromPlatform, after.mode, full = true)
+                            ?.replace("Side ", "Side\u00A0", ignoreCase = true)
                         Label("Board ${after.line} · ${after.headsign}${boardingPlace?.let { " · $it" } ?: ""}",
                             Modifier.padding(start = 7.dp, top = 3.dp).weight(1f),
                             color = if (wait < 5) c.warning else c.ink3)
