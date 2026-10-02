@@ -48,8 +48,9 @@
   limit 10, reaching the services of the last half hour), a guarded trip
   reading `Checking arrival` through the 45 s evidence wait and then settling
   by estimate, a 9-minute return keeping the board while a 10-minute return
-  lands on Home, running-row starts and Stop trip (silent on a started trip,
-  declining a guessed one), Home left open through boarding, a platform
+  lands on Home, running-row starts and Stop trip (declining a started trip
+  silently and a guessed one with `declined_inferred`), Home left open
+  through boarding, a platform
   sighting after the shown train left retiring the open snapshot so boarding
   the next train enters it (`snapshot`, the adversarial review's real-stack
   probe, kept here as a permanent regression), and on-board entry. Each check

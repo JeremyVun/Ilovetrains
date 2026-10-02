@@ -333,7 +333,8 @@ async function checkReopen(base) {
 }
 
 /* Rule 6: a running row starts the trip at once, an upcoming row opens detail,
-   and Stop trip ends a started trip silently and declines a guessed one. */
+   and Stop trip declines a started trip silently (ruling 23) and a guessed one
+   with declined_inferred. */
 async function checkStart(base) {
   await withPage(async (page) => {
     await open(page, base, { now: at('23:20:00'), doc: documentWith(), hash: '#/board' });
@@ -359,8 +360,10 @@ async function checkStart(base) {
     if (result.started.by !== 'focus' || Date.parse(result.started.departure) !== at('23:18:00')) {
       throw new Error(`running row started ${JSON.stringify(result.started)}`);
     }
-    if (result.stopped.rides || result.stopped.declined || result.stopped.events.includes('declined_inferred')) {
-      throw new Error(`stopping a started trip left a trace: ${JSON.stringify(result.stopped)}`);
+    const declinedDeparture = result.stopped.declined && Date.parse(JSON.parse(result.stopped.declined.departure)[1]);
+    if (result.stopped.rides || result.stopped.declined?.tripId !== TRIP.id || result.stopped.declined.direction !== 'forward'
+        || declinedDeparture !== at('23:18:00') || result.stopped.events.includes('declined_inferred')) {
+      throw new Error(`stopping a started trip did not decline it silently: ${JSON.stringify(result.stopped)}`);
     }
     if (result.focusAfterDetail) throw new Error('opening an upcoming row started a trip');
     await shoot(page, 'start-upcoming-detail');
@@ -379,8 +382,8 @@ async function checkStart(base) {
     if (stopped.declined?.tripId !== TRIP.id || !stopped.events.includes('declined_inferred') || stopped.rides) {
       throw new Error(`stopping a guessed trip did not decline it: ${JSON.stringify(stopped)}`);
     }
-    console.log('PASS rule 6: running row started the 23:18; upcoming row opened detail; Stop trip silent on a '
-      + `started trip, declined_inferred and ${JSON.stringify(stopped.declined)} on a guessed one`);
+    console.log('PASS rule 6: running row started the 23:18; upcoming row opened detail; Stop trip declined a '
+      + `started trip silently, and sent declined_inferred and ${JSON.stringify(stopped.declined)} on a guessed one`);
   });
 }
 

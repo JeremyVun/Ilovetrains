@@ -5,7 +5,7 @@ import { predict, locate, scoreCandidate, historyEvidence, automaticHomeOf } fro
 import { here, sightingOf, trainSpeed } from '../web/js/stations.js';
 import {
   inferFromRecords, inferOnBoard, onBoardRequests, replacesLastOpen, retiresSnapshot, runningJourney, startable,
-  writeLastOpen
+  stoppedTrip, writeLastOpen
 } from '../web/js/focus.js';
 import { readFileSync } from 'node:fs';
 import { boardModel } from '../web/js/rowmodel.js';
@@ -470,6 +470,48 @@ for (const value of runningCases) {
   assert.equal(runningJourney(value.journey, value.nowMs, value.enabledModes || ['train', 'metro', 'ferry']), value.expectedRunning, value.name);
 }
 
+/* Stop trip (rule 6, ruling 23). A started focus's pair is its journey's first
+   service leg origin to its last service leg destination. */
+const stopFocus = (by, journey, { tripId = 'rt', direction = 'forward' } = {}) =>
+  ({ tripId, direction, focusedAt: sydney('07:55'), by, journey });
+const older = declined('rr', '07:30', t9('07:00', REDFERN));
+const unsaved = stopFocus('focus', t9('08:00', STRATHFIELD, { rideMinutes: 8 }), { tripId: 'rs' });
+const stopCases = [
+  { name: 'a guessed trip declines its own trip and direction and is reported',
+    focus: stopFocus('inferred', t9('08:00')), nowMs: ms('08:05'), expectedEvent: true,
+    expectedDecline: { tripId: 'rt', direction: 'forward', departure: '["T9","2026-10-01T08:00:00+10:00"]',
+      arrival: ms('08:27'), at: ms('08:05') } },
+  { name: 'a started trip on a saved pair declines that trip unreported, until its estimated arrival',
+    focus: stopFocus('focus', t9('08:00', TOWN_HALL, { lateMinutes: 4 })), nowMs: ms('08:05'), expectedEvent: false,
+    expectedDecline: { tripId: 'rt', direction: 'forward', departure: '["T9","2026-10-01T08:00:00+10:00"]',
+      arrival: ms('08:31'), at: ms('08:05') } },
+  { name: 'a started trip on the reverse of a saved pair declines that trip in reverse',
+    focus: stopFocus('focus', t9('17:52', RHODES, { from: TOWN_HALL }), { direction: 'reverse' }), nowMs: ms('18:00'),
+    expectedEvent: false,
+    expectedDecline: { tripId: 'rt', direction: 'reverse', departure: '["T9","2026-10-01T17:52:00+10:00"]',
+      arrival: ms('18:19'), at: ms('18:00') } },
+  { name: 'a started trip on an unsaved pair writes no decline', focus: unsaved, nowMs: ms('08:05'),
+    expectedEvent: false, expectedDecline: null },
+  { name: 'a started stop replaces an older decline', doc: commuteDoc({ inferenceDeclined: older }),
+    focus: stopFocus('focus', t9('08:00')), nowMs: ms('08:05'), expectedEvent: false,
+    expectedDecline: { tripId: 'rt', direction: 'forward', departure: '["T9","2026-10-01T08:00:00+10:00"]',
+      arrival: ms('08:27'), at: ms('08:05') } },
+  { name: 'a stop that writes no decline keeps the older one', doc: commuteDoc({ inferenceDeclined: older }),
+    focus: unsaved, nowMs: ms('08:05'), expectedEvent: false,
+    expectedDecline: { tripId: 'rr', direction: 'forward', departure: '["T9","2026-10-01T07:00:00+10:00"]',
+      arrival: ms('07:22'), at: ms('07:30') } },
+].map((value) => ({ name: value.name, doc: commuteDoc(), ...value }));
+for (const value of stopCases) {
+  const legs = value.focus.journey.legDetail;
+  const stopped = stoppedTrip({ ...value.doc, focus: value.focus }, value.focus,
+    { from: legs[0].from, to: legs[legs.length - 1].to }, value.nowMs);
+  const decline = stopped.doc.inferenceDeclined;
+  assert.equal(stopped.doc.focus, undefined, value.name);
+  assert.deepEqual(decline ? { ...decline, arrival: Date.parse(decline.arrival), at: Date.parse(decline.at) } : null,
+    value.expectedDecline, value.name);
+  assert.equal(stopped.declinedInferred, value.expectedEvent, value.name);
+}
+
 const inference = {
   description: 'commute-reliability rules 3, 5 and 6, shared by web, Android and iOS. Inputs are built by '
     + 'tools/export-android-conformance.mjs; every expected value is declared by hand from the design and only '
@@ -512,6 +554,19 @@ const inference = {
     run: 'A board row starts the trip at once when expectedRunning: D <= nowMs < A on effective times, not cancelled, '
       + 'and every service leg\'s mode enabled (enabledModes; null means all three) under the transfer cap.',
     cases: runningCases
+  },
+  stopCases: {
+    run: 'Stop trip at nowMs with focus as the document\'s focus. A guessed focus (by inferred) declines its own tripId '
+      + 'and direction. A started focus (by focus) declines the saved trip whose endpoints are the focus\'s pair, its '
+      + 'journey\'s first service leg from.id to its last service leg to.id (the board a native focus carries): '
+      + 'direction forward when trip.from -> trip.to is the pair, reverse when trip.to -> trip.from is; a pair no saved '
+      + 'trip has in either direction declines nothing. A written decline replaces doc.inferenceDeclined with tripId, '
+      + 'direction, departure (the web departureKey of the focus journey\'s first service leg), arrival (the focus '
+      + 'journey\'s effective arrival, estimated else scheduled, composed with any recovery) and at (nowMs); a stop that '
+      + 'writes none leaves doc.inferenceDeclined as it was. expectedDecline is doc.inferenceDeclined after the stop, '
+      + 'null when absent, with arrival and at as epoch ms. expectedEvent is whether declined_inferred is sent: only for '
+      + 'a guessed focus. Every stop also removes the focus and clears lastOpen and the open snapshot unconditionally.',
+    cases: stopCases
   }
 };
 writeFileSync(new URL('./fixtures/conformance/inference.json', import.meta.url), JSON.stringify(inference, null, 2) + '\n');

@@ -138,6 +138,26 @@ export function declineFocus(doc, focus, nowMs) {
   }, nowMs);
 }
 
+function savedLeg(doc, ends) {
+  if (!ends || !ends.from || !ends.to) return null;
+  for (const trip of doc.trips || []) {
+    const direction = DIRECTIONS.find((value) => {
+      const pair = leg(trip, value);
+      return pair.from.id === ends.from.id && pair.to.id === ends.to.id;
+    });
+    if (direction) return { tripId: trip.id, direction };
+  }
+  return null;
+}
+
+// Ruling 23: any stop on a saved pair declines it, or the next train-speed fix guesses a rider still riding back in.
+export function stoppedTrip(doc, focus, ends, nowMs) {
+  const guessed = focus.by === 'inferred';
+  const owner = guessed ? { tripId: focus.tripId, direction: focus.direction } : savedLeg(doc, ends);
+  const stopped = clearFocus(doc);
+  return { doc: owner ? declineFocus(stopped, { ...focus, ...owner }, nowMs) : stopped, declinedInferred: guessed };
+}
+
 // The window auto-start uses for "seen at the platform".
 export function startable(journey, nowMs) {
   const departure = departureMs(journey);

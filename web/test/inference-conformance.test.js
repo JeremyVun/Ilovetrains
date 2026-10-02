@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   inferFromRecords, inferOnBoard, onBoardRequests, replacesLastOpen, retiresSnapshot, runningJourney, startable,
-  writeLastOpen
+  stoppedTrip, writeLastOpen
 } from '../js/focus.js';
 import { trainSpeed } from '../js/stations.js';
 
@@ -50,4 +50,17 @@ for (const value of fixture.startCases.cases) {
 for (const value of fixture.runningCases.cases) {
   test(`running row: ${value.name}`, () => assert.equal(
     runningJourney(value.journey, value.nowMs, value.enabledModes || ['train', 'metro', 'ferry']), value.expectedRunning));
+}
+
+for (const value of fixture.stopCases.cases) {
+  test(`stop trip: ${value.name}`, () => {
+    const legs = value.focus.journey.legDetail;
+    const stopped = stoppedTrip({ ...value.doc, focus: value.focus }, value.focus,
+      { from: legs[0].from, to: legs[legs.length - 1].to }, value.nowMs);
+    const decline = stopped.doc.inferenceDeclined;
+    assert.equal(stopped.doc.focus, undefined);
+    assert.deepEqual(decline ? { ...decline, arrival: Date.parse(decline.arrival), at: Date.parse(decline.at) } : null,
+      value.expectedDecline);
+    assert.equal(stopped.declinedInferred, value.expectedEvent);
+  });
 }

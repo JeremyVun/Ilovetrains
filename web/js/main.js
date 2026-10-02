@@ -13,7 +13,7 @@ import {
   focusOf, visibleFocus, setFocus, clearFocus, isFocused, focusExpired, matchJourney,
   applyFocusSnapshot, applyArrivalResult, composedJourney, recoveryModel, recoveryOf,
   inferFromRecords, inferOnBoard, onBoardRequests, writeLastOpen, retiresSnapshot, tickNeedsFix,
-  declineFocus, runningJourney, startable, journeyCancelled, pinResult, rideAdded, rideRecorded,
+  stoppedTrip, runningJourney, startable, journeyCancelled, pinResult, rideAdded, rideRecorded,
   TRAVEL_LATE_MS
 } from './focus.js';
 import * as Board from './board.js';
@@ -1527,11 +1527,10 @@ function renderDetail() {
 function stopTrip() {
   const focus = focusOf(state.doc);
   if (!focus) return;
-  const guessed = focus.by === 'inferred';
-  const stopped = forgetLastOpen(clearFocus(state.doc));
-  // Declined, so the same guess cannot come straight back.
-  ctx.update(guessed ? declineFocus(stopped, focus, now()) : stopped);
-  if (guessed) analytics.track('declined_inferred');
+  const trip = findTrip(state.doc, focus.tripId);
+  const stopped = stoppedTrip(state.doc, focus, trip && leg(trip, focus.direction), now());
+  ctx.update(forgetLastOpen(stopped.doc));
+  if (stopped.declinedInferred) analytics.track('declined_inferred');
   if (focusInflight) focusInflight.abort();
   focusInflight = null;
   if (recoveryInflight) recoveryInflight.abort();

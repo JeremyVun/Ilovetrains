@@ -235,14 +235,14 @@ read/write atomic and migration simple):
   has left the live board. Preference-caused recomputation does not rewrite
   it; the next independent refresh resumes normal recording. Its writers are
   subject to the hold rule under "Travel mode". Deleting the trip deletes it.
-- `inferenceDeclined` is optional and holds the one guessed trip the rider
-  stopped (see "Stop trip" under "Focused journey"): the saved trip and
-  direction, when it was stopped, the declined journey's `departureKey` (its
-  first service leg's line name and scheduled departure) and that journey's
-  effective arrival when it was stopped. The arrival is what lets the decline
-  outlast a long ride. A new decline replaces it, deleting the trip deletes it,
-  and a malformed record is dropped. Native documents keep the same fields in
-  their own time encoding.
+- `inferenceDeclined` is optional and holds the one stopped trip that belongs
+  to a saved trip, started or guessed (see "Stop trip" under "Focused
+  journey"): the saved trip and direction, when it was stopped, the declined
+  journey's `departureKey` (its first service leg's line name and scheduled
+  departure) and that journey's effective arrival when it was stopped. The
+  arrival is what lets the decline outlast a long ride. A new decline replaces
+  it, deleting the trip deletes it, and a malformed record is dropped. Native
+  documents keep the same fields in their own time encoding.
 - `locationAsk` is optional and holds only the time the user last declined the
   location panel. Absence means never declined; a malformed value is dropped,
   not repaired.
@@ -446,19 +446,31 @@ The document may contain an optional `focus` field for a pinned or inferred serv
   itself keeps its arrival metadata and only changes `by` to `"focus"`.
 - **Stop trip** ends any trip mode, started or guessed, without deleting the
   saved trip and without writing a ride. It clears the in-memory followed
-  source, the persisted `lastOpen` evidence and the open snapshot so a
-  subsequent fix cannot immediately restore the released journey, and stops
-  arrival monitoring and the tracker session. Stopping is not a trip choice: a
+  source, and clears the persisted `lastOpen` evidence and the open snapshot
+  unconditionally, whatever journey they name, so a subsequent fix cannot
+  immediately restore the released journey. It stops arrival monitoring and
+  the tracker session. Stopping is not a trip choice: a
   Home that shows the stop answers again from the prediction, where the phone
   is now, rather than holding the stopped trip and direction as an explicit
-  selection. On a guessed trip it also writes `inferenceDeclined`: while it is
-  active, no inferred entry (platform or on-board) happens for that saved trip
-  in either direction until the later of `at + 60 min` and the declined
-  journey's arrival + 30 min, and the declined departure is never inferred
-  again for that trip, however late it runs. The hour exists because a car
-  following the line would otherwise be matched to the next train along one
-  fix later. A rider who stopped by mistake restarts with Start trip or a
-  running row; there is no undo. Accepting the return offer clears completed
+  selection. It also writes `inferenceDeclined` for any stopped trip that
+  belongs to a saved trip, started or guessed (owner ruling 23, 2026-10-02):
+  otherwise a rider who stops a trip they started while still riding is
+  guessed back in by the next train-speed fix. A guessed focus names its saved
+  trip and direction. A started focus belongs to the saved trip whose endpoints
+  match its pair in either direction: `forward` when the trip runs from the
+  pair's origin, `reverse` when it runs from the pair's destination. A started
+  trip on a pair no saved trip has writes none and leaves any earlier decline
+  in place. The decline names that trip and direction, the focus journey's
+  `departureKey` and its composed effective arrival when stopped. Only a
+  guessed stop sends `declined_inferred` ([analytics.md](analytics.md)). While
+  the decline is active, no inferred entry (platform or on-board) happens for
+  that saved trip in either direction until the later of `at + 60 min` and the
+  declined journey's arrival + 30 min, and the declined departure is never
+  inferred again for that trip, however late it runs. The hour exists because
+  a car following the line would otherwise be matched to the next train along
+  one fix later. A rider who stopped by mistake restarts with Start trip or a
+  running row; there is no undo. `inference.json` `stopCases` carries the
+  decision. Accepting the return offer clears completed
   focus. Completed or never-guarded focus
   expires at effective arrival plus 30 minutes; unresolved armed focus follows
   the later retention deadline in the final-arrival contract below.
