@@ -41,7 +41,8 @@ final class ReviewCommuteReliabilityControllerTests: XCTestCase {
 
         model.receiveLocation(Fix(at: (origin.lat, origin.lon), time: clock.now, speed: 0))
         try await until { await store.load().lastAnswer?.stationId == self.origin.id }
-        let seen = try XCTUnwrap(await store.load().lastAnswer)
+        let afterSighting = await store.load()
+        let seen = try XCTUnwrap(afterSighting.lastAnswer)
         let departure = seen.journey.effectiveDeparture
 
         // A quick app switch a minute before the train: the return (not a new open) snapshots the stored record.
@@ -49,7 +50,8 @@ final class ReviewCommuteReliabilityControllerTests: XCTestCase {
         clock.now = departure - 60_000
         model.resume()
         try await refreshWritten(model, store)
-        XCTAssertEqual(await store.load().lastAnswer?.journey.key, seen.journey.key, "the return's refresh keeps the platform record")
+        let afterReturn = await store.load()
+        XCTAssertEqual(afterReturn.lastAnswer?.journey.key, seen.journey.key, "the return's refresh keeps the platform record")
 
         // Seventy seconds after it left, the rider is still on the platform.
         clock.now = departure + 70_000
@@ -59,7 +61,8 @@ final class ReviewCommuteReliabilityControllerTests: XCTestCase {
             let stored = await store.load().lastAnswer
             return stored?.journey.key != seen.journey.key && stored?.stationId == self.origin.id
         }
-        let next = try XCTUnwrap(await store.load().lastAnswer)
+        let afterSecondSighting = await store.load()
+        let next = try XCTUnwrap(afterSecondSighting.lastAnswer)
         XCTAssertGreaterThan(next.journey.effectiveDeparture, departure)
         try await until { !model.state.refreshing }
 

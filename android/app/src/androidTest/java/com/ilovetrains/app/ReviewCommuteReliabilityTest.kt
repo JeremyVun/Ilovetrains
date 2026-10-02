@@ -69,22 +69,30 @@ class ReviewCommuteReliabilityTest {
         val stillThere = departure + 70_000
         onMain { model.debugSetTrackerClock(stillThere); model.refreshTick() }
         onMain { model.location(Fix(rhodes.lat, rhodes.lon, stillThere, accuracyMetres = 10.0)) }
-        waitFor("the sighting after departure to record the next train", 60_000) {
-            stored().lastAnswer?.let { it.journey.key != seen.journey.key && it.stationId == rhodes.id } == true
+        waitFor("the refresh after the sighting", 60_000) { !model.state.value.refreshing }
+        settle()
+        val afterSighting = requireNotNull(stored().lastAnswer) { "the sighting after departure left no record" }
+        // Ruling 2: that sighting means the rider did not board, so the record must stop naming the departed train.
+        val retired = afterSighting.journey.key != seen.journey.key
+        val boarding = (afterSighting.journey.takeIf { retired } ?: nextService(model, departure)).also {
+            assertTrue("the next train leaves after the departed one", it.effectiveDeparture > departure)
         }
-        val next = requireNotNull(stored().lastAnswer)
-        assertTrue("the next train leaves after the departed one", next.journey.effectiveDeparture > departure)
-        waitFor("the refresh after the sighting") { !model.state.value.refreshing }
 
         // The rider boards the next train; a tick fix at train speed a minute after it leaves.
-        val riding = next.journey.effectiveDeparture + minute
+        val riding = boarding.effectiveDeparture + minute
         onMain { model.debugSetTrackerClock(riding); model.refreshTick() }
         val (lat, lon) = along(0.15)
         onMain { model.location(Fix(lat, lon, riding, speed = 15.0, accuracyMetres = 10.0, bearing = bearing(lat, lon, central))) }
         val focus = requireNotNull(model.state.value.focus) { "the moving fix did not enter trip mode" }
-        assertNotEquals("entered the train the rider was seen not to board", seen.journey.key, focus.journey.key)
-        assertEquals(next.journey.key, focus.journey.key)
+        assertNotEquals("entered the train the rider was seen not to board (record after the sighting: " +
+            "${afterSighting.journey.key} at ${afterSighting.at - departure} ms past its departure)", seen.journey.key, focus.journey.key)
+        assertTrue("the record after the platform sighting still named the departed train", retired)
     }
+
+    /** The first service the offline board offers after [departure], the one a rider left on the platform boards next. */
+    private fun nextService(model: TrainViewModel, departure: Long): Journey =
+        requireNotNull(model.state.value.board?.journeys?.filter { !it.cancelled && it.effectiveDeparture > departure }
+            ?.minByOrNull { it.effectiveDeparture }) { "the board offers nothing after the departed train" }
 
     /**
      * Rule 1: the evidence wait starts once per focus and foreground visit; a restart within the visit does not extend
