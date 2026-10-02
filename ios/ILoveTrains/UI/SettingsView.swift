@@ -106,8 +106,8 @@ private struct SettingsShell<Content: View>: View {
                 BackControl(label: backLabel, action: onBack)
                 Text(title).font(.system(size: 29, weight: .light)).padding(.top, 4).padding(.bottom, 12)
                 TrainRule(heavy: true)
-            }.padding(.horizontal, pagePadding)
-            ScrollView { VStack(spacing: 0) { content() }.padding(.horizontal, pagePadding) }
+            }.pagePadding()
+            ScrollView { VStack(spacing: 0) { content() }.pagePadding() }
                 .scrollIndicators(.hidden)
             if let rail { rail }
         }

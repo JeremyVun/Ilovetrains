@@ -29,12 +29,12 @@ struct SetupView: View {
     var body: some View {
         VStack(spacing: 0) {
             if !model.state.trips.isEmpty {
-                BackControl(label: "Home", action: model.back).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, pagePadding)
+                BackControl(label: "Home", action: model.back).frame(maxWidth: .infinity, alignment: .leading).pagePadding()
             }
             VStack(alignment: .leading, spacing: 0) {
                 Text("New trip").font(.system(size: 29, weight: .light)).padding(.top, model.state.trips.isEmpty ? 10 : 2).padding(.bottom, 12)
                 TrainRule(heavy: true)
-            }.padding(.horizontal, pagePadding)
+            }.pagePadding()
             ScrollView {
                 LazyVStack(spacing: 0) {
                     setupField(label: "From", station: from, placeholder: "Origin station", field: .from)
@@ -54,7 +54,7 @@ struct SetupView: View {
                         sectionLabel("Matches")
                         ForEach(matches) { station in stationResult(station) }
                     }
-                }.padding(.horizontal, pagePadding)
+                }.pagePadding()
             }.scrollIndicators(.hidden)
             if let from, let to {
                 ActionRail(text: "Save trip") { model.saveTrip(from: from, to: to) }

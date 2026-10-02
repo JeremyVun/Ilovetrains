@@ -29,7 +29,7 @@ struct BoardView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         TrainLabel(text: "Now · \(clockTime(model.state.now))", color: colors.ink, size: 11)
                             .padding(.top, 9)
-                    }.frame(maxWidth: .infinity, minHeight: 32, alignment: .topLeading).padding(.horizontal, pagePadding).id("now")
+                    }.frame(maxWidth: .infinity, minHeight: 32, alignment: .topLeading).pagePadding().id("now")
                     ForEach(future) { journey in
                         BoardRow(journey: journey, board: board, now: model.state.now) { model.openBoardRow(journey) }
                     }
@@ -40,7 +40,7 @@ struct BoardView: View {
                             if board.error != nil {
                                 Button("Update timetable", action: model.updateTimetable).buttonStyle(TrainTextButtonStyle(colors: colors))
                             }
-                        }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, pagePadding).padding(.vertical, 22)
+                        }.frame(maxWidth: .infinity, alignment: .leading).pagePadding().padding(.vertical, 22)
                     } else {
                         VStack(alignment: .leading, spacing: 8) {
                             TrainLabel(text: visible.count == 6 ? "— Six services shown" : "— End of board")
@@ -48,7 +48,7 @@ struct BoardView: View {
                                 Text("Nothing scheduled after \(visible.last.map { clockTime($0.effectiveDeparture) } ?? clockTime(model.state.now)).")
                                     .font(.system(size: 14, weight: .light)).foregroundStyle(colors.ink3)
                             }
-                        }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, pagePadding).padding(.vertical, 15)
+                        }.frame(maxWidth: .infinity, alignment: .leading).pagePadding().padding(.vertical, 15)
                     }
                 }
             }
@@ -78,7 +78,7 @@ private struct BoardMast: View {
                 .font(.system(size: 25, weight: .light)).lineLimit(3).minimumScaleFactor(0.72).frame(minHeight: 69)
             } else { Spacer().frame(height: 56) }
             TrainRule(heavy: true)
-        }.padding(.horizontal, pagePadding).padding(.top, 8)
+        }.pagePadding().padding(.top, 8)
     }
 }
 
@@ -123,7 +123,7 @@ struct BoardRow: View {
                     .font(.system(size: 13, weight: .light)).foregroundStyle(colors.ink3).lineLimit(1).padding(.top, 6)
             }.frame(maxWidth: .infinity)
         }
-        .padding(.horizontal, pagePadding).padding(.vertical, 9)
+        .pagePadding().padding(.vertical, 9)
         .frame(maxWidth: .infinity, minHeight: detail ? 100 : 96).contentShape(Rectangle())
         Group {
             if let action {
