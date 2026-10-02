@@ -219,10 +219,11 @@ read/write atomic and migration simple):
   not repaired, and a second vote on a day already voted is ignored.
 - `lastOpen` is the header's previous unfocused answer: when, which station the
   phone was sighted at (`here`'s station when the fix is within 300 m of it, or
-  null), which trip and direction, and a verbatim snapshot of the lead journey. It is what makes inferred travel mode possible
-  after the service has left the live board. Preference-caused recomputation
-  does not rewrite it; the next independent refresh resumes normal recording.
-  Deleting the trip deletes it.
+  null), which trip and direction, and a verbatim snapshot of the lead
+  journey. It is what makes inferred travel mode possible after the service
+  has left the live board. Preference-caused recomputation does not rewrite
+  it; the next independent refresh resumes normal recording. Its writers are
+  subject to the hold rule under "Travel mode". Deleting the trip deletes it.
 - `locationAsk` is optional and holds only the time the user last declined the
   location panel. Absence means never declined; a malformed value is dropped,
   not repaired.
@@ -534,7 +535,7 @@ re-matches the snapshot, expiry follows the shared final-arrival decision, and
 the way-back offer follows a completed journey.
 
 **Inferred entry** is evaluated when a valid fix arrives on home, including an
-open or a return to visibility, and `lastOpen` exists and nothing is focused.
+open or a return to visibility, and nothing is focused.
 Each of those entries takes its own fix when permission is already granted;
 an older request resolving after navigation cannot alter the current screen.
 On web, that request disallows cached fixes and enables high accuracy only
@@ -548,10 +549,35 @@ the cache paint and each successful refresh, only with an unfocused header
 and an eligible, non-cancelled lead journey; rendering never writes it.
 The station is the sighting: `here`'s station when the fix is within 300 m of
 it, else null. The 300 m covers platforms reaching about 150 m from a
-station's point and Home fixes accurate to 200 m. The initial cache paint has no fix,
-so a successful refresh after the fix supplies the platform sighting. A
-failed refresh cannot invent one. Inference uses the snapshot from before
-those writes, even when the station index or fix arrives late.
+station's point and Home fixes accurate to 200 m. The initial cache paint has
+no fix, so a successful refresh after the fix supplies the platform sighting.
+A failed refresh cannot invent one.
+
+**The hold rule.** A stored record is *inferable* at `now` when its station is
+the origin `O` of `leg(trip, direction)`, `0 ≤ D − at ≤ 15 min` and
+`now ≤ A + 30 min` (`D` and `A` the record journey's effective departure and
+arrival), and its trip still exists. While the stored record is inferable, a
+new record replaces it only when the new record's sighting is that same
+station `O` and either the stored journey has not departed (`now < D`) or the
+sighting fix was taken at least 60 s after `D`. Any other write is skipped and
+the stored record stays. A sighting at the origin a minute after the train
+left shows that the rider stayed on the platform; a train pulling out is still
+within 300 m of the platform for roughly its first 20-30 s. An unsighted
+record, or one sighted elsewhere (including an intermediate station the train
+is stopped at), proves nothing, so it cannot erase the evidence. Starting or
+stopping a trip, the return offer, deletion and expiry clear the record.
+
+**Two records.** Inference evaluates the snapshot taken when this Home open
+began, before any write of this open, and then the stored record; either may
+enter. Every client keeps the snapshot (web `previousOpen`, unchanged since
+before this rule), which on its own closes the race where an open's own
+refresh overwrites the record before the fix arrives; the hold rule protects
+the stored record for an app that stays open. Keeping both is deliberate
+(owner ruling 13, 2026-10-02): the working automatic start is untouched and
+the hold rule can only add entries. Inference uses the snapshot even when the
+station index or fix arrives late. `tools/fixtures/conformance/inference.json`
+carries the hold-rule cases and today's passing automatic starts as
+regression cases.
 
 Native clients record it after each refresh from a lead that was observed:
 in fresh live data, or, without that, in the refresh's own offline timetable
@@ -560,13 +586,13 @@ retained from an earlier answer is not evidence by itself. Without this, a
 phone with no connection never recorded `lastOpen` and could never enter
 travel mode (owner field report, 2026-09-23).
 
-With `J = lastOpen.journey`, `D` its effective
+For each record in turn, with `J` its journey, `D` its effective
 departure, `A` its effective arrival, and `O` and `Z` the origin and
-destination of `leg(trip, lastOpen.direction)` on the saved trip:
+destination of `leg(trip, record.direction)` on the saved trip:
 
 1. under way: `D ≤ now ≤ A + 30 min`;
-2. seen at the platform: `lastOpen.station.id == O.id` and
-   `D − lastOpen.at ≤ 15 min`;
+2. seen at the platform: `record.station.id == O.id` and
+   `D − record.at ≤ 15 min`;
 3. moved toward: `distance(fix, O) ≥ 1 km` and
    `distance(fix, Z) ≤ distance(O, Z) − 1 km`;
    or instead of 3: the fix reports `speed ≥ 8 m/s` (about 30 km/h) and

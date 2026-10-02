@@ -2,17 +2,18 @@
 
 import {
   loadDoc, saveDoc, addTrip, findTrip, leg, cacheKey, putCache, getCache, recordView,
-  recordHomeVote, recordLastOpen, updateStop, declineLocation, newTripId,
+  recordHomeVote, updateStop, declineLocation, newTripId,
   recordOpen, milestone, LOCATION_ASK_QUIET_MS
 } from './storage.js';
 import { distanceKm, homeOf, locate, predict } from './predict.js';
 import { here, loadStations, sightingOf, trainSpeed } from './stations.js';
 import { boardModel, promotedRow } from './rowmodel.js';
-import { journeyDetail, journeyKey, departureKey, legsOf, arrivalMs, departureMs } from './journey.js';
+import { journeyDetail, journeyKey, departureKey, arrivalMs, departureMs } from './journey.js';
 import {
   focusOf, visibleFocus, setFocus, clearFocus, isFocused, focusExpired, matchJourney,
   applyFocusSnapshot, applyArrivalResult, composedJourney, recoveryModel, recoveryOf,
-  inferTravel, journeyCancelled, pinResult, rideAdded, TRAVEL_LATE_MS
+  inferFromRecords, journeyCancelled, pinResult, rideAdded, rideRecorded, writeLastOpen,
+  TRAVEL_LATE_MS
 } from './focus.js';
 import * as Board from './board.js';
 import { clampJourneyBars } from './journeybar.js';
@@ -668,12 +669,11 @@ function noteLastOpen() {
     || selectRecommendation(journeys, now(), { modes: enabledModes(), maxTransfers: maxTransfers() });
   if (!journey) return;
   const fix = stationFix();
-  ctx.update(recordLastOpen(state.doc, {
-    station: sightingOf(here(state.doc, state.stations, fix), fix),
-    tripId: state.selection.tripId,
-    direction: state.selection.direction,
-    journey
-  }, now()));
+  const station = sightingOf(here(state.doc, state.stations, fix), fix);
+  const next = writeLastOpen(state.doc, {
+    station, tripId: state.selection.tripId, direction: state.selection.direction, journey
+  }, now(), station ? fix.at : null);
+  if (next !== state.doc) ctx.update(next);
 }
 
 /* An already-granted permission is not a prompt: home may use the fix it can
@@ -812,12 +812,7 @@ function useFix() {
     const voted = recordHomeVote(state.doc, spot.station, now());
     if (voted !== state.doc) ctx.update(voted);
   }
-  // Compare with the opening record before the cache paint replaced it.
-  const storedFocus = focusOf(state.doc);
-  const entered = (storedFocus && !focusExpired(storedFocus, now()))
-    || rideRecorded(state.doc, state.previousOpen) ? null
-    : journeyAllowed(state.previousOpen?.journey, enabledModes(), maxTransfers())
-      ? inferTravel({ ...state.doc, lastOpen: state.previousOpen }, now(), fix) : null;
+  const entered = inferFromRecords(state.doc, state.previousOpen, now(), fix);
   if (entered) {
     stopArrivalMonitoring();
     state.arrivalDecision = null;
@@ -1293,7 +1288,7 @@ function homeAction(action, element) {
     }
     state.headerKind = null;
     settleArrival();
-    state.doc = clearFocus(state.doc);
+    state.doc = forgetLastOpen(clearFocus(state.doc));
     stopArrivalMonitoring();
     state.selection = {
       tripId: state.selection.tripId,
@@ -1457,9 +1452,7 @@ function renderDetail() {
 function unpinService() {
   if (!focusOf(state.doc) || focusOf(state.doc).by === 'inferred') return;
   settleArrival();
-  const released = clearFocus(state.doc);
-  delete released.lastOpen;
-  ctx.update(released);
+  ctx.update(forgetLastOpen(clearFocus(state.doc)));
   if (focusInflight) focusInflight.abort();
   focusInflight = null;
   if (recoveryInflight) recoveryInflight.abort();
@@ -1470,8 +1463,6 @@ function unpinService() {
   state.focusIdentity = null;
   state.focusOffline = false;
   state.focusServerStale = false;
-  // A subsequent location fix must not immediately infer the released ride.
-  state.previousOpen = null;
   state.headerKind = null;
   if (state.view !== 'home') {
     state.selection = null;
@@ -1502,9 +1493,18 @@ function detailAction(action) {
     stopArrivalMonitoring();
     state.arrivalDecision = null;
     state.recovery = null;
-    ctx.update(setFocus(state.doc, state.selection, state.journey, now()));
+    ctx.update(forgetLastOpen(setFocus(state.doc, state.selection, state.journey, now())));
     return ctx.go('#/');
   }
+}
+
+/* Starting or stopping a trip and the return offer clear the evidence, so a
+   later fix cannot infer a journey the rider has already settled. */
+function forgetLastOpen(doc) {
+  const next = { ...doc };
+  delete next.lastOpen;
+  state.previousOpen = null;
+  return next;
 }
 
 /* The recovery pair is the one extra request a refresh may make (ui.md), and
@@ -1773,17 +1773,6 @@ async function fetchRecommendationPages({ base, ends, key, generation, modes, fi
     clearTimeout(deadline);
     if (recommendationInflight === controller) recommendationInflight = null;
   }
-}
-
-function rideRecorded(doc, selection) {
-  if (!selection || !selection.journey) return false;
-  const first = legsOf(selection.journey)[0] || {};
-  const departure = (first.departure || {}).scheduled
-    || ((selection.journey.departure || {}).scheduled);
-  if (!departure) return false;
-  return (doc.rides || []).some((ride) => ride.tripId === selection.tripId
-    && ride.direction === selection.direction
-    && (ride.scheduledDeparture || ride.departedAt) === departure);
 }
 
 async function fetchPast(initial) {

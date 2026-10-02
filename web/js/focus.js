@@ -17,7 +17,7 @@ import {
 } from './journey.js';
 import { shortName } from './dom.js';
 import { distanceKm, TRAIN_SPEED_MPS } from './stations.js';
-import { correctRide, findTrip, leg, recordRide } from './storage.js';
+import { correctRide, findTrip, leg, recordLastOpen, recordRide } from './storage.js';
 import { effectiveCap, journeyAllowed, preferencesOf, tripAllowed } from './preferences.js';
 
 /* Half an hour past arrival the journey is over and directions are clutter
@@ -31,6 +31,9 @@ export const TRAVEL_LATE_MS = 30 * 60_000;
 export const TRAVEL_SEEN_MS = 15 * 60_000;
 export const TRAVEL_MOVED_KM = 1;
 export const TRAVEL_SPEED_MOVED_KM = 0.2;
+/* A train pulling out is still within 300 m of the platform for its first
+   20-30 s, so only a later sighting shows the rider stayed. */
+export const HOLD_SIGHTING_AFTER_MS = 60_000;
 /* Exit: at the destination, the trip is over as the rider steps off. */
 export const ARRIVED_KM = 0.2;
 export const ARRIVED_EARLY_MS = 5 * 60_000;
@@ -102,6 +105,62 @@ export function inferTravel(doc, nowMs, fix) {
     by: 'inferred',
     journey: last.journey
   };
+}
+
+/** A ride already recorded for this trip, direction and scheduled departure. */
+export function rideRecorded(doc, selection) {
+  if (!selection || !selection.journey) return false;
+  const first = legsOf(selection.journey)[0] || {};
+  const departure = (first.departure || {}).scheduled
+    || ((selection.journey.departure || {}).scheduled);
+  if (!departure) return false;
+  return ((doc && doc.rides) || []).some((ride) => ride.tripId === selection.tripId
+    && ride.direction === selection.direction
+    && (ride.scheduledDeparture || ride.departedAt) === departure);
+}
+
+/** A `lastOpen` record inference could still use (client-storage.md, Travel mode). */
+export function lastOpenInferable(doc, record, nowMs) {
+  const trip = record && findTrip(doc, record.tripId);
+  if (!trip || !record.station) return false;
+  const departure = departureMs(record.journey);
+  const arrival = arrivalMs(record.journey);
+  const lead = departure - Date.parse(record.at);
+  return departure !== null && arrival !== null && Number.isFinite(lead)
+    && record.station.id === leg(trip, record.direction).from.id
+    && lead >= 0 && lead <= TRAVEL_SEEN_MS && nowMs <= arrival + TRAVEL_LATE_MS;
+}
+
+/** The hold rule: an unsighted record, or one sighted anywhere but the held
+    record's origin, proves nothing and cannot erase the evidence. */
+export function replacesLastOpen(doc, incoming, nowMs, sightingAtMs = null) {
+  const stored = doc && doc.lastOpen;
+  if (!lastOpenInferable(doc, stored, nowMs)) return true;
+  const origin = leg(findTrip(doc, stored.tripId), stored.direction).from;
+  if (!incoming || !incoming.station || incoming.station.id !== origin.id) return false;
+  const departure = departureMs(stored.journey);
+  return nowMs < departure
+    || (Number.isFinite(sightingAtMs) && sightingAtMs >= departure + HOLD_SIGHTING_AFTER_MS);
+}
+
+export function writeLastOpen(doc, record, nowMs, sightingAtMs = null) {
+  return replacesLastOpen(doc, record, nowMs, sightingAtMs) ? recordLastOpen(doc, record, nowMs) : doc;
+}
+
+/**
+ * Platform-sighted entry: the snapshot taken when this Home open began, then
+ * the stored record, and either may enter (owner ruling 13).
+ */
+export function inferFromRecords(doc, snapshot, nowMs, fix) {
+  const focus = focusOf(doc);
+  if (focus && !focusExpired(focus, nowMs)) return null;
+  const modes = preferencesOf(doc).enabledModes;
+  for (const record of [snapshot, doc.lastOpen]) {
+    if (!record || rideRecorded(doc, record) || !journeyAllowed(record.journey, modes, effectiveCap(doc))) continue;
+    const entered = inferTravel({ ...doc, lastOpen: record }, nowMs, fix);
+    if (entered) return entered;
+  }
+  return null;
 }
 
 /** The journey snapshot carries no coordinates, so the destination station
