@@ -623,3 +623,25 @@ web fix. `web/js/main.js` keeps `retiresSnapshot`/`stoppedTrip`, and
 `check-commute-reliability.js` passes all seven checks. Phase 4b runs on
 `cr-android4`, branched from `cr-int`. `cr-fix-ios` merges into `cr-int` when
 it lands, then `cr-int` merges to main.
+
+iOS fix done: `c567b8e` on `cr-fix-ios`. Merged through `cr-int` (with the
+`native-data.md` ruling-24 text deduplicated) to main as `3850a5f`; web 637
+pass on main.
+- Every reviewer probe passes. `tools/build-ios.sh --unit` passes with 309
+  tests, and `--ui TravelTrackerFlowTests` passes 6, with 1 skipped by its own
+  `XCTSkip`.
+- The offline tick stall was real: a failed realtime fetch never refreshed
+  the board. A tick now refreshes the board unless a followed journey's
+  request is in flight.
+- Outside its brief, it serialised `OfflinePlanner.initialize()` through a
+  process-wide queue. The fresh install on every test run made the
+  test-host/test planner install race hit every run; production has one
+  planner. The focused Home's later-trains plan also uses the two-plan board.
+- `tools/build-ios.sh` now deletes built test bundles and uninstalls the app
+  and the UI runner before every `--unit`/`--ui`/`--test` run (documented in
+  `tools/README.md`). Phase 5 runs tests through the helper only.
+- Still open for 4c/5: `AppFlowTests` (`testBoardDetailPinAndSettingsFlow` and
+  the offline setup flow expect `pin-this-train` after tapping a first row that
+  may be running). Any UI test that stops a started trip and then expects a
+  guess will now meet the decline.
+- The median lookback's lower-end limit is accepted (design rule 5).

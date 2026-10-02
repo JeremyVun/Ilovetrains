@@ -417,7 +417,13 @@ everything ten online services could reach, so on-board entry never found the
 train on frequent lines. The median (lead's decision, 2026-10-02) keeps the
 window near a typical ride. On a very frequent line a rider a few minutes out
 can fall after the tenth service; a later fix catches them as the train ages
-into the window, and native's timetable plan of 30 covers it at once.
+into the window, and native's timetable plan of 30 covers it at once. The
+accepted cost, measured in the iOS fix: a rider more than `Δ + 10 min` into an
+itinerary much longer than the median (Rhodes → Town Hall offline plans run
+to about 56 min against a median of about 33) has a departure before `at`, and
+no later fix brings it back. Tapping the running row on the board still starts
+that trip. A direct ride is far inside the window (lead's decision,
+2026-10-03).
 
 With trains eight minutes apart on a 25-minute ride, neighbouring services
 differ by about 0.32 in `f_t`, so the 0.25 window separates them. Very
