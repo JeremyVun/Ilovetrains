@@ -323,7 +323,9 @@ function enteredBy(value) {
 /* On board at Strathfield, 4.64 km from Rhodes: position progress is 0.309 toward
    Town Hall and 0.320 toward Redfern. At 08:10 the 08:00 T9 has 0.370 of its
    ride behind it (gap 0.062 to Town Hall, 0.135 to Redfern), the 08:08 has 0.074
-   (0.235 and 0.229) and the 07:52 0.667 (0.358, and 0.818 to Redfern). */
+   (0.235 and 0.229) and the 07:52 0.667 (0.358, and 0.818 to Redfern). A
+   30-minute ride that left at 07:53:32 has 0.549 behind it (0.240 to Town Hall)
+   and one that left at 07:52:56 has 0.569 (0.260). */
 const BURWOOD = place('213410', 'Burwood Station', -33.877315, 151.104762);
 const ASHFIELD = place('213610', 'Ashfield Station', -33.887917, 151.125688);
 const NORTH_STRATHFIELD = place('213710', 'North Strathfield Station', -33.858688, 151.087986);
@@ -373,6 +375,12 @@ const onBoardCases = [
   { name: 'on board: no running service within 0.25 of the position', fix: onBoardFix('08:10', { heading: 90 }),
     boards: { 'rt|forward': [t9('07:52'), t9('08:16')], 'rr|forward': [t9('07:52', REDFERN), t9('08:16', REDFERN)] },
     expectedRequests: [ask('rr', '07:00'), ask('rt', '07:00')], expected: null },
+  { name: 'on board: a service 0.24 off the position progress still matches', doc: commuteDoc(rtOnly),
+    fix: onBoardFix('08:10', { heading: 90 }), boards: { 'rt|forward': [t9('07:53:32', TOWN_HALL, { rideMinutes: 30 })] },
+    expectedRequests: [ask('rt', '07:00')], expected: onBoard(t9('07:53:32', TOWN_HALL, { rideMinutes: 30 })) },
+  { name: 'on board: a service 0.26 off the position progress is not a match', doc: commuteDoc(rtOnly),
+    fix: onBoardFix('08:10', { heading: 90 }), boards: { 'rt|forward': [t9('07:52:56', TOWN_HALL, { rideMinutes: 30 })] },
+    expectedRequests: [ask('rt', '07:00')], expected: null },
   { name: 'on board: history breaks the tie between saved trips sharing a train', doc: commuteDoc({ history: rrHabit }),
     fix: onBoardFix('08:10', { heading: 90 }), boards: morningBoards(),
     expectedRequests: [ask('rr', '07:00'), ask('rt', '07:00')], expected: onBoard(t9('08:00', REDFERN), 'rr') },
@@ -428,6 +436,9 @@ const declineCases = [
   { name: 'decline: holds both directions of its trip', doc: commuteDoc({ ...rtOnly, lastOpen: SEEN,
     inferenceDeclined: declined('rt', '08:05', t9('07:52', RHODES, { from: TOWN_HALL }), 'reverse') }),
     fix: fixAtPlace(STRATHFIELD, '08:10'), expected: null },
+  { name: 'decline: the hour alone holds entry once the declined arrival plus 30 min has passed', doc: commuteDoc({ ...rtOnly,
+    inferenceDeclined: declined('rt', '07:11', t9('06:52', TOWN_HALL, { rideMinutes: 38 })) }),
+    fix: onBoardFix('08:10', { heading: 90 }), boards: morningBoards(), expectedRequests: [], expected: null },
   { name: 'decline: entry resumes an hour after the decline', doc: commuteDoc({ ...rtOnly,
     inferenceDeclined: declined('rt', '07:10', t9('06:52')) }), fix: onBoardFix('08:10', { heading: 90 }),
     boards: morningBoards(), expectedRequests: [ask('rt', '07:00')], expected: onBoard(t9('08:00')) },
