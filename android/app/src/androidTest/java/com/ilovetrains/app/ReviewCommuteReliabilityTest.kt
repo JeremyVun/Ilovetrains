@@ -95,10 +95,10 @@ class ReviewCommuteReliabilityTest {
         assertEquals("on-board entry found the train the rider boarded", boarding.departureKey, focus.journey.departureKey)
     }
 
-    /** The first service the offline board offers after [departure], the one a rider left on the platform boards next. */
+    /** The first direct service the offline board offers after [departure], the one a rider left on the platform boards next. */
     private fun nextService(model: TrainViewModel, departure: Long): Journey =
-        requireNotNull(model.state.value.board?.journeys?.filter { !it.cancelled && it.effectiveDeparture > departure }
-            ?.minByOrNull { it.effectiveDeparture }) { "the board offers nothing after the departed train" }
+        requireNotNull(model.state.value.board?.journeys?.filter { it.legs.size == 1 && !it.cancelled && it.effectiveDeparture > departure }
+            ?.minByOrNull { it.effectiveDeparture }) { "the board offers no direct train after the departed one" }
 
     /**
      * Rule 1: the evidence wait starts once per focus and foreground visit; a restart within the visit does not extend

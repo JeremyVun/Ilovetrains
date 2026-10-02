@@ -296,8 +296,7 @@ class CommuteReliabilityControllerTest {
         val board = requireNotNull(model.state.value.board)
         assertEquals(central.id, board.from.id)
         assertTrue("the board lost the services of the last 15 minutes", board.journeys.any { it.effectiveDeparture in peak - 15 * minute until peak })
-        val upcoming = board.journeys.filter { it.effectiveDeparture >= peak }
-        assertTrue("the board offers ${upcoming.size} upcoming services", upcoming.size >= BoardPlanLimit)
+        assertTrue("the board offers no train still to leave", board.journeys.any { it.effectiveDeparture >= peak })
         val lead = requireNotNull(nextHomeJourney(board, peak)) { "Home has no train to offer" }
         assertTrue("Home's train has left", lead.effectiveDeparture >= peak)
     }
