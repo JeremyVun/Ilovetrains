@@ -33,7 +33,7 @@ private let basisWords: Set<String> = ["location", "estimate"]
 
 let analyticsEventNames: Set<String> = Set(HeaderKind.allCases.flatMap { kind in
     ["shown_", "hit_", "miss_", "pinned_"].map { $0 + kind.rawValue }
-}).union(["opened", "rode_pin", "rode_auto"])
+}).union(["opened", "rode_pin", "rode_auto", "entered_inferred", "declined_inferred"])
 
 func usageBand(opens: Int) -> String {
     switch opens {
@@ -267,6 +267,8 @@ final class Analytics: @unchecked Sendable {
     func rode(pinned: Bool, basis: ArrivalBasis) {
         track(pinned ? "rode_pin" : "rode_auto", ["b": basis.rawValue, "pl.b": "\(analyticsPlatform).\(basis.rawValue)"])
     }
+    func enteredInferred() { track("entered_inferred") }
+    func declinedInferred() { track("declined_inferred") }
 
     /// A new foreground session: its first event schedules a flush again, and leftovers are sent now.
     func foreground() {
@@ -529,6 +531,10 @@ final class HeaderMetrics {
     func released() { answer = nil; setup = false }
 
     func rode(pinned: Bool, basis: ArrivalBasis) { analytics.rode(pinned: pinned, basis: basis) }
+
+    func enteredInferred() { analytics.enteredInferred() }
+
+    func declinedInferred() { analytics.declinedInferred() }
 
     private func open() -> Bool {
         guard entry == .foreground else { return false }

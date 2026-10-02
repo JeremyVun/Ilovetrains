@@ -6,14 +6,48 @@ struct Fix: Codable, Equatable, Sendable {
     var at: Millis
     var speed: Double?
     var accuracyMetres: Double?
+    var course: Double?
 
-    init(lat: Double, lon: Double, at: Millis, speed: Double? = nil, accuracyMetres: Double? = nil) {
+    init(lat: Double, lon: Double, at: Millis, speed: Double? = nil, accuracyMetres: Double? = nil, course: Double? = nil) {
         self.lat = lat
         self.lon = lon
         self.at = at
         self.speed = speed
         self.accuracyMetres = accuracyMetres
+        self.course = course
     }
+}
+
+let atStationMetres = 200.0
+// Gadigal is 152 m from Town Hall's point, so a saved station's footprint must beat a stranger's 200 m.
+let savedStationMetres = 400.0
+// Platforms reach about 150 m from a station's point, and a Home fix may be 200 m inaccurate.
+let sightingMetres = 300.0
+let nearStationMetres = 2_000.0
+// About 30 km/h: faster than anyone walks or runs on a platform.
+let trainSpeedMetresPerSecond = 8.0
+let previousFixMinimumAge: Millis = 15_000
+let previousFixMaximumAge: Millis = 120_000
+
+func previousFixUsable(_ fix: Fix, _ previous: Fix?) -> Bool {
+    guard let previous else { return false }
+    let gap = fix.at - previous.at
+    return gap.isFinite && gap >= previousFixMinimumAge && gap <= previousFixMaximumAge
+}
+
+private func accuracyKnown(_ value: Double?) -> Bool {
+    value.map { $0.isFinite && $0 >= 0 } ?? false
+}
+
+// Without a usable speed, only a displacement no position error could produce counts.
+func trainSpeed(_ fix: Fix?, previous: Fix?) -> Bool {
+    guard let fix else { return false }
+    if let speed = fix.speed, speed.isFinite, speed >= 0 { return speed >= trainSpeedMetresPerSecond }
+    guard previousFixUsable(fix, previous), let previous,
+          accuracyKnown(fix.accuracyMetres), accuracyKnown(previous.accuracyMetres) else { return false }
+    let metres = distanceMetres(fromLat: fix.lat, lon: fix.lon, toLat: previous.lat, lon: previous.lon)
+    return metres >= trainSpeedMetresPerSecond * (fix.at - previous.at) / 1_000
+        + (fix.accuracyMetres ?? 0) + (previous.accuracyMetres ?? 0)
 }
 
 struct Selection: Codable, Equatable, Sendable {
@@ -98,8 +132,14 @@ func historyScore(events: [ViewEvent], tripId: String, reverse: Bool, now: Milli
     historyEvidence(events: events, tripId: tripId, reverse: reverse, now: now).score
 }
 
-func stationHere(data: UserData, stations: [Station], fix: Fix?, now: Millis) -> Station? {
-    guard data.useLocation, let fix, isCurrent(fix, now: now) else { return nil }
+struct StationHere: Equatable, Sendable {
+    var station: Station
+    var tier: Int
+}
+
+/// A phone at train speed is passing stations, not at one.
+func locateHere(data: UserData, stations: [Station], fix: Fix?, previousFix: Fix? = nil, now: Millis) -> StationHere? {
+    guard data.useLocation, let fix, isCurrent(fix, now: now), !trainSpeed(fix, previous: previousFix) else { return nil }
 
     var seen = Set<String>()
     let saved = data.trips
@@ -116,10 +156,27 @@ func stationHere(data: UserData, stations: [Station], fix: Fix?, now: Millis) ->
             .0
     }
 
-    return nearest(saved, within: 200)
-        ?? nearest(eligible, within: 200)
-        ?? nearest(saved, within: 2_000)
-        ?? nearest(eligible, within: 2_000)
+    if let standing = nearest(saved, within: savedStationMetres) ?? nearest(eligible, within: atStationMetres) {
+        return StationHere(station: standing, tier: 1)
+    }
+    if let near = nearest(saved, within: nearStationMetres) { return StationHere(station: near, tier: 2) }
+    return nearest(eligible, within: nearStationMetres).map { StationHere(station: $0, tier: 3) }
+}
+
+func stationHere(data: UserData, stations: [Station], fix: Fix?, previousFix: Fix? = nil, now: Millis) -> Station? {
+    locateHere(data: data, stations: stations, fix: fix, previousFix: previousFix, now: now)?.station
+}
+
+func sighting(_ here: StationHere?, fix: Fix?) -> Station? {
+    guard let here, let fix, distanceMetres(fix, here.station) <= sightingMetres else { return nil }
+    return here.station
+}
+
+func homewardPair(data: UserData, here: Station?) -> (from: Station, to: Station)? {
+    guard data.focus == nil, let here, let home = data.home ?? automaticHome(data: data), here.id != home.id,
+          !data.trips.contains(where: { compatible($0, modes: data.modes) && ($0.from.id == here.id || $0.to.id == here.id) }),
+          !home.modes.isDisjoint(with: data.modes) else { return nil }
+    return (here, home)
 }
 
 func nearestStation(stations: [Station], fix: Fix, within metres: Double = 2_000) -> Station? {
@@ -129,10 +186,12 @@ func nearestStation(stations: [Station], fix: Fix, within metres: Double = 2_000
         .0
 }
 
-func predict(data: UserData, stations: [Station], fix: Fix?, now: Millis) -> Selection? {
+func predict(data: UserData, stations: [Station], fix: Fix?, previousFix: Fix? = nil, now: Millis) -> Selection? {
     let trips = data.trips.filter { compatible($0, modes: data.modes) }
     guard !trips.isEmpty else { return nil }
 
+    // A fix at train speed says where the train is, not where the rider starts from.
+    let fix = trainSpeed(fix, previous: previousFix) ? nil : fix
     let currentFix = data.useLocation && fix.map { isCurrent($0, now: now) } == true
     let here = stationHere(data: data, stations: stations, fix: fix, now: now)
     let candidates = trips.flatMap { trip in
@@ -180,31 +239,6 @@ func predict(data: UserData, stations: [Station], fix: Fix?, now: Millis) -> Sel
     }
     let kind: HeaderKind = here == nil ? .predicted : selected == homeward && winner == nil ? .home : .usual
     return Selection(tripId: selected.trip.id, reverse: selected.reverse, receipt: receipt, kind: kind)
-}
-
-func inferredFocus(data: UserData, fix: Fix, now: Millis) -> FocusedJourney? {
-    guard data.useLocation,
-          data.focus == nil,
-          isCurrent(fix, now: now),
-          let last = data.lastAnswer,
-          let trip = data.trips.first(where: { $0.id == last.tripId }),
-          compatible(trip, modes: data.modes),
-          last.journey.legs.allSatisfy({ data.modes.contains($0.mode) }),
-          !data.rides.contains(where: { $0.tripId == trip.id && $0.reverse == last.reverse && $0.departure == last.journey.departure }) else { return nil }
-
-    let from = last.reverse ? trip.to : trip.from
-    let to = last.reverse ? trip.from : trip.to
-    let journey = last.journey
-    guard (journey.effectiveDeparture...(journey.effectiveArrival + 1_800_000)).contains(now),
-          last.stationId == from.id,
-          (0...900_000).contains(journey.effectiveDeparture - last.at) else { return nil }
-
-    let left = distanceMetres(fix, from)
-    let tripDistance = distanceMetres(Fix(lat: from.lat, lon: from.lon, at: now), to)
-    let toward = left >= 1_000 && distanceMetres(fix, to) <= tripDistance - 1_000
-    let fast = (fix.speed ?? 0) >= 8 && left >= 200
-    guard left.isFinite, tripDistance.isFinite, toward || fast else { return nil }
-    return FocusedJourney(tripId: trip.id, reverse: last.reverse, journey: journey, board: last.board, pinned: false)
 }
 
 func savedTripMetadata(
@@ -259,7 +293,7 @@ private struct PredictionCandidate: Equatable {
     var to: Station { reverse ? trip.from : trip.to }
 }
 
-private func isCurrent(_ fix: Fix, now: Millis) -> Bool {
+func isCurrent(_ fix: Fix, now: Millis) -> Bool {
     (0...300_000).contains(now - fix.at)
 }
 

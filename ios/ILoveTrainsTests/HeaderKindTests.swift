@@ -49,7 +49,12 @@ final class HeaderKindTests: XCTestCase {
             "established local history still outranks homeward fallback": "usual",
             "standing at destination chooses real return pair": "home",
             "relevant origin history outranks home fallback": "usual",
-            "three first-open votes infer home": "home"
+            "three first-open votes infer home": "home",
+            "a saved station at 269 m beats an unsaved one at 119 m": "home",
+            "a saved station at 342 m is here but no sighting": "home",
+            "an unsaved station within 200 m answers when no saved end is within 400 m": "pair",
+            "a walking pair of fixes keeps here": "home",
+            "a previous fix over 120 s old cannot derive train speed": "home"
         ]
         let url = try XCTUnwrap(Bundle(for: HeaderKindTests.self).url(forResource: "prediction", withExtension: "json"))
         let cases = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
@@ -73,11 +78,22 @@ final class HeaderKindTests: XCTestCase {
                 lastReverse: lastViewed?["direction"] == "reverse"
             )
             data.useLocation = ((doc["preferences"] as? [String: Any])?["useLocation"] as? Bool) ?? true
-            let fix = (fixture["fix"] as? [String: Double]).map { Fix(lat: $0["lat"] ?? 0, lon: $0["lon"] ?? 0, at: at) }
+            let reading = { (raw: Any?) in
+                (raw as? [String: Double]).map {
+                    Fix(lat: $0["lat"] ?? 0, lon: $0["lon"] ?? 0, at: $0["at"] ?? at, speed: $0["speed"], accuracyMetres: $0["accuracy"])
+                }
+            }
+            let fix = reading(fixture["fix"]), previousFix = reading(fixture["previousFix"])
             let stations = try ((fixture["stations"] as? [Any]) ?? []).map { try station($0) }
-            XCTAssertEqual(predict(data: data, stations: stations, fix: fix, now: at)?.kind.rawValue, web[name] ?? "predicted", name)
+            if web[name] == "pair" {
+                let here = stationHere(data: data, stations: stations, fix: fix, previousFix: previousFix, now: at)
+                XCTAssertNotNil(homewardPair(data: data, here: here), name)
+            } else {
+                XCTAssertEqual(predict(data: data, stations: stations, fix: fix, previousFix: previousFix, now: at)?.kind.rawValue,
+                               web[name] ?? "predicted", name)
+            }
             data.useLocation = false
-            XCTAssertEqual(predict(data: data, stations: stations, fix: fix, now: at)?.kind, .predicted, name)
+            XCTAssertEqual(predict(data: data, stations: stations, fix: fix, previousFix: previousFix, now: at)?.kind, .predicted, name)
         }
         XCTAssertTrue(names.isSuperset(of: web.keys))
     }

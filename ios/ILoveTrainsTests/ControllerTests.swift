@@ -90,7 +90,8 @@ final class ControllerTests: XCTestCase {
         let store = DeviceStore(directory: directory)
         try await store.save(data)
         let location = ControlledLocation()
-        let model = track(TrainViewModel(store: store, location: location))
+        let clock = TestClock(now)
+        let model = track(TrainViewModel(store: store, location: location, clock: { clock.now }))
         model.networkDisabled = true
         model.resume()
         defer { model.pause() }
@@ -104,11 +105,15 @@ final class ControllerTests: XCTestCase {
             if location.isMonitoring { break }
             try await Task.sleep(for: .milliseconds(10))
         }
-        location.onFix?(Fix(lat: -33.9, lon: 151.1, at: epochNow(), speed: 10, accuracyMetres: 10))
+        location.onFix?(Fix(lat: -33.9, lon: 151.1, at: clock.now, speed: 10, accuracyMetres: 10))
+        clock.now = now + ArrivalRules.evidenceWait - 1_000
+        model.tick()
         try await Task.sleep(for: .milliseconds(200))
-        XCTAssertNotNil(model.state.focus, "the resume lookup must get its chance before an overdue expiry")
+        XCTAssertNotNil(model.state.focus, "the evidence wait must get its chance before an overdue expiry")
         let waiting = await store.load()
         XCTAssertEqual(waiting.focus?.arrivalGuard?.retainedAt, now - 8_000_000)
+        clock.now = now + ArrivalRules.evidenceWait + 1_000
+        model.tick()
         for _ in 0..<250 {
             if await store.load().focus == nil { break }
             try await Task.sleep(for: .milliseconds(100))
@@ -175,7 +180,7 @@ final class ControllerTests: XCTestCase {
         model.openJourney(chosen.journey)
         XCTAssertEqual(model.state.detail?.key, chosen.journey.key)
         XCTAssertEqual(model.state.board, chosen.board)
-        model.pinJourney(chosen.journey)
+        model.startTrip(chosen.journey)
         try await settled(store) { $0.focus?.journey.key == chosen.journey.key }
         XCTAssertEqual(model.state.focus?.journey.key, chosen.journey.key)
     }
@@ -1203,9 +1208,10 @@ private final class ControlledLocation: LocationProviding {
     var permission: CheckedContinuation<Bool, Never>?
     var granted = false
     var immediatePermission: Bool?
+    var requests: [Bool] = []
     func refreshPermission() { onPermission?(granted, false) }
     func openSettings() {}
-    func request(prompt: Bool) {}
+    func request(prompt: Bool, precise: Bool) { requests.append(precise) }
     func monitoringPermitted() async -> Bool {
         if let immediatePermission { return immediatePermission }
         return await withCheckedContinuation { permission = $0 }
@@ -1218,6 +1224,11 @@ private final class ControlledLocation: LocationProviding {
     }
     func startMonitoring() -> Bool { isMonitoring = granted; return granted }
     func stop() { isMonitoring = false }
+}
+
+private final class TestClock {
+    var now: Millis
+    init(_ now: Millis) { self.now = now }
 }
 
 private final class PagingDepartures: URLProtocol {

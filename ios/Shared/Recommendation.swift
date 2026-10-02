@@ -28,13 +28,21 @@ func compareRecommendations(_ left: Journey, _ right: Journey) -> ComparisonResu
                    (lhs.arrival, rhs.arrival), (lhs.departure, rhs.departure)] {
         if a != b { return a < b ? .orderedAscending : .orderedDescending }
     }
-    for (a, b) in zip(lhs.identity, rhs.identity) {
+    return compareIdentity(lhs.identity, rhs.identity)
+}
+
+func compareJourneyIdentity(_ left: Journey, _ right: Journey) -> ComparisonResult {
+    compareIdentity(left.legs.map { ($0.line, $0.departure) }, right.legs.map { ($0.line, $0.departure) })
+}
+
+private func compareIdentity(_ lhs: [(String, Millis)], _ rhs: [(String, Millis)]) -> ComparisonResult {
+    for (a, b) in zip(lhs, rhs) {
         let name = compareCodePoints(a.0, b.0)
         if name != .orderedSame { return name }
         if a.1 != b.1 { return a.1 < b.1 ? .orderedAscending : .orderedDescending }
     }
-    if lhs.identity.count == rhs.identity.count { return .orderedSame }
-    return lhs.identity.count < rhs.identity.count ? .orderedAscending : .orderedDescending
+    if lhs.count == rhs.count { return .orderedSame }
+    return lhs.count < rhs.count ? .orderedAscending : .orderedDescending
 }
 
 func selectRecommendation(

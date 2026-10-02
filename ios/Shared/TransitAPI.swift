@@ -10,8 +10,12 @@ struct TransitAPI: Sendable {
         var body: Data
     }
 
-    func departures(from: Station, to: Station, modes: Set<String>, at: Double? = nil, transferLimit: Int? = nil) async throws -> BoardData {
-        try await departurePage(from: from, to: to, modes: modes, at: at, transferLimit: transferLimit).board
+    static let defaultLimit = 10
+
+    func departures(
+        from: Station, to: Station, modes: Set<String>, at: Double? = nil, transferLimit: Int? = nil, limit: Int = defaultLimit
+    ) async throws -> BoardData {
+        try await departurePage(from: from, to: to, modes: modes, at: at, transferLimit: transferLimit, limit: limit).board
     }
 
     func departurePage(
@@ -20,11 +24,12 @@ struct TransitAPI: Sendable {
         modes: Set<String>,
         at: Double? = nil,
         transferLimit: Int? = nil,
+        limit: Int = defaultLimit,
         timeout: TimeInterval = 12
     ) async throws -> DeparturePage {
         var url = URLComponents(string: baseURL + "/api/v1/departures")!
         url.queryItems = [URLQueryItem(name: "from", value: from.id), URLQueryItem(name: "to", value: to.id),
-            URLQueryItem(name: "limit", value: "10"), URLQueryItem(name: "modes", value: modes.sorted().joined(separator: ","))]
+            URLQueryItem(name: "limit", value: String(limit)), URLQueryItem(name: "modes", value: modes.sorted().joined(separator: ","))]
         if let at { url.queryItems?.append(URLQueryItem(name: "at", value: ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: at / 1000)))) }
         if let transferLimit { url.queryItems?.append(URLQueryItem(name: "transferLimit", value: String(transferLimit))) }
         var request = URLRequest(url: url.url!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: timeout)

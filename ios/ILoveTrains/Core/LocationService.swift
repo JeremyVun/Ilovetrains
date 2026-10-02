@@ -9,10 +9,14 @@ protocol LocationProviding: AnyObject {
     var isMonitoring: Bool { get }
     func refreshPermission()
     func openSettings()
-    func request(prompt: Bool)
+    func request(prompt: Bool, precise: Bool)
     func monitoringPermitted() async -> Bool
     func startMonitoring() -> Bool
     func stop()
+}
+
+extension LocationProviding {
+    func request(prompt: Bool) { request(prompt: prompt, precise: false) }
 }
 
 @MainActor
@@ -35,7 +39,7 @@ final class LocationService: NSObject, LocationProviding, @preconcurrency CLLoca
     func openSettings() {
         if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
     }
-    func request(prompt: Bool) {
+    func request(prompt: Bool, precise: Bool) {
         guard !pending else { return }
         let current = CLLocationManager()
         let status = current.authorizationStatus
@@ -61,7 +65,8 @@ final class LocationService: NSObject, LocationProviding, @preconcurrency CLLoca
                 return
             }
             current.delegate = self
-            current.desiredAccuracy = kCLLocationAccuracyHundredMeters
+            // Speed and course come from satellite fixes, which a coarse request may not wait for.
+            current.desiredAccuracy = precise ? kCLLocationAccuracyBest : kCLLocationAccuracyHundredMeters
             if status == .notDetermined { current.requestWhenInUseAuthorization() }
             else { current.requestLocation(); self.scheduleTimeout() }
         }
@@ -106,7 +111,9 @@ final class LocationService: NSObject, LocationProviding, @preconcurrency CLLoca
     }
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard manager === self.manager, pending, let location = locations.last, location.horizontalAccuracy >= 0 else { return }
-        let fix = Fix(lat: location.coordinate.latitude, lon: location.coordinate.longitude, at: location.timestamp.timeIntervalSince1970 * 1000, speed: location.speed >= 0 ? location.speed : nil, accuracyMetres: location.horizontalAccuracy)
+        let fix = Fix(lat: location.coordinate.latitude, lon: location.coordinate.longitude, at: location.timestamp.timeIntervalSince1970 * 1000,
+                      speed: location.speed >= 0 ? location.speed : nil, accuracyMetres: location.horizontalAccuracy,
+                      course: location.course >= 0 ? location.course : nil)
         if !continuous { stop() }
         onFix?(fix)
     }

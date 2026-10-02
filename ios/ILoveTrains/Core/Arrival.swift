@@ -148,6 +148,8 @@ enum ArrivalRules {
     static let maxSamples = 24
     static let maxGap: Millis = 30_000
     static let checking: Millis = 180_000
+    // Sustained movement needs three speed samples spanning 30 s, and the first provider fix can take 15 s.
+    static let evidenceWait: Millis = 45_000
     static let retention: Millis = 7_200_000
     static let expiry: Millis = 1_800_000
 }
@@ -235,13 +237,13 @@ func reduceArrival(_ input: ArrivalInput) -> ArrivalResult {
     let fresh = last.map { now - $0.at <= ArrivalRules.maxAge } ?? false
     let distance = fresh ? last.flatMap { distanceMetres($0, input.destination) } : nil
     let away = distance.map { value in value - (last?.accuracy ?? 0) >= 300 } ?? false
-    let moving = away && (meanArrivalSpeed(samples, nowMs: now) ?? -1) >= 8
+    let moving = away && (meanArrivalSpeed(samples, nowMs: now) ?? -1) >= trainSpeedMetresPerSecond
     func nearPosition(_ sample: ArrivalSample) -> Bool {
         guard let distance = distanceMetres(sample, input.destination) else { return false }
         return sample.accuracy <= 50 && distance + sample.accuracy <= 200
     }
     func deadline() -> Millis {
-        guardState?.armed == true && !confirmed && !legacy
+        guardState?.armed == true && guardState?.basis == nil && !legacy
             ? max(arrival + ArrivalRules.expiry, (guardState?.retainedAt ?? now) + ArrivalRules.retention)
             : arrival + ArrivalRules.expiry
     }
@@ -252,8 +254,8 @@ func reduceArrival(_ input: ArrivalInput) -> ArrivalResult {
        now - retainedAt >= 60_000, now <= deadline() {
         guardState?.retainedAt = now
     }
-    let expiryDeadline = deadline()
-    let expired = now > expiryDeadline && !(input.resumeWaitUntilMs.map { now < $0 } ?? false)
+    let waiting = input.resumeWaitUntilMs.map { now < $0 } ?? false
+    let expired = now > deadline() && !waiting
     if input.cancelled {
         return result(
             expired ? .expiredUnconfirmed : .travelling,
@@ -295,17 +297,18 @@ func reduceArrival(_ input: ArrivalInput) -> ArrivalResult {
         if guardState?.basis == .estimate { guardState?.basis = nil }
         return result(.travelling, action: input.legacyCompleted ? .withdraw : .none, away: away, moving: moving)
     }
-    if guardState?.armed != true, !input.permissionPending {
+    func settle() -> ArrivalResult {
         var next = guardState ?? ArrivalGuard()
         next.basis = .estimate
         guardState = next
         return result(.arrived, basis: .estimate, action: input.legacyCompleted ? .correct : .record)
     }
-    return result(
-        away || now >= arrival + ArrivalRules.checking ? .arrivalUnconfirmed : .checkingArrival,
-        away: away,
-        moving: moving
-    )
+    let checking = result(.checkingArrival, away: away, moving: moving)
+    guard guardState?.armed == true else { return input.permissionPending ? checking : settle() }
+    if guardState?.basis == .estimate { return settle() }
+    if moving { return result(.arrivalUnconfirmed, away: away, moving: moving) }
+    if now < arrival + ArrivalRules.checking || input.permissionPending || waiting { return checking }
+    return settle()
 }
 
 func distanceMetres(_ sample: ArrivalSample, _ destination: Station?) -> Double? {
@@ -321,7 +324,7 @@ private func distanceMetres(_ left: ArrivalSample, _ right: ArrivalSample) -> Do
     return distanceMetres(fromLat: left.lat, lon: left.lon, toLat: right.lat, lon: right.lon)
 }
 
-private func distanceMetres(fromLat: Double, lon fromLon: Double, toLat: Double, lon toLon: Double) -> Double {
+func distanceMetres(fromLat: Double, lon fromLon: Double, toLat: Double, lon toLon: Double) -> Double {
     let radians = Double.pi / 180
     let latitude = (toLat - fromLat) * radians
     let longitude = (toLon - fromLon) * radians
