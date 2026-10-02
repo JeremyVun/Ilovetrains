@@ -35,7 +35,18 @@ the shared fixtures define the behaviour the native phases match.
   three clients in its own worktree, committing probe tests as soon as they
   compile and flagging contract contradictions for an owner ruling. An Opus
   fix agent then takes those probes as its acceptance suite and keeps them as
-  permanent regressions. Opus is the fallback if Fable is cut off.
+  permanent regressions. Opus is the fallback if Fable is cut off. The lead
+  names these suspects for it:
+  - Snapshot first can enter the earlier train. Within one open, a rider
+    seen at the origin at least 60 s after the shown train left replaces the
+    stored record, as ruling 2 intends. If they then board the next train,
+    the snapshot still names the departed one and enters it, one service off.
+    This happens on all three clients. Ruling 2 says being seen at the
+    platform again "means you didn't board it", so that sighting should also
+    retire the snapshot.
+  - Fixture gaps: no shared case makes the decline's hour the deciding bound,
+    and the nearest progress-window case misses by 0.36, so any window below
+    that passes.
 - iOS gates run one at a time and never in loops (see the
   `no-unattended-test-loops` memory). Android and iOS gates never run
   concurrently.
@@ -216,6 +227,7 @@ test. Phase 2c builds rule 6's actions (start, stop, decline write, running-row
 tap, notification Stop action, `entered_inferred`/`declined_inferred`), rule
 7, the start and running fixture cases, the 10-minute reset test, and runs the
 full Android gate. Setup's location pick keeps the 200 m order (ruling 22).
+2c also drops the native `0 ≤ D − at` bound in platform entry (design rule 3).
 
 - Rule 1: the reducer and `focusExpiry`, and the 45 s timer replacing the
   15 s `arrivalLookupComplete` post, also set whenever monitoring starts.
@@ -315,7 +327,8 @@ runs (hold and entry cases) and the open-race and evidence-wait tests. Phase
 3b builds rule 6's actions and the `LiveActivityIntent`, rule 7, the start
 and running cases, the 10-minute reset test, the `TravelTrackerFlowTests`
 update, and runs `tools/build-ios.sh --test`. Setup's location pick keeps the
-200 m order (ruling 22).
+200 m order (ruling 22). 3b also drops the native `0 ≤ D − at` bound in
+platform entry (design rule 3).
 
 Tests: XCTest runs every case in the three shared fixtures, plus controller
 tests for the open race, the 10-minute reset with a tracker URL, and the
