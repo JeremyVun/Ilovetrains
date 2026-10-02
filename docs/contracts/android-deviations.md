@@ -25,7 +25,7 @@ This file records deliberate differences between the native Android app and the 
   narrower than the exemplar's. Both sit on the cap height.
 - Android keeps its 22 dp page margin at every width, where the web narrows
   it to 18 px at 375 px and below, and the 360 exemplar assumes the narrow
-  margin. Below about 364 dp the guessed line's question cannot print whole
+  margin. Below about 368 dp the guessed line's question cannot print whole
   beside `STOP TRIP` and `CHANGE`, so it ellipsizes (`Going somewhere el…` at
   360 dp). This is open for an owner ruling.
 - The trip-over offer keeps the native `Need to get back?  SHOW THE WAY BACK`
