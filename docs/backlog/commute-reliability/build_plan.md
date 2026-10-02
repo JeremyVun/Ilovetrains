@@ -260,6 +260,39 @@ accepted it. Phase 4 re-accepts the Android `board-transfer`,
 and `board-light` (12 px tuck under the rule gone) baselines on the baseline
 device.
 
+Phase 2b done: `6e83e7e` on `cr-android` (not yet merged). Pure logic for
+rules 2-5 and the decline is in `Inference.kt`; `InferenceConformanceTest`
+runs every hold and entry case, and `CommuteReliabilityControllerTest`
+drives the view model offline on the bundled timetable (Rhodes → Central:
+this package routes Rhodes → Town Hall through Central). Seams for 2c:
+
+- Start and stop build on `pinJourney` / `unpinJourney`, which already clear
+  `lastAnswer` and the open snapshot (`forgetLastAnswer`). A guessed stop
+  calls `declineInference(focus)` before clearing the focus; adding
+  `declined_inferred` follows `entered_inferred` (`AnalyticsEventNames`,
+  `Analytics`, `HeaderMetrics`). Starting the guessed journey itself must
+  keep its guard rather than go through `resetArrivalTracking`.
+- `entered_inferred` fires in `enterInferred` for platform and on-board
+  entry, not for Change destination's `resolveRedirect`.
+- The open snapshot is taken in `startForegroundWork` only when the screen
+  is already Home (also `back()` and widget opens to Home), so the 10-minute
+  reset must route to Home before that runs or call `homeOpened()` itself.
+  `activityResumed` counts a foreground visit only after `activityStopped`.
+- `refreshTick()` is the 30-second tick; `location()` and `arrivalLocation()`
+  read the debug clock, so tests drive them with `debugSetTrackerClock`.
+- `inference.json` `startCases` and `runningCases` are not consumed yet.
+
+Findings for the lead: both natives keep `0 ≤ D − at` in platform entry
+(Android `inferredFocus`, iOS `Prediction.swift`), where the web and
+client-storage condition 2 bound only `D − at ≤ 15 min`, so on native every
+enterable record is also held and the snapshot adds almost nothing. Inference
+tries the snapshot first, so within one open a rider seen at the origin a
+minute after the shown train left (the stored record replaced, as ruling 2
+intends) who then boards the next train is entered one service off, as on
+the web. No shared case makes the decline's hour binding (native
+`InferenceTest` covers it), and the progress-window case misses by 0.36, so
+windows below that pass.
+
 ## Phase 3 — iOS
 
 Owns: `ios/ILoveTrains/Core/{Arrival,Prediction,TrainViewModel,
