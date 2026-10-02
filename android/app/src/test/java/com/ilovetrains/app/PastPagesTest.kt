@@ -143,11 +143,12 @@ class PastPagesTest {
         val pages = PastPages(this) {}
         pages.next(key, now, { release.await() }, { release.await() })
         yield()
-        pages.next(other, now, { emptyList() }, { emptyList() })
+        val otherRow = service("T5", now - 15 * minute)
+        assertTrue(pages.next(other, now, { listOf(otherRow) }, { emptyList() }))
         release.complete(listOf(service("T1", now - 20 * minute)))
         pages.join()
         assertTrue(pages.rows(key).isEmpty())
-        assertTrue(pages.rows(other).isEmpty())
+        assertEquals(listOf(otherRow), pages.rows(other).toList())
     }
 
     @Test fun departedPageRowsJoinTheBoardAndTheBoardsObservationsWin() {
