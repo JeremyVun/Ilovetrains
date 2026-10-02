@@ -49,7 +49,11 @@ recovery. Personal files use iOS file protection and are excluded from iCloud
 backup. Raw location fixes never enter the document. Board caches are keyed by
 directed endpoints and canonical modes, bounded to 64 files; deletion removes
 both directions and every mode variant. A focused journey retains its source in
-personal storage independently of cache eviction.
+personal storage independently of cache eviction. `inferenceDeclined` keeps
+`tripId`, `reverse`, epoch-millisecond `at` and `arrival`, and `departure` as
+`Journey.departureKey`, the first service leg's `line:scheduledMillis`; a
+record missing or mistyping any of them is dropped on load, and a pending trip
+deletion carries it so undo restores it.
 
 iOS follows the web ten-trip LRU policy. A saved trip is deleted by swiping its
 row (a short swipe reveals `Delete`, a full swipe commits) or from its context
@@ -66,7 +70,7 @@ temporary exclusion by either.
 Native expiry restores scheduled times and static platform baselines, as bound
 by [native-data.md](native-data.md).
 
-The same generated prediction and row cases run in XCTest. Release builds keep
+The same generated prediction, row and inference cases run in XCTest. Release builds keep
 anonymous counters in `analytics-v1` (see "Analytics queue"); explicit
 feedback drafts remain only in controller memory.
 Both native journey decoders reject empty journeys and timestamps outside the finite

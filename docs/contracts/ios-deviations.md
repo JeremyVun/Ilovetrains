@@ -62,6 +62,13 @@ iOS implementation requested on 2026-09-07.
   Timetable generation time and realtime observation time are never renewed
   merely by loading a cache. A focused service's alternatives retain their own
   source evidence, independently of its cancellation or delay update.
+- The departures board pages back with pull-to-refresh at the top of the list,
+  as it always has, rather than loading the first past page as the board
+  opens: loading on open would push the `NOW` anchor down as rows arrive above
+  it. The first pull on a board asks from 30 minutes ago for ten services and
+  each later pull from the earliest loaded departure − 60 minutes; every page
+  merges the bundled timetable plan for the same time, as
+  [ui.md](ui.md#departure-board) sets out for both native clients.
 - The 40 minute live horizon in [ui.md](ui.md#past-stale-and-exceptional-data)
   reads the first leg's departure estimate, while the rest of the row's live
   register reads `journey.realtime`, which is true for an estimate on any leg.
