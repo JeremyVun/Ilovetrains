@@ -164,8 +164,9 @@ Keep the chronological board route and its existing limits. A separate
 recommendation result retains its own source in the planner/controller envelope
 so it is not lost by the board's prefix limit. Reuse loaded connections and
 realtime overlays; do not reload the timetable for each objective.
-Home recommends from the current time even when the chronological board starts
-15 minutes earlier to retain recently departed services.
+Home recommends from the current time, even though the board's local plan
+also keeps the 15 minutes before it (two merged plans, described with the
+board cache below).
 
 The recommendation pass examines the first 72 distinct eligible origin
 services in effective-departure order, without the board pass's sparse hourly
@@ -288,6 +289,12 @@ live observation supersedes the old one. A successful online answer remains
 authoritative for future services, including an empty answer, while recent
 departed services remain available for scrolling. Retained past rows are
 bounded to 24 hours and never cross station-pair or enabled-mode cache keys.
+
+A board's local plan is two timetable plans merged by journey key: the next 24
+departures from now, and 24 from 15 minutes earlier for the services that just
+left (owner ruling 24, 2026-10-02). A single plan from 15 minutes earlier
+filled with departed services on a busy corridor, Central–Parramatta at 08:00,
+and offered no train to take.
 
 The native cache stores an optional `homeJourneyKey`. Offline Home preserves
 that answer, even after departure, until its last-known arrival plus 30 minutes.
@@ -441,7 +448,10 @@ join remains mandatory.
 The iOS controller paints a stored board, races local planning against the online
 Trip Planner, and then prefers the online result while retaining local scheduled
 past rows. Foreground refresh is every 30 seconds and resumes immediately;
-backgrounding cancels request publication and location work. It checks timetable
+backgrounding cancels request publication and location work. A tick whose
+realtime fetch fails, as every one does with no connection, still refreshes the
+board unless a followed journey's request is in flight; otherwise the offline
+board never moved on. It checks timetable
 versions at most every six hours while active, plus the explicit Settings action.
 The shared API required no change for the iOS port.
 

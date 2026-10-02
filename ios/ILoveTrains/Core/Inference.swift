@@ -23,6 +23,8 @@ let progressWindow = 0.25
 let declineHold: Millis = 3_600_000
 let newOpenAfter: Millis = 600_000
 let timetablePageLimit = 30
+let offlineBoardLimit = 24
+let offlineBoardLookback: Millis = 900_000
 let firstPastPageLookback: Millis = 1_800_000
 let firstPastPageLimit = 10
 let pastPageStep: Millis = 3_600_000
@@ -57,6 +59,13 @@ func replacesLastAnswer(data: UserData, incoming: LastAnswer, now: Millis, sight
     return now < departure || (sightingAt.map { $0 >= departure + holdSightingAfter } ?? false)
 }
 
+// Ruling 2: seen at the origin a minute after the snapshot's train left, the rider did not board it.
+func retiresSnapshot(data: UserData, snapshot: LastAnswer?, incoming: LastAnswer, sightingAt: Millis?) -> Bool {
+    guard let snapshot, let trip = data.trips.first(where: { $0.id == snapshot.tripId }),
+          let sightingAt, incoming.stationId == origin(trip, reverse: snapshot.reverse).id else { return false }
+    return sightingAt >= snapshot.journey.effectiveDeparture + holdSightingAfter
+}
+
 func tickNeedsFix(data: UserData, now: Millis, shownDepartures: [Millis], fix: Fix?, previousFix: Fix?) -> Bool {
     if shownDepartures.contains(where: { now >= $0 && now - $0 <= shownDepartureFixWindow }) { return true }
     if let stored = data.lastAnswer, lastAnswerInferable(stored, data: data, now: now),
@@ -74,6 +83,36 @@ func inferenceDeclined(_ data: UserData, tripId: String, now: Millis, journey: J
 func inferenceDecline(of focus: FocusedJourney, at now: Millis) -> InferenceDecline {
     InferenceDecline(tripId: focus.tripId, reverse: focus.reverse, at: now,
                      departure: focus.journey.departureKey, arrival: focus.composedJourney.effectiveArrival)
+}
+
+private func savedLeg(_ data: UserData, from: String, to: String) -> (tripId: String, reverse: Bool)? {
+    for trip in data.trips {
+        if let reverse = [false, true].first(where: { origin(trip, reverse: $0).id == from && destination(trip, reverse: $0).id == to }) {
+            return (trip.id, reverse)
+        }
+    }
+    return nil
+}
+
+// Ruling 23: any stop on a saved pair declines it, or the next train-speed fix guesses a rider still riding back in.
+private func stopDecline(data: UserData, focus: FocusedJourney, at now: Millis) -> InferenceDecline? {
+    var owned = focus
+    if focus.pinned {
+        guard let owner = savedLeg(data, from: focus.board.from.id, to: focus.board.to.id) else { return nil }
+        owned.tripId = owner.tripId
+        owned.reverse = owner.reverse
+    }
+    return inferenceDecline(of: owned, at: now)
+}
+
+/// Stop trip's change to the document, and whether it is reported: only a guessed stop is. The open snapshot clears too.
+func stoppedTrip(_ data: UserData, at now: Millis) -> (data: UserData, declinedInferred: Bool)? {
+    guard let focus = data.focus else { return nil }
+    var stopped = data
+    stopped.focus = nil
+    stopped.lastAnswer = nil
+    if let decline = stopDecline(data: data, focus: focus, at: now) { stopped.inferenceDeclined = decline }
+    return (stopped, !focus.pinned)
 }
 
 // Moving toward the destination is what stops a walk home for a forgotten laptop reading as a ride.
@@ -94,7 +133,8 @@ func inferredFocus(data: UserData, record: LastAnswer?, fix: Fix, now: Millis) -
     let journey = last.journey
     guard now >= journey.effectiveDeparture, now <= journey.effectiveArrival + travelLate,
           last.stationId == from.id,
-          journey.effectiveDeparture - last.at <= travelSeen else { return nil }
+          // A record written after its train left is a retained answer, not evidence of boarding.
+          (0...travelSeen).contains(journey.effectiveDeparture - last.at) else { return nil }
 
     let left = distanceMetres(fix, from)
     let tripDistance = distanceMetres(Fix(lat: from.lat, lon: from.lon, at: now), to)
@@ -189,7 +229,9 @@ func onBoardRequests(data: UserData, now: Millis, fix: Fix, previousFix: Fix?, c
         .prefix(onBoardCandidates)
         .map { candidate in
             let key = onBoardKey(tripId: candidate.trip.id, reverse: candidate.reverse)
-            let ride = (cached[key] ?? []).compactMap(rideDuration).max() ?? onBoardDefaultRide
+            // The median, lower middle for an even count: one long offline itinerary cannot push the window past every service.
+            let durations = (cached[key] ?? []).compactMap(rideDuration).sorted()
+            let ride = durations.isEmpty ? onBoardDefaultRide : durations[(durations.count - 1) / 2]
             return OnBoardRequest(
                 tripId: candidate.trip.id, reverse: candidate.reverse,
                 from: origin(candidate.trip, reverse: candidate.reverse),
@@ -253,4 +295,24 @@ func mergedPage(online: BoardData?, timetable: BoardData?) -> BoardData? {
         $0.effectiveDeparture != $1.effectiveDeparture ? $0.effectiveDeparture < $1.effectiveDeparture : $0.key < $1.key
     }
     return merged
+}
+
+/// Ruling 24: the next departures from now joined by the last quarter hour's, because a busy corridor's quarter hour
+/// alone can fill the whole plan with trains that already left.
+func offlineBoard(
+    _ planner: OfflinePlanner,
+    from: Station,
+    to: Station,
+    now: Millis,
+    modes: Set<String>,
+    maxTransfers: Int,
+    recommendationAt: Millis? = nil
+) async throws -> OfflinePlanResult {
+    async let recent = try? planner.plan(from: from, to: to, at: now - offlineBoardLookback, modes: modes,
+                                         limit: offlineBoardLimit, maxTransfers: maxTransfers)
+    var upcoming = try await planner.planResult(from: from, to: to, at: now, modes: modes, limit: offlineBoardLimit,
+                                                maxTransfers: maxTransfers, recommendationAt: recommendationAt,
+                                                includeRecommendation: recommendationAt != nil)
+    upcoming.board = mergedPage(online: upcoming.board, timetable: await recent) ?? upcoming.board
+    return upcoming
 }

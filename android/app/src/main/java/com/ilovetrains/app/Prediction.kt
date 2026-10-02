@@ -119,8 +119,9 @@ fun inferredFocus(data: UserData, fix: Fix, now: Long): FocusedJourney? {
     val (from, to) = trip.ends(last.reverse)
     val j = last.journey
     if (rideRecorded(data, trip.id, last.reverse, j)) return null
+    // A record written after its train left is a retained answer, not evidence of boarding.
     if (now !in j.effectiveDeparture..(j.effectiveArrival + TravelLateMillis) || last.stationId != from.id ||
-        j.effectiveDeparture - last.at > TravelSeenMillis) return null
+        j.effectiveDeparture - last.at !in 0..TravelSeenMillis) return null
     val left = distanceMetres(fix, from)
     val span = distanceMetres(from, to)
     if (!left.isFinite() || !span.isFinite()) return null

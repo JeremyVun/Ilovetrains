@@ -3,6 +3,7 @@ package com.ilovetrains.app
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
@@ -57,18 +58,37 @@ class InferenceConformanceTest {
         }
     }
 
+    @Test fun stopCasesDeclineAsTheWebDeclines() {
+        val cases = fixture.getJSONObject("stopCases").getJSONArray("cases")
+        assertTrue(cases.length() > 0)
+        for (index in 0 until cases.length()) {
+            val case = cases.getJSONObject(index)
+            val name = case.getString("name")
+            val focus = focusOf(case.getJSONObject("focus"))
+            val stopped = document(case.getJSONObject("doc")).copy(focus = focus).withTripStopped(case.getLong("nowMs"))
+            assertNull(name, stopped.focus)
+            assertEquals(name, case.optJSONObject("expectedDecline")?.let { decline ->
+                InferenceDecline(decline.getString("tripId"), decline.getString("direction") == "reverse", decline.getLong("at"),
+                    departureKey(decline.getString("departure")), decline.getLong("arrival"))
+            }, stopped.inferenceDeclined)
+            assertEquals(name, case.getBoolean("expectedEvent"), !focus.pinned)
+        }
+    }
+
     private fun entered(case: JSONObject): String? {
         var data = document(case.getJSONObject("doc"))
+        var snapshot = case.optJSONObject("snapshot")?.let { record(it, null) }
         val writes = case.getJSONArray("writes")
         for (index in 0 until writes.length()) {
             val write = writes.getJSONObject(index)
-            data = data.withLastAnswer(record(write.getJSONObject("record"), write.getLong("nowMs")),
-                write.optLong("sightingAt").takeIf { !write.isNull("sightingAt") })
+            val written = record(write.getJSONObject("record"), write.getLong("nowMs"))
+            val sightingAt = write.optLong("sightingAt").takeIf { !write.isNull("sightingAt") }
+            if (retiresSnapshot(data, snapshot, written.stationId, sightingAt)) snapshot = null
+            data = data.withLastAnswer(written, sightingAt)
         }
         val now = case.getLong("nowMs")
         val fix = fixOf(case.getJSONObject("fix"), now)
         val previousFix = case.optJSONObject("previousFix")?.let { fixOf(it, now) }
-        val snapshot = case.optJSONObject("snapshot")?.let { record(it, null) }
         inferFromRecords(data, snapshot, now, fix)?.let { return described("platform", it.tripId, it.reverse, it.journey) }
         val cached = boards(case.getJSONObject("cached"))
         case.optJSONArray("expectedRequests")?.let { requests ->
@@ -100,12 +120,6 @@ class InferenceConformanceTest {
     private fun document(raw: JSONObject): UserData {
         val trips = raw.getJSONArray("trips").objects { SavedTrip(it.getString("id"), Wire.station(it.getJSONObject("from")), Wire.station(it.getJSONObject("to"))) }
         val preferences = raw.optJSONObject("preferences") ?: JSONObject()
-        val focus = raw.optJSONObject("focus")?.let { focus ->
-            val journey = Wire.journey(focus.getJSONObject("journey"))
-            FocusedJourney(focus.getString("tripId"), focus.getString("direction") == "reverse", journey,
-                BoardData(journey.legs.first().from, journey.legs.last().to, listOf(journey), time(focus.getString("focusedAt"))),
-                pinned = focus.optString("by") != "inferred")
-        }
         return UserData(
             trips = trips,
             history = raw.optJSONArray("history").objects { ViewEvent(it.getString("tripId"), it.getString("direction") == "reverse", time(it.getString("t"))) },
@@ -113,17 +127,27 @@ class InferenceConformanceTest {
                 Ride(ride.getString("tripId"), ride.getString("direction") == "reverse",
                     time(ride.optString("scheduledDeparture").ifEmpty { ride.getString("departedAt") }), time(ride.getString("arrivedAt")))
             },
-            focus = focus,
+            focus = raw.optJSONObject("focus")?.let(::focusOf),
             lastAnswer = raw.optJSONObject("lastOpen")?.let { record(it, null) },
             useLocation = preferences.optBoolean("useLocation", true),
             modes = preferences.optJSONArray("enabledModes")?.let { modes -> (0 until modes.length()).map(modes::getString).toSet() } ?: AllModes,
             inferenceDeclined = raw.optJSONObject("inferenceDeclined")?.let { decline ->
-                val departure = JSONArray(decline.getString("departure"))
                 InferenceDecline(decline.getString("tripId"), decline.getString("direction") == "reverse", time(decline.getString("at")),
-                    "${departure.getString(0)}:${time(departure.getString(1))}", time(decline.getString("arrival")))
+                    departureKey(decline.getString("departure")), time(decline.getString("arrival")))
             },
         )
     }
+
+    /** A web focus; a native focus carries its journey's board, from its first leg's origin to its last leg's destination. */
+    private fun focusOf(raw: JSONObject): FocusedJourney {
+        val journey = Wire.journey(raw.getJSONObject("journey"))
+        return FocusedJourney(raw.getString("tripId"), raw.getString("direction") == "reverse", journey,
+            BoardData(journey.legs.first().from, journey.legs.last().to, listOf(journey), time(raw.getString("focusedAt"))),
+            pinned = raw.optString("by") != "inferred")
+    }
+
+    /** The web departureKey, a JSON [line, ISO departure], as the native `line:epoch ms`. */
+    private fun departureKey(web: String) = JSONArray(web).let { "${it.getString(0)}:${time(it.getString(1))}" }
 
     /** A lastOpen record; a write's record takes its write time as [at]. */
     private fun record(raw: JSONObject, at: Long?): LastAnswer {

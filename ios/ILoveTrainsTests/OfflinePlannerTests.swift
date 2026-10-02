@@ -95,6 +95,25 @@ final class OfflinePlannerTests: XCTestCase {
         XCTAssertEqual(coverage, "5 Sep 2026–4 Oct 2026")
     }
 
+    /// The unit-test host installs the bundled timetable as it launches while a test's own planner installs beside it.
+    func testTwoPlannersInstallingIntoOneDirectoryAtOnceBothOpenTheTimetable() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let first = OfflinePlanner(bundle: .main, directory: directory)
+        let second = OfflinePlanner(bundle: .main, directory: directory)
+
+        async let firstInstalled: Void = first.initialize()
+        async let secondInstalled: Void = second.initialize()
+        _ = try await (firstInstalled, secondInstalled)
+
+        let monday = sydneyMillis(year: 2026, month: 9, day: 7, hour: 10)
+        for planner in [first, second] {
+            let board = try await planner.plan(from: station("200060", "Central Station", "train", "metro"),
+                                               to: station("215020", "Parramatta Station", "train"), at: monday, modes: ["train"])
+            XCTAssertFalse(board.journeys.isEmpty)
+        }
+    }
+
     func testRealPackageTimingProfile() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }

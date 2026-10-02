@@ -3,7 +3,13 @@
 - `build-ios.sh` — build/test the native SwiftUI client, prepare a Release archive, or upload an internal TestFlight build (`--testflight`).
   `--unit [TestClass[/testMethod]...]` and `--ui [TestClass[/testMethod]...]`
   select a test target, optionally filtered, for iteration. `--test` retains
-  the full core + UI gate. Also supports `--simulator`, `--device` and `--unsigned-archive`; see
+  the full core + UI gate. Every test mode first deletes the built `*Tests.xctest`
+  bundles and uninstalls the app and UI runner from the simulator: incremental
+  rebuilds have run test code one or two edits old with no error. A direct
+  `xcodebuild test` keeps that trap, so run tests through the helper. The fresh
+  install re-extracts the bundled timetable as the host app launches; a test's
+  own `OfflinePlanner` waits its turn for that directory rather than racing it. Also
+  supports `--simulator`, `--device` and `--unsigned-archive`; see
   [iOS operations](../docs/operations/ios.md) for signing and installation.
 - `generate-ios-project.rb` — regenerate the checked-in Xcode project after adding
   files. Requires the `xcodeproj` Ruby gem and reads the canonical web version.
@@ -40,7 +46,7 @@
   Serve `web/` on a private loopback server first. Provider evidence passes
   through callbacks; the checker never assigns a final arrival state. Synthetic
   networking sends no real API, feedback or analytics request.
-- `check-commute-reliability.js [--out DIR] [--only past,arrival,reopen,start,boarding,onboard]`
+- `check-commute-reliability.js [--out DIR] [--only past,arrival,reopen,start,boarding,snapshot,onboard]`
   — builds the TfNSW stub and the server into a temporary directory, boots
   both on free loopback ports with no API key, checks with `lsof` that the
   listener's cwd is this checkout, and drives the real web client in headless
@@ -48,9 +54,13 @@
   limit 10, reaching the services of the last half hour), a guarded trip
   reading `Checking arrival` through the 45 s evidence wait and then settling
   by estimate, a 9-minute return keeping the board while a 10-minute return
-  lands on Home, running-row starts and Stop trip (silent on a started trip,
-  declining a guessed one), Home left open through boarding, and on-board
-  entry. Each check states which guard it proves. The clock, permission,
+  lands on Home, running-row starts and Stop trip (declining a started trip
+  silently and a guessed one with `declined_inferred`), Home left open
+  through boarding, a platform
+  sighting after the shown train left retiring the open snapshot so boarding
+  the next train enters it (`snapshot`, the adversarial review's real-stack
+  probe, kept here as a permanent regression), and on-board entry. Each check
+  states which guard it proves. The clock, permission,
   geolocation provider and visibility are page-side adapters; the refresh tick
   is shortened only in the boarding check. Trap: the stub serves fixtures
   verbatim and the server refuses an `at` older than 24 hours, so the checker

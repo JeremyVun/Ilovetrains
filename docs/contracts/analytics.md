@@ -125,8 +125,10 @@ an equal identity key (every service leg's line and scheduled departure:
 `journeyKey` on web, `Journey.key` on native); `service` means the same trip
 and direction with another key. A same-trip pin when home displayed no lead
 journey emits nothing. Each start emits at most once; stopping a trip the
-rider started emits nothing, and stopping a guessed trip emits only
-`declined_inferred`. `rode_*` never fires for a correction of an existing ride
+rider started emits nothing, though it still writes the decline for a trip on
+a saved pair (owner ruling 23, [client-storage.md](client-storage.md)), and
+stopping a guessed trip emits only `declined_inferred`. The event stays
+guessed-only so the wrong-entry rate below counts only guesses. `rode_*` never fires for a correction of an existing ride
 or a legacy ride restored by migration; a withdrawn estimate ride recorded again counts
 again.
 

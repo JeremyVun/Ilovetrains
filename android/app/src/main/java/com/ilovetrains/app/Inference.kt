@@ -103,6 +103,13 @@ fun tickNeedsFix(data: UserData, now: Long, shownDepartures: Collection<Long>, f
 fun UserData.withLastAnswer(record: LastAnswer, sightingAt: Long?): UserData =
     if (replacesLastAnswer(this, record.stationId, record.at, sightingAt)) copy(lastAnswer = record) else this
 
+// Ruling 2: seen at the origin a minute after the snapshot's train left, the rider did not board it.
+fun retiresSnapshot(data: UserData, snapshot: LastAnswer?, incomingStationId: String?, sightingAt: Long?): Boolean {
+    val trip = snapshot?.let { data.trips.find { trip -> trip.id == it.tripId } } ?: return false
+    return incomingStationId != null && incomingStationId == trip.ends(snapshot.reverse).first.id &&
+        sightingAt != null && sightingAt >= snapshot.journey.effectiveDeparture + HoldSightingAfterMillis
+}
+
 fun inferenceDeclined(data: UserData, tripId: String, now: Long, journey: Journey? = null): Boolean {
     val decline = data.inferenceDeclined?.takeIf { it.tripId == tripId } ?: return false
     return journey?.departureKey == decline.departure || now < maxOf(decline.at + DeclineHoldMillis, decline.arrival + TravelLateMillis)
@@ -127,11 +134,23 @@ internal fun FocusedJourney.sameService(other: FocusedJourney): Boolean =
 fun UserData.withTripStarted(started: FocusedJourney): UserData =
     copy(focus = focus?.takeIf { it.sameService(started) }?.copy(pinned = true) ?: started)
 
-/** Stop trip records no ride; stopping a guessed trip declines it so the guess cannot come straight back. */
+fun savedLeg(data: UserData, from: Station, to: Station): TripDirection? = data.trips.firstNotNullOfOrNull { trip ->
+    listOf(false, true).firstOrNull { reverse -> trip.ends(reverse).let { it.first.id == from.id && it.second.id == to.id } }
+        ?.let { TripDirection(trip.id, it) }
+}
+
 fun UserData.withTripStopped(now: Long): UserData {
     val stopped = focus ?: return this
-    return copy(focus = null).let { if (stopped.pinned) it else it.declining(stopped, now) }
+    // Ruling 23: otherwise the next train-speed fix guesses a rider still riding back in.
+    val owner = if (stopped.pinned) savedLeg(this, stopped.board.from, stopped.board.to) else TripDirection(stopped.tripId, stopped.reverse)
+    val cleared = copy(focus = null)
+    return owner?.let { cleared.declining(stopped.copy(tripId = it.tripId, reverse = it.reverse), now) } ?: cleared
 }
+
+// Evidence for another train survives the expiry.
+fun UserData.withFocusExpired(expired: FocusedJourney): UserData = copy(focus = null, lastAnswer = lastAnswer?.takeUnless {
+    it.tripId == expired.tripId && it.reverse == expired.reverse && it.journey.key == expired.journey.key
+})
 
 fun rideRecorded(data: UserData, tripId: String, reverse: Boolean, journey: Journey): Boolean =
     data.rides.any { it.tripId == tripId && it.reverse == reverse && it.departure == journey.departure }
@@ -196,9 +215,11 @@ fun onBoardRequests(data: UserData, now: Long, fix: Fix?, previousFix: Fix?, cac
     }
     return candidates.sortedWith(compareBy<Candidate>({ it.ratio }, { it.index })).take(OnBoardCandidates).map { candidate ->
         val key = TripDirection(candidate.trip.id, candidate.reverse)
-        val longest = cached[key].orEmpty().map { it.effectiveArrival - it.effectiveDeparture }.filter { it >= 0 }.maxOrNull()
+        val durations = cached[key].orEmpty().map { it.effectiveArrival - it.effectiveDeparture }.filter { it >= 0 }.sorted()
+        // The median, lower middle for an even count: one long offline itinerary cannot push the window past every service.
+        val ride = durations.getOrNull((durations.size - 1) / 2) ?: OnBoardDefaultRideMillis
         val (from, to) = candidate.trip.ends(candidate.reverse)
-        OnBoardRequest(key, from, to, now - ((longest ?: OnBoardDefaultRideMillis) + OnBoardLookbackMarginMillis), OnBoardLimit)
+        OnBoardRequest(key, from, to, now - (ride + OnBoardLookbackMarginMillis), OnBoardLimit)
     }
 }
 

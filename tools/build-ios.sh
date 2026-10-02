@@ -27,6 +27,9 @@ case "$mode" in
     if [ "$mode" != --simulator ]; then
       xcrun simctl boot "$simulator" 2>/dev/null || true
       tools/check-log.sh ios-boot xcrun simctl bootstatus "$simulator" -b
+      # An incremental rebuild has run a test bundle one or two edits old; every run starts from a fresh bundle and install.
+      [ ! -d "$derived/Build/Products" ] || find "$derived/Build/Products" -name '*Tests.xctest' -prune -exec rm -rf {} +
+      for bundle in com.ilovetrains.ios com.ilovetrains.ios.uitests.xctrunner; do xcrun simctl uninstall "$simulator" "$bundle" 2>/dev/null || true; done
       tools/check-log.sh "ios-${mode#--}" xcodebuild "${project[@]}" -destination "platform=iOS Simulator,id=$simulator" -parallel-testing-enabled NO ${selection[@]+"${selection[@]}"} test CODE_SIGNING_ALLOWED=NO
     else
       tools/check-log.sh ios-build xcodebuild "${project[@]}" -destination "platform=iOS Simulator,id=$simulator" build CODE_SIGNING_ALLOWED=NO

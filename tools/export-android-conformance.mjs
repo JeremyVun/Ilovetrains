@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { predict, locate, scoreCandidate, historyEvidence, automaticHomeOf } from '../web/js/predict.js';
 import { here, sightingOf, trainSpeed } from '../web/js/stations.js';
 import {
-  inferFromRecords, inferOnBoard, onBoardRequests, replacesLastOpen, runningJourney, startable, writeLastOpen
+  inferFromRecords, inferOnBoard, onBoardRequests, replacesLastOpen, retiresSnapshot, runningJourney, startable,
+  stoppedTrip, writeLastOpen
 } from '../web/js/focus.js';
 import { readFileSync } from 'node:fs';
 import { boardModel } from '../web/js/rowmodel.js';
@@ -277,13 +278,39 @@ const entryCases = [
   { name: 'a journey whose mode is turned off cannot be entered', snapshot: SEEN,
     doc: commuteDoc({ lastOpen: SEEN, preferences: { useLocation: true, enabledModes: ['metro', 'ferry'] } }),
     nowMs: ms('08:10'), fix: fixAtPlace(STRATHFIELD, '08:10'), expected: null },
+  { name: 'snapshot: a same-origin sighting 60 s after departure retires the departed train from the snapshot too',
+    snapshot: SEEN, doc: commuteDoc({ lastOpen: SEEN }), writes: [writeOf('08:01:10', t9('08:08'), {}, '08:01:10')],
+    nowMs: ms('08:12'), fix: fixAtPlace(STRATHFIELD, '08:12', { speed: 14 }), expected: platform(t9('08:08')) },
+  { name: 'snapshot: a same-origin sighting fix taken 59.999 s after departure keeps it, though written later',
+    snapshot: SEEN, doc: commuteDoc(), writes: [writeOf('08:01', t9('08:08'), {}, '08:00:59.999')],
+    nowMs: ms('08:12'), fix: fixAtPlace(STRATHFIELD, '08:12', { speed: 14 }), expected: platform(t9('08:00')) },
+  { name: 'snapshot: a same-origin sighting fix taken exactly 60 s after departure retires it',
+    snapshot: SEEN, doc: commuteDoc(), writes: [writeOf('08:01', t9('08:08'), {}, '08:01')],
+    nowMs: ms('08:12'), fix: fixAtPlace(STRATHFIELD, '08:12', { speed: 14 }), expected: platform(t9('08:08')) },
+  { name: 'snapshot: a sighting at an intermediate station keeps it',
+    snapshot: SEEN, doc: commuteDoc(), writes: [writeOf('08:06', t9('08:08'), { station: STRATHFIELD }, '08:06')],
+    nowMs: ms('08:12'), fix: fixAtPlace(STRATHFIELD, '08:12', { speed: 14 }), expected: platform(t9('08:00')) },
+  { name: 'snapshot: a same-origin sighting recording another saved trip retires it',
+    snapshot: SEEN, doc: commuteDoc(), writes: [writeOf('08:01:10', t9('08:04', REDFERN), { tripId: 'rr' }, '08:01:10')],
+    nowMs: ms('08:12'), fix: fixAtPlace(STRATHFIELD, '08:12', { speed: 14 }), expected: platform(t9('08:04', REDFERN), 'rr') },
+  { name: 'a record written after its train left does not enter', doc: commuteDoc({ lastOpen: record('08:01:10', t9('08:00')) }),
+    snapshot: null, nowMs: ms('08:10'), fix: fixAtPlace(STRATHFIELD, '08:10'), expected: null },
+  { name: 'a record written as its train leaves still enters', doc: commuteDoc({ lastOpen: record('08:00', t9('08:00')) }),
+    snapshot: null, nowMs: ms('08:10'), fix: fixAtPlace(STRATHFIELD, '08:10'), expected: platform(t9('08:00')) },
+  { name: 'a platform sighting that re-records the departed train after it left enters it from neither record',
+    snapshot: SEEN, doc: commuteDoc({ lastOpen: SEEN }), writes: [writeOf('08:01:10', t9('08:00'), {}, '08:01:10')],
+    nowMs: ms('08:12'), fix: fixAtPlace(STRATHFIELD, '08:12', { speed: 14 }), expectedRequests: [], expected: null },
 ].map((value) => ({ writes: [], previousFix: null, boards: {}, cached: {}, ...value }));
 
 function enteredBy(value) {
   let doc = value.doc;
-  for (const write of value.writes) doc = writeLastOpen(doc, write.record, write.nowMs, write.sightingAt);
+  let snapshot = value.snapshot;
+  for (const write of value.writes) {
+    if (retiresSnapshot(doc, snapshot, write.record, write.sightingAt)) snapshot = null;
+    doc = writeLastOpen(doc, write.record, write.nowMs, write.sightingAt);
+  }
   const described = (via, focus) => focus && { via, tripId: focus.tripId, direction: focus.direction, journeyKey: keyOf(focus.journey) };
-  const platformEntry = inferFromRecords(doc, value.snapshot, value.nowMs, value.fix);
+  const platformEntry = inferFromRecords(doc, snapshot, value.nowMs, value.fix);
   if (platformEntry) return described('platform', platformEntry);
   if (value.expectedRequests) {
     const asked = onBoardRequests(doc, value.nowMs, value.fix, value.previousFix, value.cached)
@@ -296,7 +323,9 @@ function enteredBy(value) {
 /* On board at Strathfield, 4.64 km from Rhodes: position progress is 0.309 toward
    Town Hall and 0.320 toward Redfern. At 08:10 the 08:00 T9 has 0.370 of its
    ride behind it (gap 0.062 to Town Hall, 0.135 to Redfern), the 08:08 has 0.074
-   (0.235 and 0.229) and the 07:52 0.667 (0.358, and 0.818 to Redfern). */
+   (0.235 and 0.229) and the 07:52 0.667 (0.358, and 0.818 to Redfern). A
+   30-minute ride that left at 07:53:32 has 0.549 behind it (0.240 to Town Hall)
+   and one that left at 07:52:56 has 0.569 (0.260). */
 const BURWOOD = place('213410', 'Burwood Station', -33.877315, 151.104762);
 const ASHFIELD = place('213610', 'Ashfield Station', -33.887917, 151.125688);
 const NORTH_STRATHFIELD = place('213710', 'North Strathfield Station', -33.858688, 151.087986);
@@ -346,6 +375,12 @@ const onBoardCases = [
   { name: 'on board: no running service within 0.25 of the position', fix: onBoardFix('08:10', { heading: 90 }),
     boards: { 'rt|forward': [t9('07:52'), t9('08:16')], 'rr|forward': [t9('07:52', REDFERN), t9('08:16', REDFERN)] },
     expectedRequests: [ask('rr', '07:00'), ask('rt', '07:00')], expected: null },
+  { name: 'on board: a service 0.24 off the position progress still matches', doc: commuteDoc(rtOnly),
+    fix: onBoardFix('08:10', { heading: 90 }), boards: { 'rt|forward': [t9('07:53:32', TOWN_HALL, { rideMinutes: 30 })] },
+    expectedRequests: [ask('rt', '07:00')], expected: onBoard(t9('07:53:32', TOWN_HALL, { rideMinutes: 30 })) },
+  { name: 'on board: a service 0.26 off the position progress is not a match', doc: commuteDoc(rtOnly),
+    fix: onBoardFix('08:10', { heading: 90 }), boards: { 'rt|forward': [t9('07:52:56', TOWN_HALL, { rideMinutes: 30 })] },
+    expectedRequests: [ask('rt', '07:00')], expected: null },
   { name: 'on board: history breaks the tie between saved trips sharing a train', doc: commuteDoc({ history: rrHabit }),
     fix: onBoardFix('08:10', { heading: 90 }), boards: morningBoards(),
     expectedRequests: [ask('rr', '07:00'), ask('rt', '07:00')], expected: onBoard(t9('08:00', REDFERN), 'rr') },
@@ -367,10 +402,14 @@ const onBoardCases = [
     doc: commuteDoc({ trips: [...commuteTrips, ...extraTrips] }), fix: onBoardFix('08:10', { heading: 90 }),
     boards: morningBoards(), expectedRequests: [ask('rb', '07:00'), ask('ra', '07:00'), ask('rr', '07:00')],
     expected: onBoard(t9('08:00', REDFERN), 'rr') },
-  { name: 'on board: the cached board\'s longest ride sets how far back to look',
-    cached: { 'rt|forward': [t9('07:30'), t9('07:38', TOWN_HALL, { rideMinutes: 31 })] },
+  { name: 'on board: the cached board\'s median ride sets how far back to look, so one long itinerary cannot',
+    cached: { 'rt|forward': [t9('07:30'), t9('07:20', TOWN_HALL, { rideMinutes: 99 }), t9('07:38', TOWN_HALL, { rideMinutes: 31 })] },
     fix: onBoardFix('08:10', { heading: 90 }), boards: morningBoards(),
     expectedRequests: [ask('rr', '07:00'), ask('rt', '07:29')], expected: onBoard(t9('08:00')) },
+  { name: 'on board: an even count of cached rides takes the lower middle one',
+    cached: { 'rt|forward': [t9('07:38', TOWN_HALL, { rideMinutes: 31 }), t9('07:30')] },
+    fix: onBoardFix('08:10', { heading: 90 }), boards: morningBoards(),
+    expectedRequests: [ask('rr', '07:00'), ask('rt', '07:33')], expected: onBoard(t9('08:00')) },
   { name: 'on board: a platform-sighted record enters first', snapshot: SEEN,
     fix: onBoardFix('08:10', { heading: 90 }), boards: morningBoards(), expected: platform(t9('08:00')) },
   { name: 'on board: an unexpired focus blocks entry',
@@ -397,6 +436,9 @@ const declineCases = [
   { name: 'decline: holds both directions of its trip', doc: commuteDoc({ ...rtOnly, lastOpen: SEEN,
     inferenceDeclined: declined('rt', '08:05', t9('07:52', RHODES, { from: TOWN_HALL }), 'reverse') }),
     fix: fixAtPlace(STRATHFIELD, '08:10'), expected: null },
+  { name: 'decline: the hour alone holds entry once the declined arrival plus 30 min has passed', doc: commuteDoc({ ...rtOnly,
+    inferenceDeclined: declined('rt', '07:11', t9('06:52', TOWN_HALL, { rideMinutes: 38 })) }),
+    fix: onBoardFix('08:10', { heading: 90 }), boards: morningBoards(), expectedRequests: [], expected: null },
   { name: 'decline: entry resumes an hour after the decline', doc: commuteDoc({ ...rtOnly,
     inferenceDeclined: declined('rt', '07:10', t9('06:52')) }), fix: onBoardFix('08:10', { heading: 90 }),
     boards: morningBoards(), expectedRequests: [ask('rt', '07:00')], expected: onBoard(t9('08:00')) },
@@ -439,6 +481,48 @@ for (const value of runningCases) {
   assert.equal(runningJourney(value.journey, value.nowMs, value.enabledModes || ['train', 'metro', 'ferry']), value.expectedRunning, value.name);
 }
 
+/* Stop trip (rule 6, ruling 23). A started focus's pair is its journey's first
+   service leg origin to its last service leg destination. */
+const stopFocus = (by, journey, { tripId = 'rt', direction = 'forward' } = {}) =>
+  ({ tripId, direction, focusedAt: sydney('07:55'), by, journey });
+const older = declined('rr', '07:30', t9('07:00', REDFERN));
+const unsaved = stopFocus('focus', t9('08:00', STRATHFIELD, { rideMinutes: 8 }), { tripId: 'rs' });
+const stopCases = [
+  { name: 'a guessed trip declines its own trip and direction and is reported',
+    focus: stopFocus('inferred', t9('08:00')), nowMs: ms('08:05'), expectedEvent: true,
+    expectedDecline: { tripId: 'rt', direction: 'forward', departure: '["T9","2026-10-01T08:00:00+10:00"]',
+      arrival: ms('08:27'), at: ms('08:05') } },
+  { name: 'a started trip on a saved pair declines that trip unreported, until its estimated arrival',
+    focus: stopFocus('focus', t9('08:00', TOWN_HALL, { lateMinutes: 4 })), nowMs: ms('08:05'), expectedEvent: false,
+    expectedDecline: { tripId: 'rt', direction: 'forward', departure: '["T9","2026-10-01T08:00:00+10:00"]',
+      arrival: ms('08:31'), at: ms('08:05') } },
+  { name: 'a started trip on the reverse of a saved pair declines that trip in reverse',
+    focus: stopFocus('focus', t9('17:52', RHODES, { from: TOWN_HALL }), { direction: 'reverse' }), nowMs: ms('18:00'),
+    expectedEvent: false,
+    expectedDecline: { tripId: 'rt', direction: 'reverse', departure: '["T9","2026-10-01T17:52:00+10:00"]',
+      arrival: ms('18:19'), at: ms('18:00') } },
+  { name: 'a started trip on an unsaved pair writes no decline', focus: unsaved, nowMs: ms('08:05'),
+    expectedEvent: false, expectedDecline: null },
+  { name: 'a started stop replaces an older decline', doc: commuteDoc({ inferenceDeclined: older }),
+    focus: stopFocus('focus', t9('08:00')), nowMs: ms('08:05'), expectedEvent: false,
+    expectedDecline: { tripId: 'rt', direction: 'forward', departure: '["T9","2026-10-01T08:00:00+10:00"]',
+      arrival: ms('08:27'), at: ms('08:05') } },
+  { name: 'a stop that writes no decline keeps the older one', doc: commuteDoc({ inferenceDeclined: older }),
+    focus: unsaved, nowMs: ms('08:05'), expectedEvent: false,
+    expectedDecline: { tripId: 'rr', direction: 'forward', departure: '["T9","2026-10-01T07:00:00+10:00"]',
+      arrival: ms('07:22'), at: ms('07:30') } },
+].map((value) => ({ name: value.name, doc: commuteDoc(), ...value }));
+for (const value of stopCases) {
+  const legs = value.focus.journey.legDetail;
+  const stopped = stoppedTrip({ ...value.doc, focus: value.focus }, value.focus,
+    { from: legs[0].from, to: legs[legs.length - 1].to }, value.nowMs);
+  const decline = stopped.doc.inferenceDeclined;
+  assert.equal(stopped.doc.focus, undefined, value.name);
+  assert.deepEqual(decline ? { ...decline, arrival: Date.parse(decline.arrival), at: Date.parse(decline.at) } : null,
+    value.expectedDecline, value.name);
+  assert.equal(stopped.declinedInferred, value.expectedEvent, value.name);
+}
+
 const inference = {
   description: 'commute-reliability rules 3, 5 and 6, shared by web, Android and iOS. Inputs are built by '
     + 'tools/export-android-conformance.mjs; every expected value is declared by hand from the design and only '
@@ -456,12 +540,18 @@ const inference = {
     cases: holdCases
   },
   entryCases: {
-    run: 'Apply each write in order through the hold rule (a write that replaces sets lastOpen = {at: its nowMs '
-      + 'as ISO, ...record}). Then evaluate a Home fix at nowMs: platform-sighted inference from snapshot, then from '
+    run: 'Apply each write in order. A write whose record is sighted at the origin of the snapshot\'s '
+      + 'leg(trip, direction) on the saved trip (record.station.id equal to that origin\'s id), by a fix taken at '
+      + 'sightingAt >= the snapshot journey\'s effective departure + 60 s, retires the snapshot: it is null from then '
+      + 'on, whether or not the hold rule lets the write replace the stored record. The write\'s nowMs plays no part '
+      + 'in retirement. Then the write goes through the hold rule (a write that replaces sets lastOpen = {at: its '
+      + 'nowMs as ISO, ...record}). Then evaluate a Home fix at nowMs: platform-sighted inference from snapshot, then from '
       + 'the stored doc.lastOpen. Only when neither enters and the fix is at train speed (given previousFix), '
       + 'on-board entry: expectedRequests, when present, is the ordered list of departures requests '
       + '(from and to are station ids, at is epoch ms, limit the journey count) built from doc, fix, previousFix and '
-      + 'cached (each pair\'s cached journeys, keyed <tripId>|<direction>); boards answers each request by the same '
+      + 'cached (each pair\'s cached journeys, keyed <tripId>|<direction>; at = nowMs - (median + 10 min), the median '
+      + 'being of the effective durations A - D >= 0 there, the lower middle for an even count, 60 min when none); '
+      + 'boards answers each request by the same '
       + 'key with the journeys it returned. expected is null or the entered focus: via (platform or onBoard), '
       + 'tripId, direction and journeyKey.',
     cases: entryCases
@@ -475,6 +565,19 @@ const inference = {
     run: 'A board row starts the trip at once when expectedRunning: D <= nowMs < A on effective times, not cancelled, '
       + 'and every service leg\'s mode enabled (enabledModes; null means all three) under the transfer cap.',
     cases: runningCases
+  },
+  stopCases: {
+    run: 'Stop trip at nowMs with focus as the document\'s focus. A guessed focus (by inferred) declines its own tripId '
+      + 'and direction. A started focus (by focus) declines the saved trip whose endpoints are the focus\'s pair, its '
+      + 'journey\'s first service leg from.id to its last service leg to.id (the board a native focus carries): '
+      + 'direction forward when trip.from -> trip.to is the pair, reverse when trip.to -> trip.from is; a pair no saved '
+      + 'trip has in either direction declines nothing. A written decline replaces doc.inferenceDeclined with tripId, '
+      + 'direction, departure (the web departureKey of the focus journey\'s first service leg), arrival (the focus '
+      + 'journey\'s effective arrival, estimated else scheduled, composed with any recovery) and at (nowMs); a stop that '
+      + 'writes none leaves doc.inferenceDeclined as it was. expectedDecline is doc.inferenceDeclined after the stop, '
+      + 'null when absent, with arrival and at as epoch ms. expectedEvent is whether declined_inferred is sent: only for '
+      + 'a guessed focus. Every stop also removes the focus and clears lastOpen and the open snapshot unconditionally.',
+    cases: stopCases
   }
 };
 writeFileSync(new URL('./fixtures/conformance/inference.json', import.meta.url), JSON.stringify(inference, null, 2) + '\n');

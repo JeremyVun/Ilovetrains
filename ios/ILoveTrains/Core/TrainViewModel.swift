@@ -506,9 +506,8 @@ final class TrainViewModel: ObservableObject {
                 group.addTask {
                     do {
                         try await bootstrap?.value
-                        return .local(try await planner.planResult(
-                            from: pair.0, to: pair.1, at: now - 900_000,
-                            modes: modes, limit: 24, maxTransfers: bound, recommendationAt: now
+                        return .local(try await offlineBoard(
+                            planner, from: pair.0, to: pair.1, now: now, modes: modes, maxTransfers: bound, recommendationAt: now
                         ))
                     } catch { return .local(nil) }
                 }
@@ -595,7 +594,9 @@ final class TrainViewModel: ObservableObject {
                         board: evidence.board,
                         journey: evidence.journey
                     )
-                    if replacesLastAnswer(data: data, incoming: record, now: now, sightingAt: seen == nil ? nil : fix?.at) {
+                    let sightingAt = seen == nil ? nil : fix?.at
+                    if retiresSnapshot(data: data, snapshot: openSnapshot, incoming: record, sightingAt: sightingAt) { openSnapshot = nil }
+                    if replacesLastAnswer(data: data, incoming: record, now: now, sightingAt: sightingAt) {
                         data.lastAnswer = record
                     }
                 }
@@ -772,8 +773,8 @@ final class TrainViewModel: ObservableObject {
             defer {
                 if sharedRequest == sharedGeneration {
                     realtimeTask = nil
-                    // Restarting the board on a failed fetch would cancel the followed journey's request every tick.
-                    if refreshBoard, fetched, active, !state.refreshing { refresh() }
+                    // Offline every fetch fails and the tick still owes its refresh, unless that would cancel a followed journey's request.
+                    if refreshBoard, active, !state.refreshing, fetched || !focusRefreshPending { refresh() }
                 }
             }
             try? await bootstrap?.value
@@ -786,7 +787,8 @@ final class TrainViewModel: ObservableObject {
                     data.focus = focusAfterRefresh(subject, update: update, alternatives: nil)
                     settleFocus(matchingRefresh: update.live); persist(); syncPersonal()
                 }
-                let alternatives = try? await planner.plan(from: focus.board.from, to: focus.board.to, at: state.now - 900_000, modes: allModes, limit: 24, maxTransfers: data.offlineTransferBound)
+                let alternatives = try? await offlineBoard(planner, from: focus.board.from, to: focus.board.to, now: state.now,
+                                                           modes: allModes, maxTransfers: data.offlineTransferBound).board
                 guard !Task.isCancelled, sharedRequest == sharedGeneration, active else { return }
                 if sameFocus(focus) {
                     if let subject = data.focus {
@@ -922,7 +924,8 @@ final class TrainViewModel: ObservableObject {
         if result.action == .expire || result.action == .recordAndExpire {
             data.focus = nil
             openSnapshot = nil
-            if data.lastAnswer?.tripId == focus.tripId, data.lastAnswer?.reverse == focus.reverse {
+            if let record = data.lastAnswer, record.tripId == focus.tripId, record.reverse == focus.reverse,
+               record.journey.key == focus.journey.key {
                 data.lastAnswer = nil
             }
             clearArrivalMonitoring()
@@ -1033,7 +1036,8 @@ final class TrainViewModel: ObservableObject {
                 speed: value.speed
             ))
         }
-        let entered = inferFromRecords(data: data, snapshot: openSnapshot, fix: value, now: current)
+        // A fix that lands off Home, or resolves after the rider left it, cannot change what they are looking at.
+        let entered = state.screen == .home ? inferFromRecords(data: data, snapshot: openSnapshot, fix: value, now: current) : nil
         if let entered { enterInferred(entered) }
         if !explicit, let pair = homewardPair(data: data, here: here) {
             let trip = SavedTrip(id: UUID().uuidString, from: pair.from, to: pair.to, createdAt: current)
@@ -1116,13 +1120,6 @@ final class TrainViewModel: ObservableObject {
     private func forgetLastAnswer() {
         data.lastAnswer = nil
         openSnapshot = nil
-    }
-
-    /// Stop trip on a guessed trip: no inferred entry for that trip until the decline lapses, and never its departure again.
-    private func declineInferred(_ focus: FocusedJourney) {
-        guard !focus.pinned else { return }
-        data.inferenceDeclined = inferenceDecline(of: focus, at: clock())
-        metrics.declinedInferred()
     }
 
     /// A long absence is a new open: Home answers afresh instead of showing whatever was left behind.
@@ -1253,11 +1250,11 @@ final class TrainViewModel: ObservableObject {
         state.screen = .home; state.detail = nil; historyRecorded = false; syncPersonal(); beginArrivalMonitoring(); refresh()
     }
     func stopTrip() {
-        guard let focus = data.focus else { return }
+        guard let stopped = stoppedTrip(data, at: clock()) else { return }
         metrics.released()
-        declineInferred(focus)
+        if stopped.declinedInferred { metrics.declinedInferred() }
         clearArrivalMonitoring()
-        data.focus = nil; forgetLastAnswer(); persist()
+        data = stopped.data; openSnapshot = nil; persist()
         // Stopping is not a trip choice: Home answers where the phone is now.
         explicit = false; state.screen = .home; state.detail = nil; choosePrediction(); syncPersonal(); refresh()
     }

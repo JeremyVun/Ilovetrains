@@ -98,6 +98,12 @@ class OfflinePlanner(
                                       maxTransfers: Int = 2, recommendationAt: Long = at): PlannedBoard =
         planEnvelope(from, to, at, modes, limit, maxTransfers, includeRecommendation = true, recommendationAt)
 
+    suspend fun planBoard(from: Station, to: Station, now: Long, modes: Set<String>, maxTransfers: Int): BoardData {
+        val upcoming = planWithRecommendation(from, to, now, modes, BoardPlanLimit, maxTransfers).board
+        val recent = plan(from, to, now - BoardRecentMillis, modes, BoardPlanLimit, maxTransfers)
+        return mergeTimetablePlans(upcoming, recent)
+    }
+
     private suspend fun planEnvelope(from: Station, to: Station, at: Long, modes: Set<String>, limit: Int,
                                      maxTransfers: Int, includeRecommendation: Boolean, recommendationAt: Long = at): PlannedBoard = withContext(Dispatchers.IO) {
         mutex.withLock {

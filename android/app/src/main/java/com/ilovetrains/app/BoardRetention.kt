@@ -1,6 +1,23 @@
 package com.ilovetrains.app
 
 private const val PAST_RETENTION = 24 * 60 * 60_000L
+const val BoardPlanLimit = 24
+const val BoardRecentMillis = 15 * 60_000L
+
+// Ruling 24: a single plan from 15 minutes ago filled with departed rows on a busy corridor and offered no train to take.
+internal fun mergeTimetablePlans(upcoming: BoardData, recent: BoardData): BoardData {
+    val rows = linkedMapOf<String, Journey>()
+    (recent.journeys + upcoming.journeys).forEach { rows[it.key] = it }
+    val live = listOf(upcoming, recent).filter { it.source == "live" }
+    val base = upcoming.takeIf { it.journeys.isNotEmpty() || recent.journeys.isEmpty() } ?: recent
+    return base.copy(
+        journeys = rows.values.sortedWith(compareBy<Journey> { it.effectiveDeparture }.thenBy { it.effectiveArrival }.thenBy { it.legs.size }),
+        source = if (live.isEmpty()) base.source else "live",
+        offline = live.isEmpty() && base.offline,
+        generatedAt = live.minOfOrNull { it.generatedAt } ?: base.generatedAt,
+        recommendation = upcoming.recommendation,
+    )
+}
 
 internal fun BoardData.lastKnown(): BoardData {
     fun retainedSource(source: BoardData) = source.copy(offline = true,

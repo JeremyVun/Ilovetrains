@@ -120,15 +120,79 @@ final class CommuteReliabilityControllerTests: XCTestCase {
         XCTAssertEqual(location.requests.count, asked + 1, "five minutes on, the train is clear of the platform")
     }
 
+    func testWithEveryRequestFailingTheTickStillRefreshesTheBoard() async throws {
+        let planner = OfflinePlanner()
+        let next = try await firstDirect(planner, at: mondayMorning)
+        let clock = TestClock(next.effectiveDeparture - 120_000)
+        let location = ScriptedLocation()
+        let (store, model) = try await model(UserData(trips: [commute]), planner: planner, clock: clock, location: location)
+        model.resume()
+        try await refreshWritten(model, store)
+        let shown = try XCTUnwrap(displayedHomeLead(model.state))
+
+        // Past the shown train's fix window the tick takes no fix, so the board refresh is its own.
+        clock.now = shown.effectiveDeparture + shownDepartureFixWindow + 1_000
+        model.tick()
+        let asked = location.requests.count, sent = OfflineTransport.requests().count
+        model.refreshTick()
+
+        try await until { (model.state.recommendation?.journey.effectiveDeparture ?? 0) >= clock.now }
+        XCTAssertNotEqual(model.state.recommendation?.journey.key, shown.key)
+        XCTAssertEqual(location.requests.count, asked)
+        XCTAssertGreaterThan(OfflineTransport.requests().count, sent, "the tick's realtime fetch was asked for and failed")
+    }
+
+    func testABusyCorridorsOfflineBoardStillOffersTrainsThatHaveNotLeft() async throws {
+        // Central → Parramatta at 08:00: a quarter hour's plan alone held only trains that had left (ruling 24).
+        let clock = TestClock(mondayMorning)
+        let (_, model) = try await model(UserData(trips: [commute]), clock: clock, location: ScriptedLocation())
+        model.resume()
+        model.openTrip(id: commute.id)
+        try await until { model.state.board != nil && !model.state.refreshing }
+
+        let rows = try XCTUnwrap(model.state.board?.journeys)
+        XCTAssertTrue(rows.contains { (clock.now - offlineBoardLookback...clock.now).contains($0.effectiveDeparture) },
+                      "the last quarter hour stays on the board")
+        let upcoming = rows.filter { !$0.cancelled && $0.effectiveDeparture > clock.now }
+        XCTAssertFalse(upcoming.isEmpty, "\(rows.map { clockTime($0.effectiveDeparture) })")
+        XCTAssertLessThanOrEqual(try XCTUnwrap(upcoming.first).effectiveDeparture - clock.now, travelSeen)
+        XCTAssertEqual(rows.map(\.effectiveDeparture), rows.map(\.effectiveDeparture).sorted())
+    }
+
+    func testExpiryKeepsARecordNamingAnotherTrain() async throws {
+        let now = mondayMorning
+        let clock = TestClock(now)
+        let ride = { (departure: Millis) in
+            Journey(legs: [Leg(line: "T1", mode: "train", headsign: "Parramatta", from: self.origin, to: self.destination,
+                               departure: departure, arrival: departure + 1_800_000)])
+        }
+        let expired = ride(now - 10_800_000), next = ride(now - 300_000)
+        let focus = FocusedJourney(tripId: commute.id, reverse: false, journey: expired,
+                                   board: BoardData(from: origin, to: destination, journeys: [expired], generatedAt: expired.departure),
+                                   pinned: false)
+        let seen = LastAnswer(tripId: commute.id, reverse: false, at: next.effectiveDeparture - 120_000, stationId: origin.id,
+                              board: BoardData(from: origin, to: destination, journeys: [next], generatedAt: 0, offline: true),
+                              journey: next)
+        // Without location nothing arms the arrival guard, so the long-overdue trip expires on open.
+        let (store, model) = try await model(UserData(trips: [commute], focus: focus, lastAnswer: seen, useLocation: false),
+                                             clock: clock, location: ScriptedLocation(), network: false)
+        model.resume()
+        model.tick()
+
+        try await until { await store.load().focus == nil }
+        let kept = await store.load().lastAnswer
+        XCTAssertEqual(kept, seen, "expiry clears only a record naming the expired train")
+    }
+
     func testOfflineOnBoardEntryMatchesTheRunningTimetableService() async throws {
-        // The owner's commute; every bundled service changes on the way. Late in the ride, thirty planned
-        // services from even a long cached lookback still reach the train under way.
+        // The owner's commute; every bundled service changes on the way. Half way through a long itinerary,
+        // thirty planned services from the cached board's median ride still reach the train under way.
         let planner = OfflinePlanner()
         try await planner.initialize()
         let planned = try await planner.plan(from: rhodes, to: townHall, at: mondayMorning, modes: allModes,
                                              limit: timetablePageLimit, maxTransfers: 2)
         let riding = try XCTUnwrap(planned.journeys.first { !$0.cancelled })
-        let progress = 0.8
+        let progress = 0.5
         let ridingNow = riding.effectiveDeparture + (riding.effectiveArrival - riding.effectiveDeparture) * progress
         let clock = TestClock(ridingNow - 30_000)
         let trip = SavedTrip(id: "rt", from: rhodes, to: townHall)
@@ -295,7 +359,7 @@ final class CommuteReliabilityControllerTests: XCTestCase {
         XCTAssertNil(declined)
     }
 
-    func testARunningBoardRowStartsTheTripOfflineAndStoppingItLeavesNoTrace() async throws {
+    func testARunningBoardRowStartsTheTripOfflineAndItsLockScreenStopDeclinesItUnreported() async throws {
         let planner = OfflinePlanner()
         let clock = TestClock(mondayMorning)
         let tracker = quietTracker()
@@ -304,7 +368,6 @@ final class CommuteReliabilityControllerTests: XCTestCase {
         model.resume()
         model.openTrip(id: commute.id)
         try await until { model.state.board != nil && !model.state.refreshing }
-        // Offline, this busy corridor's board holds only the services that left in the last quarter hour.
         let left = try XCTUnwrap(model.state.board?.journeys.filter { !$0.cancelled && $0.effectiveDeparture <= clock.now })
         let arrived = try XCTUnwrap(left.min { $0.effectiveArrival < $1.effectiveArrival })
         let running = try XCTUnwrap(left.max { $0.effectiveArrival < $1.effectiveArrival })
@@ -324,15 +387,21 @@ final class CommuteReliabilityControllerTests: XCTestCase {
         try await until { await store.load().focus?.journey.key == running.key }
         try await until { await tracker.snapshot().active != nil }
         XCTAssertFalse(OfflineTransport.requests().isEmpty, "every request failed on the way")
+        let active = await tracker.snapshot().active
+        let session = try XCTUnwrap(active?.sessionId)
+        StopTripIntent.handler = { [weak model] in await model?.stopTrip(session: $0) }
+        defer { StopTripIntent.handler = nil }
 
-        model.stopTrip()
+        _ = try await StopTripIntent(session: session).perform()
 
         XCTAssertNil(model.state.focus)
-        try await until { await store.load().focus == nil }
         let stored = await store.load()
+        XCTAssertNil(stored.focus)
         XCTAssertTrue(stored.rides.isEmpty)
-        XCTAssertNil(stored.inferenceDeclined)
-        XCTAssertFalse(analytics.ledger.contains { $0.t == "declined_inferred" })
+        XCTAssertEqual(stored.inferenceDeclined, InferenceDecline(tripId: commute.id, reverse: false, at: clock.now,
+                                                                  departure: running.departureKey, arrival: running.effectiveArrival),
+                       "a rider who stops a trip they started while riding is not guessed back in")
+        XCTAssertFalse(analytics.ledger.contains { $0.t == "declined_inferred" }, "only a guessed stop is reported")
         try await until { await tracker.snapshot().active == nil }
     }
 
