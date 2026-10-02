@@ -25,12 +25,15 @@ internal fun nextPastAt(now: Long, cursor: Long?, earliestPaged: Long?): Long? {
     return (minOf(cursor, earliestPaged ?: cursor) - PastStepMillis).coerceAtLeast(bound)
 }
 
-/** Departed page rows join the board; the board's own copy of a service wins. */
+/** Departed page rows join the board. The board's copy wins unless only the page observed how the service ran. */
 internal fun BoardData.withPast(rows: Collection<Journey>, now: Long): BoardData {
     val past = rows.filter { it.effectiveDeparture < now && it.effectiveDeparture >= now - PastBoundMillis }
     if (past.isEmpty()) return this
-    return copy(journeys = mergeEarlier(journeys, past))
+    val observedOnPage = past.filter { it.observed }.mapTo(hashSetOf()) { it.key }
+    return copy(journeys = mergeEarlier(journeys.filterNot { it.key in observedOnPage && !it.observed }, past))
 }
+
+private val Journey.observed get() = realtime || cancelled
 
 internal class PastPages(private val scope: CoroutineScope, private val loaded: (PastKey) -> Unit) {
     private var key: PastKey? = null
