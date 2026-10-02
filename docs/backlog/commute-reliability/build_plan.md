@@ -7,8 +7,12 @@ the shared fixtures define the behaviour the native phases match.
 ## Execution
 
 - The build runs in a fresh context through the `backlog-item` skill.
-- Phases 2 and 3 run in parallel after phase 1 merges. Phase 4 needs the
-  comp verdict recorded in design.md. Phase 5 closes the item.
+- Phase 2 is split (lead's decision, 2026-10-02). Phase 2a, Android rules 8
+  and 9 (board paging and location plumbing), depends on nothing in phase 1
+  and runs in parallel with it on branch `cr-android`. Phase 2b, Android rules
+  1-7, continues on that branch after phase 1 merges, in parallel with
+  phase 3. Phase 4 needs the comp verdict recorded in design.md. Phase 5
+  closes the item.
 - At most two build agents at a time alongside peer sessions. Each agent
   works in its own worktree under `/private/tmp` created by the lead (verify
   with a landmark file), commits after every step, runs gates in the
@@ -124,7 +128,9 @@ if one is cleaner, `android/app/src/test/**`, `android/app/src/androidTest/**`
 and the copied fixtures under test resources.
 
 Work: rules 1-9 for Android, with the decline as a view-model action (no
-visual control yet).
+visual control yet). Phase 2a builds rules 8 and 9, with the instrumented
+board test and the setup-cancellation test. Phase 2b builds rules 1-7 and
+the remaining tests on top of 2a.
 
 - Rule 1: the reducer and `focusExpiry`, and the 45 s timer replacing the
   15 s `arrivalLookupComplete` post, also set whenever monitoring starts.
@@ -157,7 +163,7 @@ Gate: `tools/build-android.sh --unit` during iteration; the full
 `tools/build-android.sh` once on final sources, on the agent's own AVD started
 with `tools/start-android-emulator.sh` and a distinct port.
 
-Done marker: `Phase 2 done: <commit>`.
+Done markers: `Phase 2a done: <commit>`, then `Phase 2 done: <commit>`.
 
 ## Phase 3 — iOS
 
