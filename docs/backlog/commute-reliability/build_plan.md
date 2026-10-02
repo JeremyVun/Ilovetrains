@@ -35,7 +35,18 @@ the shared fixtures define the behaviour the native phases match.
   three clients in its own worktree, committing probe tests as soon as they
   compile and flagging contract contradictions for an owner ruling. An Opus
   fix agent then takes those probes as its acceptance suite and keeps them as
-  permanent regressions. Opus is the fallback if Fable is cut off.
+  permanent regressions. Opus is the fallback if Fable is cut off. The lead
+  names these suspects for it:
+  - Snapshot first can enter the earlier train. Within one open, a rider
+    seen at the origin at least 60 s after the shown train left replaces the
+    stored record, as ruling 2 intends. If they then board the next train,
+    the snapshot still names the departed one and enters it, one service off.
+    This happens on all three clients. Ruling 2 says being seen at the
+    platform again "means you didn't board it", so that sighting should also
+    retire the snapshot.
+  - Fixture gaps: no shared case makes the decline's hour the deciding bound,
+    and the nearest progress-window case misses by 0.36, so any window below
+    that passes.
 - iOS gates run one at a time and never in loops (see the
   `no-unattended-test-loops` memory). Android and iOS gates never run
   concurrently.
@@ -216,6 +227,7 @@ test. Phase 2c builds rule 6's actions (start, stop, decline write, running-row
 tap, notification Stop action, `entered_inferred`/`declined_inferred`), rule
 7, the start and running fixture cases, the 10-minute reset test, and runs the
 full Android gate. Setup's location pick keeps the 200 m order (ruling 22).
+2c also drops the native `0 ≤ D − at` bound in platform entry (design rule 3).
 
 - Rule 1: the reducer and `focusExpiry`, and the 45 s timer replacing the
   15 s `arrivalLookupComplete` post, also set whenever monitoring starts.
@@ -282,7 +294,8 @@ runs (hold and entry cases) and the open-race and evidence-wait tests. Phase
 3b builds rule 6's actions and the `LiveActivityIntent`, rule 7, the start
 and running cases, the 10-minute reset test, the `TravelTrackerFlowTests`
 update, and runs `tools/build-ios.sh --test`. Setup's location pick keeps the
-200 m order (ruling 22).
+200 m order (ruling 22). 3b also drops the native `0 ≤ D − at` bound in
+platform entry (design rule 3).
 
 Tests: XCTest runs every case in the three shared fixtures, plus controller
 tests for the open race, the 10-minute reset with a tracker URL, and the
@@ -294,6 +307,37 @@ Gate: `tools/build-ios.sh --unit` during iteration (one at a time, no loops);
 `tools/build-ios.sh --test` once on final sources.
 
 Done markers: `Phase 3a done: <commit>`, then `Phase 3 done: <commit>`.
+
+Phase 3a done: `03c1bea` on `cr-ios` (not yet merged). 287 unit tests pass.
+Pure logic is in `Core/Inference.swift`; `CommuteReliabilityControllerTests`
+drives the controller offline over the bundled timetable with an injected
+clock and `tick()`/`refreshTick()` hooks. Its readings: permission denial
+still clears the evidence wait (monitoring never started); a matching focus
+refresh in flight now holds settlement for armed guards too, per the web's
+ordering. iOS decline encoding (`reverse`, ms times, `departure` as
+`line:scheduledMillis`) and the pull-to-refresh deviation are in the branch's
+contracts. Seams for 3b: `declineInferred(_:)` writes a decline (no-op for a
+started trip); `forgetLastAnswer()` clears `lastAnswer` and the snapshot;
+`resume()`/`pause()` from `ILoveTrainsApp.swift`; `openURL` routes widget Home,
+setup and tracker links (pending until ready); the 10-minute reset must take
+the snapshot as `openHomeFromWidget` does.
+
+3a ended at about 662k context. 3b is therefore code and unit tests plus only
+the UI test classes it changes (`TravelTrackerFlowTests`). The full
+`tools/build-ios.sh --test` runs once after the fix wave, on final sources.
+
+Found in 3a, for the fix wave:
+- The on-board lookback used the longest cached duration, and an offline plan
+  holds itineraries up to 99 min, so ten online services never reached the
+  train. Design rule 5 now says median (lead's decision); the web, the
+  `inference.json` cases that pin `expectedRequests[].at`, Android and iOS all
+  change.
+- Pre-existing on iOS: with no connection, the 30 s tick never refreshes the
+  board once the realtime fetch starts. Check whether rule 4's tick fix still
+  runs offline.
+- The bundled timetable has no direct Rhodes → Town Hall service; every
+  offline plan changes, often via the M1 (2b saw the same through Central).
+  This is outside this item; it was raised with the owner.
 
 ## Phase 4 — The trip-control line, new words and the removed state, on screen (visual)
 

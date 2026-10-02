@@ -305,7 +305,11 @@ stopping a trip, the return offer, deletion and expiry clear the record.
 Inference evaluates two records, and either may enter: the snapshot taken when
 this Home open began, before any write of this open, and the stored record.
 The web already infers from its `previousOpen` snapshot; that stays exactly
-as it is. Android and iOS gain the same snapshot, which is what fixes the
+as it is. Platform-sighted entry's "seen at the platform" condition is
+`D − at ≤ 15 min` with no lower bound on every client, as `client-storage.md`
+states and the web does. Both natives carried an extra `0 ≤ D − at`. Phase 2b
+found it, and the lead removed it on 2026-10-02 for parity: it only adds
+entries. Android and iOS gain the same snapshot, which is what fixes the
 open race on its own. The hold rule protects the stored record for an app that
 stays open. Keeping both is deliberate (ruling 13): today's working auto-start
 path is untouched, and the new rule can only add entries. The 60 s margin
@@ -357,8 +361,9 @@ not entered, and only for a fix at train speed. Let `P` be the fix.
    test decides only when exactly one direction passes it; otherwise the next
    test applies.
 3. **Running journeys** for each decided (trip, direction): request
-   departures `O → Z` with `at = now − (Δ + 10 min)`, where `Δ` is the longest
-   effective duration in that pair's cached board (else 60 min), limit 10,
+   departures `O → Z` with `at = now − (Δ + 10 min)`, where `Δ` is the median
+   effective duration in that pair's cached board (the lower middle value for
+   an even count; else 60 min), limit 10,
    under the current modes and cap. Native also plans the same window from the
    offline timetable (limit 30) and merges by journey key, online first. Keep
    journeys with `D ≤ now ≤ A`, not cancelled, modes and cap allowed. At most
@@ -378,6 +383,14 @@ not entered, and only for a fix at train speed. Let `P` be the fix.
 7. **Entry** is the existing inferred entry: `focus` with `by: "inferred"`,
    that journey and its source board. Refresh, arrival monitoring, the
    tracker and `Change destination` then work as for any inferred focus.
+
+`Δ` was first the longest duration. Phase 3a measured an iOS offline plan
+with a 99-minute T9 → T9 → T1 itinerary, which pushed the request back past
+everything ten online services could reach, so on-board entry never found the
+train on frequent lines. The median (lead's decision, 2026-10-02) keeps the
+window near a typical ride. On a very frequent line a rider a few minutes out
+can fall after the tenth service; a later fix catches them as the train ages
+into the window, and native's timetable plan of 30 covers it at once.
 
 With trains eight minutes apart on a 25-minute ride, neighbouring services
 differ by about 0.32 in `f_t`, so the 0.25 window separates them. Very
