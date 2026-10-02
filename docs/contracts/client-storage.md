@@ -646,7 +646,10 @@ in fresh live data, or, without that, in the refresh's own offline timetable
 plan, whose matching non-cancelled service becomes the snapshot. A saved row
 retained from an earlier answer is not evidence by itself. Without this, a
 phone with no connection never recorded `lastOpen` and could never enter
-travel mode (owner field report, 2026-09-23).
+travel mode (owner field report, 2026-09-23). Native clients call this record
+`lastAnswer`; its writes follow the hold rule above, and each Home open and
+return snapshots it before that open's own refresh can write, as the web's
+`previousOpen` does.
 
 For each record in turn, with `J` its journey, `D` its effective
 departure, `A` its effective arrival, and `O` and `Z` the origin and

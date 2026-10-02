@@ -591,28 +591,41 @@ async function checkGuardedLifecycle() {
       if (t.state.arrivalDecision?.state !== 'checkingArrival') {
         throw new Error(`ETA+2:59 was not checking arrival: ${t.state.arrivalDecision?.state}`);
       }
-      h.clock.set(h.clock.now + 1_000);
+      // The 45 s evidence wait began with the resume at ETA+2:59.
+      h.clock.set(h.clock.now + 44_000);
       t.tick();
-      if (t.state.arrivalDecision?.state !== 'arrivalUnconfirmed') {
-        throw new Error(`ETA+3:00 was not unconfirmed: ${t.state.arrivalDecision?.state}`);
+      if (t.state.arrivalDecision?.state !== 'checkingArrival') {
+        throw new Error(`ETA+3:43, inside the evidence wait, was not checking arrival: ${t.state.arrivalDecision?.state}`);
       }
       if (t.state.doc.rides.length || document.querySelector('[data-act="way-back"]')) {
-        throw new Error('missing evidence created a ride or return action');
+        throw new Error('the evidence wait created a ride or return action');
       }
       if (document.querySelector('.hm-hd .sy-mk')) throw new Error('missing movement kept the pending-end marker visible');
-      if (!h.geo.activeIds().includes(resumed)) throw new Error('guarded unconfirmed trip stopped sampling');
+      if (!h.geo.activeIds().includes(resumed)) throw new Error('the evidence wait stopped sampling');
+      h.clock.set(h.clock.now + 1_000);
+      // A matching refresh still in flight holds settlement until it lands.
+      await wait(() => { t.tick(); return t.state.arrivalDecision?.state !== 'checkingArrival'; },
+        'ETA+3:44 never left checking arrival');
+      if (t.state.arrivalDecision?.state !== 'arrived' || t.state.arrivalDecision.basis !== 'estimate') {
+        throw new Error(`ETA+3:44 without movement did not settle by estimate: ${JSON.stringify(t.state.arrivalDecision)}`);
+      }
+      await wait(() => document.querySelector('[data-act="way-back"]'), 'estimate settlement offered no return');
+      if (t.state.doc.rides.length !== 1 || t.state.doc.focus?.arrivalGuard?.basis !== 'estimate') {
+        throw new Error('estimate settlement did not record one ride and latch the guard');
+      }
+      if (h.geo.activeIds().length) throw new Error('a settled trip kept sampling');
       h.clock.persist(h.clock.now);
     }, async () => {
       for (let index = 0; index < 120 && !window.__trains?.state?.arrivalDecision; index += 1) {
         await new Promise((resolve) => setTimeout(resolve, 25));
       }
       const restored = window.__trains.state;
-      if (!restored.doc.focus?.arrivalGuard?.armed || restored.doc.rides.length) {
-        throw new Error('reload lost the guard or created a ride');
+      if (restored.doc.focus?.arrivalGuard?.basis !== 'estimate' || restored.doc.rides.length !== 1) {
+        throw new Error('reload lost the settled guard or recorded the ride again');
       }
       if (restored.arrivalWindow?.samples?.length) throw new Error('reload persisted raw arrival samples');
-      if (restored.arrivalDecision.state !== 'arrivalUnconfirmed') {
-        throw new Error(`reload changed guarded result: ${restored.arrivalDecision.state}`);
+      if (restored.arrivalDecision.state !== 'arrived') {
+        throw new Error(`reload changed the settled result: ${restored.arrivalDecision.state}`);
       }
     });
 }
@@ -1114,9 +1127,9 @@ async function checkResumeExpiry() {
           h.geo.emit(watch, { lat: -33.83, lon: 151.08, accuracy: 1000, speed: 12, timestamp: h.clock.now });
           if (!t.state.doc.focus) throw new Error('invalid provider callback expired focus during service lookup');
         }
-        h.clock.set(h.clock.now + 14_000);
+        h.clock.set(h.clock.now + 44_000);
         t.tick();
-        if (!t.state.doc.focus) throw new Error('lookup did not retain focus for its bounded allowance');
+        if (!t.state.doc.focus) throw new Error('the 45 s evidence wait did not retain focus');
         h.geo.emit(watch, { lat: -33.83, lon: 151.08, accuracy: 10, speed: 12, timestamp: h.clock.now });
         if (h.net.pending.has('focus-lookup')) h.net.release('focus-lookup');
         await new Promise(resolve => setTimeout(resolve, 30));
@@ -1131,10 +1144,10 @@ async function checkResumeExpiry() {
       const t = window.__trains, h = window.__commuteHarness;
       await new Promise(resolve => setTimeout(resolve, 100));
       if (!t.state.doc.focus) throw new Error('expired before lookup allowance');
-      h.clock.set(h.clock.now + 15_001);
+      h.clock.set(h.clock.now + 45_001);
       t.tick();
       if (t.state.doc.focus || t.state.doc.rides.length !== 1 || h.geo.activeIds().length) {
-        throw new Error('overdue focus did not end and count its ride at the lookup deadline');
+        throw new Error('overdue focus did not end and count its ride when the evidence wait ended');
       }
     });
 }
