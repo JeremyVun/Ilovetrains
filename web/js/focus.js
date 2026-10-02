@@ -16,7 +16,7 @@ import {
   modeWords, withLegs, RECOVERY_FLOOR_MIN
 } from './journey.js';
 import { shortName } from './dom.js';
-import { distanceKm } from './stations.js';
+import { distanceKm, TRAIN_SPEED_MPS } from './stations.js';
 import { correctRide, findTrip, leg, recordRide } from './storage.js';
 import { effectiveCap, journeyAllowed, preferencesOf, tripAllowed } from './preferences.js';
 
@@ -30,7 +30,6 @@ export const FOCUS_CLEAR_MS = 30 * 60_000;
 export const TRAVEL_LATE_MS = 30 * 60_000;
 export const TRAVEL_SEEN_MS = 15 * 60_000;
 export const TRAVEL_MOVED_KM = 1;
-export const TRAVEL_SPEED_MS = 8;
 export const TRAVEL_SPEED_MOVED_KM = 0.2;
 /* Exit: at the destination, the trip is over as the rider steps off. */
 export const ARRIVED_KM = 0.2;
@@ -92,7 +91,7 @@ export function inferTravel(doc, nowMs, fix) {
   if (left === null) return null;
   const toward = left >= TRAVEL_MOVED_KM
     && distanceKm(fix, destination) <= distanceKm(origin, destination) - TRAVEL_MOVED_KM;
-  const fast = Number.isFinite(fix.speed) && fix.speed >= TRAVEL_SPEED_MS
+  const fast = Number.isFinite(fix.speed) && fix.speed >= TRAIN_SPEED_MPS
     && left >= TRAVEL_SPEED_MOVED_KM;
   if (!toward && !fast) return null;
 

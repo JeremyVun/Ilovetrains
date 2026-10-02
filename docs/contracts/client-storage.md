@@ -218,8 +218,8 @@ read/write atomic and migration simple):
   newest last, at most one per LOCAL calendar day. A malformed vote is dropped,
   not repaired, and a second vote on a day already voted is ignored.
 - `lastOpen` is the header's previous unfocused answer: when, which station the
-  phone was at (tier 1 only, or null), which trip and direction, and a verbatim
-  snapshot of the lead journey. It is what makes inferred travel mode possible
+  phone was sighted at (`here`'s station when the fix is within 300 m of it, or
+  null), which trip and direction, and a verbatim snapshot of the lead journey. It is what makes inferred travel mode possible
   after the service has left the live board. Preference-caused recomputation
   does not rewrite it; the next independent refresh resumes normal recording.
   Deleting the trip deletes it.
@@ -546,7 +546,9 @@ The web controller snapshots `lastOpen` before the current Home open or
 visibility return can replace it. It records the next open's evidence after
 the cache paint and each successful refresh, only with an unfocused header
 and an eligible, non-cancelled lead journey; rendering never writes it.
-The station is tier-1 `here` or null. The initial cache paint has no fix,
+The station is the sighting: `here`'s station when the fix is within 300 m of
+it, else null. The 300 m covers platforms reaching about 150 m from a
+station's point and Home fixes accurate to 200 m. The initial cache paint has no fix,
 so a successful refresh after the fix supplies the platform sighting. A
 failed refresh cannot invent one. Inference uses the snapshot from before
 those writes, even when the station index or fix arrives late.
@@ -871,18 +873,33 @@ it shows the filtered empty Home instead of opening setup. `locate(doc, now,
 
 `here` is the station the user is standing at, from the baked station index
 (`web/stations.json`, fetched once per page load, never written to the
-document) and a fix at most 5 minutes old. It is the first of: any index
-station within 200 m, preferring saved endpoints, then nearest; the nearest
-end of a saved trip within 2 km; the nearest index station within 2 km; none.
-Saved endpoints use the index coordinates when available, falling back to
-the saved snapshot. The saved end outranks a nearer stranger so a
-user whose own origin is a kilometre away is not handed a station they have
-never used. Without the index, or without a fix, there is no `here`.
+document) and a fix at most 5 minutes old. It is the first of: the nearest
+end of a saved trip within 400 m; the nearest eligible index station within
+200 m; the nearest end of a saved trip within 2 km; the nearest index station
+within 2 km; none. Saved endpoints use the index coordinates when available,
+falling back to the saved snapshot. The saved end outranks a nearer stranger
+so a user whose own origin is a kilometre away is not handed a station they
+have never used, and 400 m keeps a rider inside Town Hall's own footprint from
+being handed Gadigal, 152 m from Town Hall's point (owner ruling, 2026-10-01).
+Without the index, or without a fix, there is no `here`.
+
+**Train speed.** A fix is at train speed when its reported speed is finite,
+non-negative and at least 8 m/s. A fix without a usable speed is at train
+speed when the previous Home fix, taken 15-120 s earlier with both accuracies
+known, is at least `8 m/s × Δt + accuracy₁ + accuracy₂` away: the bound
+subtracts the worst-case error of both positions, so GPS jitter cannot produce
+it. The previous Home fix lives in memory only and is cleared with the
+in-memory fix. A fix at train speed has no `here`: it casts no home vote,
+creates no pair, adds no location term, records no sighting, and does not
+re-run `locate` over the answer Home already shows. A passing station is never
+`here` (owner ruling, 2026-10-01).
 Wharves and railway stations follow the same rules. `stations.js` exposes
 `loadStations()` (one fetch per page, null on failure),
-`nearest(stations, fix, withinKm)` (`{station, km}` or null), and
-`here(doc, stations, fix)` (`{station, tier}` or null). The index is
-precached for offline use.
+`nearest(stations, fix, withinKm)` (`{station, km}` or null),
+`here(doc, stations, fix, previousFix)` (`{station, tier}` or null),
+`trainSpeed(fix, previousFix)` and `sightingOf(here, fix)`. The index is
+precached for offline use. `tools/fixtures/conformance/prediction.json`
+carries each case's expected `here` and sighting.
 
 ```
 here = above, or none

@@ -670,7 +670,8 @@ test('the controller records the chosen journey after cache, base and lookahead 
   assert.ok(body, 'the controller still has noteLastOpen');
   assert.match(body[1], /state\.view !== 'home' \|\| focusSelection\(\)/);
   assert.match(body[1], /selectRecommendation\(journeys/, 'fallback uses the same eligibility and cost rule');
-  assert.match(body[1], /spot && spot\.tier === 1 \? spot\.station : null/);
+  assert.match(body[1], /sightingOf\(here\(state\.doc, state\.stations, fix\), fix\)/,
+    'the sighting is here within 300 m');
   assert.equal(main.match(/^\s*noteLastOpen\(\);$/gm).length, 4,
     'cache paint, first page, improved lookahead and retired supplementary pages');
   assert.ok(!/renderHome\(\)[\s\S]{0,40}noteLastOpen/.test(

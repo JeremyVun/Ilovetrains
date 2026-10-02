@@ -6,7 +6,7 @@ import {
   recordOpen, milestone, LOCATION_ASK_QUIET_MS
 } from './storage.js';
 import { distanceKm, homeOf, locate, predict } from './predict.js';
-import { here, loadStations } from './stations.js';
+import { here, loadStations, sightingOf, trainSpeed } from './stations.js';
 import { boardModel, promotedRow } from './rowmodel.js';
 import { journeyDetail, journeyKey, departureKey, legsOf, arrivalMs, departureMs } from './journey.js';
 import {
@@ -105,6 +105,7 @@ const state = {
   loadingPast: false,
   pastExhausted: false,
   fix: null,
+  previousFix: null,
   stations: null,
   loadedAt: Date.now(),
   leap: null,
@@ -238,7 +239,7 @@ const ctx = {
     suppressPreferenceEvents = true;
     if (before.useLocation !== after.useLocation) {
       geoGeneration += 1;
-      state.fix = null;
+      clearFix();
       stopArrivalMonitoring();
     }
     if (before.homeOverride?.id !== after.homeOverride?.id || before.useLocation !== after.useLocation) {
@@ -477,8 +478,8 @@ function locateSelection() {
   const doc = tripsForModes(state.doc, state.stations);
   if (!doc.trips.length) { state.leap = null; return null; }
   const stations = state.stations?.filter((station) => stationAllowed(station, enabledModes()));
-  const hasHere = Boolean(here(doc, stations, validFix()));
-  const answer = locate(doc, now(), { fix: validFix(), stations, home: homeOf(state.doc) });
+  const hasHere = Boolean(here(doc, stations, stationFix()));
+  const answer = locate(doc, now(), { fix: stationFix(), stations, home: homeOf(state.doc) });
   state.leap = answer.kind === 'pair' ? 'pair' : hasHere ? answer.leap || null : null;
   if (answer.kind === 'trip') return { tripId: answer.tripId, direction: answer.direction };
   if (answer.kind === 'pair' && tripAllowed(answer, enabledModes(), state.stations)) {
@@ -487,12 +488,12 @@ function locateSelection() {
     });
   }
   state.leap = null;
-  return predict(doc, now(), { fix: validFix() });
+  return predict(doc, now(), { fix: stationFix() });
 }
 
 function explicitSelection() {
   return (suggestionAllowed(savedSelection()) ? savedSelection() : null)
-    || focusSelection() || predict(tripsForModes(state.doc, state.stations), now(), { fix: validFix() });
+    || focusSelection() || predict(tripsForModes(state.doc, state.stations), now(), { fix: stationFix() });
 }
 
 /* Hiding, restoring or ending a followed journey reconciles the selected
@@ -505,7 +506,7 @@ function reconcileSuggestionSelection(released = false) {
   if (!followed && !released && suggestionAllowed(state.selection)) return false;
   state.leap = null;
   const next = followed || (released ? locateSelection()
-    : predict(tripsForModes(state.doc, state.stations), now(), { fix: validFix() }));
+    : predict(tripsForModes(state.doc, state.stations), now(), { fix: stationFix() }));
   if (!state.selection && !next) return false;
   invalidateSuggestions();
   state.selection = next;
@@ -521,6 +522,26 @@ function reconcileSuggestionSelection(released = false) {
 
 function validFix() {
   return preferencesOf(state.doc).useLocation && fixIsValid(state.fix) ? state.fix : null;
+}
+
+function movingFix() {
+  return trainSpeed(validFix(), state.previousFix);
+}
+
+/* The fix that may say where the rider is; at train speed it only says where
+   the train is (client-storage.md, Train speed). */
+function stationFix() {
+  return movingFix() ? null : validFix();
+}
+
+function setHomeFix(fix) {
+  state.previousFix = state.fix;
+  state.fix = fix;
+}
+
+function clearFix() {
+  state.fix = null;
+  state.previousFix = null;
 }
 
 function loadSelectedCache() {
@@ -589,7 +610,7 @@ function setRecommendationCandidates(sources, offline = false) {
 function showHome(root) {
   state.view = 'home';
   state.detailSource = null;
-  state.fix = null;
+  clearFix();
   state.previousOpen = state.doc.lastOpen || null;
   state.selection = chooseSelection();
   if (state.selection) loadSelectedCache();
@@ -646,9 +667,9 @@ function noteLastOpen() {
   const journey = state.recommendation?.journey
     || selectRecommendation(journeys, now(), { modes: enabledModes(), maxTransfers: maxTransfers() });
   if (!journey) return;
-  const spot = here(state.doc, state.stations, validFix());
+  const fix = stationFix();
   ctx.update(recordLastOpen(state.doc, {
-    station: spot && spot.tier === 1 ? spot.station : null,
+    station: sightingOf(here(state.doc, state.stations, fix), fix),
     tripId: state.selection.tripId,
     direction: state.selection.direction,
     journey
@@ -677,7 +698,7 @@ async function silentFix() {
   }
   const fix = await takeFix({ enableHighAccuracy: underWay(), maximumAge: 0 });
   if (generation !== geoGeneration || state.view !== 'home' || !fix) return;
-  state.fix = fix;
+  setHomeFix(fix);
   useFix();
 }
 
@@ -713,7 +734,7 @@ async function takeContextFix(options = {}) {
     void ensureArrivalMonitoring();
     return null;
   }
-  state.fix = fix;
+  setHomeFix(fix);
   void ensureArrivalMonitoring();
   return fix;
 }
@@ -737,7 +758,7 @@ function permissionChanged() {
   state.geoPermission = geoPermissionStatus?.state || 'prompt';
   state.arrivalPermissionPending = false;
   geoGeneration += 1;
-  state.fix = null;
+  clearFix();
   stopArrivalMonitoring();
   syncArrivalMonitoring();
   renderCurrent();
@@ -785,7 +806,8 @@ function useFix() {
   if (state.view !== 'home') return;
   const fix = validFix();
   if (!fix) return;
-  const spot = here(state.doc, state.stations, fix);
+  const moving = movingFix();
+  const spot = here(state.doc, state.stations, stationFix());
   if (spot) {
     const voted = recordHomeVote(state.doc, spot.station, now());
     if (voted !== state.doc) ctx.update(voted);
@@ -805,7 +827,7 @@ function useFix() {
     state.selection = { tripId: entered.tripId, direction: entered.direction };
     openForAnalytics();
     analytics.track('entered_inferred');
-  } else if (state.predicted) {
+  } else if (state.predicted && !moving) {
     const answer = locateSelection();
     state.selection = answer;
     if (!answer) { state.body = null; renderHome(); return; }
@@ -936,7 +958,7 @@ function syncArrivalMonitoring() {
     }, (error) => {
       if (generation !== arrivalGeneration) return;
       if (error?.code === 1) state.geoPermission = 'denied';
-      state.fix = null;
+      clearFix();
       stopArrivalMonitoring();
       settleArrival();
       renderCurrent();
@@ -1037,7 +1059,7 @@ function renderHome() {
   const home = Home.homeModel(state.doc, state.selection, state.body, now(), {
     stations: state.stations,
     resumeWaitUntilMs: state.arrivalResumeWaitUntil,
-    fix: validFix(),
+    fix: stationFix(),
     stale: focused ? focusModel.stale : candidateModel.stale,
     offline: focused ? !followed || followed.offline : state.offline,
     awaiting: awaitingAnswer(),
@@ -1115,7 +1137,7 @@ function restoreHomeAttribution() {
 }
 
 function leaveDistance() {
-  const fix = validFix();
+  const fix = stationFix();
   if (!fix || !selectedTrip()) return '';
   const origin = currentLeg().from;
   const distanceKmFromOrigin = distanceKm(fix, origin.location);
@@ -1323,7 +1345,6 @@ async function requestLocation() {
   if (generation !== geoGeneration || state.view !== 'home') return;
   if (fix) {
     analytics.track('granted_panel');
-    state.fix = fix;
     useFix();
   } else {
     analytics.track('denied_panel');
@@ -1882,7 +1903,7 @@ document.addEventListener('visibilitychange', () => {
   if (state.selection) awaitFirstAnswers();
   suppressPreferenceEvents = false;
   if (state.view === 'home') {
-    state.fix = null;
+    clearFix();
     state.previousOpen = state.doc.lastOpen || null;
   }
   const focus = focusOf(state.doc);

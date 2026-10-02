@@ -2,6 +2,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { predict, locate, scoreCandidate, historyEvidence, automaticHomeOf } from '../web/js/predict.js';
+import { here, sightingOf } from '../web/js/stations.js';
 import { readFileSync } from 'node:fs';
 import { boardModel } from '../web/js/rowmodel.js';
 import { NOW, departuresBody, TRANSFER_NOW, TRANSFER_DEPARTED_NOW, transferBody,
@@ -44,15 +45,54 @@ const cases = [
   { name: 'three first-open votes infer home', doc: { ...base, homeVotes: ['2026-09-02', '2026-09-03', '2026-09-04'].map(day => ({ day, station: bondi })) }, fix: rhodes.location },
   { name: 'weekend midnight uses circular hour proximity', now: '2026-09-06T00:10:00+10:00', doc: { ...base, history: [{ tripId: 'b', direction: 'reverse', t: '2026-09-05T23:50:00+10:00' }] }, fix: null },
 ];
-const out = cases.map(value => {
+/* Rule 2 of commute-reliability, on the index's own points: Gadigal is 152 m
+   from Town Hall. Each case declares its intended place and answer. */
+const townHall = station('200070', 'Town Hall Station', -33.873596, 151.206899);
+const gadigal = { ...station('200066', 'Gadigal Station', -33.873866, 151.208509), modes: ['metro'] };
+const rhodesPoint = station('213820', 'Rhodes Station', -33.83053, 151.087032);
+const centralPoint = station('200060', 'Central Station', -33.883882, 151.205829);
+const city = [townHall, gadigal, rhodesPoint, centralPoint];
+const evening = '2026-10-01T17:30:00+10:00';
+const eveningMs = Date.parse(evening);
+const cityDoc = { ...base, trips: [{ id: 'th', from: rhodesPoint, to: townHall, createdAt: '2026-09-01T00:00:00+10:00' }] };
+const fixAt = (lat, lon, extra = {}) => ({ lat, lon, at: eveningMs, accuracy: 10, ...extra });
+const placeCases = [
+  { name: 'a saved station at 269 m beats an unsaved one at 119 m', fix: fixAt(-33.8738, 151.209799),
+    wantedHere: ['200070', 1, '200070'], wanted: ['th', true] },
+  { name: 'a saved station at 342 m is here but no sighting', fix: fixAt(-33.8738, 151.210599),
+    wantedHere: ['200070', 1, null], wanted: ['th', true] },
+  { name: 'an unsaved station within 200 m answers when no saved end is within 400 m',
+    doc: { ...base, trips: [{ id: 'cr', from: rhodesPoint, to: centralPoint, createdAt: '2026-09-01T00:00:00+10:00' }] },
+    fix: fixAt(-33.8738, 151.209799), wantedHere: ['200066', 1, '200066'], wantedKind: 'pair' },
+  { name: 'a fix reporting train speed has no here', fix: fixAt(-33.873596, 151.206899, { speed: 12 }),
+    wantedHere: null, wanted: ['th', false] },
+  { name: 'a fix 600 m on from one 30 s earlier is at train speed', fix: fixAt(-33.873596, 151.206899),
+    previousFix: { lat: -33.879, lon: 151.2069, at: eveningMs - 30_000, accuracy: 10 },
+    wantedHere: null, wanted: ['th', false] },
+  { name: 'a walking pair of fixes keeps here', fix: fixAt(-33.873596, 151.206899),
+    previousFix: { lat: -33.8738, lon: 151.2069, at: eveningMs - 30_000, accuracy: 10 },
+    wantedHere: ['200070', 1, '200070'], wanted: ['th', true] },
+  { name: 'a previous fix over 120 s old cannot derive train speed', fix: fixAt(-33.873596, 151.206899),
+    previousFix: { lat: -33.92, lon: 151.2069, at: eveningMs - 120_001, accuracy: 10 },
+    wantedHere: ['200070', 1, '200070'], wanted: ['th', true] },
+].map(value => ({ doc: cityDoc, now: evening, stations: city, ...value }));
+const out = [...cases, ...placeCases].map(value => {
   const time = Date.parse(value.now || now);
-  const answer = locate(value.doc, time, { stations, fix: value.fix });
+  const where = value.stations || stations;
+  const answer = locate(value.doc, time, { stations: where, fix: value.fix, previousFix: value.previousFix });
   if (value.wanted) assert.deepEqual([answer.tripId, answer.direction === 'reverse'], value.wanted, value.name);
-  return { ...value, now: value.now || now, stations, expected: {
+  if (value.wantedKind) assert.equal(answer.kind, value.wantedKind, value.name);
+  const spot = here(value.doc, where, value.fix, value.previousFix);
+  const placed = spot ? [spot.station.id, spot.tier, sightingOf(spot, value.fix)?.id || null] : null;
+  if (Object.hasOwn(value, 'wantedHere')) assert.deepEqual(placed, value.wantedHere, value.name);
+  const { wantedHere, wantedKind, ...recorded } = value;
+  return { ...recorded, now: value.now || now, stations: where, expected: {
     selection: answer.kind === 'trip' ? { tripId: answer.tripId, reverse: answer.direction === 'reverse' } : null,
     noLocation: predict(value.doc, time),
     home: automaticHomeOf(value.doc)?.station?.id || null,
-    scores: trips.flatMap(t => ['forward', 'reverse'].map(direction => ({ tripId: t.id, reverse: direction === 'reverse', value: scoreCandidate(value.doc.history, t.id, direction, time), days: historyEvidence(value.doc.history, t.id, direction, time).days, receiptDays: historyEvidence(value.doc.history, t.id, direction, time).receiptDays })))
+    here: spot ? { stationId: spot.station.id, tier: spot.tier } : null,
+    sighting: sightingOf(spot, value.fix)?.id || null,
+    scores: value.doc.trips.flatMap(t => ['forward', 'reverse'].map(direction => ({ tripId: t.id, reverse: direction === 'reverse', value: scoreCandidate(value.doc.history, t.id, direction, time), days: historyEvidence(value.doc.history, t.id, direction, time).days, receiptDays: historyEvidence(value.doc.history, t.id, direction, time).receiptDays })))
   } };
 });
 mkdirSync(new URL('./fixtures/conformance/', import.meta.url), { recursive: true });

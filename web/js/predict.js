@@ -13,7 +13,7 @@
 
 import { DIRECTIONS } from './storage.js';
 import { preferencesOf } from './preferences.js';
-import { distanceKm, here } from './stations.js';
+import { distanceKm, here, trainSpeed } from './stations.js';
 
 export { distanceKm };
 
@@ -96,9 +96,15 @@ export function locationFactor(fix, origin) {
    0.01 × 1.0. Any real history dwarfs it. */
 export const PREDICT_FLOOR = 0.01;
 
+/* A fix at train speed says where the train is, not where the rider is
+   starting from (client-storage.md, Train speed). */
+function startingFix(doc, opts) {
+  return preferencesOf(doc).useLocation && !trainSpeed(opts.fix, opts.previousFix) ? opts.fix : null;
+}
+
 /** All (trip, direction) candidates with their scores, board order preserved. */
 export function scoreAll(doc, nowMs, opts = {}) {
-  const fix = preferencesOf(doc).useLocation ? opts.fix : null;
+  const fix = startingFix(doc, opts);
   const out = [];
   for (const trip of doc.trips) {
     for (const direction of DIRECTIONS) {
@@ -203,7 +209,7 @@ const chosen = (candidate, leap) =>
 
 /* Three shapes, one per answer the header can give: see client-storage.md. */
 export function locate(doc, nowMs, opts = {}) {
-  const fix = preferencesOf(doc).useLocation ? opts.fix : null;
+  const fix = startingFix(doc, opts);
   const locationOpts = { ...opts, fix };
   const spot = here(doc, opts.stations, fix);
   const trips = doc.trips || [];

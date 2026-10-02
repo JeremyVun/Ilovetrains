@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { locate, scoreCandidate, historyEvidence, automaticHomeOf } from '../js/predict.js';
+import { here, sightingOf } from '../js/stations.js';
 import { boardModel } from '../js/rowmodel.js';
 
 process.env.TZ = 'Australia/Sydney';
@@ -9,9 +10,12 @@ const cases = JSON.parse(readFileSync(new URL('../../tools/fixtures/conformance/
 for (const value of cases) {
   test(`native conformance: ${value.name}`, () => {
     const now = Date.parse(value.now);
-    const answer = locate(value.doc, now, { stations: value.stations, fix: value.fix });
+    const answer = locate(value.doc, now, { stations: value.stations, fix: value.fix, previousFix: value.previousFix });
     const selection = answer.kind === 'trip' ? { tripId: answer.tripId, reverse: answer.direction === 'reverse' } : null;
     assert.deepEqual(selection, value.expected.selection);
+    const spot = here(value.doc, value.stations, value.fix, value.previousFix);
+    assert.deepEqual(spot && { stationId: spot.station.id, tier: spot.tier }, value.expected.here);
+    assert.equal(sightingOf(spot, value.fix)?.id || null, value.expected.sighting);
     assert.equal(automaticHomeOf(value.doc)?.station?.id || null, value.expected.home);
     for (const score of value.expected.scores) {
       const evidence = historyEvidence(value.doc.history, score.tripId, score.reverse ? 'reverse' : 'forward', now);
