@@ -565,6 +565,12 @@ Traps:
   never rebuilds that app: a stale one shoots old code with no error, and the
   Settings frame's version string is the tell (2026-09-08: a 1.2.4 build shot
   a 1.4.0 tree and reported the new row missing).
+- The Android baselines are shot on a Pixel-profile AVD without a display
+  cutout (`avdmanager create avd -d pixel`, `hw.lcd` 1024×2216 at 420 dpi,
+  the API 36.1 image) in dark mode, which gives a 24 dp status bar and a
+  24 dp gesture bar. A Pixel 7 profile adds a 44 dp cutout inset and moves
+  every frame. The manifest's `configuredSafeDrawing` is read before the
+  window dispatches its insets, so it prints zeros whatever the device has.
 - The Android app-screen drive runs only `UiCalibrationTest#captureCanonicalScreens`
   (`INSTRUMENT_CLASS` on `shoot-android.sh`); the class's other tests assert
   behaviour and are the build gate's job. The iOS drive caps the settle at two
