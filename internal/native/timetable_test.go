@@ -152,9 +152,11 @@ func TestTimetableRefreshPublishesOnlyCompleteCompilerOutput(t *testing.T) {
 	dataDir := t.TempDir()
 	compiler := filepath.Join(t.TempDir(), "compiler.py")
 	script := `
-import gzip, hashlib, json, pathlib, sys, zipfile
+import gzip, hashlib, json, pathlib, sys, tempfile, zipfile
 args = dict(zip(sys.argv[1::2], sys.argv[2::2]))
 out = pathlib.Path(args['--output-dir'])
+if pathlib.Path(tempfile.gettempdir()).resolve() != out.resolve().parent:
+    sys.exit('compiler temp dir is not the refresh work dir: ' + tempfile.gettempdir())
 out.mkdir(parents=True, exist_ok=True)
 draft = out / 'draft.zip'
 with zipfile.ZipFile(draft, 'w') as archive:

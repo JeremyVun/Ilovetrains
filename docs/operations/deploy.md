@@ -310,6 +310,18 @@ Check cached module content as well as the worker version: old HTTP-cached
 assets can otherwise enter a newly named shell cache. Installation reloads
 all shell requests; the cached controller must match the deployed source.
 
+Check that the native timetable refresh published. A container start refreshes
+at once when the active package is over a day old, so within a few minutes
+`curl -s "https://ilovetrains.jeremyvun.com/api/v1/timetable/manifest?x=$(date +%s)"`
+must show a `generatedAt` from today and a `serviceDateTo` weeks away. A failed
+refresh logs only `native timetable refresh: <error>` and keeps serving the
+old package. From 7 September to 3 October 2026 every refresh failed with
+`[Errno 18] Cross-device link`, because the compiler staged files in the
+container's `/tmp` and renamed them into the `/data` volume, and nothing
+noticed until the bundled package was a day from expiry. The server now gives
+the compiler a temp directory inside its work directory on `/data`. Infra also
+sets `TMPDIR=/data`.
+
 Check what the realtime refresh actually published. Each source logs one line
 per refresh that changed the feed:
 
