@@ -308,6 +308,37 @@ Gate: `tools/build-ios.sh --unit` during iteration (one at a time, no loops);
 
 Done markers: `Phase 3a done: <commit>`, then `Phase 3 done: <commit>`.
 
+Phase 3a done: `03c1bea` on `cr-ios` (not yet merged). 287 unit tests pass.
+Pure logic is in `Core/Inference.swift`; `CommuteReliabilityControllerTests`
+drives the controller offline over the bundled timetable with an injected
+clock and `tick()`/`refreshTick()` hooks. Its readings: permission denial
+still clears the evidence wait (monitoring never started); a matching focus
+refresh in flight now holds settlement for armed guards too, per the web's
+ordering. iOS decline encoding (`reverse`, ms times, `departure` as
+`line:scheduledMillis`) and the pull-to-refresh deviation are in the branch's
+contracts. Seams for 3b: `declineInferred(_:)` writes a decline (no-op for a
+started trip); `forgetLastAnswer()` clears `lastAnswer` and the snapshot;
+`resume()`/`pause()` from `ILoveTrainsApp.swift`; `openURL` routes widget Home,
+setup and tracker links (pending until ready); the 10-minute reset must take
+the snapshot as `openHomeFromWidget` does.
+
+3a ended at about 662k context. 3b is therefore code and unit tests plus only
+the UI test classes it changes (`TravelTrackerFlowTests`). The full
+`tools/build-ios.sh --test` runs once after the fix wave, on final sources.
+
+Found in 3a, for the fix wave:
+- The on-board lookback used the longest cached duration, and an offline plan
+  holds itineraries up to 99 min, so ten online services never reached the
+  train. Design rule 5 now says median (lead's decision); the web, the
+  `inference.json` cases that pin `expectedRequests[].at`, Android and iOS all
+  change.
+- Pre-existing on iOS: with no connection, the 30 s tick never refreshes the
+  board once the realtime fetch starts. Check whether rule 4's tick fix still
+  runs offline.
+- The bundled timetable has no direct Rhodes → Town Hall service; every
+  offline plan changes, often via the M1 (2b saw the same through Central).
+  This is outside this item; it was raised with the owner.
+
 ## Phase 4 — The trip-control line, new words and the removed state, on screen (visual)
 
 Needs: the round 3 verdict (design.md rulings 17-20) and the round 3b

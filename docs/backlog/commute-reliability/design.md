@@ -361,8 +361,9 @@ not entered, and only for a fix at train speed. Let `P` be the fix.
    test decides only when exactly one direction passes it; otherwise the next
    test applies.
 3. **Running journeys** for each decided (trip, direction): request
-   departures `O → Z` with `at = now − (Δ + 10 min)`, where `Δ` is the longest
-   effective duration in that pair's cached board (else 60 min), limit 10,
+   departures `O → Z` with `at = now − (Δ + 10 min)`, where `Δ` is the median
+   effective duration in that pair's cached board (the lower middle value for
+   an even count; else 60 min), limit 10,
    under the current modes and cap. Native also plans the same window from the
    offline timetable (limit 30) and merges by journey key, online first. Keep
    journeys with `D ≤ now ≤ A`, not cancelled, modes and cap allowed. At most
@@ -382,6 +383,14 @@ not entered, and only for a fix at train speed. Let `P` be the fix.
 7. **Entry** is the existing inferred entry: `focus` with `by: "inferred"`,
    that journey and its source board. Refresh, arrival monitoring, the
    tracker and `Change destination` then work as for any inferred focus.
+
+`Δ` was first the longest duration. Phase 3a measured an iOS offline plan
+with a 99-minute T9 → T9 → T1 itinerary, which pushed the request back past
+everything ten online services could reach, so on-board entry never found the
+train on frequent lines. The median (lead's decision, 2026-10-02) keeps the
+window near a typical ride. On a very frequent line a rider a few minutes out
+can fall after the tenth service; a later fix catches them as the train ages
+into the window, and native's timetable plan of 30 covers it at once.
 
 With trains eight minutes apart on a 25-minute ride, neighbouring services
 differ by about 0.32 in `f_t`, so the 0.25 window separates them. Very
