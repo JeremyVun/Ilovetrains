@@ -389,6 +389,9 @@ Run once on final sources, one platform at a time: `go test ./...`,
 visual-regression matrix. Then the `backlog-item` close stage: confirm every
 contract change in design.md landed, then add the deviations entries.
 Migrate the exemplar, delete this folder, and release and deploy by
-`docs/operations/deploy.md`, `android.md` and `ios.md`.
+`docs/operations/deploy.md`, `android.md` and `ios.md`. The bundled bootstrap
+timetable expires `2026-10-04T23:59:59+11:00`. The owner's iPhone rides
+offline, so regenerate the bootstrap (compiler in `native-data.md`) before
+building the release, if it has not already been done.
 
 Done marker: the folder's deletion.
