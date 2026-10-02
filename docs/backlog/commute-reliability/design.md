@@ -25,8 +25,8 @@ measurements in [comps/MEASUREMENTS.md](comps/MEASUREMENTS.md).
 
 ## Owner rulings
 
-Rulings 1-7 are from 2026-10-01 and 8-24 from 2026-10-02, answering options
-laid out in the design session (21-24 during the build). Quoted text is the option label and
+Rulings 1-7 are from 2026-10-01 and 8-24 from 2026-10-02 and 25 from 2026-10-03, answering options
+laid out in the design session (21-25 during the build). Quoted text is the option label and
 description the owner chose, or the owner's own words.
 
 1. Trip end: “End after estimate (Recommended)” — “3 min after the last arrival
@@ -123,6 +123,15 @@ description the owner chose, or the owner's own words.
     upcoming row: “Fix it in this item (Recommended)” — both phones plan the
     next 24 departures from now plus the last 15 minutes as today, and merge
     them, so the board always shows upcoming trains.
+25. Narrow phones, asked during the build after phase 4b found the guessed
+    question cut to `Going somewhere el…` at 360 dp because Android keeps a
+    22 dp page margin at every width: “Port the web margin (Recommended)” —
+    Android uses the web's 18 dp page margin on phones 375 dp wide and
+    narrower, on every screen, so the line matches the 360 exemplar; 390 and
+    412 are unchanged. Phase 4c found the same on iOS at 375 pt (22 pt margin,
+    the question needs 337 of a 331 pt track; its stopgap shrank the
+    question's font). The lead applied the ruling to iOS too: 18 pt at 375 pt
+    and narrower, and the font stopgap goes.
 
 The owner's regression concern in ruling 13 is binding: automatic trip starts
 that work today must keep working. Every rule below only adds ways in, and the
