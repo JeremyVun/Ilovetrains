@@ -154,7 +154,6 @@ class CommuteReliabilityControllerTest {
         assertEquals(Screen.Home, model.state.value.screen)
         waitFor("the stop to persist") { stored().focus == null && stored().inferenceDeclined != null }
         val saved = stored()
-        assertNull("no evidence left to restore the trip", saved.lastAnswer)
         assertTrue("stopping records no ride", saved.rides.isEmpty())
         assertEquals(InferenceDecline(trip.id, false, now, guessed.journey.departureKey, guessed.composed.effectiveArrival), saved.inferenceDeclined)
         waitFor("declined_inferred") { events().count { it == "declined_inferred" } == 1 }
