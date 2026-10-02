@@ -252,6 +252,21 @@ final class InferenceRuleTests: XCTestCase {
         XCTAssertNil(inferredFocus(data: data, record: early, fix: riding, now: now))
     }
 
+    func testHomeOffersStartTripOnlyForItsLeadWhileItLeavesWithinFifteenMinutes() {
+        var state = AppState()
+        state.trips = [SavedTrip(id: "rt", from: rhodes, to: townHall)]
+        state.selectedTripId = "rt"
+        state.now = now
+        let soon = journey(departing: now + travelSeen)
+        state.board = board(soon)
+        XCTAssertEqual(state.startableLead?.key, soon.key)
+        state.board = board(journey(departing: now + travelSeen + 1_000))
+        XCTAssertNil(state.startableLead, "never a train further off")
+        state.board = board(soon)
+        state.focus = FocusedJourney(tripId: "rt", reverse: false, journey: soon, board: board(soon), pinned: false)
+        XCTAssertNil(state.startableLead, "trip mode is already on")
+    }
+
     private func journey(departing departure: Millis) -> Journey {
         Journey(legs: [Leg(line: "T9", mode: "train", headsign: "Town Hall", from: rhodes, to: townHall,
                            departure: departure, arrival: departure + 1_620_000)])
