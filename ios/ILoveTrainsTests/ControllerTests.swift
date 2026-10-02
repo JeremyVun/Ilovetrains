@@ -180,7 +180,7 @@ final class ControllerTests: XCTestCase {
         model.openJourney(chosen.journey)
         XCTAssertEqual(model.state.detail?.key, chosen.journey.key)
         XCTAssertEqual(model.state.board, chosen.board)
-        model.pinJourney(chosen.journey)
+        model.startTrip(chosen.journey)
         try await settled(store) { $0.focus?.journey.key == chosen.journey.key }
         XCTAssertEqual(model.state.focus?.journey.key, chosen.journey.key)
     }

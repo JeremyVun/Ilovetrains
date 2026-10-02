@@ -81,7 +81,7 @@ final class MetricsControllerTests: XCTestCase {
         model.state.recommendation = JourneyRecommendation(journey: second, board: moved)
         XCTAssertEqual(displayedHomeLead(model.state)?.key, second.key, "Home would now lead with the later service")
         model.openJourney(second)
-        model.pinJourney(second)
+        model.startTrip(second)
         XCTAssertEqual(Array(analytics.ledger.suffix(3)), [
             AnalyticsEvent(t: "hit_predicted", d: iosDims("1")),
             AnalyticsEvent(t: "hit_predicted", d: iosDims("1")),
@@ -89,17 +89,17 @@ final class MetricsControllerTests: XCTestCase {
         ])
 
         try await until { self.names.last == "shown_focus" }
-        model.unpinJourney()
+        model.stopTrip()
         try await until { self.names.last == "shown_predicted" }
         try await quiet(model)
         let lead = try XCTUnwrap(displayedHomeLead(model.state))
         model.openJourney(lead)
-        model.pinJourney(lead)
+        model.startTrip(lead)
         XCTAssertEqual(Array(analytics.ledger.suffix(2)), [
             AnalyticsEvent(t: "hit_predicted", d: iosDims("1")),
             AnalyticsEvent(t: "pinned_predicted", d: iosDims("1", ["r": "same", "pl.r": "ios.same"]))
         ])
-        model.unpinJourney()
+        model.stopTrip()
         XCTAssertEqual(names.filter { $0.hasPrefix("pinned_") }.count, 2, "unpinning emits nothing")
     }
 

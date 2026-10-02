@@ -253,6 +253,198 @@ final class CommuteReliabilityControllerTests: XCTestCase {
         ISO8601DateFormatter().date(from: "2026-09-07T08:00:00+10:00")!.timeIntervalSince1970 * 1_000
     }
 
+    func testStopTripOnAGuessedTripDeclinesItAndEndsTheTracker() async throws {
+        let tracker = quietTracker()
+        let (store, model, boarded, _, location) = try await guessedTrip(tracker: tracker)
+        try await until { await tracker.snapshot().active != nil }
+
+        model.stopTrip()
+
+        XCTAssertNil(model.state.focus)
+        XCTAssertEqual(model.state.screen, .home)
+        XCTAssertTrue(model.state.selectionPredicted, "Home answers where the phone is now")
+        XCTAssertFalse(location.isMonitoring)
+        XCTAssertEqual(analytics.ledger.filter { $0.t == "declined_inferred" }.count, 1)
+        try await until { await store.load().focus == nil }
+        let stored = await store.load()
+        XCTAssertEqual(stored.inferenceDeclined?.tripId, commute.id)
+        XCTAssertEqual(stored.inferenceDeclined?.departure, boarded.departureKey)
+        XCTAssertNil(stored.lastAnswer)
+        XCTAssertTrue(stored.rides.isEmpty)
+        try await until { await tracker.snapshot().active == nil }
+    }
+
+    func testStartingTheGuessedJourneyFromItsRunningRowKeepsItsArrivalGuard() async throws {
+        let (store, model, boarded, clock, location) = try await guessedTrip()
+        try await until { model.state.focus?.arrivalGuard?.armed == true }
+        let armed = model.state.focus?.arrivalGuard
+        clock.now += 30_000
+        model.tick()
+        model.openTrip(id: commute.id)
+        try await until { model.state.board != nil && !model.state.refreshing }
+        let row = try XCTUnwrap(model.state.board?.journeys.first { $0.key == boarded.key })
+
+        model.openBoardRow(row)
+
+        XCTAssertEqual(model.state.screen, .home)
+        XCTAssertEqual(model.state.focus?.pinned, true)
+        XCTAssertEqual(model.state.focus?.arrivalGuard, armed, "the guard armed while guessed survives the start")
+        XCTAssertTrue(location.isMonitoring)
+        try await until { await store.load().focus?.pinned == true }
+        let declined = await store.load().inferenceDeclined
+        XCTAssertNil(declined)
+    }
+
+    func testARunningBoardRowStartsTheTripOfflineAndStoppingItLeavesNoTrace() async throws {
+        let planner = OfflinePlanner()
+        try await planner.initialize()
+        let clock = TestClock(mondayMorning)
+        let tracker = quietTracker()
+        let (store, model) = try await model(UserData(trips: [commute]), planner: planner, clock: clock, location: ScriptedLocation(),
+                                             tracker: tracker)
+        model.resume()
+        model.openTrip(id: commute.id)
+        try await until { model.state.board != nil && !model.state.refreshing }
+        // Offline, this busy corridor's board holds only the services that left in the last quarter hour.
+        let left = try XCTUnwrap(model.state.board?.journeys.filter { !$0.cancelled && $0.effectiveDeparture <= clock.now })
+        let arrived = try XCTUnwrap(left.min { $0.effectiveArrival < $1.effectiveArrival })
+        let running = try XCTUnwrap(left.max { $0.effectiveArrival < $1.effectiveArrival })
+        XCTAssertGreaterThan(running.effectiveArrival, arrived.effectiveArrival)
+        clock.now = arrived.effectiveArrival
+        model.tick()
+
+        model.openBoardRow(arrived)
+        XCTAssertEqual(model.state.screen, .detail, "a row that has arrived still opens its journey")
+        XCTAssertNil(model.state.focus)
+        model.back()
+        model.openBoardRow(running)
+
+        XCTAssertEqual(model.state.screen, .home)
+        XCTAssertEqual(model.state.focus?.journey.key, running.key)
+        XCTAssertEqual(model.state.focus?.pinned, true)
+        try await until { await store.load().focus?.journey.key == running.key }
+        try await until { await tracker.snapshot().active != nil }
+        XCTAssertFalse(OfflineTransport.requests().isEmpty, "every request failed on the way")
+
+        model.stopTrip()
+
+        XCTAssertNil(model.state.focus)
+        try await until { await store.load().focus == nil }
+        let stored = await store.load()
+        XCTAssertTrue(stored.rides.isEmpty)
+        XCTAssertNil(stored.inferenceDeclined)
+        XCTAssertFalse(analytics.ledger.contains { $0.t == "declined_inferred" })
+        try await until { await tracker.snapshot().active == nil }
+    }
+
+    func testTheLiveActivityStopActsOnlyForTheCurrentSession() async throws {
+        let tracker = quietTracker()
+        let (store, model, _, _, _) = try await guessedTrip(tracker: tracker)
+        try await until { await tracker.snapshot().active != nil }
+        let current = await tracker.snapshot().active
+        let session = try XCTUnwrap(current?.sessionId)
+        StopTripIntent.handler = { [weak model] in await model?.stopTrip(session: $0) }
+        defer { StopTripIntent.handler = nil }
+
+        _ = try await StopTripIntent(session: UUID()).perform()
+        XCTAssertNotNil(model.state.focus, "an old activity's button cannot stop the current trip")
+
+        _ = try await StopTripIntent(session: session).perform()
+        XCTAssertNil(model.state.focus)
+        let stored = await store.load()
+        XCTAssertNil(stored.focus, "the stop is saved before the intent returns")
+        XCTAssertNotNil(stored.inferenceDeclined)
+        XCTAssertEqual(analytics.ledger.filter { $0.t == "declined_inferred" }.count, 1)
+        let ended = await tracker.snapshot().active
+        XCTAssertNil(ended)
+    }
+
+    func testTenMinutesAwayIsANewOpenAndNineKeepTheBoard() async throws {
+        let clock = TestClock(mondayMorning)
+        let (_, model) = try await model(UserData(trips: [commute]), clock: clock, location: ScriptedLocation())
+        model.resume()
+        model.openTrip(id: commute.id)
+        XCTAssertFalse(model.state.selectionPredicted)
+
+        model.pause()
+        clock.now += newOpenAfter - 60_000
+        model.resume()
+        XCTAssertEqual(model.state.screen, .board, "a quick switch keeps the board")
+        XCTAssertFalse(model.state.selectionPredicted)
+
+        model.pause()
+        clock.now += newOpenAfter
+        model.resume()
+        XCTAssertEqual(model.state.screen, .home)
+        XCTAssertTrue(model.state.selectionPredicted, "the explicit selection is gone")
+    }
+
+    func testATrackerTapStillLandsOnItsJourneyAfterTenMinutesInEitherOrder() async throws {
+        let planner = OfflinePlanner()
+        try await planner.initialize()
+        let clock = TestClock(mondayMorning)
+        let tracker = quietTracker()
+        let (_, model) = try await model(UserData(trips: [commute]), planner: planner, clock: clock, location: ScriptedLocation(),
+                                         tracker: tracker)
+        model.resume()
+        model.openTrip(id: commute.id)
+        try await until { model.state.board != nil && !model.state.refreshing }
+        let running = try XCTUnwrap(model.state.board?.journeys.filter { onItsWay($0, now: clock.now, data: UserData()) }
+            .max { $0.effectiveArrival < $1.effectiveArrival })
+        XCTAssertGreaterThan(running.effectiveArrival, clock.now + 2 * newOpenAfter + 60_000, "still riding after both returns")
+        model.openBoardRow(running)
+        try await until { await tracker.snapshot().active != nil }
+        let active = await tracker.snapshot().active
+        let session = try XCTUnwrap(active?.sessionId)
+        let url = try XCTUnwrap(URL(string: "ilovetrains://tracker?session=\(session.uuidString)"))
+
+        model.openTrip(id: commute.id)
+        model.pause()
+        clock.now += newOpenAfter
+        model.openURL(url)
+        try await until { model.state.screen == .detail }
+        model.resume()
+        XCTAssertEqual(model.state.screen, .detail, "the route landed first, and the return does not override it")
+        XCTAssertEqual(model.state.detail?.key, running.key)
+
+        model.back()
+        model.pause()
+        clock.now += newOpenAfter
+        model.resume()
+        XCTAssertEqual(model.state.screen, .home)
+        model.openURL(url)
+        try await until { model.state.screen == .detail }
+        XCTAssertEqual(model.state.detail?.key, running.key)
+    }
+
+    private func quietTracker() -> TravelTrackerController {
+        TravelTrackerController(store: TravelTrackerSessionFileStore(directory: temporaryDirectory()), driver: QuietActivities())
+    }
+
+    /// Trip mode entered the way it is guessed today: seen at the platform, then a fix on the way.
+    private func guessedTrip(
+        tracker: TravelTrackerController? = nil
+    ) async throws -> (DeviceStore, TrainViewModel, Journey, TestClock, ScriptedLocation) {
+        let planner = OfflinePlanner()
+        try await planner.initialize()
+        let clock = TestClock(mondayMorning)
+        // The plan the offline board makes at this moment, so the guessed service is one of its rows.
+        let board = try await planner.plan(from: origin, to: destination, at: clock.now - 900_000, modes: allModes, limit: 24, maxTransfers: 2)
+        let boarded = try XCTUnwrap(board.journeys.last { !$0.cancelled && $0.effectiveDeparture <= clock.now - 180_000 })
+        let seen = LastAnswer(tripId: commute.id, reverse: false, at: boarded.effectiveDeparture - 120_000, stationId: origin.id,
+                              board: BoardData(from: origin, to: destination, journeys: [boarded], generatedAt: 0, offline: true),
+                              journey: boarded)
+        let location = ScriptedLocation()
+        let (store, model) = try await model(UserData(trips: [commute], lastAnswer: seen), planner: planner, clock: clock,
+                                             location: location, tracker: tracker)
+        model.resume()
+        try await refreshWritten(model, store)
+        model.receiveLocation(Fix(at: along(0.17), time: clock.now, speed: 14))
+        XCTAssertEqual(model.state.focus?.journey.key, boarded.key)
+        XCTAssertEqual(model.state.focus?.pinned, false)
+        return (store, model, boarded, clock, location)
+    }
+
     private func along(_ fraction: Double) -> (Double, Double) {
         (origin.lat + (destination.lat - origin.lat) * fraction, origin.lon + (destination.lon - origin.lon) * fraction)
     }
@@ -269,7 +461,8 @@ final class CommuteReliabilityControllerTests: XCTestCase {
         planner: OfflinePlanner = OfflinePlanner(),
         clock: TestClock,
         location: ScriptedLocation,
-        network: Bool = true
+        network: Bool = true,
+        tracker: TravelTrackerController? = nil
     ) async throws -> (DeviceStore, TrainViewModel) {
         let store = DeviceStore(directory: temporaryDirectory())
         try await store.save(data)
@@ -278,7 +471,7 @@ final class CommuteReliabilityControllerTests: XCTestCase {
         var api = TransitAPI()
         api.baseURL = "http://offline.invalid"
         api.session = URLSession(configuration: configuration)
-        let tracker = TravelTrackerController(store: TravelTrackerSessionFileStore(directory: temporaryDirectory()), driver: QuietActivities())
+        let tracker = tracker ?? quietTracker()
         let model = TrainViewModel(store: store, api: api, planner: planner, tracker: tracker, location: location,
                                    keepalive: StoppedKeepalive(), analytics: analytics, clock: { clock.now })
         models.append(model)

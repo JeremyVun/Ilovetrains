@@ -24,14 +24,14 @@ struct BoardView: View {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(past) { journey in
-                        BoardRow(journey: journey, board: board, now: model.state.now) { model.openJourney(journey) }
+                        BoardRow(journey: journey, board: board, now: model.state.now) { model.openBoardRow(journey) }
                     }
                     VStack(alignment: .leading, spacing: 0) {
                         TrainLabel(text: "Now · \(clockTime(model.state.now))", color: colors.ink, size: 11)
                             .padding(.top, 9)
                     }.frame(maxWidth: .infinity, minHeight: 32, alignment: .topLeading).padding(.horizontal, pagePadding).id("now")
                     ForEach(future) { journey in
-                        BoardRow(journey: journey, board: board, now: model.state.now) { model.openJourney(journey) }
+                        BoardRow(journey: journey, board: board, now: model.state.now) { model.openBoardRow(journey) }
                     }
                     if visible.isEmpty {
                         VStack(alignment: .leading, spacing: 10) {

@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "0DAF94EDBB44576E18E0BC02D7CF05CB"
+               BlueprintIdentifier = "8E307700F94DF89AD2443FAE65A521E5"
                BuildableName = "ILoveTrains.app"
                BlueprintName = "ILoveTrains"
                ReferencedContainer = "container:ILoveTrains.xcodeproj">
@@ -30,7 +30,7 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "0DAF94EDBB44576E18E0BC02D7CF05CB"
+            BlueprintIdentifier = "8E307700F94DF89AD2443FAE65A521E5"
             BuildableName = "ILoveTrains.app"
             BlueprintName = "ILoveTrains"
             ReferencedContainer = "container:ILoveTrains.xcodeproj">
@@ -73,7 +73,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "0DAF94EDBB44576E18E0BC02D7CF05CB"
+            BlueprintIdentifier = "8E307700F94DF89AD2443FAE65A521E5"
             BuildableName = "ILoveTrains.app"
             BlueprintName = "ILoveTrains"
             ReferencedContainer = "container:ILoveTrains.xcodeproj">
@@ -90,7 +90,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "0DAF94EDBB44576E18E0BC02D7CF05CB"
+            BlueprintIdentifier = "8E307700F94DF89AD2443FAE65A521E5"
             BuildableName = "ILoveTrains.app"
             BlueprintName = "ILoveTrains"
             ReferencedContainer = "container:ILoveTrains.xcodeproj">

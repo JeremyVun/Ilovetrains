@@ -381,12 +381,17 @@ actor TravelTrackerController {
     }
 
     func focusIdentity(for url: URL) async -> TravelTrackerIdentity? {
-        await load()
         guard url.scheme == "ilovetrains", url.host == "tracker",
               let raw = URLComponents(url: url, resolvingAgainstBaseURL: false)?
                 .queryItems?.first(where: { $0.name == "session" })?.value,
-              let requested = UUID(uuidString: raw),
-              let active = session.active, active.sessionId == requested,
+              let requested = UUID(uuidString: raw) else { return nil }
+        return await focusIdentity(session: requested)
+    }
+
+    /// An old activity's tap or button cannot act on a replaced or dismissed focus.
+    func focusIdentity(session requested: UUID) async -> TravelTrackerIdentity? {
+        await load()
+        guard let active = session.active, active.sessionId == requested,
               session.suppressedIdentity != active.identity || session.suppression == nil else { return nil }
         return active.identity
     }

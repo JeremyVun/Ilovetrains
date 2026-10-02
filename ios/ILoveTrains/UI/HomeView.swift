@@ -181,7 +181,7 @@ private struct SmartHeader: View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
                 if pinned {
-                    Button(action: model.unpinJourney) {
+                    Button(action: model.stopTrip) {
                         HStack(spacing: 5) {
                             if status == "Pinned" { Image(systemName: "pin.fill").font(.system(size: 12)) }
                             TrainLabel(text: status, color: statusWarning ? colors.warning : colors.ink2, size: 11)

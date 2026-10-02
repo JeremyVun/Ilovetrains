@@ -71,7 +71,7 @@ struct DetailView: View {
                 .layoutPriority(1)
                 if pinned || (!focused && !shown.cancelled) {
                     ActionRail(text: pinned ? "Unpin this \(genericModeName(first.mode))" : "Pin this \(genericModeName(first.mode))", minHeight: 66) {
-                        if pinned { model.unpinJourney() } else { model.pinJourney(journey) }
+                        if pinned { model.stopTrip() } else { model.startTrip(journey) }
                     }
                     .fixedSize(horizontal: false, vertical: true)
                     .layoutPriority(1)

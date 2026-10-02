@@ -70,6 +70,9 @@ final class TrainViewModel: ObservableObject {
     private var arrivalPermissionPending = false
     private var evidenceWait: (identity: String, visit: Int, until: Millis)?
     private var foregroundVisit = 0
+    private var backgroundedAt: Millis?
+    private var routedReturn = false
+    private var readyWaiters: [CheckedContinuation<Void, Never>] = []
     private var arrivalGeneration = 0
     private let undoWindow: Duration
     private let clock: () -> Millis
@@ -162,6 +165,7 @@ final class TrainViewModel: ObservableObject {
             publish(retainedOfflineBoard(cached), request: generation)
         }
         state.ready = true; state.screen = data.trips.isEmpty ? .setup : .home
+        readyWaiters.forEach { $0.resume() }; readyWaiters = []
         if let url = pendingURL { pendingURL = nil; openURL(url) }
         refresh(); refreshFlags()
         do { try await bootstrap?.value }
@@ -327,6 +331,8 @@ final class TrainViewModel: ObservableObject {
         let returningFromKeepalive = keepalive.isRunning
         keepalive.stop()
         background = false
+        let away = backgroundedAt.map { clock() - $0 } ?? 0
+        backgroundedAt = nil
         #if DEBUG
         if seeded { return }
         #endif
@@ -336,6 +342,8 @@ final class TrainViewModel: ObservableObject {
         state.justAddedTripId = nil
         state.now = clock(); location.refreshPermission()
         if state.ready {
+            // A route that already landed is where the tap pointed; one still resolving lands after this.
+            if away >= newOpenAfter, !routedReturn { reopen() }
             if state.screen == .home { openSnapshot = data.lastAnswer }
             evidenceWaitOnOpen()
             focusRefreshPending = canNetwork && data.focus != nil
@@ -369,6 +377,7 @@ final class TrainViewModel: ObservableObject {
     func pause() {
         metrics.backgrounded()
         background = true
+        if backgroundedAt == nil { backgroundedAt = clock(); routedReturn = false }
         if startTrackerKeepalive() {
             clearArrivalMonitoring()
             state.distanceMetres = nil; state.nearestStation = nil; state.earlierLoading = false
@@ -1110,10 +1119,21 @@ final class TrainViewModel: ObservableObject {
     }
 
     /// Stop trip on a guessed trip: no inferred entry for that trip until the decline lapses, and never its departure again.
-    func declineInferred(_ focus: FocusedJourney) {
+    private func declineInferred(_ focus: FocusedJourney) {
         guard !focus.pinned else { return }
         data.inferenceDeclined = inferenceDecline(of: focus, at: clock())
-        persist()
+        metrics.declinedInferred()
+    }
+
+    /// A long absence is a new open: Home answers afresh instead of showing whatever was left behind.
+    private func reopen() {
+        if state.screen == .setup { cancelSetupLocation() }
+        historyTask?.cancel()
+        supplementTask?.cancel(); supplementTask = nil
+        redirect = nil; redirectTargetId = nil; pastPagePair = nil
+        explicit = false; historyRecorded = false; settingsBack = .home
+        state.screen = data.trips.isEmpty ? .setup : .home
+        state.detail = nil; state.selectingHome = false; state.setupFrom = nil; state.setupTo = nil
     }
 
     func back() {
@@ -1174,7 +1194,7 @@ final class TrainViewModel: ObservableObject {
         case widgetHomeURL.host: openHomeFromWidget()
         case widgetSetupURL.host:
             guard state.ready else { pendingURL = url; return }
-            newTrip()
+            newTrip(); routedReturn = true
         default: openTracker(url)
         }
     }
@@ -1185,7 +1205,7 @@ final class TrainViewModel: ObservableObject {
         historyTask?.cancel()
         redirect = nil; redirectTargetId = nil
         state.screen = .home; state.detail = nil; state.selectingHome = false
-        explicit = false; historyRecorded = false
+        explicit = false; historyRecorded = false; routedReturn = true
         openSnapshot = data.lastAnswer
         choosePrediction(); syncPersonal(); silentLocation(); refresh()
     }
@@ -1202,14 +1222,28 @@ final class TrainViewModel: ObservableObject {
             state.screen = .detail
             state.receipt = nil
             state.selectionPredicted = false
+            routedReturn = true
             recordHistory()
             #if DEBUG
             publishTrackerDebugStatus(await tracker.debugStatus())
             #endif
         }
     }
-    func pinJourney(_ journey: Journey) {
-        guard !journey.cancelled, data.withinTransferLimit(journey), journeyAllowed(journey, modes: data.modes), let id = state.selectedTripId, var board = state.board, let pair = ends(), board.from.id == pair.0.id, board.to.id == pair.1.id else { return }
+    /// A board row on its way is the train the rider is on, so it starts trip mode instead of opening detail.
+    func openBoardRow(_ journey: Journey) {
+        if onItsWay(journey, now: state.now, data: data) { startTrip(journey) } else { openJourney(journey) }
+    }
+    func startTrip(_ journey: Journey) {
+        guard !journey.cancelled, data.withinTransferLimit(journey), journeyAllowed(journey, modes: data.modes), let id = state.selectedTripId else { return }
+        if var current = data.focus, current.tripId == id, current.reverse == state.reverse, current.journey.key == journey.key {
+            metrics.pinned(tripId: id, reverse: state.reverse, journeyKey: journey.key)
+            // Starting the guessed journey itself keeps its arrival evidence.
+            current.pinned = true
+            data.focus = current; forgetLastAnswer(); persist()
+            state.screen = .home; state.detail = nil; historyRecorded = false; syncPersonal(); refresh()
+            return
+        }
+        guard var board = state.board, let pair = ends(), board.from.id == pair.0.id, board.to.id == pair.1.id else { return }
         metrics.pinned(tripId: id, reverse: state.reverse, journeyKey: journey.key)
         board.journeys = merge(board.journeys, [journey])
         var focus = FocusedJourney(tripId: id, reverse: state.reverse, journey: journey, board: board)
@@ -1218,13 +1252,24 @@ final class TrainViewModel: ObservableObject {
         data.focus = focus; forgetLastAnswer(); persist()
         state.screen = .home; state.detail = nil; historyRecorded = false; syncPersonal(); beginArrivalMonitoring(); refresh()
     }
-    func unpinJourney() {
-        guard let focus = data.focus, focus.pinned else { return }
+    func stopTrip() {
+        guard let focus = data.focus else { return }
         metrics.released()
+        declineInferred(focus)
         clearArrivalMonitoring()
         data.focus = nil; forgetLastAnswer(); persist()
-        // Releasing a pin is not a trip choice: Home answers where the phone is now.
+        // Stopping is not a trip choice: Home answers where the phone is now.
         explicit = false; state.screen = .home; state.detail = nil; choosePrediction(); syncPersonal(); refresh()
+    }
+    /// The Live Activity's Stop trip, which may have launched the app in the background to run.
+    func stopTrip(session: UUID) async {
+        if !state.ready { await withCheckedContinuation { readyWaiters.append($0) } }
+        guard let identity = await tracker.focusIdentity(session: session),
+              data.focus?.trackerIdentity == identity else { return }
+        stopTrip()
+        await trackerTask?.value
+        await tracker.awaitPublications()
+        await writeTask?.value
     }
     func showReturn() {
         guard let focus = data.focus else { return }

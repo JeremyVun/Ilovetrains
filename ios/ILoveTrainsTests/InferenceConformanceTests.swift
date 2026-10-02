@@ -73,6 +73,28 @@ final class InferenceConformanceTests: XCTestCase {
         }
     }
 
+    func testStartCases() throws {
+        let cases = try section("startCases")
+        XCTAssertEqual(cases.count, 6)
+        for raw in cases {
+            let name = try XCTUnwrap(raw["name"] as? String)
+            let journey = try TransitWire.journey(dictionary(raw["journey"]))
+            XCTAssertEqual(startable(journey, now: try number(raw["nowMs"])), try XCTUnwrap(raw["expectedStartable"] as? Bool), name)
+        }
+    }
+
+    func testRunningCases() throws {
+        let cases = try section("runningCases")
+        XCTAssertEqual(cases.count, 7)
+        for raw in cases {
+            let name = try XCTUnwrap(raw["name"] as? String)
+            let journey = try TransitWire.journey(dictionary(raw["journey"]))
+            var data = UserData()
+            if let modes = raw["enabledModes"] as? [String] { data.modes = Set(modes) }
+            XCTAssertEqual(onItsWay(journey, now: try number(raw["nowMs"]), data: data), try XCTUnwrap(raw["expectedRunning"] as? Bool), name)
+        }
+    }
+
     private func section(_ name: String) throws -> [[String: Any]] {
         let value = try dictionary(fixture[name])
         XCTAssertNotNil(value["run"] as? String)
@@ -214,6 +236,20 @@ final class InferenceRuleTests: XCTestCase {
         XCTAssertFalse(inferenceDeclined(data, tripId: "rt", now: now + declineHold, journey: other))
         XCTAssertTrue(inferenceDeclined(data, tripId: "rt", now: now + 86_400_000, journey: declined), "never the declined departure")
         XCTAssertFalse(inferenceDeclined(data, tripId: "rr", now: now))
+    }
+
+    func testAPlatformSightingRecordedAfterTheTrainLeftStillEnters() {
+        let departed = journey(departing: now - 300_000)
+        var data = UserData(trips: [SavedTrip(id: "rt", from: rhodes, to: townHall)])
+        data.useLocation = true
+        let seenAfter = LastAnswer(tripId: "rt", reverse: false, at: departed.effectiveDeparture + 30_000, stationId: rhodes.id,
+                                   board: board(departed), journey: departed)
+        let riding = Fix(lat: -33.83914, lon: 151.111, at: now, speed: 14, accuracyMetres: 10)
+        XCTAssertEqual(inferredFocus(data: data, record: seenAfter, fix: riding, now: now)?.journey.key, departed.key,
+                       "seen at the platform is D - at <= 15 min with no lower bound, as on the web")
+        var early = seenAfter
+        early.at = departed.effectiveDeparture - travelSeen - 1
+        XCTAssertNil(inferredFocus(data: data, record: early, fix: riding, now: now))
     }
 
     private func journey(departing departure: Millis) -> Journey {

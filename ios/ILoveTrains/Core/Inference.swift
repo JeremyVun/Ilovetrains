@@ -21,6 +21,7 @@ let onBoardDefaultRide: Millis = 3_600_000
 let progressWindow = 0.25
 // A car following the line would otherwise match the next train along one fix later.
 let declineHold: Millis = 3_600_000
+let newOpenAfter: Millis = 600_000
 let timetablePageLimit = 30
 let firstPastPageLookback: Millis = 1_800_000
 let firstPastPageLimit = 10
@@ -93,7 +94,7 @@ func inferredFocus(data: UserData, record: LastAnswer?, fix: Fix, now: Millis) -
     let journey = last.journey
     guard now >= journey.effectiveDeparture, now <= journey.effectiveArrival + travelLate,
           last.stationId == from.id,
-          (0...travelSeen).contains(journey.effectiveDeparture - last.at) else { return nil }
+          journey.effectiveDeparture - last.at <= travelSeen else { return nil }
 
     let left = distanceMetres(fix, from)
     let tripDistance = distanceMetres(Fix(lat: from.lat, lon: from.lon, at: now), to)
@@ -101,6 +102,25 @@ func inferredFocus(data: UserData, record: LastAnswer?, fix: Fix, now: Millis) -
     let fast = (fix.speed ?? 0) >= trainSpeedMetresPerSecond && left >= travelSpeedMovedMetres
     guard left.isFinite, tripDistance.isFinite, toward || fast else { return nil }
     return FocusedJourney(tripId: trip.id, reverse: last.reverse, journey: journey, board: last.board, pinned: false)
+}
+
+/// Home's Start trip: the window auto-start uses for "seen at the platform".
+func startable(_ journey: Journey, now: Millis) -> Bool {
+    !journey.cancelled && (0...travelSeen).contains(journey.effectiveDeparture - now)
+}
+
+extension AppState {
+    /// What Home's Start trip would start: the header's lead journey, only while no trip mode is on.
+    var startableLead: Journey? {
+        guard focus == nil, let lead = displayedHomeLead(self), startable(lead, now: now) else { return nil }
+        return lead
+    }
+}
+
+/// A board row on its way starts trip mode at once instead of opening detail.
+func onItsWay(_ journey: Journey, now: Millis, data: UserData) -> Bool {
+    journey.effectiveDeparture <= now && now < journey.effectiveArrival && !journey.cancelled
+        && journeyAllowed(journey, modes: data.modes) && data.withinTransferLimit(journey)
 }
 
 // Owner ruling 13: the open's snapshot, unchanged, and then the stored record may each enter.
