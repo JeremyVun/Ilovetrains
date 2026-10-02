@@ -27,13 +27,13 @@ zone.
   board or detail the rider was on (client-storage.md, Trip selection).
 - The smart header is a section, not a single tap target: the
   saved-trip row is the affordance, and the header's own trip carries the same
-  `DEPARTURES ›` cue as every other row. A journey the app inferred rather than
-  the user chose carries one control below the heavy rule. While the
-  `strip-placement` experiment runs, variant A2 places that same control in
-  the receipt slot. An empty answer caused by service preferences also links
-  to Settings. Before departure, a separate 44px next-service rail opens the
-  following journey's detail. The `Pinned` label is a 44px-high button that
-  unpins the service; other header content remains read-only.
+  `DEPARTURES ›` cue as every other row. Trip mode is started and stopped
+  with one pair of words, `Start trip` and `Stop trip`, on the trip-control
+  line below the heavy rule (Smart home); it is the header's only control
+  besides the next-service rail. An empty answer caused by service preferences
+  also links to Settings. Before departure, a separate 44px next-service rail
+  opens the following journey's detail. Other header content remains
+  read-only.
 - Tapping a saved-trip row opens that trip's departure board. It records the
   explicit selection and never changes the focused journey; browsing therefore
   never replaces the focused train.
@@ -44,14 +44,19 @@ zone.
   any current trip mode; that is how a wrong guess is corrected to the right
   train (owner ruling 12, 2026-10-02). Upcoming and arrived rows still open
   detail.
-- `Pin this train` on journey detail and a running board row are the controls
-  that start a trip on a journey. Each returns home and follows that service
-  in the smart header; directions begin when it departs. Tapping `Pinned` on
-  home or `Unpin this train` in detail clears the explicit pin and returns to
-  the ordinary home answer for that trip. The board never shows a separate focus strip.
-- An explicitly pinned journey has an `Unpin this train` (or ferry) action
-  rail, including when cancelled. Other cancelled or inferred journeys carry
-  no action rail; the back control is the way out.
+- `Start trip` starts trip mode on exactly the journey it is attached to: on
+  journey detail that journey, and on Home the header's own train while it
+  leaves within 15 minutes. A running board row starts its journey the same
+  way. Each replaces any current trip mode, returns home and follows that
+  service in the smart header; directions begin when it departs. `Stop trip`
+  on Home's trip-control line and on a started journey's detail ends trip
+  mode for a started or a guessed trip alike, records no ride, and returns to
+  the ordinary home answer. There is no undo; a rider who
+  stopped by mistake starts again. The board never shows a separate focus
+  strip.
+- A journey the rider started has a `Stop trip` action rail, including when
+  cancelled. Other cancelled or guessed journeys carry no action rail; the
+  back control is the way out, and a guessed trip stops from Home.
 - When a focused journey is over, home may offer the opposite direction. The
   client fetches a real return journey and never reverses the outbound snapshot
   or invents transfer platforms.
@@ -155,16 +160,12 @@ When the flag is off, the trip line remains unchanged and does no animation work
 - When a journey is focused, that line is its status instead: `RUNNING`,
   `RUNNING LATE`, `CONNECTION GONE`, `LATE · CONNECTION GONE`, `CANCELLED` or
   `TRIP OVER`. Only the header carries it; the focused saved-trip row does
-  not repeat it (owner ruling, 2026-09-23). An explicitly pinned service adds a
-  pin icon and `PINNED` in the header; beside a lost connection it
-  adds the pin icon alone, without the word, and a recovery journey is never
-  labelled `PINNED`. Before departure, an ordinary
-  `RUNNING` status is replaced by `PINNED`; late, cancelled and completed
-  statuses retain their words. Inferred travel never gets a pin indicator.
-  A cancellation replacement is not labelled as the pinned service.
-  The header pin indicator releases the pin when tapped. No copy claims the rider is aboard. The status line keeps
-  identical height with and without the icon; the trip grid starts 14px below
-  the status band.
+  not repeat it (owner ruling, 2026-09-23). A started trip reads the service's
+  own status exactly as a guessed one does, `RUNNING` before departure
+  included (owner rulings 14 and 20, 2026-10-02): the status line carries no
+  pin, no `PINNED` and no control. A cancellation replacement is not labelled
+  as the started service. No copy claims the rider is aboard. The trip grid
+  starts 14px below the status band.
 - `RUNNING LATE` requires all three of: fresh data, neither stale nor offline;
   a realtime estimate on the relevant leg's departure or arrival; and a
   positive difference between the printed clock minutes of that estimate and
@@ -279,16 +280,27 @@ When the flag is off, the trip line remains unchanged and does no animation work
   use device-held facts such as line identity, distance and last ride; opening
   home must not fan out one upstream request per saved trip. The rule guards
   that fan-out, not the followed journey's own tail.
-- An inferred journey puts one line between the heavy rule and `MY TRIPS`:
-  `Going somewhere else?` at the left in the offer-paragraph type, `CHANGE` at
-  the right in the offer-button idiom, a hairline below it, 49px tall with a
-  44px tap target. It appears in inferred travel mode only — never above a
-  journey the user chose, and never outside travel mode.
-- During `strip-placement`, A2 moves that same question and CHANGE action
-  into the receipt slot and removes the line below the rule. The question
-  stays on one line, ellipsising only if necessary; CHANGE keeps its full
-  44px tap target. The receipt adds height to the content-sized header.
-  Copy and action behavior are identical in both variants.
+- The trip-control line sits between the heavy rule and `MY TRIPS`: 48px with
+  a hairline below it, 49px in all, the page margin at both ends, question
+  words at the left in the offer-paragraph type (`--ink-2`) and every action
+  at the right in the offer-button idiom with a 48px-high target (owner
+  rulings 9 and 15-19, 2026-10-02, the round 3b exemplars). Its states:
+
+  | Home state | Line |
+  | --- | --- |
+  | Guessed trip mode (`by: "inferred"`) | `Going somewhere else?`, then `STOP TRIP` in `--ink-2`, a 14px `--rule-2` hairline and `CHANGE` in `--ink`, 22px apart |
+  | Trip mode the rider started | `■ STOP TRIP` alone at the right |
+  | No trip mode, and the header's train leaves within 15 minutes, not cancelled | `Taking the <HH:MM>?` with the header train's effective departure clock, and `▶ START TRIP` at the right |
+  | Otherwise, and whenever the trip is over | no line |
+
+  The lone actions take the bar's glyph idiom: an 11px `■` or `▶` in
+  `--ink-2`, `aria-hidden`, 9px before the word and centred on the caps
+  rather than the line box. Stop trip stands where Start trip stood, so the
+  stop appears under the thumb that started the trip. The question carries a
+  -1px end margin so the guessed line prints whole at 360px in Roboto; at
+  360px in SF, which no phone uses, it ellipsises. When the startable line
+  appears it moves `MY TRIPS` down by its 49px; the header never moves. The
+  trip-over offer replaces the line.
 - Saved-trip rows are 72px with a `DEPARTURES ›` cue at the right, which the
   sub line reserves 106px for. Names use 19px type; an overflowing paired
   name fits down in 0.25px steps to a 16px floor. If the complete pair still
@@ -333,12 +345,13 @@ When the flag is off, the trip line remains unchanged and does no animation work
   around now.`), never that they ride it. Only a persisted ride supports the
   reverse-direction receipt.
 - `Train` is the generic word for any service, metro included (`Next train`,
-  `Pin this train`, `Getting the next trains…`). The word `metro` appears only
+  `Getting the next trains…`). The word `metro` appears only
   where the distinction changes what the rider does: the setup sheet's mode
   label under a station, the next-service rail, and a change between modes
   in journey detail. Line colour and headsign carry the rest.
 - Ferry-first journeys use `ferry` where journey-specific copy uses `train`:
-  `Next ferry`, `Pin this ferry`, and `<time> cancelled · next ferry`.
+  `Next ferry` and `<time> cancelled · next ferry`. `Start trip` and
+  `Stop trip` are the same words for every mode.
   Loading and no-journey states remain generic: `Getting the next trains…`.
   Train and metro legs call their boarding place `Platform`; ferry legs call
   it `Wharf`. A transfer uses the word for the leg being boarded. The client
@@ -639,9 +652,9 @@ When the flag is off, the trip line remains unchanged and does no animation work
   colour with the time struck. Freshness appears at the top right beside the
   Detail back control on all three clients (owner ruling, 2026-09-08), using
   its existing status copy and colours. The tail is followed by the 66px
-  action rail `Pin this train` or `Pin this ferry`,
-  chosen from the first leg (`Unpin this train` or ferry when pinned), which shares its geometry with home's `New trip`
-  rail.
+  action rail `Start trip` (`Stop trip` when the rider started this journey),
+  which shares its geometry with home's `New trip` rail. The rail carries
+  words only, no glyph.
 - Once the journey has departed, the promoted row keeps the board row's
   figure: the time since departure with `AGO`, never a countdown to the next
   action, which belongs to the home header alone. The same place counting
@@ -670,7 +683,7 @@ When the flag is off, the trip line remains unchanged and does no animation work
   is omitted when upstream gives none. The boarding-place cap disappears after
   boarding.
 - The progress marker moves continuously from timetable and live estimates only
-  during a ride or change. It is hidden before departure, even when pinned, and
+  during a ride or change. It is hidden before departure, even on a started trip, and
   after completion. The centered station label's small grey stem follows the
   same active phases. Keep at least 6px between the station text and the
   instruction below it. Progress is a time inference, never a claim of
@@ -685,7 +698,10 @@ existing type hierarchy. Keep the last ETA and destination instruction visible; 
 | --- | --- | --- |
 | Checking arrival | `Checking arrival` | Dash; `Checking arrival at <destination>.` |
 | Fresh away plus sustained movement | `Arrival uncertain` | Whole minutes `Past estimate`; `Still on the way to <destination>.` |
-| Stopped away, ambiguous or missing position | `Arrival unconfirmed` | Dash; `Arrival time needs an update.` |
+
+There is no stopped or missing-position row: without movement the trip ends
+three minutes after its estimate (client-storage.md, Final arrival decision),
+so an unconfirmed trip always means a moving one.
 
 The main figure is the home header's; journey detail keeps its board-row
 figure and shows the instruction and `Last estimate` tail only.
@@ -693,11 +709,16 @@ Minutes past estimate uses nonnegative floor elapsed minutes; in its first
 minute use a dash rather than a misleading zero. Never print `0 min TO GO`,
 `Trip over`, “You've arrived,” or a return offer for an unconfirmed trip.
 Keep existing offline/stale source indication independently of arrival status.
-For never-guarded estimate completion, replace the existing personal claim
+For estimate completion, guarded or not, replace the personal claim
 “You've arrived” with `The scheduled trip has ended. The return trip is ready.`
 when schedule-only, or `The last arrival estimate has passed. The return trip is ready.`
-when an estimate exists. Location-confirmed completion keeps the existing
-arrival/return composition and wording.
+when an estimate exists. That sign wraps onto a second line rather than
+cutting; on Home every instruction the app writes wraps, and only an upstream
+headsign may ellipsise. The trip-over offer below it then reads
+`The return trip is ready when you are.` without `You’ve arrived.` (owner
+ruling 21, 2026-10-02). Location-confirmed completion keeps the existing
+arrival/return composition and wording, `You’ve arrived. The return trip is
+ready when you are.`
 
 The shared arrival state must override all repeated UI `now >= A` tests.
 Journey detail's final step does not become done solely from ETA for the
@@ -705,8 +726,9 @@ matching guarded focus; other timetable rows retain their normal time styling.
 Native tracker lifecycle must not end/suppress the session, or settle a ride,
 solely because its projection reaches the final endpoint. Publish the same
 unconfirmed semantics using its existing quiet instruction/context rows.
-A guarded session remains unconfirmed until permitted foreground evidence,
-correction or expiry; background fixes never feed the arrival guard.
+A guarded session settles by the final-arrival rules (client-storage.md):
+permitted foreground evidence, three minutes past its estimate unless still
+moving, correction or expiry; background fixes never feed the arrival guard.
 While a journey is followed, iOS keeps running in the background through
 coarse background location updates (hundred-metre accuracy, a 100 m distance
 filter, no `Always` permission, the background indicator shown, fixes
@@ -1000,7 +1022,8 @@ Settings frames and two filtered-Home frames:
   `direct`, `long`, `departed`, `focused` and `hero-light` variants, and
   `detail-412x732-hero.png` with its `tight`, `cancelled` and `long` variants.
   `departed` is the post-departure promoted row under `TO CHANGE`; `focused` is
-  the explicitly pinned journey, which carries an unpin action rail.
+  the journey the rider started, which carries the `Stop trip` rail; every
+  other variant with a rail reads `Start trip`.
 - Ferry detail: `detail-390x844-ferry-pyrmont.png` carries the generic `Wharf`
   origin cap, the compact `5B` to `4B` transfer and its full secondary
   boarding instruction. `detail-390x844-ferry-numeric.png` preserves the full
@@ -1008,45 +1031,56 @@ Settings frames and two filtered-Home frames:
 - Smart home and directions: `home-390x844-before.png` plus `change`, `final`,
   `tight`, `cxl`, `focused-cxl`, `late`, `back` and `before-light`, and
   `home-412x732-change.png`. `tight` is a late unfocused lead, `cxl` the
-  unfocused cancelled lead, `focused-cxl` a focused journey cancelled before it
-  departs, `late` the `RUNNING LATE` treatment, and `back` the return direction
-  with its real transfer platforms after the offer is accepted.
-- Pinned and next service: `home-390x844-mascot-before.png`,
+  unfocused cancelled lead, `focused-cxl` a started journey cancelled before it
+  departs, which keeps its `Stop trip` line, `late` the `RUNNING LATE`
+  treatment, and `back` the return direction with its real transfer platforms
+  after the offer is accepted. `before`, `tight` and `back` lead with a train
+  inside 15 minutes, so they carry the startable line.
+- Started trip and next service: `home-390x844-mascot-before.png`,
   `home-390x844-mascot-pinned.png` and `home-390x844-mascot-active.png`, with
   `-light` variants and the same six frames at `412x732`. These reproduce the
   approved short Mascot–Central leg: centered Central, separated platform
-  labels, the 44px next-service rail, explicit pin indication and at least
-  6px to the instruction. The source screenshot's overnight services are
-  scheduled-only; the active frame advances the clock to show travel state.
+  labels, the 44px next-service rail, the started trip's `■ STOP TRIP` line
+  and at least 6px to the instruction. The source screenshot's overnight
+  services are scheduled-only; the active frame advances the clock to show
+  travel state.
 - Ferry smart home: `home-390x844-ferry-pyrmont-focused.png` calibrates the
   generic `Wharf` origin with the compact `5B` to `4B` transfer;
   `home-390x844-ferry-numeric-focused.png` calibrates the full initial
   `Wharf 4, Side B` cap. `home-925x844-ferry-pyrmont-focused.png` carries the
   same generic origin at desktop width.
 - Location-first home: `home-390x844-inferred.png` and its `inferred-light`
-  variant are inferred travel mode carrying the `Going somewhere else?` line;
-  `home-390x844-just-added.png` is the open on which the app saved the pair it
-  is showing, marked once in the sub line.
-- Inferred experiment A2: `home-390x844-inferred-a2.png` and
-  `home-390x844-inferred-a2-light.png` put the correction in the receipt slot.
+  variant are guessed trip mode carrying the `Going somewhere else?  STOP TRIP
+  │ CHANGE` line; `home-390x844-just-added.png` is the open on which the app
+  saved the pair it is showing, marked once in the sub line.
+- Trip-control line (the round 3b verdict exemplars): `inferred` above is the
+  guessed line and `home-390x844-guessed-stress.png` the same line under a lost
+  connection; `home-390x844-started.png` and `-started-after.png`, each with a
+  `-light` variant, are the lone `■ STOP TRIP` before and after departure;
+  `home-390x844-startable.png` with its `-light` variant,
+  `home-375x667-startable.png` and `home-390x844-startable-ferry.png` are
+  `Taking the <HH:MM>?  ▶ START TRIP`; `home-390x844-leaves-later.png` is the
+  header's train 25 minutes out, with no line.
 - Setup: `setup-390x844-origin.png` is the sheet opening with From filled from
   a fix and the destination field focused.
 
 Measurements these frames carry deliberately, so nothing above reads as drift:
 the two header clocks share a baseline to within 1px, which is the tolerance
 the instrument allows. Header height follows its transfer-label band, receipt
-and optional next-service rail. A future pinned journey keeps its boarding cap
-but has no progress marker or station stem;
-`home-390x844-inferred` carries the inferred line at 49px with its 48px action;
-its A2 variant has a 44px action;
+and optional next-service rail. A future started journey keeps its boarding
+cap but has no progress marker or station stem;
+every trip-control line is 49px with 48px-high actions, STOP TRIP and CHANGE
+22px apart; the startable and started lines put `MY TRIPS` 49px lower than
+`home-390x844-leaves-later`, and the guessed line's glyph-free STOP TRIP
+leaves CHANGE where it was;
 `home-390x844-just-added` carries the 63px mark inside the sub line's 212px track;
 `detail-*-tight` shoots a change shortened by a late first leg,
 so its promoted row reads `5 MIN LATE`.
 
 The screenshot tool checks contrast against the nearest opaque background,
 compositing translucent ink first. Dark/light reference ratios are 4.3/4.83:1
-for `Just added`, 8/8.13:1 for the inferred question, and 17.6/17.8:1 for
-its action. The instrument allows 0.1 below each reference ratio for the
+for `Just added`, 8/8.13:1 for the trip-control question and the guessed line's
+STOP TRIP, and 17.6/17.8:1 for CHANGE and the lone START TRIP and STOP TRIP. The instrument allows 0.1 below each reference ratio for the
 difference between the page and panel backgrounds.
 
 Client markup carries the data attributes the comps harness probes, so the

@@ -885,14 +885,15 @@ async function checkRecommendation() {
       if (document.querySelector('[data-t="footer"]')?.textContent.trim() !== 'Live') {
         throw new Error('chosen detail lost its page source freshness');
       }
-      const pin = document.querySelector('[data-act="focus"]');
-      if (!pin) throw new Error('chosen recommendation detail has no pin action');
-      pin.click();
-      await wait(() => t.state.doc.focus && t.state.view === 'home' && document.querySelector('[data-act="unpin"]'),
-        'pin action did not return to focused Home');
-      if (keyOf(t.state.doc.focus.journey) !== expected) throw new Error('pin persisted a different journey');
-      document.querySelector('[data-act="unpin"]').click();
-      await wait(() => !t.state.doc.focus, 'unpin did not clear recommendation focus');
+      const start = document.querySelector('[data-act="focus"]');
+      if (!start) throw new Error('chosen recommendation detail has no Start trip action');
+      start.click();
+      const stop = '[data-tripline="started"] [data-act="stop-trip"]';
+      await wait(() => t.state.doc.focus && t.state.view === 'home' && document.querySelector(stop),
+        'Start trip did not return to Home with Stop trip');
+      if (keyOf(t.state.doc.focus.journey) !== expected) throw new Error('Start trip persisted a different journey');
+      document.querySelector(stop).click();
+      await wait(() => !t.state.doc.focus, 'Stop trip did not clear the recommendation focus');
 
       location.hash = '#/settings';
       await wait(() => document.querySelector('.st-transfer-row'), 'Settings did not open');
@@ -993,19 +994,26 @@ async function captureGuardedHome() {
         await configurePage(page, focusedConfig(journey), documentFor(journey), { width, height, scheme });
         await evaluate(page, async () => {
           const t = window.__trains;
-          for (let index = 0; index < 120 && t.state.arrivalDecision?.state !== 'arrivalUnconfirmed'; index += 1) {
+          for (let index = 0; index < 120 && t.state.arrivalDecision?.state !== 'checkingArrival'; index += 1) {
             t.tick();
             await new Promise((resolve) => setTimeout(resolve, 25));
           }
-          if (t.state.arrivalDecision?.state !== 'arrivalUnconfirmed') {
-            throw new Error(`guarded Home did not reach arrivalUnconfirmed: ${t.state.arrivalDecision?.state}`);
+          if (t.state.arrivalDecision?.state !== 'checkingArrival') {
+            throw new Error(`guarded Home did not reach checkingArrival: ${t.state.arrivalDecision?.state}`);
           }
           const text = document.body.textContent;
-          if (!text.includes('Arrival unconfirmed') || !text.includes('Arrival time needs an update.')) {
-            throw new Error('guarded Home capture has the wrong missing-evidence copy');
+          if (document.querySelector('[data-focus-status]')?.textContent.trim() !== 'Checking arrival'
+              || !text.includes('Checking arrival at Bondi Junction.')) {
+            throw new Error('guarded Home capture has the wrong checking copy');
+          }
+          if (text.includes('Arrival unconfirmed') || text.includes('Arrival time needs an update.')) {
+            throw new Error('guarded Home capture shows the removed stopped state');
           }
           if (/\b0\s*min\s*to go\b/i.test(text) || document.querySelector('[data-act="way-back"]')) {
             throw new Error('guarded Home capture contains finished-trip UI');
+          }
+          if (!document.querySelector('[data-tripline="started"] [data-act="stop-trip"]')) {
+            throw new Error('a started trip checking its arrival has no Stop trip');
           }
           const all = [...document.querySelectorAll('body *')];
           const worst = all.reduce((answer, element) => {
@@ -1016,10 +1024,10 @@ async function captureGuardedHome() {
           }, { overflow: 0, tag: '' });
           if (worst.overflow > 0.5) throw new Error(`horizontal overflow ${JSON.stringify(worst)}`);
         });
-        const file = path.join(outDir, `home-guarded-${width}x${height}-${scheme}.png`);
+        const file = path.join(outDir, `home-checking-arrival-${width}x${height}-${scheme}.png`);
         fs.writeFileSync(file, await screenshot(page));
       });
-      console.log(`PASS guarded Home ${width}x${height} ${scheme}`);
+      console.log(`PASS guarded Home checking arrival ${width}x${height} ${scheme}`);
     }
   }
 }

@@ -22,13 +22,17 @@ const bandOpens = [1, 2, 6, 11, 16, 21, 26, 31, 36, 41, 46, 51];
 const dimensionlessEvents = [
   'shown_predicted', 'hit_predicted', 'miss_predicted',
   'shown_focus', 'hit_focus', 'miss_focus',
-  'change_inferred', 'asked_panel', 'asked_setup'
+  'shown_usual', 'hit_usual', 'miss_usual',
+  'shown_home', 'hit_home', 'miss_home',
+  'change_inferred', 'entered_inferred', 'declined_inferred',
+  'asked_panel', 'asked_setup', 'later_panel'
 ];
 
-/* A document with no bucket still rides in the control arm, so every enabled
-   event carries the experiment dimension. */
-const dv = (u, variant) => ({ u, pl: 'web', 'pl.u': `web.${u}`, 'x.strip-placement': variant });
-const d = (u = '1') => dv(u, 'a3');
+/* No experiment runs, so an enabled event carries no x.* dimension. */
+const dv = (u) => ({ u, pl: 'web', 'pl.u': `web.${u}` });
+const d = (u = '1') => dv(u);
+// A stand-in table: assignment is kept for the next experiment.
+const PLACEMENT = { 'strip-placement': { variants: ['a3', 'a2'], offset: 0 } };
 
 function fakeFetch(...responses) {
   const calls = [];
@@ -72,31 +76,36 @@ test('analytics is enabled only on the production origin, with consent and a usa
   assert.deepEqual([...storage._map.keys()], [], 'the probe leaves nothing behind');
 });
 
+test('strip-placement is closed and no experiment runs', () => {
+  assert.deepEqual(EXPERIMENTS, {});
+  assert.equal(variant(bucketed(37), 'strip-placement', true), null);
+  assert.deepEqual(experimentDims(bucketed(37), true), {});
+});
+
 test('the bucket picks the variant, and the control answers when it cannot', () => {
-  assert.deepEqual(EXPERIMENTS['strip-placement'], { variants: ['a3', 'a2'], offset: 0 });
-  assert.equal(variant(bucketed(37), 'strip-placement', true), 'a2');
-  assert.equal(variant(bucketed(38), 'strip-placement', true), 'a3');
-  assert.equal(variant(emptyDoc(), 'strip-placement', true), 'a3');
-  assert.equal(variant(bucketed(37), 'strip-placement', false), 'a3');
-  assert.equal(variant(bucketed(-1), 'strip-placement', true), 'a3');
-  assert.equal(variant(bucketed(100), 'strip-placement', true), 'a3');
-  assert.equal(variant(null, 'strip-placement', true), 'a3');
-  assert.equal(variant(bucketed(37), 'toString', true), null);
-  assert.equal(variant(bucketed(37), '__proto__', true), null);
+  assert.equal(variant(bucketed(37), 'strip-placement', true, PLACEMENT), 'a2');
+  assert.equal(variant(bucketed(38), 'strip-placement', true, PLACEMENT), 'a3');
+  assert.equal(variant(emptyDoc(), 'strip-placement', true, PLACEMENT), 'a3');
+  assert.equal(variant(bucketed(37), 'strip-placement', false, PLACEMENT), 'a3');
+  assert.equal(variant(bucketed(-1), 'strip-placement', true, PLACEMENT), 'a3');
+  assert.equal(variant(bucketed(100), 'strip-placement', true, PLACEMENT), 'a3');
+  assert.equal(variant(null, 'strip-placement', true, PLACEMENT), 'a3');
+  assert.equal(variant(bucketed(37), 'toString', true, PLACEMENT), null);
+  assert.equal(variant(bucketed(37), '__proto__', true, PLACEMENT), null);
 });
 
 test('every running experiment dimensions every event, and none does when disabled', () => {
-  assert.deepEqual(experimentDims(bucketed(37), true), { 'x.strip-placement': 'a2' });
-  assert.deepEqual(experimentDims(bucketed(37), false), {});
-  assert.deepEqual(Object.keys(experimentDims(emptyDoc(), true)),
-    Object.keys(EXPERIMENTS).map((id) => 'x.' + id));
+  assert.deepEqual(experimentDims(bucketed(37), true, PLACEMENT), { 'x.strip-placement': 'a2' });
+  assert.deepEqual(experimentDims(bucketed(37), false, PLACEMENT), {});
+  assert.deepEqual(Object.keys(experimentDims(emptyDoc(), true, PLACEMENT)),
+    Object.keys(PLACEMENT).map((id) => 'x.' + id));
 });
 
-test('an event carries its usage band, its own dims and the experiment, and nothing else', () => {
+test('an event carries its usage band and its own dims, and nothing else', () => {
   const { analytics } = make({ getDoc: () => bucketed(37, 4) });
   analytics.track('saved_setup', { f: 'search' });
   assert.deepEqual(analytics.events, [
-    { t: 'saved_setup', d: { ...dv('2-5', 'a2'), f: 'search' } }
+    { t: 'saved_setup', d: { ...dv('2-5'), f: 'search' } }
   ]);
 });
 
@@ -143,10 +152,10 @@ test('personal, arbitrary and reserved caller dimensions are rejected', () => {
 
   assert.equal(docReads, 1, 'rejected calls do not inspect the document');
   assert.deepEqual(analytics.events, [
-    { t: 'shown_predicted', d: dv('2-5', 'a2') }
+    { t: 'shown_predicted', d: dv('2-5') }
   ]);
   assert.deepEqual(analytics.queue(), [
-    { t: 'shown_predicted', d: dv('2-5', 'a2'), n: 1 }
+    { t: 'shown_predicted', d: dv('2-5'), n: 1 }
   ]);
 });
 
@@ -167,7 +176,7 @@ test('accepted caller dimensions are copied before document access', () => {
   analytics.track('saved_setup', dims);
   assert.equal(reads, 1);
   assert.deepEqual(analytics.events, [
-    { t: 'saved_setup', d: { ...dv('2-5', 'a2'), f: 'search' } }
+    { t: 'saved_setup', d: { ...dv('2-5'), f: 'search' } }
   ]);
 });
 
@@ -181,7 +190,7 @@ test('repeats compact to a count, a changed dimension starts a new entry', () =>
   analytics.track('shown_predicted');
   assert.deepEqual(analytics.queue(), [
     { t: 'shown_predicted', d: d(), n: 5 },
-    { t: 'shown_predicted', d: dv('2-5', 'a2'), n: 1 }
+    { t: 'shown_predicted', d: dv('2-5'), n: 1 }
   ]);
   assert.equal(analytics.events.length, 6, 'the ledger keeps every record');
   assert.deepEqual(JSON.parse(storage._map.get(QUEUE_KEY)).queue.length, 2);
@@ -191,7 +200,7 @@ test('the queue is capped at 200 entries, oldest dropped', () => {
   let doc = emptyDoc();
   const { analytics } = make({ getDoc: () => doc });
   const combinations = dimensionlessEvents.flatMap((name) =>
-    bandOpens.flatMap((opens) => [0, 1].map((bucket) => ({ name, doc: bucketed(bucket, opens) }))));
+    bandOpens.map((opens) => ({ name, doc: bucketed(0, opens) })));
   for (const combination of combinations.slice(0, QUEUE_CAP)) {
     doc = combination.doc;
     analytics.track(combination.name);
@@ -203,7 +212,7 @@ test('the queue is capped at 200 entries, oldest dropped', () => {
   assert.equal(queue.length, QUEUE_CAP);
   assert.deepEqual(queue[0], {
     t: combinations[1].name,
-    d: dv('1', 'a2'),
+    d: dv('2-5'),
     n: 1
   });
   assert.equal(queue.at(-1).t, combinations[QUEUE_CAP].name);
@@ -259,7 +268,8 @@ test('obsolete or privacy-invalid persisted entries are dropped before sending',
     { t: 'shown_predicted', d: d(), n: 1, sid: 'page-load-1' },
     { t: 'shown_predicted', d: { ...d(), pl: 'ios', 'pl.u': 'ios.1' }, n: 1 },
     { t: 'shown_predicted', d: { ...d(), 'pl.u': 'web.51+' }, n: 1 },
-    { t: 'shown_predicted', d: { u: '1', pl: 'web', 'x.strip-placement': 'a3' }, n: 1 },
+    { t: 'shown_predicted', d: { u: '1', pl: 'web' }, n: 1 },
+    { t: 'shown_predicted', d: { ...d(), 'x.strip-placement': 'a3' }, n: 1 },
     { t: 'pinned_usual', d: d(), n: 1 },
     { t: 'pinned_usual', d: { ...d(), r: 'same' }, n: 1 },
     { t: 'pinned_usual', d: { ...d(), r: 'same', 'pl.r': 'web.trip' }, n: 1 },
@@ -281,7 +291,7 @@ test('the largest valid queue stays within the service body cap', async () => {
   const fetchFn = fakeFetch({ ok: true });
   const { analytics, storage } = make({ getDoc: () => doc, fetchFn });
   const combinations = dimensionlessEvents.flatMap((name) =>
-    bandOpens.flatMap((opens) => [0, 1].map((bucket) => ({ name, doc: bucketed(bucket, opens) }))));
+    bandOpens.map((opens) => ({ name, doc: bucketed(0, opens) })));
   for (const combination of combinations.slice(0, QUEUE_CAP)) {
     doc = combination.doc;
     analytics.track(combination.name);
@@ -442,23 +452,23 @@ test('pins and rides carry their own dimension and its platform composite', () =
   analytics.track('rode_pin', { r: 'same' });
   analytics.track('shown_usual', { r: 'same' });
   assert.deepEqual(analytics.events, [
-    { t: 'pinned_usual', d: { ...dv('2-5', 'a2'), r: 'service', 'pl.r': 'web.service' } },
-    { t: 'rode_auto', d: { ...dv('2-5', 'a2'), b: 'location', 'pl.b': 'web.location' } }
+    { t: 'pinned_usual', d: { ...dv('2-5'), r: 'service', 'pl.r': 'web.service' } },
+    { t: 'rode_auto', d: { ...dv('2-5'), b: 'location', 'pl.b': 'web.location' } }
   ]);
 });
 
 test('entries queued before platform dimensions are upgraded and sent, not dropped', async () => {
   const storage = memoryStore();
   storage.setItem(QUEUE_KEY, JSON.stringify({ queue: [
-    { t: 'shown_predicted', d: { u: '6-10', 'x.strip-placement': 'a2' }, n: 3 },
-    { t: 'opened', d: { u: '1', 'x.strip-placement': 'a3', m: '1' }, n: 1 }
+    { t: 'shown_predicted', d: { u: '6-10' }, n: 3 },
+    { t: 'opened', d: { u: '1', m: '1' }, n: 1 }
   ] }));
   const fetchFn = fakeFetch({ ok: true });
   const { analytics } = make({ storage, fetchFn, getDoc: () => bucketed(37, 7) });
   analytics.track('shown_predicted');
   await analytics.flush();
   assert.deepEqual(fetchFn.calls[0].body, [
-    { p: PROJECT, t: 'shown_predicted', d: dv('6-10', 'a2'), n: 4 },
+    { p: PROJECT, t: 'shown_predicted', d: dv('6-10'), n: 4 },
     { p: PROJECT, t: 'opened', d: { ...d(), m: '1' }, n: 1 }
   ]);
   assert.deepEqual(analytics.queue(), []);

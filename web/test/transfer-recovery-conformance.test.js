@@ -141,8 +141,10 @@ for (const value of fixture.cases) {
     const directions = model.directions;
 
     assert.equal(model.status.text.toUpperCase(), expected.status, 'status');
-    assert.equal(/class="answer-line">[^]*?class="pin-icon"/.test(html), expected.pinIcon,
-      'the pin icon beside the header status');
+    // pinIcon stays in the shared fixture until the native clients drop the icon;
+    // on the web a started trip is marked by its Stop trip line instead (ruling 14).
+    assert.doesNotMatch(html, /pin-icon|Pinned/, 'no pin beside the header status');
+    assert.equal(model.tripLine?.kind === 'started', expected.pinIcon, 'a started trip stops from its line');
     assert.deepEqual(model.changes.map((change) => change.label.toUpperCase()),
       expected.changeLabels, 'change labels');
     assert.equal(directions.receipt, expected.receipt, 'receipt');

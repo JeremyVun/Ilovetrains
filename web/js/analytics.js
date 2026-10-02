@@ -6,9 +6,7 @@ export const ENDPOINT = 'https://analytics.jeremyvun.com/e';
 export const PROJECT = 'ilovetrains';
 export const QUEUE_KEY = 'trains.analytics.v1';
 export const QUEUE_CAP = 200;
-export const EXPERIMENTS = Object.freeze({
-  'strip-placement': Object.freeze({ variants: Object.freeze(['a3', 'a2']), offset: 0 })
-});
+export const EXPERIMENTS = Object.freeze({});
 
 const PLATFORM = 'web';
 const PROBE_KEY = 'trains.analytics.probe';
@@ -62,9 +60,9 @@ export function isEnabled(env) {
   return !!storage && storageWorks(storage);
 }
 
-export function variant(doc, id, enabled) {
-  if (!Object.hasOwn(EXPERIMENTS, id)) return null;
-  const experiment = EXPERIMENTS[id];
+export function variant(doc, id, enabled, experiments = EXPERIMENTS) {
+  if (!Object.hasOwn(experiments, id)) return null;
+  const experiment = experiments[id];
   const bucket = doc && doc.telemetry ? doc.telemetry.bucket : null;
   if (!enabled || !Number.isInteger(bucket) || bucket < 0 || bucket > 99) {
     return experiment.variants[0];
@@ -72,10 +70,10 @@ export function variant(doc, id, enabled) {
   return experiment.variants[(bucket + experiment.offset) % experiment.variants.length];
 }
 
-export function experimentDims(doc, enabled) {
+export function experimentDims(doc, enabled, experiments = EXPERIMENTS) {
   if (!enabled) return {};
   const dims = {};
-  for (const id of Object.keys(EXPERIMENTS)) dims['x.' + id] = variant(doc, id, enabled);
+  for (const id of Object.keys(experiments)) dims['x.' + id] = variant(doc, id, enabled, experiments);
   return dims;
 }
 

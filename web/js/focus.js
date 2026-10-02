@@ -588,9 +588,7 @@ function legDelayMinutes(item) {
 export function focusStatus(journey, opts = {}) {
   const state = (text, kind, late, leg, delay) => ({ text, kind, late, leg, delay });
   if (opts.arrivalState === 'checkingArrival') return state('Checking arrival', 'ordinary', false, -1, 0);
-  if (opts.arrivalState === 'arrivalUnconfirmed') {
-    return state(opts.moving ? 'Arrival uncertain' : 'Arrival unconfirmed', 'uncertain', false, -1, 0);
-  }
+  if (opts.arrivalState === 'arrivalUnconfirmed') return state('Arrival uncertain', 'uncertain', false, -1, 0);
   if (opts.over) return state('Trip over', 'complete', false, -1, 0);
   if (journeyCancelled(journey)) return state('Cancelled', 'exception', false, -1, 0);
   const leg = Number.isInteger(opts.activeLeg) && opts.activeLeg >= 0 ? opts.activeLeg : 0;
@@ -712,15 +710,11 @@ export function directionsModel(value, nowMs, opts = {}) {
       model.figure = '—';
       model.provenance = '';
       model.instruction = `Checking arrival at ${model.to}.`;
-    } else if (decision.moving) {
+    } else {
       const elapsed = Math.floor((nowMs - arrMs) / 60000);
       model.figure = elapsed > 0 ? String(elapsed) : '—';
       model.provenance = elapsed > 0 ? 'PAST ESTIMATE' : '';
       model.instruction = `Still on the way to ${model.to}.`;
-    } else {
-      model.figure = '—';
-      model.provenance = 'LAST ESTIMATE';
-      model.instruction = 'Arrival time needs an update.';
     }
     return model;
   }

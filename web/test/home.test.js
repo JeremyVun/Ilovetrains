@@ -72,27 +72,30 @@ test('a pinned header takes its next service and freshness from its own pair', (
   assert.match(html, /data-transfer-station[^>]*>Town Hall</);
 });
 
-test('pinning is visible only for explicit choice and preserves travel and exception status', () => {
+/* Rulings 14 and 20: a started trip reads the service's own status, and its
+   only control is the line's Stop trip. */
+test('a started trip shows its service status and Stop trip, never PINNED', () => {
   const journey = transferJourneys()[0];
   for (const by of ['focus', undefined, 'inferred']) {
     const doc = homeDoc(journey);
     doc.focus.by = by;
     const model = homeModel(doc, HOME_SELECTION, transferBody(), at('09:21'));
-    assert.equal(model.pinned, by !== 'inferred');
-    assert.equal(homeHtml(model).includes('data-pinned'), by !== 'inferred');
-    assert.doesNotMatch(homeHtml(model), /sy-mk|sy-pstn travelling/);
-    if (by !== 'inferred') assert.doesNotMatch(homeHtml(model), />Running</);
+    const html = homeHtml(model);
+    assert.equal(model.tripLine.kind, by === 'inferred' ? 'guessed' : 'started');
+    assert.doesNotMatch(html, /Pinned|data-pinned|pin-icon|data-act="unpin"/);
+    assert.doesNotMatch(html, /sy-mk|sy-pstn travelling/);
+    assert.equal(html.match(/>Running</g).length, 1, 'the status before departure is the service\'s');
   }
   const doc = homeDoc(journey);
   const active = homeModel(doc, HOME_SELECTION, transferBody(), at('09:33'));
   assert.equal(active.following, null);
   assert.match(homeHtml(active), /Running/);
-  assert.match(homeHtml(active), /data-pinned/);
+  assert.match(homeHtml(active), /data-tripline="started"/);
   assert.match(homeHtml(active), /sy-pstn travelling/);
   cancelLeg(journey, 0);
   const cancelled = homeModel(doc, HOME_SELECTION, transferBody({ journeys: [journey] }), at('09:21'));
   assert.match(homeHtml(cancelled), /Cancelled/);
-  assert.match(homeHtml(cancelled), /data-pinned/);
+  assert.match(homeHtml(cancelled), /data-tripline="started"/);
 });
 
 test('a focused cancellation replacement and its next service use the same live source', () => {
@@ -110,7 +113,8 @@ test('a focused cancellation replacement and its next service use the same live 
   assert.equal(model.following.figure, '33');
   assert.equal(model.following.source.body, sourceBody);
   assert.equal(model.following.source.offline, false);
-  assert.equal(model.pinned, false, 'the replacement service has not been pinned');
+  assert.equal(model.status.text, 'Cancelled', 'the replacement is not labelled as the started service');
+  assert.equal(model.tripLine.kind, 'started', 'the trip whose train was cancelled can still be stopped');
 });
 
 test('directions follows the closed state ladder on one journey', () => {
@@ -765,7 +769,7 @@ test('the trip the app just saved is marked once, on the open that saved it', ()
   assert.ok(!mark(at('09:20'), { loadedAt: undefined }).includes('hm-new'));
 });
 
-test('the strip is the inferred header\'s receipt, and only its own', () => {
+test('the guessed line is the inferred header\'s own: question, Stop trip, Change', () => {
   const journey = transferJourneys()[0];
   const focused = (by) => ({
     ...emptyDoc(),
@@ -779,42 +783,58 @@ test('the strip is the inferred header\'s receipt, and only its own', () => {
     origin: RHODES,
     destination: BONDI,
     departureMs: departureMs(journey),
-    journeyKey: departureKey(journey),
-    slot: 'below'
+    journeyKey: departureKey(journey)
   });
-  assert.match(html, /<div class="hm-rule"><\/div>\s*<div class="hm-strip" data-strip>/,
-    'the strip sits under the heavy rule');
-  assert.ok(html.includes('<div class="hm-strip" data-strip><span class="q">Going somewhere else?</span>'
-    + '<button data-act="change-destination" data-tap>Change</button></div>'), 'one line, two parts');
+  assert.deepEqual(model.tripLine, { kind: 'guessed' });
+  assert.match(html, /<div class="hm-rule"><\/div>\s*<div class="hm-strip guessed" data-tripline="guessed" data-strip>/,
+    'the line sits under the heavy rule');
+  assert.ok(html.includes('<span class="q">Going somewhere else?</span>'
+    + '<button class="hm-strip-stop" data-act="stop-trip" data-tap>Stop trip</button>'
+    + '<i class="hm-strip-div" aria-hidden="true"></i>'
+    + '<button data-act="change-destination" data-tap>Change</button></div>'), 'one line, the actions at its right');
   assert.ok(html.indexOf('hm-strip') < html.indexOf('data-t="trip-list"'), 'and above MY TRIPS');
 
-  assert.equal(homeModel(focused('focus'), HOME_SELECTION, transferBody(), at('09:33'), {}).strip, null);
-  assert.ok(!homeHtml(homeModel(focused('focus'), HOME_SELECTION, transferBody(), at('09:33'), {}))
-    .includes('hm-strip'));
+  const started = homeModel(focused('focus'), HOME_SELECTION, transferBody(), at('09:33'), {});
+  assert.equal(started.strip, null);
+  assert.ok(!homeHtml(started).includes('data-strip'));
   assert.equal(homeModel({ ...emptyDoc(), trips: [HOME_TRIP] }, HOME_SELECTION,
     transferBody(), at('09:33'), {}).strip, null);
 });
 
-test('A2 moves the inferred correction into the receipt slot', () => {
+/* Ruling 15 closed strip-placement: nothing of the line ever enters the header. */
+test('the trip-control line has one place, under the heavy rule', () => {
   const journey = transferJourneys()[0];
-  const doc = {
-    ...emptyDoc(),
-    trips: [HOME_TRIP],
-    focus: {
-      tripId: 't1', direction: 'forward', focusedAt: '2026-09-01T09:21:00+10:00',
-      by: 'inferred', journey
-    }
-  };
-  const a2 = homeModel(doc, HOME_SELECTION, transferBody(), at('09:33'), { stripVariant: 'a2' });
-  const html = homeHtml(a2);
+  const doc = homeDoc(journey);
+  doc.focus.by = 'inferred';
+  const html = homeHtml(homeModel(doc, HOME_SELECTION, transferBody(), at('09:33'), { stripVariant: 'a2' }));
+  assert.doesNotMatch(html, /hm-rec-strip/);
+  assert.ok(html.indexOf('data-tripline') > html.indexOf('hm-rule'));
+});
 
-  assert.equal(a2.strip.slot, 'receipt');
-  assert.ok(html.includes('<span class="hm-rec hm-rec-strip" data-strip>'
-    + '<span class="q">Going somewhere else?</span>'
-    + '<button data-act="change-destination" data-tap>Change</button></span>'));
-  assert.doesNotMatch(html, /<div class="hm-rule"><\/div>\s*<div class="hm-strip"/,
-    'A2 leaves nothing below the heavy rule');
-  assert.ok(html.indexOf('hm-rec-strip') < html.indexOf('hm-rule'));
+/* Rulings 13, 18 and 19: Start trip names the header's train, and only while it
+   leaves within 15 minutes. */
+test('the startable line names the header train and starts nothing further off', () => {
+  const [lead] = transferJourneys();
+  const line = (nowMs) => homeModel(homeDoc(), HOME_SELECTION, transferBody(), nowMs).tripLine;
+  const leaves = departureMs(lead);
+
+  assert.deepEqual(line(at('09:21')), { kind: 'startable', depTime: '09:24' });
+  assert.deepEqual(line(leaves - 15 * 60_000), { kind: 'startable', depTime: '09:24' }, 'exactly 15 minutes out');
+  assert.notEqual(line(leaves - 15 * 60_000 - 1000)?.kind, 'startable', 'further off, no Start trip');
+  const model = homeModel(homeDoc(), HOME_SELECTION, transferBody(), at('09:21'));
+  assert.equal(model.startable, true);
+  assert.equal(departureKey(model.journey), departureKey(lead));
+  const html = homeHtml(model);
+  assert.match(html, /<div class="hm-rule"><\/div>\s*<div class="hm-strip startable" data-tripline="startable"><span class="q">Taking the 09:24\?<\/span><button class="hm-strip-act" data-act="start-trip" data-tap><span><svg class="hm-strip-g" aria-hidden="true"/);
+  assert.match(html, /<\/svg>Start trip<\/span><\/button><\/div>/);
+
+  const started = homeHtml(homeModel(homeDoc(lead), HOME_SELECTION, transferBody(), at('09:21')));
+  assert.match(started, /<div class="hm-strip started" data-tripline="started"><button class="hm-strip-act" data-act="stop-trip" data-tap><span><svg class="hm-strip-g" aria-hidden="true"[^>]*><rect[^>]*\/><\/svg>Stop trip<\/span><\/button><\/div>/);
+  assert.doesNotMatch(started, /Taking the/);
+
+  const cancelled = cancelLeg(transferJourneys()[0], 0);
+  assert.equal(homeModel(homeDoc(), HOME_SELECTION, transferBody({ journeys: [cancelled] }), at('09:21')).tripLine,
+    null, 'a cancelled train is never started');
 });
 
 test('a fix at the destination ends the trip before its timetable does', () => {
@@ -830,6 +850,34 @@ test('a fix at the destination ends the trip before its timetable does', () => {
   assert.equal(model({ arrived: true }).over, true);
   assert.equal(model({ arrived: true }).status.text, 'Trip over');
   assert.ok(homeHtml(model({ arrived: true })).includes('Show the way back'));
+  assert.ok(homeHtml(model({ arrived: true })).includes('<p>You’ve arrived. The return trip is ready when you are.</p>'));
+  assert.equal(model({ arrived: true }).tripLine, null, 'the offer owns the trip-over moment');
+});
+
+/* Ruling 21: an estimate ending claims nothing about the rider. */
+test('an estimate ending offers the way back without saying you arrived', () => {
+  const journey = transferJourneys()[0];
+  const doc = homeDoc(journey);
+  const ended = (basis) => homeModel(doc, HOME_SELECTION, transferBody(), at('10:12'),
+    { arrivalDecision: { state: 'arrived', basis } });
+
+  const estimate = homeHtml(ended('estimate'));
+  assert.ok(estimate.includes('<p>The return trip is ready when you are.</p>'));
+  assert.doesNotMatch(estimate, /You’ve arrived/);
+  assert.match(estimate, /<span class="hm-sign hm-act">The last arrival estimate has passed\. The return trip is ready\.<\/span>/);
+  assert.ok(homeHtml(ended('location')).includes('<p>You’ve arrived. The return trip is ready when you are.</p>'));
+});
+
+test('the moving unconfirmed state is the only unconfirmed state', () => {
+  const journey = transferJourneys()[0];
+  const doc = homeDoc(journey);
+  const unconfirmed = homeModel(doc, HOME_SELECTION, transferBody(), at('10:12'),
+    { arrivalDecision: { state: 'arrivalUnconfirmed', basis: null, moving: true } });
+  assert.equal(unconfirmed.status.text, 'Arrival uncertain');
+  assert.equal(unconfirmed.directions.instruction, 'Still on the way to Bondi Junction.');
+  const html = homeHtml(unconfirmed);
+  assert.doesNotMatch(html, /Arrival unconfirmed|Arrival time needs an update/);
+  assert.match(html, /data-tripline="started"/, 'a trip still on its way can be stopped');
 });
 
 
@@ -883,14 +931,16 @@ test('a restored cancelled focus cannot borrow a replacement from another select
 });
 
 
-test('only an explicit header pin offers unpin; the saved-row label stays read-only', () => {
+test('Stop trip is the one control a trip has on Home; the saved-row label stays read-only', () => {
   const journey = transferJourneys()[0];
   const doc = homeDoc(journey);
   const html = homeHtml(homeModel(doc, HOME_SELECTION, transferBody(), at('09:21'), {}));
-  assert.equal((html.match(/data-act="unpin"/g) || []).length, 1);
-  assert.match(html, /<button[^>]*aria-label="Unpin this service"/);
+  assert.equal((html.match(/data-act="stop-trip"/g) || []).length, 1);
+  assert.doesNotMatch(html, /data-act="unpin"|data-act="start-trip"/);
   doc.focus.by = 'inferred';
-  assert.doesNotMatch(homeHtml(homeModel(doc, HOME_SELECTION, transferBody(), at('09:33'), {})), /data-act="unpin"/);
+  const guessed = homeHtml(homeModel(doc, HOME_SELECTION, transferBody(), at('09:33'), {}));
+  assert.equal((guessed.match(/data-act="stop-trip"/g) || []).length, 1);
+  assert.doesNotMatch(guessed, /data-act="unpin"/);
 });
 
 /* A flag answer that changes nothing must not disturb the open, and one that
@@ -957,7 +1007,7 @@ test('a lost connection keeps the original arrival struck beside the one the rid
   assert.match(html, /data-transfer-station[^>]*>TOWN HALL · T4 10:08</i);
 });
 
-test('the lost status is warned in the top line, with the pin icon alone beside it', () => {
+test('the lost status is warned in the top line, alone', () => {
   const { model, html } = lostScreen();
 
   assert.deepEqual([model.status.text, model.status.kind, model.status.late],
@@ -965,8 +1015,9 @@ test('the lost status is warned in the top line, with the pin icon alone beside 
   assert.equal(html.match(/Late · Connection gone/g).length, 1, 'the top line only');
   assert.match(html, /class="answer-kind status-copy status-lost status-late"/);
   assert.doesNotMatch(html, /data-row-status/);
-  assert.equal(html.match(/class="pin-icon"/g).length, 1, 'the icon is the header pin, once');
-  assert.doesNotMatch(html, /Pinned/, 'a recovery journey is never labelled PINNED');
+  assert.match(html, /<span class="answer-line">Late · Connection gone<\/span>/, 'nothing beside the status');
+  assert.doesNotMatch(html, /Pinned|pin-icon/);
+  assert.match(html, /data-tripline="started"/, 'the started trip still stops from the line');
   assert.match(html, / active-late"/, 'the countdown is painted late with the status');
 });
 
