@@ -87,3 +87,26 @@ test('a board row is on its way from its departure until its arrival', () => {
   assert.equal(runningJourney({ ...train, cancelled: true }, at('08:10:00'), modes), false);
   assert.equal(runningJourney(train, at('08:10:00'), ['ferry']), false, 'mode turned off');
 });
+
+/* The controller is browser-only; these read its source for the constants the
+   browser drive (tools/check-commute-reliability.js) exercises end to end. */
+test('the first past page asks from 30 minutes ago for ten services; later pages step an hour', async () => {
+  const { readFileSync } = await import('node:fs');
+  const main = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
+  assert.match(main, /const FIRST_PAST_PAGE_MS = 30 \* 60_000;/);
+  assert.match(main, /const FIRST_PAST_PAGE_LIMIT = 10;/);
+  assert.match(main, /const PAST_STEP_MS = 60 \* 60_000;/);
+  const past = /async function fetchPast\(initial\) \{([\s\S]*?)\n\}/.exec(main)[1];
+  assert.match(past, /const at = first \? now\(\) - FIRST_PAST_PAGE_MS : earliest - PAST_STEP_MS;/);
+  assert.match(past, /limit: first \? FIRST_PAST_PAGE_LIMIT : LIMIT/);
+});
+
+test('a return after ten minutes away reopens Home', async () => {
+  const { readFileSync } = await import('node:fs');
+  const main = readFileSync(new URL('../js/main.js', import.meta.url), 'utf8');
+  assert.match(main, /const NEW_OPEN_AFTER_MS = 10 \* 60_000;/);
+  assert.match(main, /if \(away >= NEW_OPEN_AFTER_MS\) return reopen\(\);/);
+  const reopen = /function reopen\(\) \{([\s\S]*?)\n\}/.exec(main)[1];
+  assert.match(reopen, /state\.selection = null;/);
+  assert.match(reopen, /ctx\.go\('#\/'\)/);
+});

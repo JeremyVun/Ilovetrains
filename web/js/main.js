@@ -50,6 +50,9 @@ const LOOKUP_TIMEOUT_MS = 15_000;
 /* Owner ruling 3: a return this long after leaving is a new open. */
 const NEW_OPEN_AFTER_MS = 10 * 60_000;
 const PAST_STEP_MS = 60 * 60_000;
+// The first past page reaches the trains that just left, where a rider on one looks (ui.md, Departure board).
+const FIRST_PAST_PAGE_MS = 30 * 60_000;
+const FIRST_PAST_PAGE_LIMIT = 10;
 const PAST_BOUND_MS = 24 * 60 * 60_000;
 const FIX_MAX_AGE_MS = 5 * 60_000;
 const DISSOLVE_HOLD_MS = 260;
@@ -1875,7 +1878,8 @@ async function fetchPast(initial) {
   const all = state.pastBodies.flatMap((page) => page.journeys || []);
   const earliest = all.map((journey) => Date.parse((journey.departure || {}).scheduled))
     .filter(Number.isFinite).sort((a, b) => a - b)[0];
-  const at = initial || !Number.isFinite(earliest) ? now() - PAST_STEP_MS : earliest - PAST_STEP_MS;
+  const first = !Number.isFinite(earliest);
+  const at = first ? now() - FIRST_PAST_PAGE_MS : earliest - PAST_STEP_MS;
   if (now() - at > PAST_BOUND_MS) {
     state.pastExhausted = true;
     state.loadingPast = false;
@@ -1886,7 +1890,7 @@ async function fetchPast(initial) {
   const generation = routeGeneration;
   try {
     const { body } = await getDepartures(ends.from.id, ends.to.id, {
-      limit: LIMIT,
+      limit: first ? FIRST_PAST_PAGE_LIMIT : LIMIT,
       at, modes: enabledModes(), transferLimit: transferLimit(),
       signal: controller.signal
     });

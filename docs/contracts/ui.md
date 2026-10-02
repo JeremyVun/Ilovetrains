@@ -453,6 +453,20 @@ When the flag is off, the trip line remains unchanged and does no animation work
   scroll affordance (`EARLIER`, `NOW`), and no reverse control anywhere in the
   client: the smart header offers the return direction itself once a focused
   trip is over. The anchor reads `NOW · HH:MM`.
+- Past departures arrive in pages. The first past page of a board is anchored
+  at `now − 30 min` with limit 10, so the services that just left, the ones a
+  rider on board is looking for, are reached first; each later page asks from
+  the earliest loaded departure − 60 min. Web and Android request the first
+  page as the board opens, and reaching the top of the list requests the next
+  page whenever none is in flight, retrying after a failure, with or without
+  past rows already on the board. A board refresh never cancels or discards a
+  past page in flight; the page merges into the current board for the same
+  pair, and the list keeps the `NOW` anchor in place as rows arrive above it.
+  Native clients merge every past page with the offline timetable plan for the
+  same `at` (limit 30): online rows win by journey key, either alone is used
+  when the other fails, and a timetable-only past row uses the scheduled
+  register. iOS keeps pull-to-refresh at the top as its past-paging gesture
+  (ios-deviations.md).
 - Rows rank by effective departure. Past and future rows use the same grammar
   and equal height; past rows are distinguished through type colour, not
   container opacity.
