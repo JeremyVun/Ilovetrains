@@ -104,7 +104,8 @@
   including assertion failures. Test fixture assertions must use ordinary loops;
   a green test that puts assertions inside `readEach` is not conformance evidence.
 - `shoot-android.sh` — build and drive the native renderer on one booted Android
-  emulator: `tools/shoot-android.sh 390x844` or `tools/shoot-android.sh 412x732`.
+  emulator: `tools/shoot-android.sh 390x844`, `412x732` or `360x780` (the
+  Roboto widths of the trip-control line exemplars).
   `FONT_SCALE=1.3` exercises enlarged text; `OUT` selects the capture directory.
   `CALIBRATION_SCREENS=home,board,detail` selects only those canonical frames
   and their setup/assertions. It defaults to the capture method when filtered;
@@ -570,6 +571,12 @@ Traps:
   never rebuilds that app: a stale one shoots old code with no error, and the
   Settings frame's version string is the tell (2026-09-08: a 1.2.4 build shot
   a 1.4.0 tree and reported the new row missing).
+- The Android baselines are shot on a Pixel-profile AVD without a display
+  cutout (`avdmanager create avd -d pixel`, `hw.lcd` 1024×2216 at 420 dpi,
+  the API 36.1 image) in dark mode, which gives a 24 dp status bar and a
+  24 dp gesture bar. A Pixel 7 profile adds a 44 dp cutout inset and moves
+  every frame. The manifest's `configuredSafeDrawing` is read before the
+  window dispatches its insets, so it prints zeros whatever the device has.
 - The Android app-screen drive runs only `UiCalibrationTest#captureCanonicalScreens`
   (`INSTRUMENT_CLASS` on `shoot-android.sh`); the class's other tests assert
   behaviour and are the build gate's job. The iOS drive caps the settle at two

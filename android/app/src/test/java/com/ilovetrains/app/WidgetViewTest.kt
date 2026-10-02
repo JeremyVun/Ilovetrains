@@ -124,21 +124,21 @@ class WidgetViewTest {
         assertEquals("LAST UPDATED 01:08", none.foot?.text)
     }
 
-    @Test fun pinnedServiceIsMarkedAndRidingShowsTheNextStep() {
-        val pinned = trip("09:39")
-        val board = live(trip("09:24"), pinned, trip("09:54"), at = "09:19")
-        val focus = WidgetFocus("commute", false, true, pinned, board, pinned.effectiveArrival + 1_800_000)
+    @Test fun aStartedServiceShowsItsServiceStatusAndRidingShowsTheNextStep() {
+        val started = trip("09:39")
+        val board = live(trip("09:24"), started, trip("09:54"), at = "09:19")
+        val focus = WidgetFocus("commute", false, true, started, board, started.effectiveArrival + 1_800_000)
         val before = content(t("09:21"), board, focus)
         val small = view(before, small) as WidgetSmall
-        assertEquals(listOf(null, "PINNED"), small.kicker?.parts?.map { it?.text })
+        assertEquals("RUNNING", small.kicker?.text)
         assertEquals("09:39", small.clock?.text)
         val wide = view(before, wide) as WidgetBoard
         assertEquals(listOf("09:39", "09:54"), wide.rows.map { it.clock.text })
-        assertTrue((wide.rows[0] as WidgetServiceRow).pinned)
+        assertNull(wide.kicker)
 
         val riding = content(t("09:48"), board.copy(generatedAt = t("09:45")), focus)
         val ride = view(riding, this.small) as WidgetSmall
-        assertEquals(listOf("RUNNING", " · ", null, "PINNED"), ride.kicker?.parts?.map { it?.text })
+        assertEquals("RUNNING", ride.kicker?.text)
         assertEquals("10:06", ride.clock?.text)
         assertEquals(WidgetSentence("Town Hall in ", t("10:06"), 13f), ride.sentence)
         assertEquals(listOf("GET OFF", "Town Hall"), ride.step.map { it.text })
@@ -197,8 +197,8 @@ class WidgetViewTest {
         WidgetBlank -> emptyList()
         is WidgetEmpty -> listOf(v.kicker, v.message)
         is WidgetSmall -> listOfNotNull(v.route, v.note, v.clock, v.arrival, v.message, v.foot) + v.meta + v.step +
-            v.kicker?.parts.orEmpty().filterNotNull() + listOfNotNull(v.nextStep?.time, v.nextStep?.action)
-        is WidgetBoard -> listOfNotNull(v.route, v.message, v.foot) + v.end + v.kicker?.parts.orEmpty().filterNotNull() +
+            listOfNotNull(v.kicker, v.nextStep?.time, v.nextStep?.action)
+        is WidgetBoard -> listOfNotNull(v.route, v.message, v.foot, v.kicker) + v.end +
             v.rows.flatMap { row -> when (row) {
                 is WidgetServiceRow -> listOf(row.clock, row.arrival) + row.meta
                 is WidgetStepRow -> listOfNotNull(row.clock, row.action, row.station)

@@ -189,6 +189,18 @@ class TravelTrackerStateTest {
         assertEquals("Get off at Balmain Wharf.", requireNotNull(TravelTrackerState.derive(named, MINUTE, 1)).instruction)
     }
 
+    @Test fun anOverdueTripIsCheckedOrStillOnTheWayAndNeverStoppedUnconfirmed() {
+        val leg = Leg("T1", "train", "End", Station("a", "Start"), Station("b", "End"), 0, 10 * MINUTE)
+        fun arrival(state: ArrivalState, moving: Boolean) =
+            ArrivalResult(state, null, null, ArrivalWindow("trip", emptyList()), away = true, moving = moving, action = ArrivalAction.None)
+        val checking = requireNotNull(TravelTrackerState.derive(focus(listOf(leg)), 11 * MINUTE, 1, arrival(ArrivalState.CheckingArrival, false)))
+        assertEquals("Checking arrival", checking.headline.text)
+        assertEquals("Checking arrival at End.", checking.instruction)
+        val moving = requireNotNull(TravelTrackerState.derive(focus(listOf(leg)), 11 * MINUTE, 1, arrival(ArrivalState.ArrivalUnconfirmed, true)))
+        assertEquals("Arrival uncertain", moving.headline.text)
+        assertEquals("Still on the way to End.", moving.instruction)
+    }
+
     @Test fun countdownUsesPrintedMinuteBoundariesAndRoundsOnlyLongHeadlineDisplay() {
         val leg = Leg("T1", "train", "End", Station("a", "Start"), Station("b", "End"),
             0, 10 * MINUTE + 1_000)

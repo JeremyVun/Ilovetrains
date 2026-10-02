@@ -24,9 +24,6 @@ data class WidgetChip(val text: String, val line: String, val mode: String, val 
 
 data class WidgetSentence(val lead: String, val deadline: Long, val sp: Float, val maxLines: Int = 1)
 
-/** The header's status line; a null part is the pin icon. */
-data class WidgetKicker(val parts: List<WidgetText?>)
-
 data class WidgetNextStep(val time: WidgetText, val action: WidgetText, val chip: WidgetChip?)
 
 data class WidgetSegment(val width: Float, val line: String?, val mode: String?, val tight: Boolean = false)
@@ -34,7 +31,7 @@ data class WidgetLaneChip(val x: Float, val width: Float, val chip: WidgetChip)
 data class WidgetLane(val start: Float, val segments: List<WidgetSegment>, val chips: List<WidgetLaneChip>, val faded: Boolean)
 
 sealed interface WidgetRow { val clock: WidgetText }
-data class WidgetServiceRow(override val clock: WidgetText, val pinned: Boolean, val lane: WidgetLane,
+data class WidgetServiceRow(override val clock: WidgetText, val lane: WidgetLane,
     val meta: List<WidgetText>, val arrival: WidgetText) : WidgetRow
 data class WidgetStepRow(override val clock: WidgetText, val action: WidgetText, val station: WidgetText?,
     val chip: WidgetChip?) : WidgetRow
@@ -43,7 +40,7 @@ sealed interface WidgetView
 data object WidgetBlank : WidgetView
 data class WidgetEmpty(val kicker: WidgetText, val message: WidgetText) : WidgetView
 data class WidgetSmall(
-    val kicker: WidgetKicker? = null,
+    val kicker: WidgetText? = null,
     val route: WidgetText? = null,
     val note: WidgetText? = null,
     val clock: WidgetText? = null,
@@ -59,7 +56,7 @@ data class WidgetSmall(
     val gap: Float = 1f,
 ) : WidgetView
 data class WidgetBoard(
-    val kicker: WidgetKicker? = null,
+    val kicker: WidgetText? = null,
     val route: WidgetText? = null,
     val sentence: WidgetSentence? = null,
     val rows: List<WidgetRow> = emptyList(),
@@ -94,8 +91,6 @@ object WidgetDimens {
     const val LaneHeight = 18f
     const val LaneChipPad = 4f
     const val LaneBar = 5f
-    const val PinMark = 12f
-    const val PinGap = 3f
     const val ColumnGap = 10f
     const val RowMin = 40f
     const val RowMax = 56f
@@ -230,18 +225,12 @@ private fun message(content: WidgetContent) = "— " + when {
     else -> "No services in the next few hours"
 }
 
-private fun kicker(content: WidgetContent): WidgetKicker? {
+private fun kicker(content: WidgetContent): WidgetText? {
     val focus = content.answer?.focus ?: return null
     val lead = content.next ?: return null
     if (lead.key != focus.journey.key) return null
-    val header = focusHeader(widgetFocused(focus, content.board), content.date)
-    val status = label(header.status.text, if (header.status.warning) WidgetTone.Warn else WidgetTone.Ink2)
-    return WidgetKicker(when {
-        !focus.pinned -> listOf(status)
-        header.status.text == "Pinned" -> listOf(null, label("Pinned", WidgetTone.Ink2))
-        header.pinWord -> listOf(status, label(" · ", WidgetTone.Ink3), null, label("Pinned", WidgetTone.Ink2))
-        else -> listOf(status, null)
-    })
+    val status = focusHeader(widgetFocused(focus, content.board), content.date).status
+    return label(status.text, if (status.warning) WidgetTone.Warn else WidgetTone.Ink2)
 }
 
 private fun riding(content: WidgetContent): Boolean {
@@ -409,7 +398,6 @@ private fun boardView(content: WidgetContent, width: Float, height: Float, measu
         return WidgetBoard(kicker = kicker, sentence = sentence, rows = rows, rowHeight = rowHeight, routeWidth = routeWidth,
             clockWidth = clockWidth, foot = foot)
     }
-    val pinned = content.answer.focus?.takeIf { it.pinned && it.journey.key == lead.key } != null
     val services = listOfNotNull(content.cancelled?.let { it to false }, lead to true) + content.following.map { it to false }
     val shown = services.take(capacity)
     val clocks = shown.map { (journey, isLead) ->
@@ -420,11 +408,11 @@ private fun boardView(content: WidgetContent, width: Float, height: Float, measu
         WidgetText(clockTime(journey.effectiveArrival), WidgetType.RowArrival, if (journey.cancelled) WidgetTone.Ink3 else WidgetTone.Ink2,
             struck = journey.cancelled)
     }
-    val clockWidth = clocks.maxOf { measure.width(it.text, it.font) } + if (pinned) d.PinGap + d.PinMark else 0f
+    val clockWidth = clocks.maxOf { measure.width(it.text, it.font) }
     val arrivalWidth = arrivals.maxOf { measure.width(it.text, it.font) }
     val laneWidth = w - clockWidth - arrivalWidth - 2 * d.ColumnGap
-    val rows = shown.mapIndexed { i, (journey, isLead) ->
-        WidgetServiceRow(clocks[i], isLead && pinned, widgetLane(journey, laneWidth, measure), provenance(journey, content.board), arrivals[i])
+    val rows = shown.mapIndexed { i, (journey, _) ->
+        WidgetServiceRow(clocks[i], widgetLane(journey, laneWidth, measure), provenance(journey, content.board), arrivals[i])
     }
     val end = if (services.size < capacity) listOf(label("— End of board"),
         WidgetText("Nothing scheduled after ${clockTime(services.last().first.effectiveDeparture)}.", WidgetType.EndNote, WidgetTone.Ink3))

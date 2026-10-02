@@ -232,6 +232,50 @@ class UiCalibrationTest {
             compose.runOnIdle { state.value = fixture.activeInferredState }
             capture("home-active-inferred")
         }
+        for (appearance in listOf(Appearance.Dark, Appearance.Light)) {
+            val suffix = if (appearance == Appearance.Light) "-light" else ""
+            frame("home-guessed$suffix") {
+                compose.runOnIdle { state.value = fixture.activeInferredState.copy(appearance = appearance) }
+                capture("home-guessed$suffix")
+            }
+            frame("home-started$suffix") {
+                compose.runOnIdle { state.value = fixture.startedBeforeState.copy(appearance = appearance) }
+                compose.onNodeWithText("STOP TRIP").assertIsDisplayed()
+                capture("home-started$suffix")
+            }
+            frame("home-started-after$suffix") {
+                compose.runOnIdle { state.value = fixture.startedAfterState.copy(appearance = appearance) }
+                capture("home-started-after$suffix")
+            }
+            frame("home-startable$suffix") {
+                compose.runOnIdle { state.value = fixture.startableState.copy(appearance = appearance) }
+                compose.onNodeWithText("Taking the 09:24?").assertIsDisplayed()
+                capture("home-startable$suffix")
+            }
+            frame("home-startable-ferry$suffix") {
+                compose.runOnIdle { state.value = fixture.longNamesState.copy(appearance = appearance) }
+                capture("home-startable-ferry$suffix")
+            }
+            frame("home-far$suffix") {
+                compose.runOnIdle { state.value = fixture.farState.copy(appearance = appearance) }
+                compose.onAllNodesWithTag("trip-line").assertCountEquals(0)
+                capture("home-far$suffix")
+            }
+        }
+        frame("home-guessed-stress") {
+            compose.runOnIdle { state.value = fixture.guessedStressState }
+            capture("home-guessed-stress")
+        }
+        frame("home-checking-arrival") {
+            compose.runOnIdle { state.value = fixture.checkingArrivalState }
+            compose.onNodeWithText("Checking arrival at Bondi Junction.").assertIsDisplayed()
+            capture("home-checking-arrival")
+        }
+        frame("detail-focused") {
+            compose.runOnIdle { state.value = fixture.startedBeforeState.copy(screen = Screen.Detail, detail = fixture.startedBeforeState.focus?.journey) }
+            compose.onNodeWithText("STOP TRIP").assertIsDisplayed()
+            capture("detail-focused")
+        }
         frame("home-completed") {
             compose.runOnIdle { state.value = fixture.completedState }
             capture("home-completed")
@@ -944,9 +988,29 @@ private class Fixtures {
     val lostDwellState = lostState(lostCandidate.effectiveDeparture - 6 * 60_000, lostRecovery)
     val lostNoneState = lostState(lostFollowed.legs[0].effectiveArrival - 13 * 60_000, null)
 
+    // The round 3b exemplar clocks: the 09:24 at 09:16 (8 min out) and at 08:59 (25 min out).
+    private fun transferAt(now: Long, started: Boolean): AppState {
+        val board = transferBoard.copy(generatedAt = now)
+        return activePinnedState.copy(now = now, board = board, homeBoard = board,
+            focus = if (started) FocusedJourney("rhodes-bondi", false, board.journeys.first(), board) else null)
+    }
+    val startedBeforeState = transferAt(transferNow - 5 * 60_000, started = true)
+    val startableState = transferAt(transferNow - 5 * 60_000, started = false)
+    val farState = transferAt(transferNow - 22 * 60_000, started = false)
+    val startedAfterState = (centralNow + 13 * 60_000).let { now ->
+        val board = centralBoard.copy(generatedAt = now)
+        state(now, board).copy(focus = FocusedJourney(centralTrip.id, false, board.journeys.first(), board))
+    }
+    val checkingArrivalState = (activeJourney.effectiveArrival + 60_000).let { now ->
+        val board = activeBoard.copy(generatedAt = now)
+        activePinnedState.copy(now = now, board = board, homeBoard = board, focus = activePinnedState.focus?.copy(board = board),
+            arrival = ArrivalResult(ArrivalState.CheckingArrival, null, null, ArrivalWindow("rhodes-bondi", emptyList()),
+                away = true, moving = false, action = ArrivalAction.None))
+    }
     val activeInferredState = activePinnedState.copy(
         focus = activePinnedState.focus?.copy(pinned = false))
     val completedState = activePinnedState.copy(focusComplete = true)
+    val guessedStressState = lostRidingState.copy(focus = lostRidingState.focus?.copy(pinned = false))
     private fun activeAt(now: Long): AppState {
         val board = activeBoard.copy(generatedAt = now)
         return activePinnedState.copy(now = now, board = board, homeBoard = board,

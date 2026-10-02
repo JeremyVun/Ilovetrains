@@ -1,6 +1,8 @@
 # Android tracker — native calibration
 
-These are real Android system notification cards, reviewed on 2026-09-08.
+These are real Android system notification cards, reviewed on 2026-09-08. The
+API 36.1 sets were recaptured on 2026-10-03 with the `Stop trip` action the
+system draws under every card (owner ruling 16); the API 35 set predates it.
 Each PNG is cropped to the notification row's observed accessibility bounds;
 no product text or geometry is altered. The folder name records API version,
 logical phone size and font scale. `device.txt` records the actual emulator.
@@ -12,6 +14,8 @@ logical phone size and font scale. `device.txt` records the actual emulator.
 | [API 35, 390×844, default text](35-390x844-1.0/) | Ride, offline, long name, missed connection |
 
 Enlarged text and Android 15 use BigText with a stock determinate progress bar.
+`Stop trip` is a plain notification action with no icon, in the system's
+accent; it ends trip mode for the card's current journey only.
 The missed-connection card omits the bar and labels arrival `Planned`. Expanded
 cards preserve the platform roles, event/change clocks, destination arrival and
 source timestamp. System-controlled collapsed presentations contain fewer facts.

@@ -1,4 +1,4 @@
-serial=emulator-5556
+serial=emulator-5592
 device=sdk_gphone64_arm64
 build=google/sdk_gphone64_arm64/emu64a:16/BE4B.251210.005/14574095:user/release-keys
 sdk=36
@@ -9,6 +9,7 @@ font_scale=1.0
 schemes=dark,light
 cases=ride,transfer,final-leg-cancelled
 surfaces=shade
-capture_mode=deterministic System UI capture through the production notification builder
+capture_only=1
+capture_mode=deterministic system-surface capture only; lifecycle checks skipped
 fixture=tools/fixtures/conformance/travel-tracker.json
 capture_clock=fixed fixture review epoch through DEBUG-only model seam

@@ -55,7 +55,22 @@ class UiPresentationTest {
         assertEquals("Running", focusStatus(focus.copy(journey = journey.copy(retained = true)), now, false).text)
         assertEquals("Cancelled", focusStatus(focus.copy(journey = journey.copy(legs = listOf(first.copy(cancelled = true), second))), now, false).text)
         assertEquals("Trip over", focusStatus(focus, now, complete = true).text)
-        assertEquals("Pinned", focusStatus(focus.copy(journey = Journey(listOf(second.copy(estimatedDeparture = null)))), now, false).text)
+        // A started trip reads its service's status before departure too (rulings 14 and 20).
+        assertEquals("Running", focusStatus(focus.copy(journey = Journey(listOf(second.copy(estimatedDeparture = null)))), now, false).text)
+        val unconfirmed = ArrivalResult(ArrivalState.ArrivalUnconfirmed, null, null, ArrivalWindow("trip", emptyList()),
+            away = true, moving = true, action = ArrivalAction.None)
+        assertEquals(FocusStatus("Arrival uncertain", true), focusStatus(focus, now, false, unconfirmed))
+    }
+
+    @Test fun theTripLineFollowsTheTripModeAndStepsAsideWhenTheTripIsOver() {
+        val now = 1_000_000L
+        val journey = Journey(listOf(Leg("T1", "train", "Beta", a, b, now + 8 * 60_000, now + 30 * 60_000)))
+        val started = FocusedJourney("trip", false, journey, BoardData(a, b, listOf(journey), now, source = "live"))
+        assertEquals(TripLine.Started, tripLine(started, over = false, startable = null))
+        assertEquals(TripLine.Guessed, tripLine(started.copy(pinned = false), over = false, startable = null))
+        assertNull(tripLine(started, over = true, startable = null))
+        assertEquals(TripLine.Startable(journey), tripLine(null, over = false, startable = journey))
+        assertNull(tripLine(null, over = false, startable = null))
     }
 
     @Test fun figureWidthUsesTheRenderedTokenAndNextUsesSharedRoundingAcrossSourceStates() {

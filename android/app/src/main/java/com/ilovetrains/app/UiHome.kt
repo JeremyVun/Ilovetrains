@@ -8,7 +8,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
@@ -22,6 +23,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
@@ -36,8 +38,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.util.Locale
+import kotlin.math.roundToInt
 
 /** Gmail's dismiss red, the swipe background Android users already know. */
 private val DismissRed = Color(0xFFD93025)
@@ -114,7 +119,6 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
     val warnFigure = late || header?.status?.late == true
     val focusState = header?.status
     val focused = focus != null && cancelledLeadTime == null
-    val explicitlyPinned = focused && focus?.pinned == true
     val departed = focused && state.now >= journey.effectiveDeparture
     val completed = state.focusComplete || state.arrival?.state == ArrivalState.Arrived
     val overdue = focused && state.now >= journey.effectiveArrival && !completed
@@ -128,7 +132,7 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
     } else fig
     val directionFigure = homeHeaderFigure(header, departed, boardFigure)
     Column(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth().heightIn(min = if (explicitlyPinned) 44.dp else 22.dp).padding(horizontal = PagePadding), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 22.dp).padding(horizontal = PagePadding), verticalAlignment = Alignment.CenterVertically) {
             val status = when {
                 focusState != null -> focusState.text
                 journey.retained && board.offline && state.now >= journey.effectiveDeparture -> "Last shown"
@@ -136,25 +140,8 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
                 state.distanceMetres != null -> "${distanceText(state.distanceMetres)} to ${first.from.shortName}"
                 else -> "Next ${first.modeName()}"
             }
-            Row(modifier = if (explicitlyPinned) Modifier.heightIn(min = 44.dp)
-                .clickable(role = Role.Button, onClick = actions::stopTrip) else Modifier,
-                verticalAlignment = Alignment.CenterVertically) {
-                val statusWarns = focusState?.warning == true || journey.cancelled || late && !focused
-                if (explicitlyPinned && status == "Pinned") {
-                    Icon(Icons.Filled.PushPin, null, Modifier.size(12.dp), tint = c.ink2)
-                    Spacer(Modifier.width(5.dp)); Label("Pinned", color = c.ink2, size = 11)
-                } else {
-                Label(status, color = if (statusWarns) c.warning else c.ink2, size = 11)
-                    if (explicitlyPinned && header?.pinWord == false) {
-                        Spacer(Modifier.width(8.dp))
-                        Icon(Icons.Filled.PushPin, null, Modifier.size(12.dp), tint = if (statusWarns) c.warning else c.ink2)
-                    } else if (explicitlyPinned) {
-                        Label(" · ", color = c.ink3, size = 11)
-                        Icon(Icons.Filled.PushPin, null, Modifier.size(12.dp), tint = c.ink2)
-                        Spacer(Modifier.width(4.dp)); Label("Pinned", color = c.ink2, size = 11)
-                    }
-                }
-            }
+            val statusWarns = focusState?.warning == true || journey.cancelled || late && !focused
+            Label(status, color = if (statusWarns) c.warning else c.ink2, size = 11)
             Spacer(Modifier.weight(1f))
             Freshness(board, state.now, state.awaitingAnswer)
         }
@@ -203,17 +190,16 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
                 }
             }
         }
-        val overdueUnconfirmed = overdue
         val progress = if (departed && !completed) {
             val duration = (journey.effectiveArrival - journey.effectiveDeparture).coerceAtLeast(1)
-            if (overdueUnconfirmed) .98f else {
+            if (overdue) .98f else {
                 val elapsed = ((state.now - journey.effectiveDeparture) / 60_000) * 60_000
                 (elapsed.toFloat() / duration).coerceIn(0f, .999f)
             }
         } else null
         JourneyAxis(journey, Modifier.fillMaxWidth().padding(horizontal = PagePadding), large = true, tinyTrain = true,
             recoveryFrom = header?.recoveryFrom,
-            showCap = !departed, progress = progress?.takeIf { !overdueUnconfirmed || state.arrival?.moving == true },
+            showCap = !departed, progress = progress?.takeIf { !overdue || state.arrival?.moving == true },
             travelledAt = progress?.let { journey.effectiveDeparture +
                 ((journey.effectiveArrival - journey.effectiveDeparture) * it).toLong() })
         val instruction = when {
@@ -222,19 +208,19 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
                 "The last arrival estimate has passed. The return trip is ready."
                 else "The scheduled trip has ended. The return trip is ready."
             completed -> "The journey has finished"
-            overdueUnconfirmed && state.arrival?.moving == true -> "Still on the way to ${journey.legs.last().to.shortName}."
-            overdueUnconfirmed && state.arrival?.state == ArrivalState.CheckingArrival ->
-                "Checking arrival at ${journey.legs.last().to.shortName}."
-            overdueUnconfirmed -> "Arrival time needs an update."
+            overdue && state.arrival?.state == ArrivalState.ArrivalUnconfirmed ->
+                "Still on the way to ${journey.legs.last().to.shortName}."
+            overdue -> "Checking arrival at ${journey.legs.last().to.shortName}."
             header != null && departed -> header.instruction
-            else -> first.headsign.ifBlank { first.to.shortName }
+            else -> null
         }
         if (cancelledLeadTime != null || header?.warnInstruction == true && departed) {
-            Label(instruction, Modifier.padding(horizontal = PagePadding, vertical = 8.dp), color = c.warning, size = 11, maxLines = 2)
+            Label(instruction.orEmpty(), Modifier.padding(horizontal = PagePadding, vertical = 8.dp), color = c.warning, size = 11)
         } else {
-            Text(instruction, color = if (departed) c.ink else c.ink2, fontSize = 15.sp,
+            // Only an upstream headsign may be cut off; every sign the app writes wraps.
+            Text(instruction ?: first.headsign.ifBlank { first.to.shortName }, color = if (departed) c.ink else c.ink2, fontSize = 15.sp,
                 fontWeight = if (departed) FontWeight.Normal else FontWeight.Light,
-                maxLines = 2, overflow = TextOverflow.Ellipsis,
+                maxLines = if (instruction == null) 2 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(start = PagePadding, end = PagePadding, top = 6.dp, bottom = 8.dp))
         }
         val receipt = header?.receipt?.takeIf { it.isNotBlank() && departed } ?: state.receipt
@@ -273,16 +259,77 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
             }
         }
         Rule(heavy = true)
-        if (focus != null && !focus.pinned) {
-            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = PagePadding), verticalAlignment = Alignment.CenterVertically) {
-                Text("Going somewhere else?", Modifier.weight(1f), color = c.ink2, fontSize = 15.sp, fontWeight = FontWeight.Light)
-                Label("Change", Modifier.heightIn(min = 44.dp).clickable(role = Role.Button, onClick = actions::newTrip)
-                    .wrapContentHeight(Alignment.CenterVertically), color = c.ink, size = 12)
+        tripLine(focus, completed && focus != null, state.startableJourney)?.let { TripControlLine(it, actions) }
+    }
+}
+
+@Composable
+private fun TripControlLine(line: TripLine, actions: UiActions) {
+    val c = LocalTrainColors.current
+    Row(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = PagePadding).testTag("trip-line"),
+        verticalAlignment = Alignment.CenterVertically) {
+        when (line) {
+            TripLine.Guessed -> {
+                TripLineQuestion("Going somewhere else?")
+                Spacer(Modifier.width(13.dp))
+                TripLineAction("Stop trip", c.ink2, actions::stopTrip)
+                Spacer(Modifier.width(10.5.dp))
+                Box(Modifier.size(1.dp, 14.dp).background(c.rule2))
+                Spacer(Modifier.width(10.5.dp))
+                TripLineAction("Change", c.ink, actions::newTrip)
             }
-            Rule()
+            TripLine.Started -> {
+                Spacer(Modifier.weight(1f))
+                TripLineAction("Stop trip", c.ink, actions::stopTrip, LineGlyph.Stop)
+            }
+            is TripLine.Startable -> {
+                TripLineQuestion("Taking the ${clockTime(line.journey.effectiveDeparture)}?")
+                Spacer(Modifier.width(13.dp))
+                TripLineAction("Start trip", c.ink, { actions.startTrip(line.journey) }, LineGlyph.Start)
+            }
+        }
+    }
+    Rule()
+}
+
+@Composable
+private fun RowScope.TripLineQuestion(text: String) {
+    Text(text, Modifier.weight(1f), color = LocalTrainColors.current.ink2, fontSize = 15.sp, fontWeight = FontWeight.Light,
+        letterSpacing = 0.sp, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+}
+
+@Composable
+private fun TripLineAction(text: String, color: Color, onClick: () -> Unit, glyph: LineGlyph? = null) {
+    Box(Modifier.fillMaxHeight().clickable(role = Role.Button, onClick = onClick), contentAlignment = Alignment.Center) {
+        Row {
+            if (glyph != null) {
+                TripLineGlyph(glyph)
+                Spacer(Modifier.width(9.dp))
+            }
+            // CSS tracking also follows the last letter; Android's stops at it.
+            val trailing = with(LocalDensity.current) { ActionTracking.toDp() }
+            Text(text.uppercase(Locale.ENGLISH), Modifier.alignByBaseline().padding(end = trailing), color = color,
+                fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = ActionTracking, maxLines = 1, softWrap = false)
         }
     }
 }
+
+/** Material's glyphs fill about half their box, so each is drawn at the size that shows the exemplar's mark in the 11 dp slot. */
+private enum class LineGlyph(val vector: ImageVector, val drawn: Dp) {
+    Stop(Icons.Filled.Stop, 16.5.dp),
+    Start(Icons.Filled.PlayArrow, 15.dp),
+}
+
+@Composable
+private fun RowScope.TripLineGlyph(glyph: LineGlyph) {
+    val capHalf = with(LocalDensity.current) { (12.sp.toPx() * RobotoCapHeight / 2).roundToInt() }
+    Box(Modifier.size(11.dp).alignBy { it.measuredHeight / 2 + capHalf }, contentAlignment = Alignment.Center) {
+        Icon(glyph.vector, null, Modifier.requiredSize(glyph.drawn), tint = LocalTrainColors.current.ink2)
+    }
+}
+
+private const val RobotoCapHeight = 1456f / 2048f
+private val ActionTracking = 1.68.sp
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
