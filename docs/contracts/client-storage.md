@@ -625,7 +625,11 @@ left shows that the rider stayed on the platform; a train pulling out is still
 within 300 m of the platform for roughly its first 20-30 s. An unsighted
 record, or one sighted elsewhere (including an intermediate station the train
 is stopped at), proves nothing, so it cannot erase the evidence. Starting or
-stopping a trip, the return offer, deletion and expiry clear the record.
+stopping a trip and accepting the return offer clear the record and the open
+snapshot unconditionally, whatever they name. Deleting a trip deletes a record
+naming it. Expiry of the focus clears the open snapshot, and clears the record
+only when it names the expired trip, direction and journey (the full journey
+key), so evidence for another train survives.
 
 **Two records.** Inference evaluates the snapshot taken when this Home open
 began, before any write of this open, and then the stored record; either may
@@ -909,10 +913,11 @@ it. Expiry is silent removal, not “Arrived,” and no
 return offer. It records the followed journey as ridden with estimate basis
 (`recordAndExpire`) unless the journey is cancelled or a ride for it already
 exists (plain `expire`): a phone left in a pocket after a pin rode the train
-(owner ruling, 2026-09-23). Clear matching `lastOpen` so it cannot
-immediately reinfer. Completed/never-guarded focus keeps the existing
-ETA-plus-30-minute expiry, and records the same way if the app was not open
-to record it at the estimate.
+(owner ruling, 2026-09-23). Clear `lastOpen` when it names the expired trip,
+direction and journey, and the open snapshot, so it cannot immediately
+reinfer (see the hold rule under "Travel mode"). Completed/never-guarded
+focus keeps the existing ETA-plus-30-minute expiry, and records the same way
+if the app was not open to record it at the estimate.
 
 Location confirmation is persisted atomically with its ride write. Ride
 identity/deduplication and endpoint snapshots stay unchanged. Existing ride
