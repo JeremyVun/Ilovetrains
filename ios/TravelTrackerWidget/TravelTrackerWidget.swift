@@ -1,4 +1,5 @@
 import ActivityKit
+import AppIntents
 import SwiftUI
 import UIKit
 import WidgetKit
@@ -24,16 +25,19 @@ struct TravelTrackerLiveActivity: Widget {
                     TrackerIslandEvent(state: context.state, stale: context.isStale)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    if context.state.cancelled || context.state.eventDeadline == nil {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(TrackerPalette.current.warning(context.state.cancelled))
-                            .accessibilityLabel(context.state.headline.lead)
-                    } else {
-                        TrackerCountdown(state: context.state)
-                            .font(.caption.monospacedDigit().weight(.semibold))
-                            .foregroundStyle(TrackerPalette.current.warning(context.state.tightConnection))
-                            .lineLimit(1)
-                            .accessibilityLabel(TrackerCountdown.accessibilityText(state: context.state))
+                    HStack(spacing: 8) {
+                        StopTripRoundButton(session: context.attributes.sessionId)
+                        if context.state.cancelled || context.state.eventDeadline == nil {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(TrackerPalette.current.warning(context.state.cancelled))
+                                .accessibilityLabel(context.state.headline.lead)
+                        } else {
+                            TrackerCountdown(state: context.state)
+                                .font(.caption.monospacedDigit().weight(.semibold))
+                                .foregroundStyle(TrackerPalette.current.warning(context.state.tightConnection))
+                                .lineLimit(1)
+                                .accessibilityLabel(TrackerCountdown.accessibilityText(state: context.state))
+                        }
                     }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
@@ -65,6 +69,13 @@ private struct TrackerLockScreen: View {
         .frame(minHeight: 160, alignment: .topLeading)
         .background(TrackerPalette.current.background)
         .accessibilityElement(children: .combine)
+        // Outside the combined element, so VoiceOver reaches it as its own button.
+        .overlay(alignment: .topTrailing) {
+            Button(intent: StopTripIntent(session: context.attributes.sessionId)) { StopTripCapsule() }
+                .buttonStyle(.plain)
+                .padding(.top, 12)
+                .padding(.trailing, 20)
+        }
     }
 }
 
@@ -79,11 +90,16 @@ private struct TrackerCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            TrackerHeadline(state: state)
-                .font(condensed ? .headline : .title2)
-                .foregroundStyle(palette.warning(state.cancelled || state.tightConnection))
-                .lineLimit(2)
-                .minimumScaleFactor(0.76)
+            HStack(alignment: .top, spacing: 8) {
+                // A headline that would wrap beside Stop trip scales on its one line instead: the card is at its height limit.
+                TrackerHeadline(state: state)
+                    .font(condensed ? .headline : .title2)
+                    .foregroundStyle(palette.warning(state.cancelled || state.tightConnection))
+                    .lineLimit(condensed || dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                    .minimumScaleFactor(0.76)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                StopTripCapsule().hidden()
+            }
 
             TrackerInstruction(state: state)
                 .font(condensed ? .caption : .subheadline)
@@ -103,6 +119,41 @@ private struct TrackerCard: View {
                     .padding(.top, condensed ? 5 : 8)
             }
         }
+    }
+}
+
+/// The card's worded Stop trip, an iOS bordered small capsule drawn in the tracker's own inks.
+private struct StopTripCapsule: View {
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "stop.fill").resizable().scaledToFit().frame(width: 9, height: 9)
+                .accessibilityHidden(true)
+            Text("Stop trip").font(.footnote.weight(.semibold)).lineLimit(1)
+        }
+        .foregroundStyle(TrackerPalette.current.ink)
+        .padding(.leading, 10)
+        .padding(.trailing, 11)
+        .frame(minHeight: 28)
+        .background(TrackerPalette.current.ink.opacity(0.14), in: Capsule())
+        .fixedSize()
+    }
+}
+
+/// The expanded Island has no row to spare under its height limit, so its Stop trip is icon only.
+private struct StopTripRoundButton: View {
+    let session: UUID
+
+    var body: some View {
+        Button(intent: StopTripIntent(session: session)) {
+            Image(systemName: "stop.fill").resizable().scaledToFit().frame(width: 10, height: 10)
+                .foregroundStyle(TrackerPalette.current.ink)
+                .frame(width: 28, height: 28)
+                .background(TrackerPalette.current.ink.opacity(0.16), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Stop trip")
+        // Drawn at 28 pt, centred on the countdown, but takes no height: the Island is at its height limit.
+        .frame(height: 0)
     }
 }
 

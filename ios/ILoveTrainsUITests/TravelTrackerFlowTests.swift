@@ -266,6 +266,25 @@ final class TravelTrackerFlowTests: XCTestCase {
     }
 
     @MainActor
+    func testLiveActivityStopTripEndsTheTrip() {
+        // The intent runs in a background launch without test arguments, so it must find the default store.
+        let domain: String? = nil
+        var app = launch(["--tracker-debug", "dismiss-start"], domain: domain)
+        assertStatus(app, contains: ["activities=1", "focus=dismiss-original"])
+        app.terminate()
+        showNotificationCenter()
+        assertNotificationCard()
+        let stop = XCUIApplication(bundleIdentifier: springboardBundle).buttons["Stop trip"]
+        XCTAssertTrue(stop.waitForExistence(timeout: 5), "the card does not offer Stop trip as its own button")
+        stop.tap()
+        // Enumerating cells while the ended card leaves races its removal, so wait on the button instead.
+        XCTAssertTrue(stop.waitForNonExistence(timeout: 8), "the Live Activity remains after Stop trip")
+
+        app = launch(["--tracker-debug", "inspect"], domain: domain)
+        assertStatus(app, contains: ["focus=none", "activities=0"])
+    }
+
+    @MainActor
     func testLiveActivityDenialPreservesFocus() throws {
         guard environment("TRACKER_EXPECT_PERMISSION_PROMPT", fallback: "0") == "1" else {
             throw XCTSkip("Requires a fresh app install and TRACKER_EXPECT_PERMISSION_PROMPT=1")

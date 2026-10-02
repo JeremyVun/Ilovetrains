@@ -377,7 +377,6 @@ private struct MediumBoard: View {
                 BoardRowView(
                     journey: journey,
                     now: content.date,
-                    pinned: journey.key == content.lead?.key && content.answer?.focus?.pinned == true && content.replaced == nil,
                     style: style
                 )
                 .frame(height: rowHeight)
@@ -399,7 +398,6 @@ private struct MediumBoard: View {
 private struct BoardRowView: View {
     let journey: Journey
     let now: Millis
-    let pinned: Bool
     let style: WidgetStyle
 
     private var colors: TrainColors { style.colors }
@@ -418,9 +416,6 @@ private struct BoardRowView: View {
                     .lineLimit(1)
                     .frame(width: 58, alignment: .leading)
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
-                    if pinned {
-                        Image(systemName: "pin.fill").font(.system(size: 11)).foregroundStyle(colors.ink2)
-                    }
                     if journey.cancelled {
                         Text("—").font(.system(size: 15, weight: .light)).foregroundStyle(colors.ink3)
                     } else {
@@ -638,27 +633,9 @@ private struct StatusLine: View {
     let style: WidgetStyle
 
     var body: some View {
-        // Where the words do not fit, the pin stands alone, as the header's does beside a lost connection.
-        ViewThatFits(in: .horizontal) {
-            line(pinWord: true)
-            line(pinWord: false)
-        }
-    }
-
-    private func line(pinWord: Bool) -> some View {
-        let colors = style.colors
-        return HStack(spacing: 4) {
-            if let text = status.text {
-                WidgetLabel(text: text, color: status.warns ? colors.warning : colors.ink2)
-                if status.pinned { Text("·").font(.system(size: 11)).foregroundStyle(colors.ink3) }
-            }
-            if status.pinned {
-                Image(systemName: "pin.fill").font(.system(size: 11)).foregroundStyle(colors.ink2)
-                if pinWord || status.text == nil { WidgetLabel(text: "Pinned", color: colors.ink2) }
-            }
-        }
-        .lineLimit(1)
-        .fixedSize()
+        WidgetLabel(text: status.text, color: status.warns ? style.colors.warning : style.colors.ink2)
+            .lineLimit(1)
+            .fixedSize()
     }
 }
 

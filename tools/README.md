@@ -195,7 +195,12 @@
   3), records capture metrics and restores the content-size and status-bar
   overrides.
   `setup-location-{idle,loading,denied,failed,disabled,empty,approximate}`
-  and their `-light` variants capture native setup's location states. The iOS
+  and their `-light` variants capture native setup's location states. The
+  trip-control line's states are `home` (startable), `home-inferred`
+  (guessed), `home-pinned` and `home-active` (started, before and after
+  departure), `home-ferry`, and `home-far` (the header's train 25 minutes out,
+  no line); `home-commute-checking` is Checking arrival and `home-commute` an
+  estimate ending, and `detail-pinned` is the `Stop trip` rail. The iOS
   `AppFlowTests` location tests reset authorization in a fresh test storage
   domain, supply Town Hall through `XCUIDevice.location`, and drive the actual
   system grant/denial sheet, autofill, destination keyboard focus and retry.

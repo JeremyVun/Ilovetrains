@@ -147,7 +147,6 @@ private struct SmartHeader: View {
     private var first: Leg { journey.legs[0] }
     private var focus: FocusedJourney? { model.state.focus }
     private var focused: Bool { focus != nil && cancelledLeadTime == nil }
-    private var pinned: Bool { focused && focus?.pinned == true }
     private var plan: RecoveryPlan? { focused ? focus.map(recoveryPlan) : nil }
     // The header renders the composed journey; the focus keeps the followed one as its identity.
     private var rendered: Journey { plan?.composed ?? journey }
@@ -158,13 +157,16 @@ private struct SmartHeader: View {
         focused ? focusJourneyIsLate(rendered, board: board, now: model.state.now)
             : minutesBetween(journey.departure, journey.effectiveDeparture) > 0
     }
-    private var statusPresentation: FocusStatusPresentation? {
+    private var focusStatusText: String? {
         guard focused, let focus, arrival?.state != .checkingArrival,
               arrival?.state != .arrivalUnconfirmed else { return nil }
-        return focusStatusPresentation(focus, now: model.state.now, complete: complete)
+        return focusStatus(focus, now: model.state.now, complete: complete)
     }
     private var statusWarning: Bool {
-        statusPresentation?.warning ?? (status == "Cancelled" || status == "Running late")
+        status.contains(connectionGoneWord) || status == "Cancelled" || status == "Running late"
+    }
+    private var tripLine: TripControlLine? {
+        tripControlLine(focus: focus, startable: model.state.startableLead, over: complete && focused)
     }
     private var instructionWarns: Bool {
         if cancelledLeadTime != nil { return true }
@@ -180,23 +182,9 @@ private struct SmartHeader: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
-                if pinned {
-                    Button(action: model.stopTrip) {
-                        HStack(spacing: 5) {
-                            if status == "Pinned" { Image(systemName: "pin.fill").font(.system(size: 12)) }
-                            TrainLabel(text: status, color: statusWarning ? colors.warning : colors.ink2, size: 11)
-                            if statusPresentation?.pinWord == false {
-                                Image(systemName: "pin.fill").font(.system(size: 12)).foregroundStyle(colors.warning)
-                            } else if status != "Pinned" {
-                                Text("·").foregroundStyle(colors.ink3); Image(systemName: "pin.fill").font(.system(size: 12)); TrainLabel(text: "Pinned", color: colors.ink2, size: 11)
-                            }
-                        }.frame(minHeight: 44)
-                    }.buttonStyle(.plain).accessibilityIdentifier("unpin-home")
-                } else {
-                    TrainLabel(text: status, color: statusWarning ? colors.warning : colors.ink2, size: 11)
-                }
+                TrainLabel(text: status, color: statusWarning ? colors.warning : colors.ink2, size: 11)
                 Spacer(); FreshnessView(board: board, now: model.state.now, awaiting: model.state.awaitingAnswer)
-            }.padding(.horizontal, pagePadding).frame(minHeight: pinned ? 44 : 22)
+            }.padding(.horizontal, pagePadding).frame(minHeight: 22)
 
             Button { model.openJourney(journey) } label: {
             HStack(alignment: .top, spacing: 14) {
@@ -261,21 +249,15 @@ private struct SmartHeader: View {
                 }.buttonStyle(.plain).padding(.horizontal, pagePadding).accessibilityIdentifier("next-service")
             }
             TrainRule(heavy: true)
-            if let focus, !focus.pinned {
-                HStack {
-                    Text("Going somewhere else?").font(.system(size: 15, weight: .light)).foregroundStyle(colors.ink2)
-                    Spacer(); Button("Change", action: model.newTrip).buttonStyle(TrainTextButtonStyle(colors: colors))
-                }.padding(.horizontal, pagePadding).frame(minHeight: 48)
-                TrainRule()
-            }
+            if let tripLine { TripControlLineView(line: tripLine, model: model) }
         }
     }
 
     private var status: String {
         if cancelledLeadTime != nil && focus != nil { return "Cancelled" }
         if arrival?.state == .checkingArrival { return "Checking arrival" }
-        if arrival?.state == .arrivalUnconfirmed { return arrival?.moving == true ? "Arrival uncertain" : "Arrival unconfirmed" }
-        if let statusPresentation { return statusPresentation.text }
+        if arrival?.state == .arrivalUnconfirmed { return "Arrival uncertain" }
+        if let focusStatusText { return focusStatusText }
         if let retained = retainedHeaderStatus(board: board, journey: journey, hasFocus: focus != nil, now: model.state.now) {
             return retained
         }
@@ -441,22 +423,99 @@ private struct SavedTripRow: View {
     }
 }
 
-struct FocusStatusPresentation: Equatable {
-    var text: String
-    var pinIcon: Bool
-    var pinWord: Bool
-    var warning: Bool
+enum TripControlLine: Equatable {
+    case guessed
+    case started
+    case startable(Journey)
 }
 
-func focusStatusPresentation(_ focus: FocusedJourney, now: Millis, complete: Bool) -> FocusStatusPresentation {
-    let text = focusStatus(focus, now: now, complete: complete)
-    let lost = text.contains(connectionGoneWord)
-    return FocusStatusPresentation(
-        text: text,
-        pinIcon: focus.pinned,
-        pinWord: focus.pinned && !lost,
-        warning: lost || text == "Cancelled" || text == "Running late"
-    )
+/// The line under the heavy rule (ui.md, Smart home). The trip-over offer takes its place.
+func tripControlLine(focus: FocusedJourney?, startable: Journey?, over: Bool) -> TripControlLine? {
+    guard !over else { return nil }
+    if let focus { return focus.pinned ? .started : .guessed }
+    return startable.map(TripControlLine.startable)
+}
+
+private struct TripControlLineView: View {
+    let line: TripControlLine
+    @ObservedObject var model: TrainViewModel
+    @Environment(\.trainColors) private var colors
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                switch line {
+                case .guessed:
+                    question("Going somewhere else?")
+                    Spacer(minLength: 13)
+                    action("Stop trip", ink: colors.ink2, id: "stop-trip-home", perform: model.stopTrip)
+                    // The hairline keeps STOP TRIP CHANGE from reading as one phrase.
+                    Rectangle().fill(colors.rule2).frame(width: 1, height: 14).padding(.horizontal, 10.5)
+                        .accessibilityHidden(true)
+                    action("Change", id: "change-destination", perform: model.newTrip)
+                case .started:
+                    Spacer(minLength: 0)
+                    action("Stop trip", glyph: .stop, id: "stop-trip-home", perform: model.stopTrip)
+                case .startable(let lead):
+                    question("Taking the \(clockTime(lead.effectiveDeparture))?")
+                    Spacer(minLength: 14)
+                    action("Start trip", glyph: .start, id: "start-trip-home") { model.startTrip(lead) }
+                }
+            }
+            .padding(.horizontal, pagePadding)
+            .frame(height: 48)
+            TrainRule()
+        }
+    }
+
+    private func question(_ text: String) -> some View {
+        // iOS keeps its 22 pt margin at 375 pt, where the guessed question needs 6 pt it does not have.
+        Text(text).font(.system(size: 15, weight: .light)).foregroundStyle(colors.ink2)
+            .lineLimit(1).minimumScaleFactor(0.9)
+    }
+
+    private func action(_ word: String, glyph: TripLineGlyph? = nil, ink: Color? = nil, id: String,
+                        perform: @escaping () -> Void) -> some View {
+        Button(action: perform) {
+            HStack(alignment: .capCentre, spacing: 9) {
+                if let glyph { glyph.image.foregroundStyle(colors.ink2).accessibilityHidden(true) }
+                Text(word.uppercased()).font(.system(size: 12, weight: .semibold)).tracking(1.68)
+                    .foregroundStyle(ink ?? colors.ink)
+                    .alignmentGuide(.capCentre) { $0[.firstTextBaseline] - tripLineCapHeight / 2 }
+            }
+            .frame(minHeight: 48).contentShape(Rectangle())
+        }
+        .buttonStyle(PressedOpacityButtonStyle())
+        .fixedSize()
+        .accessibilityLabel(word)
+        .accessibilityIdentifier(id)
+    }
+}
+
+private let tripLineCapHeight = UIFont.systemFont(ofSize: 12, weight: .semibold).capHeight
+
+private enum TripLineGlyph {
+    case stop, start
+
+    var image: some View {
+        Image(systemName: self == .stop ? "stop.fill" : "play.fill")
+            .resizable().scaledToFit()
+            .frame(width: self == .stop ? 8.5 : 7.75, height: 8.5)
+            .frame(width: 11, height: 11)
+    }
+}
+
+private extension VerticalAlignment {
+    enum CapCentre: AlignmentID {
+        static func defaultValue(in dimensions: ViewDimensions) -> CGFloat { dimensions[VerticalAlignment.center] }
+    }
+    static let capCentre = VerticalAlignment(CapCentre.self)
+}
+
+private struct PressedOpacityButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.opacity(configuration.isPressed ? 0.6 : 1)
+    }
 }
 
 let connectionGoneWord = "Connection gone"
@@ -471,7 +530,6 @@ func focusStatus(_ focus: FocusedJourney, plan: RecoveryPlan, now: Millis, compl
     let late = focusJourneyIsLate(plan.composed, board: focus.board, now: now)
     if connectionIsGone(plan, now: now) { return late ? "Late · \(connectionGoneWord)" : connectionGoneWord }
     if late { return "Running late" }
-    if focus.pinned, now < focus.journey.effectiveDeparture { return "Pinned" }
     return "Running"
 }
 

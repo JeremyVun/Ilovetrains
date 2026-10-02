@@ -1,4 +1,4 @@
-simulator=61C74D65-6705-426C-9486-08F72B8589F6
+simulator=B0D35236-B994-4A9B-AD23-7878CFF7BEC0
 device=iPhone 17 Pro
 runtime=iOS 26.4
 logical_size=402x874

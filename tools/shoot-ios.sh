@@ -15,6 +15,7 @@ default_states=(
   home-light board-light detail-light settings-light
   home-offline board-offline detail-offline home-deleted
   home-lost-riding home-lost-dwell home-lost-none
+  home-far home-ferry home-commute-checking home-commute detail-pinned
 )
 if [ "$#" -gt 0 ]; then states=("$@")
 else states=("${default_states[@]}")

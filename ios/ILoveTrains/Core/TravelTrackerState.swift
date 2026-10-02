@@ -105,8 +105,7 @@ struct TravelTrackerState: Equatable, Sendable {
         focus: FocusedJourney,
         now: Millis,
         generation: Int,
-        arrivalState: ArrivalState? = nil,
-        arrivalMoving: Bool = false
+        arrivalState: ArrivalState? = nil
     ) -> TravelTrackerState? {
         let plan = recoveryPlan(focus)
         let legs = plan.composed.legs
@@ -148,12 +147,9 @@ struct TravelTrackerState: Equatable, Sendable {
             if arrivalState == .checkingArrival {
                 headline = TravelTrackerHeadline(lead: "Checking arrival")
                 instruction = "Checking arrival at \(destination)."
-            } else if arrivalMoving {
+            } else {
                 headline = TravelTrackerHeadline(lead: "Arrival uncertain")
                 instruction = "Still on the way to \(destination)."
-            } else {
-                headline = TravelTrackerHeadline(lead: "Arrival unconfirmed")
-                instruction = "Arrival time needs an update."
             }
             connection = "Last estimate \(trackerClock(last.effectiveArrival))"
             tight = false

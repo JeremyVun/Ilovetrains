@@ -233,25 +233,15 @@ final class TravelTrackerStateTests: XCTestCase {
             focus: focus,
             now: focus.journey.effectiveArrival + minute,
             generation: 2,
-            arrivalState: .arrivalUnconfirmed,
-            arrivalMoving: true
-        ))
-        let stopped = try XCTUnwrap(TravelTrackerState.derive(
-            focus: focus,
-            now: focus.journey.effectiveArrival + minute,
-            generation: 3,
             arrivalState: .arrivalUnconfirmed
         ))
-
         XCTAssertEqual(checking.headline.text, "Checking arrival")
         XCTAssertEqual(checking.instruction, "Checking arrival at Finish.")
         XCTAssertEqual(moving.headline.text, "Arrival uncertain")
         XCTAssertEqual(moving.instruction, "Still on the way to Finish.")
-        XCTAssertEqual(stopped.headline.text, "Arrival unconfirmed")
-        XCTAssertEqual(stopped.instruction, "Arrival time needs an update.")
-        XCTAssertEqual(stopped.etaText, "Last estimate 10:40")
-        XCTAssertEqual(stopped.connection, "Last estimate 10:40")
-        XCTAssertNil(stopped.event.countdownMinutes)
+        XCTAssertEqual(moving.etaText, "Last estimate 10:40")
+        XCTAssertEqual(moving.connection, "Last estimate 10:40")
+        XCTAssertNil(moving.event.countdownMinutes)
     }
 
     func testCancellationAfterEstimateDoesNotBecomeTrackerCompletion() throws {

@@ -5,7 +5,7 @@ final class AppFlowTests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     @MainActor
-    func testHomeRecommendationOutsideBoardRowsOpensAndPins() {
+    func testHomeRecommendationOutsideBoardRowsOpensAndStarts() {
         let app = XCUIApplication()
         app.launchArguments = ["--calibration", "home-recommendation-outside-prefix"]
         app.launchEnvironment["ILOVETRAINS_TEST_DOMAIN"] = UUID().uuidString
@@ -13,10 +13,10 @@ final class AppFlowTests: XCTestCase {
         let recommendation = app.buttons["open-recommended-journey"]
         XCTAssertTrue(recommendation.waitForExistence(timeout: 10))
         recommendation.tap()
-        let pin = app.buttons["pin-this-train"]
-        XCTAssertTrue(pin.waitForExistence(timeout: 5))
-        pin.tap()
-        XCTAssertTrue(app.buttons["unpin-home"].waitForExistence(timeout: 5))
+        let start = app.buttons["start-trip"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5))
+        start.tap()
+        XCTAssertTrue(app.buttons["stop-trip-home"].waitForExistence(timeout: 5))
         app.terminate()
     }
 
@@ -118,19 +118,19 @@ final class AppFlowTests: XCTestCase {
     }
 
     @MainActor
-    func testBoardDetailPinAndSettingsFlow() {
+    func testBoardDetailStartStopAndSettingsFlow() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--calibration", "home"]
         app.launch()
         let trip = app.buttons["trip-calibration-trip"]
         XCTAssertTrue(trip.waitForExistence(timeout: 5)); trip.tap()
-        let service = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'service-'")).firstMatch
-        XCTAssertTrue(service.waitForExistence(timeout: 5)); service.tap()
-        let pin = app.buttons["pin-this-train"]
-        XCTAssertTrue(pin.waitForExistence(timeout: 5)); pin.tap()
-        let unpin = app.buttons["unpin-home"]
-        XCTAssertTrue(unpin.waitForExistence(timeout: 5)); unpin.tap()
-        XCTAssertFalse(unpin.exists)
+        let service = try XCTUnwrap(upcomingService(app, after: calibrationNow, timeout: 5))
+        service.tap()
+        let start = app.buttons["start-trip"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5)); start.tap()
+        let stop = app.buttons["stop-trip-home"]
+        XCTAssertTrue(stop.waitForExistence(timeout: 5)); stop.tap()
+        XCTAssertTrue(stop.waitForNonExistence(timeout: 5))
         app.buttons["settings"].tap()
         app.buttons["appearance-light"].tap()
         XCTAssertTrue(app.buttons["appearance-light"].isSelected)
@@ -143,7 +143,7 @@ final class AppFlowTests: XCTestCase {
     }
 
     @MainActor
-    func testCreatesNewTripAndReopensEntirelyOffline() {
+    func testCreatesNewTripAndReopensEntirelyOffline() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--offline"]
         app.launchEnvironment["ILOVETRAINS_TEST_DOMAIN"] = UUID().uuidString
@@ -163,15 +163,14 @@ final class AppFlowTests: XCTestCase {
         app.buttons["save-trip"].tap()
         let trip = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'trip-'")).firstMatch
         XCTAssertTrue(trip.waitForExistence(timeout: 10)); trip.tap()
-        let service = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'service-'")).firstMatch
-        XCTAssertTrue(service.waitForExistence(timeout: 25))
+        let service = try XCTUnwrap(upcomingService(app, after: fixtureDate.timeIntervalSince1970 * 1_000, timeout: 25))
         XCTAssertTrue(app.staticTexts["OFFLINE"].exists || app.staticTexts["SCHEDULED"].exists)
         service.tap()
-        XCTAssertTrue(app.buttons["pin-this-train"].waitForExistence(timeout: 5))
-        app.buttons["pin-this-train"].tap()
-        XCTAssertTrue(app.buttons["unpin-home"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["start-trip"].waitForExistence(timeout: 5))
+        app.buttons["start-trip"].tap()
+        XCTAssertTrue(app.buttons["stop-trip-home"].waitForExistence(timeout: 5))
         app.terminate(); app.launch()
-        XCTAssertTrue(app.buttons["unpin-home"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["stop-trip-home"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'trip-'")).firstMatch.exists)
     }
 
@@ -241,6 +240,19 @@ final class AppFlowTests: XCTestCase {
                              label: "Use location, Nearby trips use location, TURN OFF",
                              labelAfterTap: "Use location, Location is not used, TURN ON",
                              toggleValue: "On", expectedHeight: rowHeight)
+    }
+
+    /// The `home` calibration's clock, 22:45 on 31 August 2026.
+    private let calibrationNow: Double = 1_788_180_300_000
+
+    /// A row that has not left yet opens its journey; a row on its way would start the trip at once.
+    @MainActor
+    private func upcomingService(_ app: XCUIApplication, after now: Double, timeout: TimeInterval) -> XCUIElement? {
+        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'service-'"))
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: timeout))
+        return rows.allElementsBoundByIndex.first { row in
+            Double(row.identifier.dropFirst("service-".count)).map { $0 >= now + 120_000 } ?? false
+        }
     }
 
     @MainActor

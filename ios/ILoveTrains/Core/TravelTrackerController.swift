@@ -273,7 +273,6 @@ actor TravelTrackerController {
         now: Millis,
         recordedComplete: Bool,
         arrivalState: ArrivalState? = nil,
-        arrivalMoving: Bool = false,
         journeyAlerts: Bool = true,
         background: Bool = false,
         debugStaticCountdown: String? = nil
@@ -313,8 +312,7 @@ actor TravelTrackerController {
                     focus: focus,
                     now: now,
                     generation: 0,
-                    arrivalState: arrivalState,
-                    arrivalMoving: arrivalMoving
+                    arrivalState: arrivalState
                 ) != nil
             let newFocus = !(session.suppressedIdentity == identity && session.suppression == .dismissed)
             if completedCanResume || newFocus {
@@ -346,8 +344,7 @@ actor TravelTrackerController {
             focus: focus,
             now: now,
             generation: active.generation,
-            arrivalState: arrivalState,
-            arrivalMoving: arrivalMoving
+            arrivalState: arrivalState
         ) else {
             await suppress(.completed, identity: identity)
             return nil
