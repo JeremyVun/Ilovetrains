@@ -915,8 +915,10 @@ WidgetKit and Pixel launcher renderers.
   carry `N MIN LATE`; scheduled-only rows carry `SCHEDULED`.
 - **Lock screen (iOS, rectangular):** the tracker's three lines,
   `T9 leaves in 2:24`, `Go to Platform 1`, `<destination> about 10:08`.
-- **Pinned and under way:** the status line reads `PINNED` or
-  `RUNNING · PINNED`; once under way the widget shows journey detail's steps
+- **Started and under way:** a started trip's status line reads its
+  service's status as the smart header does, `RUNNING` before departure
+  included, with no pin (owner rulings 14 and 20, 2026-10-02); once under way
+  the widget shows journey detail's steps
   (`GET OFF`, `BOARD T4`, `ARRIVE`). A widget never shows `RUNNING LATE` or
   `Trip over`: its data is never fresh enough to claim either.
 - **Freshness:** every home-screen widget always shows the Live Activity's
@@ -989,7 +991,11 @@ left and approximate arrival at right, fixed in place; and a quiet proportional
 trip line underneath with one progress marker. No app header, repeated platform
 graphics or caption stacks. The OS owns the container, so Android's templates
 and iOS's Island decide the actual geometry. Platform-number boxes on the line
-are an optional visual follow-up, not part of the accepted baseline.
+are an optional visual follow-up, not part of the accepted baseline. The
+Android card carries one action, `Stop trip`, which the system draws as plain
+text without an icon under the card in every state (owner ruling 16,
+2026-10-02). It stops trip mode exactly as Home's `Stop trip` does, for the
+card's current journey only: a tap on a replaced or dismissed card is ignored.
 
 The board, home and detail calibration frames are listed below.
 `tools/check-settings-browser.js --frames assets/comps/latest` adds twelve

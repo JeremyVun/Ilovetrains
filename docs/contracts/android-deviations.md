@@ -13,6 +13,26 @@ This file records deliberate differences between the native Android app and the 
 - A journey whose first leg departs on the timetable while a later leg carries a realtime estimate paints in the live register on Android, where `journey.realtime` is true for an estimate on any leg, and reads `SCHEDULED` on web, which looks only at the departure the rider acts on. The 40 minute live horizon rule in [ui.md](ui.md#past-stale-and-exceptional-data) does not close the gap: its predicate reads the first leg's departure estimate, so such a row is left exactly as it is today at any lead (owner ruling, 2026-09-11).
 - Android stores user state in app-private atomic files and excludes it from cloud backup and device transfer. The native trip list is not capped at the web client’s ten-trip LRU, and each trip has the explicit native deletion menu described above.
 
+## Trip-control line
+
+- The line matches the round 3b Roboto exemplars at 412 dp to within a dp.
+  The question is 15 sp Light without the 0.5 sp tracking the app's body
+  style otherwise inherits. The actions carry the CSS .14em tracking, which
+  also follows the last letter. The glyphs are Material `Icons.Filled.Stop`
+  and `Icons.Filled.PlayArrow`, drawn at 16.5 dp and 15 dp in their 11 dp
+  slot because Material fills about half its box. The stop square is the
+  exemplar's 8 dp mark; the play triangle keeps Material's shape, 1 dp
+  narrower than the exemplar's. Both sit on the cap height.
+- Android keeps its 22 dp page margin at every width, where the web narrows
+  it to 18 px at 375 px and below, and the 360 exemplar assumes the narrow
+  margin. Below about 364 dp the guessed line's question cannot print whole
+  beside `STOP TRIP` and `CHANGE`, so it ellipsizes (`Going somewhere el…` at
+  360 dp). This is open for an owner ruling.
+- The trip-over offer keeps the native `Need to get back?  SHOW THE WAY BACK`
+  composition, which iOS shares, in place of the web's `Trip over` block. It
+  never claims `You’ve arrived`, so ruling 21 changes no Android copy. A
+  location-confirmed ending's sign reads `The journey has finished`.
+
 ## Home-screen widget
 
 - A Jetpack Glance widget (`SizeMode.Exact`, so names are fitted and bars
@@ -122,7 +142,10 @@ and its `-light` variant, the flag-on
 `android-board-390x844-now.png`, the Home/Board
 `-390x844-offline-retained-t9.png` frames, and the swipe-to-delete pair
 `android-home-390x844-deleting.png` (row dragged past the threshold) and
-`android-home-390x844-deleted.png` (row gone, bar offering `Undo`). `tools/shoot-android.sh` reproduces
+`android-home-390x844-deleted.png` (row gone, bar offering `Undo`), the
+trip-control line frames `android-home-390x844-{inferred,guessed-stress,started,started-after,startable,startable-ferry,leaves-later}.png`
+(`inferred`, `started`, `started-after` and `startable` with `-light`
+variants) and `android-detail-390x844-focused.png`, the `Stop trip` rail. `tools/shoot-android.sh` reproduces
 them, with the offline Board scrolled upward to reveal the retained service.
 The same states are checked at 412×732 and font scale 1.3.
 
