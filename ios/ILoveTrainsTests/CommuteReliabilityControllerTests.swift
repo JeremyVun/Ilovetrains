@@ -297,7 +297,6 @@ final class CommuteReliabilityControllerTests: XCTestCase {
 
     func testARunningBoardRowStartsTheTripOfflineAndStoppingItLeavesNoTrace() async throws {
         let planner = OfflinePlanner()
-        try await planner.initialize()
         let clock = TestClock(mondayMorning)
         let tracker = quietTracker()
         let (store, model) = try await model(UserData(trips: [commute]), planner: planner, clock: clock, location: ScriptedLocation(),
@@ -381,7 +380,6 @@ final class CommuteReliabilityControllerTests: XCTestCase {
 
     func testATrackerTapStillLandsOnItsJourneyAfterTenMinutesInEitherOrder() async throws {
         let planner = OfflinePlanner()
-        try await planner.initialize()
         let clock = TestClock(mondayMorning)
         let tracker = quietTracker()
         let (_, model) = try await model(UserData(trips: [commute]), planner: planner, clock: clock, location: ScriptedLocation(),
