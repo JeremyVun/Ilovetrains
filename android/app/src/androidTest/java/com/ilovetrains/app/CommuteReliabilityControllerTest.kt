@@ -1,0 +1,233 @@
+package com.ilovetrains.app
+
+import android.app.Application
+import android.content.Context
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import kotlinx.coroutines.runBlocking
+import org.json.JSONObject
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.junit.runner.RunWith
+import java.io.File
+import java.net.ServerSocket
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.UUID
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+
+/**
+ * Commute-reliability rules 1, 3, 4 and 5 through the real view model with no network: every request fails, and
+ * the bundled timetable plans every board, as on the owner's offline rides.
+ */
+@RunWith(AndroidJUnit4::class)
+class CommuteReliabilityControllerTest {
+    private val instrumentation = InstrumentationRegistry.getInstrumentation()
+    private val context = instrumentation.targetContext
+    private val root = File(context.cacheDir, "commute-reliability-${UUID.randomUUID()}")
+    private val owner = object : ViewModelStoreOwner { override val viewModelStore = ViewModelStore() }
+    private val minute = 60_000L
+    private val stations by lazy { runBlocking { DeviceStore(context).stations() } }
+    private val rhodes by lazy { stations.first { it.id == "213820" } }
+    private val central by lazy { stations.first { it.id == "200060" } }
+    private val trip by lazy { SavedTrip("rhodes-central", rhodes, central) }
+    private lateinit var application: IsolatedApplication
+    @Volatile private var homeFixes = 0
+
+    @After fun release() {
+        instrumentation.runOnMainSync { owner.viewModelStore.clear() }
+        root.deleteRecursively()
+    }
+
+    @Test fun theOpenRaceKeepsThePlatformRecordAndEntersOffline() {
+        val model = open(UserData(trips = listOf(trip), modes = setOf("train"), useLocation = true), morningDeparture() - 2 * minute)
+        val seen = seenOnThePlatform(model)
+        val departure = seen.journey.effectiveDeparture
+
+        onMain { model.activityStopped(); model.pause(); model.backgrounded() }
+        val opened = departure + 3 * minute
+        val asked = homeFixes
+        onMain { model.debugSetTrackerClock(opened); model.activityResumed(); model.permission(granted = true, denied = false); model.resume() }
+        waitFor("the open's own refresh to answer") { model.state.value.board?.journeys?.isNotEmpty() == true && !model.state.value.refreshing }
+        settle()
+        assertEquals("the open's unsighted record cannot replace the platform record", seen, stored().lastAnswer)
+        assertTrue("the open asked for a Home fix", homeFixes > asked)
+
+        onMain { model.location(Fix(along(0.25).first, along(0.25).second, opened, accuracyMetres = 10.0)) }
+        val focus = requireNotNull(model.state.value.focus) { "the fix after the open's refresh did not enter trip mode" }
+        assertFalse(focus.pinned)
+        assertEquals(trip.id, focus.tripId)
+        assertEquals(seen.journey.key, focus.journey.key)
+    }
+
+    @Test fun homeLeftOpenThroughADepartureEntersFromTheHeldRecordOnATickFix() {
+        val model = open(UserData(trips = listOf(trip), modes = setOf("train"), useLocation = true), morningDeparture() - 2 * minute)
+        val seen = seenOnThePlatform(model)
+        val departure = seen.journey.effectiveDeparture
+
+        onMain { model.debugSetTrackerClock(departure + 30_000); model.refresh() }
+        waitFor("the tick after departure to answer") { !model.state.value.refreshing && model.state.value.now == departure + 30_000 }
+        settle()
+        assertEquals("a platform fix from before departure cannot replace the departed train", seen, stored().lastAnswer)
+
+        val asked = homeFixes
+        onMain { model.debugSetTrackerClock(departure + minute); model.refreshTick() }
+        assertEquals("the tick after a shown departure takes a fix", asked + 1, homeFixes)
+        assertFalse("the tick's fix refreshes in its place", model.state.value.refreshing)
+
+        val (lat, lon) = along(0.15)
+        onMain { model.location(Fix(lat, lon, departure + minute, speed = 15.0, accuracyMetres = 10.0, bearing = bearing(lat, lon, central))) }
+        val focus = requireNotNull(model.state.value.focus) { "the moving tick fix did not enter from the held record" }
+        assertFalse(focus.pinned)
+        assertEquals(seen.journey.key, focus.journey.key)
+    }
+
+    @Test fun aFixOnBoardEntersTheRunningServiceFromTheOfflineTimetable() {
+        val running = morningDirect()
+        val now = running.effectiveDeparture + (running.effectiveArrival - running.effectiveDeparture) / 2
+        val model = open(UserData(trips = listOf(trip), modes = setOf("train"), useLocation = true), now)
+
+        val (lat, lon) = along(0.5)
+        onMain { model.location(Fix(lat, lon, now, speed = 15.0, accuracyMetres = 10.0, bearing = bearing(lat, lon, central))) }
+        waitFor("on-board entry from the timetable", 60_000) { model.state.value.focus != null }
+        val focus = requireNotNull(model.state.value.focus)
+        assertFalse(focus.pinned)
+        assertEquals(trip.id, focus.tripId)
+        assertFalse(focus.reverse)
+        assertEquals(running.key, focus.journey.key)
+        assertEquals("schedule", focus.board.source)
+    }
+
+    @Test fun theEvidenceWaitHoldsAnOverdueTripFor45SecondsAndAProviderRestartDoesNotExtendIt() {
+        val now = System.currentTimeMillis()
+        val journey = Journey(listOf(Leg("T9", "train", "Hornsby", rhodes, central, now - 20 * minute, now - 4 * minute)))
+        val focus = FocusedJourney(trip.id, false, journey, BoardData(rhodes, central, listOf(journey), now - 4 * minute, source = "live"),
+            pinned = false, arrivalGuard = ArrivalGuard(armed = true, retainedAt = now - 20 * minute))
+        val model = model(UserData(trips = listOf(trip), modes = setOf("train"), useLocation = true, focus = focus), now)
+        waitFor("the model to load") { model.state.value.ready }
+        onMain {
+            model.attachActivity(Any(), {}, {}, {}, {}, { beforeStart -> beforeStart(); true }, {}, {})
+            model.activityResumed()
+            model.permission(granted = true, denied = false)
+        }
+        assertTrue(model.arrivalMonitoringActive)
+        assertEquals(ArrivalState.CheckingArrival, model.state.value.arrival?.state)
+
+        fun standing(at: Long) = onMain {
+            model.debugSetTrackerClock(at)
+            model.arrivalLocation(Fix(rhodes.lat, rhodes.lon, at, speed = 0.0, accuracyMetres = 10.0))
+        }
+        standing(now + 30_000)
+        onMain { model.arrivalMonitoringFailed(SetupLocationStatus.ServicesDisabled); model.permission(granted = true, denied = false) }
+        assertTrue("monitoring restarted after the provider failure", model.arrivalMonitoringActive)
+        standing(now + 44_999)
+        assertEquals("still inside the wait", ArrivalState.CheckingArrival, model.state.value.arrival?.state)
+        standing(now + 45_000)
+        assertEquals("the restart did not extend the wait", ArrivalState.Arrived, model.state.value.arrival?.state)
+        assertEquals(ArrivalBasis.Estimate, model.state.value.arrival?.basis)
+        assertTrue(model.state.value.focusComplete)
+    }
+
+    /** Home opened two minutes before a train with a fix on Rhodes's platform: a real refresh writes the sighted record. */
+    private fun seenOnThePlatform(model: TrainViewModel): LastAnswer {
+        val at = model.state.value.now
+        onMain { model.location(Fix(rhodes.lat, rhodes.lon, at, accuracyMetres = 10.0)) }
+        waitFor("the platform refresh to write a sighted record", 60_000) { stored().lastAnswer?.stationId == rhodes.id }
+        val seen = requireNotNull(stored().lastAnswer)
+        assertEquals(trip.id, seen.tripId)
+        assertTrue("the shown train leaves within 15 minutes of the sighting", seen.journey.effectiveDeparture - seen.at in 0..15 * minute)
+        assertNotNull(model.state.value.board)
+        return seen
+    }
+
+    private fun open(data: UserData, at: Long): TrainViewModel {
+        val model = model(data, at)
+        waitFor("the model and its timetable", 120_000) { model.state.value.ready && model.state.value.timetableStatus != "Opening offline timetable" }
+        onMain {
+            model.attachActivity(Any(), {}, { homeFixes++ }, {}, {}, { false }, {}, {})
+            model.activityResumed()
+            model.permission(granted = true, denied = false)
+            model.resume()
+        }
+        waitFor("the opening refresh", 60_000) { !model.state.value.refreshing && model.state.value.board != null }
+        return model
+    }
+
+    private fun model(data: UserData, at: Long): TrainViewModel {
+        application = IsolatedApplication(File(root, "app")).also { it.attachTo(context) }
+        runBlocking { DeviceStore(application).save(data) }
+        val closedPort = ServerSocket(0).use { it.localPort }
+        lateinit var model: TrainViewModel
+        onMain {
+            val factory = object : ViewModelProvider.Factory {
+                override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                    modelClass.cast(TrainViewModel(application, TransitApi("http://127.0.0.1:$closedPort")))!!
+            }
+            model = ViewModelProvider(owner, factory)[TrainViewModel::class.java]
+            model.debugSetTrackerClock(at)
+        }
+        return model
+    }
+
+    private fun morningDeparture(): Long = morningDirect().effectiveDeparture
+
+    /** The first direct T9 from Rhodes to Central after 07:50 on a weekday the bundled timetable covers. */
+    private fun morningDirect(): Journey = runBlocking {
+        val manifest = JSONObject(context.assets.open("timetable-manifest.json").bufferedReader().use { it.readText() })
+        var day = LocalDate.parse(manifest.getString("serviceDateFrom"), DateTimeFormatter.BASIC_ISO_DATE).plusDays(1)
+        while (day.dayOfWeek == DayOfWeek.SATURDAY || day.dayOfWeek == DayOfWeek.SUNDAY) day = day.plusDays(1)
+        val after = day.atTime(7, 50).atZone(Sydney).toInstant().toEpochMilli()
+        val planner = OfflinePlanner(context, File(root, "search-timetable")).apply { initialize() }
+        planner.plan(rhodes, central, after, setOf("train"), 30, 2).journeys
+            .filter { it.legs.size == 1 && it.effectiveDeparture >= after }.minBy { it.effectiveDeparture }
+    }
+
+    /** A point [share] of the straight line from Rhodes to Central. */
+    private fun along(share: Double) =
+        (rhodes.lat + (central.lat - rhodes.lat) * share) to (rhodes.lon + (central.lon - rhodes.lon) * share)
+
+    private fun bearing(lat: Double, lon: Double, to: Station): Double {
+        val rad = Math.PI / 180
+        val dLon = (to.lon - lon) * rad
+        val y = sin(dLon) * cos(to.lat * rad)
+        val x = cos(lat * rad) * sin(to.lat * rad) - sin(lat * rad) * cos(to.lat * rad) * cos(dLon)
+        return (atan2(y, x) / rad + 360) % 360
+    }
+
+    private fun stored(): UserData = runBlocking { DeviceStore(application).load() }
+
+    /** A refresh caches its board before writing the record; give that write its turn on the main thread. */
+    private fun settle() {
+        Thread.sleep(1_500)
+        onMain {}
+    }
+
+    private fun onMain(block: () -> Unit) = instrumentation.runOnMainSync(block)
+
+    private fun waitFor(what: String, timeoutMillis: Long = 15_000, condition: () -> Boolean) {
+        val deadline = System.currentTimeMillis() + timeoutMillis
+        while (!condition()) {
+            check(System.currentTimeMillis() < deadline) { "Timed out waiting for $what" }
+            Thread.sleep(50)
+        }
+    }
+
+    private class IsolatedApplication(private val root: File) : Application() {
+        fun attachTo(context: Context) = attachBaseContext(context)
+        override fun getApplicationContext(): Context = this
+        override fun getFilesDir(): File = File(root, "files").apply(File::mkdirs)
+        override fun getCacheDir(): File = File(root, "cache").apply(File::mkdirs)
+        override fun getNoBackupFilesDir(): File = File(root, "no-backup").apply(File::mkdirs)
+    }
+}
