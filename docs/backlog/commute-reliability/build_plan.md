@@ -17,8 +17,15 @@ the shared fixtures define the behaviour the native phases match.
   works in its own worktree under `/private/tmp` created by the lead (verify
   with a landmark file), commits after every step, runs gates in the
   foreground, and reports once.
-- Nonvisual phases go to Opus. Phase 4 is visual and goes to Opus or Astra
-  (Astra needs the owner's approval for that assignment).
+- Nonvisual phases go to Opus. Phase 4 is visual and goes to Opus (owner,
+  2026-10-02: “Opus (Recommended)”).
+- Adversarial review (owner, 2026-10-02: “Yes, one Fable reviewer”): after
+  phases 2 and 3 land, one Fable reviewer attacks the hold rule, the
+  auto-start regressions, on-board matching and arrival settlement across the
+  three clients in its own worktree, committing probe tests as soon as they
+  compile and flagging contract contradictions for an owner ruling. An Opus
+  fix agent then takes those probes as its acceptance suite and keeps them as
+  permanent regressions. Opus is the fallback if Fable is cut off.
 - iOS gates run one at a time and never in loops (see the
   `no-unattended-test-loops` memory). Android and iOS gates never run
   concurrently.
