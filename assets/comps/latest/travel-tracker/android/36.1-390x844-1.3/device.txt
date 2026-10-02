@@ -1,4 +1,4 @@
-serial=emulator-5556
+serial=emulator-5592
 device=sdk_gphone64_arm64
 build=google/sdk_gphone64_arm64/emu64a:16/BE4B.251210.005/14574095:user/release-keys
 sdk=36
@@ -9,7 +9,7 @@ font_scale=1.3
 schemes=dark,light
 cases=ride,long-content,missed-connection
 surfaces=shade
+capture_only=1
+capture_mode=deterministic system-surface capture only; lifecycle checks skipped
 fixture=tools/fixtures/conformance/travel-tracker.json
 capture_clock=fixed fixture review epoch through DEBUG-only model seam
-capture_mode=capture_only
-reviewed=2026-09-08
