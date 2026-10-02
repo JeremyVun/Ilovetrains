@@ -32,6 +32,26 @@ iOS implementation requested on 2026-09-07.
   `ios-home-390x844-deleted.png` are the exemplars. iOS follows the web's
   ten-trip LRU policy, including history and cache cleanup on eviction,
   instead of Android's unlimited saved list.
+- iOS keeps its 22pt page margin at every width, where the web narrows to 18px
+  at 375px and below. The guessed trip-control line needs 337pt of a 331pt
+  track on a 375pt iPhone, so there its question `Going somewhere else?`
+  steps down to about 14.4pt instead of ellipsising, and its actions keep
+  their size; wider phones print it at 15pt as the exemplars do. SwiftUI
+  centres the line's words on their text frame, which sets them about 0.8pt
+  higher than the web exemplar's line box; each glyph stays centred on its
+  word's caps. The line exemplars are `assets/comps/latest/ios-home-guessed.png`,
+  `ios-home-started.png`, `ios-home-started-after.png`,
+  `ios-home-startable.png` and its `-light` variant,
+  `ios-home-startable-ferry.png`, `ios-home-leaves-later.png` (no line) and
+  `ios-home-trip-over.png`, with the journey rails `ios-detail-start-trip.png`
+  and `ios-detail-stop-trip.png`, shot at 402×874pt by `tools/shoot-ios.sh`
+  from the calibration states `home-inferred`, `home-pinned`, `home-active`,
+  `home`, `home-light`, `home-ferry`, `home-far`, `home-commute`, `detail` and
+  `detail-pinned`.
+- Home's trip-over offer is one line, `NEED TO GET BACK?  SHOW THE WAY BACK`,
+  with no `Trip over` paragraph and no `Not now`, so it never says
+  `You’ve arrived.` after either ending; ruling 21 changes only the web's
+  paragraph. The estimate-ending sign above it wraps onto a second line.
 - New offline trips route over the same bundled SQLite package as Android.
   Conservative same-hub transfers and no cross-hub walking graph can produce
   different routes from the online planner. The app uses online Trip Planner
@@ -57,7 +77,7 @@ iOS implementation requested on 2026-09-07.
   keep their full fill and text colours; cancellation fades the composited
   journey device once so underlying bars cannot bleed through the labels.
 - Expired or unavailable realtime makes new local plans use scheduled times;
-  previously displayed boards and pins retain their last-known observations
+  previously displayed boards and started trips retain their last-known observations
   under the [native cache rules](native-data.md#cached-boards-and-departed-services).
   Timetable generation time and realtime observation time are never renewed
   merely by loading a cache. A focused service's alternatives retain their own
@@ -113,7 +133,7 @@ While a stored focus is under way, the existing foreground location owner can
 monitor it across Home, detail and Settings with already-granted permission.
 Provider updates target ten seconds; accepted evidence is at least five seconds
 apart. Setup lookups share the owner. Backgrounding, disabling location,
-permission loss, unpinning, deleting or replacing focus stops collection and
+permission loss, Stop trip, deleting or replacing focus stops collection and
 clears the raw window; late callbacks cannot cross generations. The tracker's
 background keepalive runs a separate provider whose fixes are discarded, so no
 background position reaches the guard and no location payload leaves the
@@ -128,7 +148,7 @@ on resume. OS dismissal remains surface suppression, never ride completion.
 
 ## Persistent travel tracker
 
-Entering travel mode, inferred or by pinning a train, starts a local Live
+Entering travel mode, guessed or started with Start trip, starts a local Live
 Activity when the app can request one and iOS permits it (owner ruling,
 2026-09-23); replacing an already-tracked focus also replaces its activity. The containing
 app publishes focused journey updates through ActivityKit, and the widget
@@ -168,7 +188,14 @@ background if needed; the app registers its handler at launch and waits for
 the stored document before acting. It carries the tracker session ID and is
 honoured only while that session is still current and undismissed, like a
 surface tap, with exactly Stop trip's effects, including the decline and
-`declined_inferred` for a guessed trip.
+`declined_inferred` for a guessed trip. The card's `■ Stop trip` capsule and
+the expanded Island's round button invoke it ([ui.md](ui.md#calibration-and-verification));
+the capsule sits outside the card's combined accessibility element so
+VoiceOver reaches it as its own button. Holding the 28pt capsule makes the
+card's headline row 28pt tall, so the instruction and context rows sit 1pt
+lower than before; the Island button takes no layout height and moves
+nothing. `TravelTrackerFlowTests` taps the card's capsule in Notification
+Center and checks that the trip and its activity end.
 
 Calibration exemplars are the real ActivityKit captures in
 `assets/comps/latest/travel-tracker/ios/`, reproduced with
