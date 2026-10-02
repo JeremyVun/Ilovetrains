@@ -20,7 +20,7 @@ fun compatible(trip: SavedTrip, modes: Set<String>) = modes.isNotEmpty() && list
 fun focusExpiry(focus: FocusedJourney): Long {
     val guard = focus.arrivalGuard
     val arrival = focus.composed.effectiveArrival
-    return if (guard?.armed == true && guard.basis != ArrivalBasis.Location) {
+    return if (guard?.armed == true && guard.basis == null) {
         max(arrival + ArrivalConstants.Expiry, (guard.retainedAt ?: arrival) + ArrivalConstants.Retention)
     } else arrival + ArrivalConstants.Expiry
 }

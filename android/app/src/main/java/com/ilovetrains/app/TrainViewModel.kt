@@ -84,9 +84,11 @@ class TrainViewModel private constructor(
     private var arrivalResult: ArrivalResult? = null
     private var arrivalMonitoring = false
     internal val arrivalMonitoringActive get() = arrivalMonitoring
-    private var arrivalLookupJob: Job? = null
+    private var evidenceWaitJob: Job? = null
     private var arrivalPermissionPending = true
     private var arrivalResumeWaitUntil: Long? = null
+    private var evidenceWaitFor: String? = null
+    private var foregroundVisit = 0
     private var trackerPublicationGeneration = 0L
     @Volatile private var debugTrackerClock: Long? = null
     @Volatile private var debugTrackerCaptureMode = false
@@ -114,8 +116,8 @@ class TrainViewModel private constructor(
         viewModelScope.launch {
             data = store.load(); stations = runCatching { store.stations() }.getOrDefault(emptyList())
             widgetWrites.trySend(Unit)
-            if (data.useLocation && arrivalPermissionPending && arrivalResumeWaitUntil == null) {
-                arrivalResumeWaitUntil = System.currentTimeMillis() + ArrivalLookupMillis
+            if (data.focus?.let { trackerNow() >= it.composed.effectiveArrival } == true && arrivalResumeWaitUntil == null) {
+                arrivalResumeWaitUntil = trackerNow() + ArrivalConstants.EvidenceWait
             }
             syncPersonal()
             ensureArrivalMonitoring()
@@ -234,9 +236,17 @@ class TrainViewModel private constructor(
     }
 
     fun activityResumed() {
+        val returning = !activityForeground
         activityForeground = true
         arrivalPermissionPending = true
-        arrivalResumeWaitUntil = System.currentTimeMillis() + ArrivalLookupMillis
+        if (returning) {
+            foregroundVisit++
+            val focus = data.focus
+            if (focus?.arrivalGuard?.let { it.armed == true && it.basis == null } == true &&
+                trackerNow() >= focus.composed.effectiveArrival) {
+                arrivalResumeWaitUntil = trackerNow() + ArrivalConstants.EvidenceWait
+            }
+        }
         trackerRefreshJob?.cancel()
         trackerPublicationGeneration++
         tracker.activityResumed()
@@ -833,30 +843,39 @@ class TrainViewModel private constructor(
             focus.journey.cancelled || mutable.value.now < focus.journey.effectiveDeparture ||
             arrivalResult?.state == ArrivalState.Arrived) return
         val identity = focusIdentity(focus)
+        beginEvidenceWait("$identity#$foregroundVisit")
         val started = onArrivalMonitoring?.invoke {
             if (data.focus?.let(::focusIdentity) != identity) return@invoke
             evaluateArrival(monitoringOverride = true)
         } == true
         if (data.focus?.let(::focusIdentity) != identity) return
         arrivalMonitoring = started
-        if (started) arrivalMonitoringStarted() else evaluateArrival()
+        if (started) settleWhenEvidenceWaitEnds() else evaluateArrival()
     }
 
-    private fun arrivalMonitoringStarted() {
-        arrivalLookupJob?.cancel()
-        arrivalLookupJob = viewModelScope.launch {
-            delay(ArrivalLookupMillis)
-            arrivalLookupComplete()
+    /** Once per focus and foreground visit, so a provider failure restarting monitoring cannot extend it. */
+    private fun beginEvidenceWait(visit: String) {
+        if (evidenceWaitFor == visit) return
+        evidenceWaitFor = visit
+        arrivalResumeWaitUntil = trackerNow() + ArrivalConstants.EvidenceWait
+    }
+
+    private fun settleWhenEvidenceWaitEnds() {
+        evidenceWaitJob?.cancel()
+        val until = arrivalResumeWaitUntil ?: return
+        evidenceWaitJob = viewModelScope.launch {
+            delay((until - trackerNow()).coerceAtLeast(0))
+            evidenceWaitElapsed()
         }
     }
 
-    fun arrivalLookupComplete() {
+    fun evidenceWaitElapsed() {
         arrivalResumeWaitUntil = null
         evaluateArrival()
     }
 
     fun arrivalLocation(value: Fix) {
-        val receivedAt = System.currentTimeMillis()
+        val receivedAt = trackerNow()
         if (!data.useLocation || !arrivalMonitoring) return
         mutable.value = mutable.value.copy(now = receivedAt)
         evaluateArrival(ArrivalSample(value.lat, value.lon, value.at,
@@ -873,7 +892,7 @@ class TrainViewModel private constructor(
     private fun stopArrivalMonitoring(clearWindow: Boolean) {
         if (arrivalMonitoring) onArrivalMonitoringStop?.invoke()
         arrivalMonitoring = false
-        arrivalLookupJob?.cancel()
+        evidenceWaitJob?.cancel()
         if (clearWindow) {
             arrivalWindow = null
             arrivalResult = arrivalResult?.let { it.copy(window = ArrivalWindow(it.window.identity, emptyList())) }
@@ -884,6 +903,7 @@ class TrainViewModel private constructor(
         stopArrivalMonitoring(clearWindow = true)
         arrivalResult = null
         arrivalResumeWaitUntil = null
+        evidenceWaitFor = null
         if (activityForeground && mutable.value.locationGranted) ensureArrivalMonitoring()
     }
     fun permission(granted: Boolean, denied: Boolean) {
@@ -897,7 +917,7 @@ class TrainViewModel private constructor(
     }
     fun location(value: Fix) {
         // A fix can be newer than the last one-second render tick.
-        val receivedAt = System.currentTimeMillis()
+        val receivedAt = trackerNow()
         if (!data.useLocation) return
         if (receivedAt - value.at !in 0..300_000) { locationFailed(SetupLocationStatus.Unavailable); return }
         mutable.value = mutable.value.copy(now = receivedAt)
@@ -1208,8 +1228,6 @@ class TrainViewModel private constructor(
     }
     override fun dismissMessage() { message(null) }
 }
-
-internal const val ArrivalLookupMillis = 15_000L
 
 internal fun List<Ride>.settled(focus: FocusedJourney, arrived: Boolean, ends: Pair<Station, Station>? = null): List<Ride> {
     val arrival = focus.journey.effectiveArrival

@@ -288,7 +288,8 @@ class ControllerParityInstrumentedTest {
 
         delay(750)
         model.arrivalLocation(Fix(primaryTrip.from.lat, primaryTrip.from.lon, System.currentTimeMillis(), 12.0, 20.0))
-        assertEquals(ArrivalState.ArrivalUnconfirmed, model.state.value.arrival?.state)
+        assertEquals("one away sample proves no movement, so the trip checks", ArrivalState.CheckingArrival,
+            model.state.value.arrival?.state)
         assertFalse(model.state.value.focusComplete)
 
         model.activityStopped()
@@ -352,7 +353,7 @@ class ControllerParityInstrumentedTest {
         model.permission(true, false)
         model.arrivalLocation(Fix(primaryTrip.from.lat, primaryTrip.from.lon, System.currentTimeMillis(), 10.0, 20.0))
         assertNotNull("the resume lookup lost its chance before the overdue expiry", model.state.value.focus)
-        model.arrivalLookupComplete()
+        model.evidenceWaitElapsed()
         assertNull("away evidence revived an overdue focus", model.state.value.focus)
         assertEquals(listOf(primaryTrip.id), storedAfterWrites().rides.map { it.tripId })
     }
