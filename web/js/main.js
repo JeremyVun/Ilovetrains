@@ -28,7 +28,7 @@ import {
   tripAllowed, tripsForModes, stationAllowed, SUPPORTED_MODES,
   preferencesOf, setPreferences, setFlags, effectiveCap, journeyAllowed, filterBody
 } from './preferences.js';
-import { reduceArrival } from './arrival.js';
+import { ARRIVAL, reduceArrival } from './arrival.js';
 import { earliestAlternative, nextRecommendationCursor, selectRecommendation } from './recommendation.js';
 import {
   createAnalytics, install as installAnalytics, isEnabled, variant, EXPERIMENTS
@@ -43,7 +43,7 @@ const RECOMMENDATION_LIMIT = 10;
 const RECOMMENDATION_PAGES = 2;
 const RECOMMENDATION_DEADLINE_MS = 12_000;
 const RECOMMENDATION_THROTTLE_MS = 60_000;
-const ARRIVAL_RESUME_WAIT_MS = 15_000;
+const LOOKUP_TIMEOUT_MS = 15_000;
 const PAST_STEP_MS = 60 * 60_000;
 const PAST_BOUND_MS = 24 * 60 * 60_000;
 const FIX_MAX_AGE_MS = 5 * 60_000;
@@ -132,6 +132,8 @@ state.recommendationPages = [];
 state.arrivalDecision = null;
 state.arrivalWindow = null;
 state.arrivalResumeWaitUntil = null;
+state.evidenceWaitFor = null;
+state.foregroundVisit = 0;
 state.arrivalPermissionPending = false;
 state.focusRefreshPending = null;
 state.recovery = null;
@@ -916,6 +918,12 @@ function syncArrivalMonitoring() {
     return;
   }
   const generation = ++arrivalGeneration;
+  // Once per focus and foreground visit, so a provider error restarting the watch cannot extend it.
+  const visit = `${identityOfFocus(focusOf(state.doc))}#${state.foregroundVisit}`;
+  if (state.evidenceWaitFor !== visit) {
+    state.evidenceWaitFor = visit;
+    beginEvidenceWait();
+  }
   settleArrival({ monitoring: true });
   if (generation !== arrivalGeneration || !arrivalMonitorEligible() || !focusOf(state.doc)) return;
   try {
@@ -932,11 +940,15 @@ function syncArrivalMonitoring() {
       stopArrivalMonitoring();
       settleArrival();
       renderCurrent();
-    }, { enableHighAccuracy: true, timeout: ARRIVAL_RESUME_WAIT_MS, maximumAge: 0 });
+    }, { enableHighAccuracy: true, timeout: LOOKUP_TIMEOUT_MS, maximumAge: 0 });
   } catch (_) {
     arrivalWatch = null;
     settleArrival();
   }
+}
+
+function beginEvidenceWait() {
+  state.arrivalResumeWaitUntil = now() + ARRIVAL.evidenceWait;
 }
 
 async function ensureArrivalMonitoring() {
@@ -1565,14 +1577,12 @@ async function refreshFollowed() {
   state.focusRefreshPending = identity;
   const departure = departureMs(focus.journey);
   if (now() >= (arrivalMs(composedJourney(focus)) ?? Infinity)
-      && !Number.isFinite(state.arrivalResumeWaitUntil)) {
-    state.arrivalResumeWaitUntil = now() + ARRIVAL_RESUME_WAIT_MS;
-  }
+      && !Number.isFinite(state.arrivalResumeWaitUntil)) beginEvidenceWait();
   let timedOut = false;
   const timeout = setTimeout(() => {
     timedOut = true;
     controller.abort();
-  }, ARRIVAL_RESUME_WAIT_MS);
+  }, LOOKUP_TIMEOUT_MS);
   try {
     const { body, serverStale } = await getDepartures(ends.from.id, ends.to.id, {
       limit: LIMIT, modes: SUPPORTED_MODES, signal: controller.signal,
@@ -1867,6 +1877,7 @@ document.addEventListener('visibilitychange', () => {
     return;
   }
   loadFlags();
+  state.foregroundVisit += 1;
   if (!onLiveView() && state.view !== 'settings') return;
   if (state.selection) awaitFirstAnswers();
   suppressPreferenceEvents = false;
@@ -1876,9 +1887,7 @@ document.addEventListener('visibilitychange', () => {
   }
   const focus = focusOf(state.doc);
   if (focus?.arrivalGuard?.armed && !focus.arrivalGuard.basis
-      && now() >= (arrivalMs(composedJourney(focus)) ?? Infinity)) {
-    state.arrivalResumeWaitUntil = now() + ARRIVAL_RESUME_WAIT_MS;
-  }
+      && now() >= (arrivalMs(composedJourney(focus)) ?? Infinity)) beginEvidenceWait();
   startTimers(state.view === 'board');
   fetchLive();
   void ensureArrivalMonitoring();

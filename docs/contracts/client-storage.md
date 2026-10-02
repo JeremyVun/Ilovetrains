@@ -618,8 +618,10 @@ settlement when permission is known granted. While permission is unresolved,
 do not let an initial paint/clock tick settle it; query silently first.
 Permission failure/denial permits the never-armed fallback, without prompting.
 
-Once armed, loss of GPS, permission, app visibility or the location preference
-never turns time alone into arrival before expiry. Turning location off immediately stops
+Once armed, the trip ends by estimate three minutes after its arrival estimate
+unless fresh evidence shows the phone still moving at vehicle speed away from
+the destination (owner ruling, 2026-10-01). Loss of GPS, permission, app
+visibility or the location preference cannot hold it open. Turning location off immediately stops
 collection and clears all raw evidence; the guard's boolean remains. An
 already recorded legacy ride is not revoked merely by migration.
 
@@ -673,16 +675,27 @@ turn. Failed/unmatched refresh retains its snapshot and honest freshness.
 | Already confirmed at destination | Remain arrived; a later ETA cannot undo physical arrival. |
 | Destination confirmation window passes | Arrived with location basis, including before ETA. |
 | Guard armed, `now < A`, no destination confirmation | Travelling. |
-| Guard armed, `now >= A`, fresh credible away evidence | Arrival unconfirmed immediately, whether moving or stopped. |
-| Guard armed, no decisive evidence, `A <= now < A + 3 min` | Checking arrival. |
-| Guard armed, no decisive evidence, `now >= A + 3 min` | Arrival unconfirmed; no completion until expiry. |
-| Guard never armed, accepted snapshot's ETA passed | Arrived with estimate basis, preserving the existing refresh-before-settlement rule. |
+| Guard armed and already settled with basis `estimate`, `now >= A` | Arrived with estimate basis; `record`, or `correct` when the ride exists. Movement cannot revive it; only an ETA back in the future withdraws it. |
+| Guard armed, `now >= A`, fresh credible away evidence and sustained vehicle-like movement | Arrival unconfirmed, moving. Retention renews as below. |
+| Guard armed, `A <= now < A + 3 min`, permission pending, or inside the evidence wait | Checking arrival. |
+| Guard armed, otherwise | Arrived with estimate basis; the guard's basis becomes `estimate`; `record`, or `correct` when the ride exists. |
+| Guard never armed, accepted snapshot's ETA passed | Arrived with estimate basis, preserving the existing refresh-before-settlement rule; checking arrival while permission is pending. |
 | ETA moves back into future without location confirmation | Return to travelling; withdraw an estimate-only ride as existing correction does. |
 
-The buffer gives location resolution a chance to settle; it is not a grace
-period after which contradictory evidence is ignored. A stopped train away
-from destination stays unconfirmed even without a high speed reading. Losing
-fresh evidence changes the copy classification, never fabricates arrival.
+Arrival unconfirmed therefore always means the phone is plainly still riding.
+A train stopped between stations with stale realtime ends three minutes after
+its last estimate; that is the accepted trade-off of the owner's ruling, and
+the estimate copy says the estimate passed, not that the rider arrived.
+
+**Evidence wait.** The reducer's `resumeWaitUntil` input is the evidence wait:
+45 seconds from the moment foreground arrival monitoring starts for the focus
+in a foreground visit, and from an open or a return to the foreground with a
+guarded, unsettled focus already past its estimate. Sustained movement needs
+three speed samples spanning 30 seconds and the first provider fix can take
+15 seconds, so without the wait a rider who opens the app on a late, still
+moving train would be settled before the evidence could show movement. A
+provider error that restarts sampling within the same visit does not restart
+the wait. The wait also holds an overdue expiry.
 
 ### Persisted metadata, expiry and correction
 
@@ -706,15 +719,16 @@ movement, fresh away evidence) or on a matching refresh whose ETA is still in
 the future, and only while the current deadline has not passed. This is
 retention evidence, not arrival evidence; standing still away from the
 destination, a position near it, an old/stale estimate or a render does not
-renew it. An unconfirmed focus expires after both `A + 30 min` and
-`retainedAt + 2 h` have passed. Use the later deadline. A continuing delayed
+renew it. An armed focus with no basis expires after both `A + 30 min` and
+`retainedAt + 2 h` have passed. Use the later deadline. A settled focus, by
+estimate or location, expires at `A + 30 min`. A continuing delayed
 train with moving foreground evidence keeps its focus; reopening an old trip
 does not renew it, and no evidence revives a focus whose deadline has passed:
 an away position at the office or the next evening kept a morning trip
 showing for good (owner field report, 2026-09-23). Evaluate fresh evidence
-before expiry when available on resume, allowing the normal provider lookup
-up to 15 seconds before applying an overdue expiry; only destination
-confirmation can pre-empt it. Expiry is silent removal, not “Arrived,” and no
+before expiry when available on resume, allowing the evidence wait to pass
+before applying an overdue expiry; only destination confirmation can pre-empt
+it. Expiry is silent removal, not “Arrived,” and no
 return offer. It records the followed journey as ridden with estimate basis
 (`recordAndExpire`) unless the journey is cancelled or a ride for it already
 exists (plain `expire`): a phone left in a pocket after a pin rode the train
@@ -729,7 +743,8 @@ arrival fields retain the service's effective arrival estimate, not the phone
 sample timestamp; `confirmedAt` separately supplies the location completion
 latch. A matching refresh can update the ride's effective times after physical
 arrival without removing it. Estimate-only rides remain revisable/withdrawable.
-Guarded unconfirmed trips enter completed-ride history only when they expire. An
+Guarded trips enter completed-ride history when they settle by estimate, or
+when they expire unsettled. An
 existing same-identity recorded ride restores the old completion behavior when
 there is no new metadata; migration does not rewrite past rides. A plain
 restore preserves a legacy ride even before ETA; a successful matching refresh
@@ -1022,8 +1037,8 @@ ride writes atomically through the existing personal-document owner.
 Location-confirmed rides stay completed when an ETA moves forward; matching
 refreshes can correct their effective times. Estimate-only rides remain
 correctable and withdraw when their accepted ETA moves back into the future.
-Guarded unconfirmed journeys become estimate rides only at expiry; cancelled
-ones never do. An old
+Guarded journeys become estimate rides when they settle by estimate or expire
+unsettled; cancelled ones never do. An old
 same-identity ride with no arrival metadata restores legacy completion rather
 than being revoked by migration.
 

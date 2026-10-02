@@ -3,6 +3,8 @@
    location term already treats as near (client-storage.md). */
 export const AT_STATION_KM = 0.2;
 export const NEAR_STATION_KM = 2;
+/* About 30 km/h: faster than anyone walks or runs on a platform. */
+export const TRAIN_SPEED_MPS = 8;
 
 export function distanceKm(a, b) {
   if (!a || !b || !Number.isFinite(a.lat) || !Number.isFinite(a.lon)
