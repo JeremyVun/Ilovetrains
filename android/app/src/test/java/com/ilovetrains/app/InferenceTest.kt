@@ -2,6 +2,7 @@ package com.ilovetrains.app
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -42,6 +43,52 @@ class InferenceTest {
         assertEquals(seen, data.withLastAnswer(seen, sightingAt = now + minute).lastAnswer)
         assertEquals(stored, data.withLastAnswer(seen.copy(stationId = null), sightingAt = null).lastAnswer)
         assertEquals(seen, data.copy(lastAnswer = null).withLastAnswer(seen, null).lastAnswer)
+    }
+
+    @Test fun aRecordWrittenAfterItsTrainLeftCanStillEnter() {
+        val left = journey(now - 5 * minute, 27)
+        val written = LastAnswer(trip.id, false, now - 2 * minute, rhodes.id, BoardData(rhodes, townHall, listOf(left), now), left)
+        val onTheWay = Fix(-33.85, 151.13, now, accuracyMetres = 10.0)
+        assertEquals(left.key, inferredFocus(UserData(trips = listOf(trip), lastAnswer = written), onTheWay, now)?.journey?.key)
+        assertEquals("the open's snapshot enters the same way", left.key,
+            inferFromRecords(UserData(trips = listOf(trip)), written, now, onTheWay)?.journey?.key)
+    }
+
+    private fun riding(pinned: Boolean): FocusedJourney {
+        val followed = journey(now - 10 * minute, 27)
+        return FocusedJourney(trip.id, false, followed, BoardData(rhodes, townHall, listOf(followed), now - minute), pinned = pinned,
+            arrivalGuard = ArrivalGuard(armed = true, retainedAt = now - 8 * minute))
+    }
+
+    @Test fun stoppingAGuessedTripDeclinesItAndRecordsNoRide() {
+        val guessed = riding(pinned = false)
+        val earlier = Ride("other", false, now - 120 * minute, now - 90 * minute)
+        val stopped = UserData(trips = listOf(trip), rides = listOf(earlier), focus = guessed).withTripStopped(now)
+        assertNull(stopped.focus)
+        assertEquals(listOf(earlier), stopped.rides)
+        assertEquals(InferenceDecline(trip.id, false, now, guessed.journey.departureKey, guessed.composed.effectiveArrival),
+            stopped.inferenceDeclined)
+    }
+
+    @Test fun stoppingAStartedTripRecordsNoRideAndNoDecline() {
+        val earlier = Ride("other", false, now - 120 * minute, now - 90 * minute)
+        val stopped = UserData(trips = listOf(trip), rides = listOf(earlier), focus = riding(pinned = true)).withTripStopped(now)
+        assertNull(stopped.focus)
+        assertEquals(listOf(earlier), stopped.rides)
+        assertNull(stopped.inferenceDeclined)
+    }
+
+    @Test fun startingTheGuessedJourneyKeepsItsGuardAndAnyOtherStartReplacesIt() {
+        val guessed = riding(pinned = false)
+        val data = UserData(trips = listOf(trip), focus = guessed)
+        val tapped = FocusedJourney(trip.id, false, guessed.journey, BoardData(rhodes, townHall, listOf(guessed.journey), now))
+        assertEquals(guessed.copy(pinned = true), data.withTripStarted(tapped).focus)
+
+        val next = journey(now + 5 * minute, 27)
+        val later = FocusedJourney(trip.id, false, next, BoardData(rhodes, townHall, listOf(next), now))
+        assertEquals(later, data.withTripStarted(later).focus)
+        val back = tapped.copy(reverse = true)
+        assertEquals(back, data.withTripStarted(back).focus)
     }
 
     @Test fun aTickTakesAFixAroundAShownDepartureAHeldDepartedRecordOrAMovingPhone() {

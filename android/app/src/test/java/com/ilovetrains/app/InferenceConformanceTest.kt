@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 
-/** Every hold and entry case of the shared inference.json, in the order each section's `run` states. */
+/** Every case of the shared inference.json, in the order each section's `run` states. */
 class InferenceConformanceTest {
     private val fixture = JSONObject(requireNotNull(javaClass.getResourceAsStream("/inference.json")).bufferedReader().use { it.readText() })
 
@@ -33,6 +33,27 @@ class InferenceConformanceTest {
         for (index in 0 until cases.length()) {
             val case = cases.getJSONObject(index)
             assertEquals(case.getString("name"), expected(case.opt("expected")), entered(case))
+        }
+    }
+
+    @Test fun startCasesOfferStartTripWhereTheWebOffersIt() {
+        val cases = fixture.getJSONObject("startCases").getJSONArray("cases")
+        assertTrue(cases.length() > 0)
+        for (index in 0 until cases.length()) {
+            val case = cases.getJSONObject(index)
+            assertEquals(case.getString("name"), case.getBoolean("expectedStartable"),
+                startable(Wire.journey(case.getJSONObject("journey")), case.getLong("nowMs")))
+        }
+    }
+
+    @Test fun runningCasesStartFromTheBoardWhereTheWebStarts() {
+        val cases = fixture.getJSONObject("runningCases").getJSONArray("cases")
+        assertTrue(cases.length() > 0)
+        for (index in 0 until cases.length()) {
+            val case = cases.getJSONObject(index)
+            val modes = case.optJSONArray("enabledModes")?.let { modes -> (0 until modes.length()).map(modes::getString).toSet() } ?: AllModes
+            assertEquals(case.getString("name"), case.getBoolean("expectedRunning"),
+                runningJourney(Wire.journey(case.getJSONObject("journey")), case.getLong("nowMs"), modes, null))
         }
     }
 

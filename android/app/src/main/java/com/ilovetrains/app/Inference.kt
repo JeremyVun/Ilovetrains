@@ -111,6 +111,28 @@ fun inferenceDeclined(data: UserData, tripId: String, now: Long, journey: Journe
 fun UserData.declining(focus: FocusedJourney, now: Long): UserData = copy(inferenceDeclined = InferenceDecline(
     focus.tripId, focus.reverse, now, focus.journey.departureKey, focus.composed.effectiveArrival))
 
+/** Home offers Start trip for its train in the window auto-start reads as "seen at the platform". */
+fun startable(journey: Journey, now: Long): Boolean =
+    !journey.cancelled && journey.effectiveDeparture - now in 0..TravelSeenMillis
+
+/** A board row on its way starts trip mode at once; upcoming and arrived rows open detail. */
+fun runningJourney(journey: Journey, now: Long, modes: Set<String>, maxTransfers: Int?): Boolean =
+    journey.effectiveDeparture <= now && now < journey.effectiveArrival && !journey.cancelled &&
+        journeyAllowed(journey, modes) && journey.withinTransferCap(maxTransfers)
+
+internal fun FocusedJourney.sameService(other: FocusedJourney): Boolean =
+    tripId == other.tripId && reverse == other.reverse && journey.key == other.journey.key
+
+/** Starting the guessed journey itself keeps its arrival evidence; any other start replaces the focus. */
+fun UserData.withTripStarted(started: FocusedJourney): UserData =
+    copy(focus = focus?.takeIf { it.sameService(started) }?.copy(pinned = true) ?: started)
+
+/** Stop trip records no ride; stopping a guessed trip declines it so the guess cannot come straight back. */
+fun UserData.withTripStopped(now: Long): UserData {
+    val stopped = focus ?: return this
+    return copy(focus = null).let { if (stopped.pinned) it else it.declining(stopped, now) }
+}
+
 fun rideRecorded(data: UserData, tripId: String, reverse: Boolean, journey: Journey): Boolean =
     data.rides.any { it.tripId == tripId && it.reverse == reverse && it.departure == journey.departure }
 
