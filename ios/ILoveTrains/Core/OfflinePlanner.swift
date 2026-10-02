@@ -381,7 +381,8 @@ actor OfflinePlanner {
         let manifestData = try Data(contentsOf: manifestURL)
         let info = try parseManifest(manifestData)
         guard try Self.sha256(archiveURL) == info.sha256 else { throw OfflineCoreError.invalidPackage }
-        let extracted = directory.appendingPathComponent("candidate-\(info.sha256).sqlite3")
+        // The unit-test host installs as it launches while a test's planner may install too; neither writes the other's file.
+        let extracted = directory.appendingPathComponent("candidate-\(info.sha256)-\(UUID().uuidString).sqlite3")
         defer { try? FileManager.default.removeItem(at: extracted) }
         try OfflineZip.extractDatabase(from: archiveURL, to: extracted)
         guard validateDatabase(extracted, info: info) else { throw OfflineCoreError.invalidDatabase }
