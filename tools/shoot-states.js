@@ -885,7 +885,8 @@ async function states() {
       return {
         name: 'mascot-active-unpin-location', seed, now, body, route: '#/',
         geo: { lat: -33.87181, lon: 151.094427, speed: 12 }, permission: 'granted',
-        events: ['shown_focus', 'shown_predicted', 'shown_pair'],
+        // At train speed Strathfield is a passing station, never here, so no pair is saved.
+        events: ['shown_focus', 'shown_predicted'],
         after: `
   {
     const action = document.querySelector('.hm-top [data-act="unpin"]');
@@ -904,6 +905,9 @@ async function states() {
     await sleep(700);
     if (t.state.doc.focus || document.querySelector('[data-pinned]')) {
       console.error('released active journey re-entered from a granted moving fix');
+    }
+    if (t.state.doc.trips.length !== stored.trips.length) {
+      console.error('a moving fix saved its passing station as a new pair');
     }
   }`,
         expect: { pinned: false }

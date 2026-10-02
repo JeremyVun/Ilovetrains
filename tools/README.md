@@ -756,7 +756,8 @@ first detail paint and becomes stale only after its refresh fails.
 `mascot-home-unpin` proves that releasing a future service restores the earliest
 answer without shifting the header; `mascot-active-unpin-location` uses the real
 clock and a granted moving fix to prove stale `lastOpen` evidence cannot infer
-the released ride again. `detail-unpin-flow` exercises the matching detail
+the released ride again, and that a fix at train speed saves no
+passing-station pair. `detail-unpin-flow` exercises the matching detail
 action, while `detail-inferred` proves an inferred journey offers neither a pin
 nor an unpin action.
 Every `detail-*` state reaches the view by CLICKING a board row, so each one is
