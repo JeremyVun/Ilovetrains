@@ -273,15 +273,12 @@ final class TravelTrackerFlowTests: XCTestCase {
         assertStatus(app, contains: ["activities=1", "focus=dismiss-original"])
         app.terminate()
         showNotificationCenter()
-        let card = assertNotificationCard()
+        assertNotificationCard()
         let stop = XCUIApplication(bundleIdentifier: springboardBundle).buttons["Stop trip"]
-        if stop.waitForExistence(timeout: 2) {
-            stop.tap()
-        } else {
-            // iOS 26.4 can expose only the host cell; the capsule sits at the card's top trailing content corner.
-            card.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: card.frame.width - 64, dy: 26)).tap()
-        }
-        waitForNotificationCardAbsence()
+        XCTAssertTrue(stop.waitForExistence(timeout: 5), "the card does not offer Stop trip as its own button")
+        stop.tap()
+        // Enumerating cells while the ended card leaves races its removal, so wait on the button instead.
+        XCTAssertTrue(stop.waitForNonExistence(timeout: 8), "the Live Activity remains after Stop trip")
 
         app = launch(["--tracker-debug", "inspect"], domain: domain)
         assertStatus(app, contains: ["focus=none", "activities=0"])
