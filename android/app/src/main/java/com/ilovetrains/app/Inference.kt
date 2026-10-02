@@ -134,13 +134,11 @@ internal fun FocusedJourney.sameService(other: FocusedJourney): Boolean =
 fun UserData.withTripStarted(started: FocusedJourney): UserData =
     copy(focus = focus?.takeIf { it.sameService(started) }?.copy(pinned = true) ?: started)
 
-/** The saved trip and direction that run from [from] to [to]. */
 fun savedLeg(data: UserData, from: Station, to: Station): TripDirection? = data.trips.firstNotNullOfOrNull { trip ->
     listOf(false, true).firstOrNull { reverse -> trip.ends(reverse).let { it.first.id == from.id && it.second.id == to.id } }
         ?.let { TripDirection(trip.id, it) }
 }
 
-/** Stop trip records no ride and declines the saved trip it belongs to; a started trip belongs to the trip on its pair. */
 fun UserData.withTripStopped(now: Long): UserData {
     val stopped = focus ?: return this
     // Ruling 23: otherwise the next train-speed fix guesses a rider still riding back in.
@@ -149,7 +147,7 @@ fun UserData.withTripStopped(now: Long): UserData {
     return owner?.let { cleared.declining(stopped.copy(tripId = it.tripId, reverse = it.reverse), now) } ?: cleared
 }
 
-/** Expiry clears the record only when it names the expired trip, direction and journey: evidence for another train survives. */
+// Evidence for another train survives the expiry.
 fun UserData.withFocusExpired(expired: FocusedJourney): UserData = copy(focus = null, lastAnswer = lastAnswer?.takeUnless {
     it.tripId == expired.tripId && it.reverse == expired.reverse && it.journey.key == expired.journey.key
 })
