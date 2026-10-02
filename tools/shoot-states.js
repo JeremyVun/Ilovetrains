@@ -1263,6 +1263,27 @@ async function states() {
     smart('home-inferred', {
       ...inferred(), events: ['shown_predicted', 'entered_inferred', 'shown_inferred']
     }),
+    // The guessed line's STOP TRIP ends the guess and declines it, so the same
+    // train is not guessed straight back.
+    smart('home-guessed-stop', {
+      ...inferred(),
+      // Home then answers from where the phone is: at Strathfield, a saved pair home.
+      events: ['shown_predicted', 'entered_inferred', 'shown_inferred', 'declined_inferred', 'shown_pair'],
+      expect: { strip: false },
+      after: `
+  {
+    const stop = document.querySelector('[data-tripline="guessed"] [data-act="stop-trip"]');
+    if (!stop) throw new Error('the guessed line has no Stop trip');
+    stop.click();
+    await sleep(200);
+    const stored = JSON.parse(localStorage.getItem('trains.v1'));
+    if (stored.focus) console.error('guessed Stop trip left the focus');
+    if (!stored.inferenceDeclined || stored.inferenceDeclined.tripId !== stored.trips[0].id) {
+      console.error('guessed Stop trip wrote no decline');
+    }
+    if (document.querySelector('[data-tripline="guessed"]')) console.error('the guessed line survived Stop trip');
+  }`
+    }),
     smart('home-inferred-long', {
       ...inferredLong(), events: ['shown_predicted', 'entered_inferred', 'shown_inferred']
     }),
