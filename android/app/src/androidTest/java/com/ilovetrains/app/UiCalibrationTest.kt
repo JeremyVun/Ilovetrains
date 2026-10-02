@@ -48,6 +48,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -236,6 +237,7 @@ class UiCalibrationTest {
             val suffix = if (appearance == Appearance.Light) "-light" else ""
             frame("home-guessed$suffix") {
                 compose.runOnIdle { state.value = fixture.activeInferredState.copy(appearance = appearance) }
+                assertGuessedQuestionPrintsWhole()
                 capture("home-guessed$suffix")
             }
             frame("home-started$suffix") {
@@ -264,6 +266,7 @@ class UiCalibrationTest {
         }
         frame("home-guessed-stress") {
             compose.runOnIdle { state.value = fixture.guessedStressState }
+            assertGuessedQuestionPrintsWhole()
             capture("home-guessed-stress")
         }
         frame("home-checking-arrival") {
@@ -789,6 +792,20 @@ class UiCalibrationTest {
             captured.compress(Bitmap.CompressFormat.PNG, 100, it)
         }
         captured.recycle()
+    }
+
+    private fun assertGuessedQuestionPrintsWhole() {
+        val question = compose.onNodeWithText("Going somewhere else?", useUnmergedTree = true).fetchSemanticsNode()
+        val stop = compose.onNodeWithText("STOP TRIP", useUnmergedTree = true).fetchSemanticsNode()
+        val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        assertTrue(checkNotNull(question.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action)(results))
+        val layout = results.single()
+        val natural = layout.multiParagraph.intrinsics.maxIntrinsicWidth
+        val gap = stop.boundsInRoot.left - question.boundsInRoot.left - natural
+        val dp = compose.density.density
+        val detail = "box=${question.size.width / dp}dp natural=${natural / dp}dp gapToStop=${gap / dp}dp"
+        println("Guessed question $detail")
+        if (compose.density.fontScale == 1f) assertFalse("guessed question ellipsized: $detail", layout.isLineEllipsized(0))
     }
 
     private fun assertDetailGeometryAndPixels() {

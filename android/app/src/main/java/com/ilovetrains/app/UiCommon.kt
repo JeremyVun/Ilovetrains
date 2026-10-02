@@ -11,9 +11,11 @@ import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
@@ -37,7 +39,10 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-val PagePadding = 22.dp
+// The web narrows its page margin at max-width 375px, and the 360 exemplars assume it.
+val PagePadding: Dp
+    @Composable @ReadOnlyComposable
+    get() = if (with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() } <= 375.dp) 18.dp else 22.dp
 
 @Composable
 fun Label(text: String, modifier: Modifier = Modifier, color: Color = LocalTrainColors.current.ink3,

@@ -849,6 +849,10 @@ scrollbar — not the board, the trip list or journey detail — because on a
 pointer device it was the one piece of chrome on a screen that is otherwise all
 hairlines (owner ruling, 2026-09-05).
 
+A phone's page margin is 22px. On phones 375px wide and narrower it is 18px on
+every screen and every client (owner ruling 25, 2026-10-03), which is what lets
+the guessed trip-control line print whole at 360px.
+
 Dark is the primary scheme; light is a warm-paper printing of the same contrast
 hierarchy, not a colour inversion.
 

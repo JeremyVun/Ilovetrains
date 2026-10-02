@@ -15,7 +15,7 @@ This file records deliberate differences between the native Android app and the 
 
 ## Trip-control line
 
-- The line matches the round 3b Roboto exemplars at 412 dp to within a dp.
+- The line matches the round 3b Roboto exemplars at 360 and 412 dp to within a dp.
   The question is 15 sp Light without the 0.5 sp tracking the app's body
   style otherwise inherits. The actions carry the CSS .14em tracking, which
   also follows the last letter. The glyphs are Material `Icons.Filled.Stop`
@@ -23,11 +23,15 @@ This file records deliberate differences between the native Android app and the 
   slot because Material fills about half its box. The stop square is the
   exemplar's 8 dp mark; the play triangle keeps Material's shape, 1 dp
   narrower than the exemplar's. Both sit on the cap height.
-- Android keeps its 22 dp page margin at every width, where the web narrows
-  it to 18 px at 375 px and below, and the 360 exemplar assumes the narrow
-  margin. Below about 368 dp the guessed line's question cannot print whole
-  beside `STOP TRIP` and `CHANGE`, so it ellipsizes (`Going somewhere el…` at
-  360 dp). This is open for an owner ruling.
+- At 375 dp and narrower every screen takes the web's 18 dp page margin
+  (owner ruling 25, 2026-10-03). At 360 dp the guessed question then prints
+  whole, 155.4 dp of text in a 157.3 dp box, 14.9 dp before `STOP TRIP`;
+  `UiCalibrationTest` fails if it ellipsizes at font scale 1. Android does not
+  take the rest of the web's narrow-phone rule: the Home header keeps its
+  104 dp figure column, 64 sp figure and 16 sp station names, which the web
+  narrows to 92, 56 and 15 px. So at 360 dp a struck arrival clock pushes its
+  replacement onto two lines (`10:1` over `8`). This is open for an owner
+  ruling.
 - The trip-over offer keeps the native `Need to get back?  SHOW THE WAY BACK`
   composition, which iOS shares, in place of the web's `Trip over` block. It
   never claims `You’ve arrived`, so ruling 21 changes no Android copy. A
@@ -148,6 +152,9 @@ trip-control line frames `android-home-390x844-{inferred,guessed-stress,started,
 variants) and `android-detail-390x844-focused.png`, the `Stop trip` rail. `tools/shoot-android.sh` reproduces
 them, with the offline Board scrolled upward to reveal the retained service.
 The same states are checked at 412×732 and font scale 1.3.
+`android-home-360x780-inferred.png`, its `-light` variant and
+`android-home-360x780-startable.png` are the narrow margin's line, from
+`tools/shoot-android.sh 360x780`.
 
 Native setup location exemplars are `assets/comps/latest/android-setup-location-`
 `{idle,denied,failed,approximate}[-light].png`, captured on a 390×844 dp
