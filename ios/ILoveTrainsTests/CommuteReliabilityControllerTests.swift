@@ -173,8 +173,9 @@ final class CommuteReliabilityControllerTests: XCTestCase {
         let seen = LastAnswer(tripId: commute.id, reverse: false, at: next.effectiveDeparture - 120_000, stationId: origin.id,
                               board: BoardData(from: origin, to: destination, journeys: [next], generatedAt: 0, offline: true),
                               journey: next)
-        let (store, model) = try await model(UserData(trips: [commute], focus: focus, lastAnswer: seen), clock: clock,
-                                             location: ScriptedLocation(), network: false)
+        // Without location nothing arms the arrival guard, so the long-overdue trip expires on open.
+        let (store, model) = try await model(UserData(trips: [commute], focus: focus, lastAnswer: seen, useLocation: false),
+                                             clock: clock, location: ScriptedLocation(), network: false)
         model.resume()
         model.tick()
 
@@ -184,14 +185,14 @@ final class CommuteReliabilityControllerTests: XCTestCase {
     }
 
     func testOfflineOnBoardEntryMatchesTheRunningTimetableService() async throws {
-        // The owner's commute; every bundled service changes on the way. Late in the ride, thirty planned
-        // services from even a long cached lookback still reach the train under way.
+        // The owner's commute; every bundled service changes on the way. Half way through a long itinerary,
+        // thirty planned services from the cached board's median ride still reach the train under way.
         let planner = OfflinePlanner()
         try await planner.initialize()
         let planned = try await planner.plan(from: rhodes, to: townHall, at: mondayMorning, modes: allModes,
                                              limit: timetablePageLimit, maxTransfers: 2)
         let riding = try XCTUnwrap(planned.journeys.first { !$0.cancelled })
-        let progress = 0.8
+        let progress = 0.5
         let ridingNow = riding.effectiveDeparture + (riding.effectiveArrival - riding.effectiveDeparture) * progress
         let clock = TestClock(ridingNow - 30_000)
         let trip = SavedTrip(id: "rt", from: rhodes, to: townHall)
@@ -386,7 +387,8 @@ final class CommuteReliabilityControllerTests: XCTestCase {
         try await until { await store.load().focus?.journey.key == running.key }
         try await until { await tracker.snapshot().active != nil }
         XCTAssertFalse(OfflineTransport.requests().isEmpty, "every request failed on the way")
-        let session = try XCTUnwrap(await tracker.snapshot().active?.sessionId)
+        let active = await tracker.snapshot().active
+        let session = try XCTUnwrap(active?.sessionId)
         StopTripIntent.handler = { [weak model] in await model?.stopTrip(session: $0) }
         defer { StopTripIntent.handler = nil }
 
