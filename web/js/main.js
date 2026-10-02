@@ -195,6 +195,7 @@ let focusInflight = null;
 let recoveryInflight = null;
 let recommendationInflight = null;
 let onBoardInflight = null;
+let onBoardFix = null;
 let requestGeneration = 0;
 let answeredKey = null;
 let preserveSelection = false;
@@ -751,12 +752,13 @@ function fixIsValid(fix) {
 }
 
 function fixOf(position) {
-  const speed = position.coords.speed;
+  const { speed, heading } = position.coords;
   return {
     lat: position.coords.latitude,
     lon: position.coords.longitude,
     accuracy: position.coords.accuracy,
     speed: Number.isFinite(speed) ? speed : undefined,
+    heading: Number.isFinite(heading) ? heading : undefined,
     at: Number.isFinite(position.timestamp) ? position.timestamp : NaN
   };
 }
@@ -865,10 +867,11 @@ async function enterOnBoard(fix) {
   const doc = tripsForModes(state.doc, state.stations);
   const cached = cachedJourneys(doc);
   const requests = onBoardRequests(doc, at, fix, previous, cached);
-  if (!requests.length) return;
+  if (!requests.length || (onBoardInflight && onBoardFix === fix)) return;
   onBoardInflight?.abort();
   const controller = new AbortController();
   onBoardInflight = controller;
+  onBoardFix = fix;
   const generation = geoGeneration;
   const boards = {};
   const bodies = {};
