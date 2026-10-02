@@ -105,7 +105,7 @@ private func stopDecline(data: UserData, focus: FocusedJourney, at now: Millis) 
     return inferenceDecline(of: owned, at: now)
 }
 
-/// Stop trip's change to the document; only a guessed stop is reported. The controller also retires the open snapshot.
+/// Stop trip's change to the document, and whether it is reported: only a guessed stop is. The open snapshot clears too.
 func stoppedTrip(_ data: UserData, at now: Millis) -> (data: UserData, declinedInferred: Bool)? {
     guard let focus = data.focus else { return nil }
     var stopped = data

@@ -773,8 +773,7 @@ final class TrainViewModel: ObservableObject {
             defer {
                 if sharedRequest == sharedGeneration {
                     realtimeTask = nil
-                    // With no connection every fetch fails, and the tick still owes its board refresh; only a followed
-                    // journey's request still in flight would be cancelled by it.
+                    // Offline every fetch fails and the tick still owes its refresh, unless that would cancel a followed journey's request.
                     if refreshBoard, active, !state.refreshing, fetched || !focusRefreshPending { refresh() }
                 }
             }
@@ -1122,7 +1121,6 @@ final class TrainViewModel: ObservableObject {
         data.lastAnswer = nil
         openSnapshot = nil
     }
-
 
     /// A long absence is a new open: Home answers afresh instead of showing whatever was left behind.
     private func reopen() {
