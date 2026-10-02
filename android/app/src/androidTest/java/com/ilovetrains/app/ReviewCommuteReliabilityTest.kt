@@ -11,7 +11,8 @@ import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -49,9 +50,10 @@ class ReviewCommuteReliabilityTest {
     }
 
     /**
-     * Lead suspect 1 (build_plan.md Execution). Ruling 2: seen at the platform again after the shown train left means
-     * the rider did not board it. The hold rule replaces the stored record; the snapshot the visit began with must not
-     * enter that departed train when the rider boards the next one.
+     * Findings 1 and 2. Ruling 2: seen at the platform again after the shown train left means the rider did not board
+     * it. That sighting retires the snapshot the visit began with, and offline it re-records the departed train after
+     * its departure, which the 0 <= D - at bound keeps from entering. Neither record enters the departed train when
+     * the rider boards the next one; on-board entry finds that one.
      */
     @Test fun aPlatformSightingAfterDepartureRetiresTheDepartedTrainFromTheSnapshotToo() {
         val model = open(UserData(trips = listOf(trip), modes = setOf("train"), useLocation = true), morningDeparture() - 2 * minute)
@@ -72,21 +74,25 @@ class ReviewCommuteReliabilityTest {
         waitFor("the refresh after the sighting", 60_000) { !model.state.value.refreshing }
         settle()
         val afterSighting = requireNotNull(stored().lastAnswer) { "the sighting after departure left no record" }
-        // Ruling 2: that sighting means the rider did not board, so the record must stop naming the departed train.
-        val retired = afterSighting.journey.key != seen.journey.key
-        val boarding = (afterSighting.journey.takeIf { retired } ?: nextService(model, departure)).also {
-            assertTrue("the next train leaves after the departed one", it.effectiveDeparture > departure)
-        }
+        assertEquals("offline Home re-records the departed train it keeps as its answer", seen.journey.key, afterSighting.journey.key)
+        assertEquals(stillThere, afterSighting.at)
+        val boarding = nextService(model, departure)
 
-        // The rider boards the next train; a tick fix at train speed a minute after it leaves.
-        val riding = boarding.effectiveDeparture + minute
+        // The rider boards the next train; a fix at train speed where that train is four minutes after it leaves.
+        val riding = boarding.effectiveDeparture + 4 * minute
         onMain { model.debugSetTrackerClock(riding); model.refreshTick() }
-        val (lat, lon) = along(0.15)
-        onMain { model.location(Fix(lat, lon, riding, speed = 15.0, accuracyMetres = 10.0, bearing = bearing(lat, lon, central))) }
-        val focus = requireNotNull(model.state.value.focus) { "the moving fix did not enter trip mode" }
-        assertNotEquals("entered the train the rider was seen not to board (record after the sighting: " +
-            "${afterSighting.journey.key} at ${afterSighting.at - departure} ms past its departure)", seen.journey.key, focus.journey.key)
-        assertTrue("the record after the platform sighting still named the departed train", retired)
+        val (lat, lon) = along((riding - boarding.effectiveDeparture).toDouble() / (boarding.effectiveArrival - boarding.effectiveDeparture))
+        var platformEntry: FocusedJourney? = null
+        onMain {
+            model.location(Fix(lat, lon, riding, speed = 15.0, accuracyMetres = 10.0, bearing = bearing(lat, lon, central)))
+            platformEntry = model.state.value.focus
+        }
+        assertNull("a record entered the train the rider was seen not to board (record after the sighting: " +
+            "${afterSighting.journey.key} at ${afterSighting.at - departure} ms past its departure)", platformEntry)
+        waitFor("on-board entry", 60_000) { model.state.value.focus != null }
+        val focus = requireNotNull(model.state.value.focus)
+        assertFalse(focus.pinned)
+        assertEquals("on-board entry found the train the rider boarded", boarding.departureKey, focus.journey.departureKey)
     }
 
     /** The first service the offline board offers after [departure], the one a rider left on the platform boards next. */

@@ -235,6 +235,31 @@ class TravelTrackerIntegrationTest {
         assertServiceStopped()
     }
 
+    /** Ruling 23 from the lock screen: Stop trip on a started trip declines its saved trip, and only a guessed stop is reported. */
+    @Test fun theStopTripActionOnAStartedTripDeclinesItUnreported() {
+        grantNotifications()
+        launchActivity()
+        clearFocus()
+
+        val started = fixture("ride", "stop-action-started", pinned = true)
+        setFocus(started)
+        val stop = stopAction(waitForNotification())
+        val declinesBefore = app.analytics.ledger.count { it.t == "declined_inferred" }
+
+        shell("input keyevent HOME")
+        stop.actionIntent.send()
+        waitUntil("Stop trip did not end the trip") { model.state.value.focus == null && trackerNotification() == null }
+        waitUntil("the stop did not persist its decline") {
+            runBlocking { DeviceStore(context).load().inferenceDeclined }?.let {
+                it.tripId == started.tripId && !it.reverse && it.departure == started.journey.departureKey
+            } == true
+        }
+        SystemClock.sleep(1_500)
+        assertEquals("a started stop was reported as a declined guess", declinesBefore,
+            app.analytics.ledger.count { it.t == "declined_inferred" })
+        assertServiceStopped()
+    }
+
     private fun stopAction(notification: Notification): Notification.Action =
         requireNotNull(notification.actions?.singleOrNull { it.title.toString() == "Stop trip" }) { "the tracker has no Stop trip action" }
 

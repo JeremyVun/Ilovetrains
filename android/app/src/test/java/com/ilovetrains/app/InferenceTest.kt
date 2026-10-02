@@ -94,6 +94,18 @@ class InferenceTest {
         assertEquals(older, stopped.inferenceDeclined)
     }
 
+    @Test fun expiryClearsOnlyARecordNamingTheExpiredTripDirectionAndJourney() {
+        val expired = riding(pinned = false)
+        val named = LastAnswer(trip.id, false, now - 12 * minute, rhodes.id, expired.board, expired.journey)
+        assertNull(UserData(trips = listOf(trip), focus = expired, lastAnswer = named).withFocusExpired(expired).lastAnswer)
+        val next = journey(now + 8 * minute, 27)
+        for (other in listOf(named.copy(journey = next), named.copy(reverse = true), named.copy(tripId = "other"))) {
+            val kept = UserData(trips = listOf(trip), focus = expired, lastAnswer = other).withFocusExpired(expired)
+            assertNull(kept.focus)
+            assertEquals(other, kept.lastAnswer)
+        }
+    }
+
     @Test fun startingTheGuessedJourneyKeepsItsGuardAndAnyOtherStartReplacesIt() {
         val guessed = riding(pinned = false)
         val data = UserData(trips = listOf(trip), focus = guessed)

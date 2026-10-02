@@ -889,9 +889,7 @@ class TrainViewModel private constructor(
                     data = data.copy(rides = before.settled(updatedFocus, true, ends(updatedFocus.tripId, updatedFocus.reverse)))
                     noteRide(before, updatedFocus, result.basis)
                 }
-                data = data.copy(focus = null, lastAnswer = data.lastAnswer?.takeUnless {
-                    it.tripId == updatedFocus.tripId && it.reverse == updatedFocus.reverse && it.journey.key == updatedFocus.journey.key
-                })
+                data = data.withFocusExpired(updatedFocus)
                 openSnapshot = null
                 arrivalResult = null
                 changed = true

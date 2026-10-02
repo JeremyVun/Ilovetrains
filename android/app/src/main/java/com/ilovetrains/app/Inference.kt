@@ -149,6 +149,11 @@ fun UserData.withTripStopped(now: Long): UserData {
     return owner?.let { cleared.declining(stopped.copy(tripId = it.tripId, reverse = it.reverse), now) } ?: cleared
 }
 
+/** Expiry clears the record only when it names the expired trip, direction and journey: evidence for another train survives. */
+fun UserData.withFocusExpired(expired: FocusedJourney): UserData = copy(focus = null, lastAnswer = lastAnswer?.takeUnless {
+    it.tripId == expired.tripId && it.reverse == expired.reverse && it.journey.key == expired.journey.key
+})
+
 fun rideRecorded(data: UserData, tripId: String, reverse: Boolean, journey: Journey): Boolean =
     data.rides.any { it.tripId == tripId && it.reverse == reverse && it.departure == journey.departure }
 
