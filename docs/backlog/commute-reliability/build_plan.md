@@ -406,7 +406,39 @@ Fix work known before the review, all three clients unless named:
 
 The web and the fixtures go first, as the reference. Then Android and iOS fix
 agents run in parallel through the gate lock. The full `tools/build-ios.sh
---test` runs once at the end of the iOS fix, on final sources.
+--test` and Android instrumented suites run once in phase 5, after phases 4b
+and 4c change the UI.
+
+Fable review done: `fb77a14` on `cr-review` (probes only; `REVIEW.md` at its
+root). The lead's decisions on its findings are folded into design.md rule 3:
+- Finding 1: the open snapshot entered the train the rider was seen not to
+  board, on all three clients. The same-origin sighting 60 s or more after
+  `D` now retires the snapshot too.
+- Finding 2: offline Android re-recorded the departed train at `D + 70 s` and
+  entered it. The `0 ≤ D − at` bound is restored on every client (a reversal
+  of the 2c/3b parity change); invert 2c's
+  `aRecordWrittenAfterItsTrainLeftCanStillEnter` and 3b's
+  `testAPlatformSightingRecordedAfterTheTrainLeftStillEnters`.
+- Finding 3 (iOS only): a fix landing off Home started trip mode; entry is
+  evaluated only on Home, as the contract and the other clients do.
+- Finding 4 (Android only): a preference change, flag read or trip deletion
+  within the visit restarted the 45 s evidence wait through
+  `resetArrivalTracking()`; the wait is per focus identity and visit.
+- Wording and alignment: Stop clears `lastOpen` and the snapshot
+  unconditionally; native expiry clears the record only on a trip, direction
+  and journey match, like the web.
+- Fixture cases proposed in `REVIEW.md`: the decline held by the hour alone,
+  progress 0.24 match and 0.26 miss, and the snapshot case for finding 1.
+- Refuted, with evidence in `REVIEW.md`: rule 7 ordering on all clients, the
+  hold-rule writers, the two-hour `Arrival unconfirmed` (every reducer settles
+  at `A + 3 min` unless moving), and lock-screen identity.
+- Noted, no action: the web's ISO departure keys change offset on the
+  2026-10-04 DST day, but each journey's key is stable, and natives use epoch
+  ms.
+
+The fix agents base on `cr-review`, keep its probes as permanent regressions
+(renaming or moving them into the suites they belong to is fine) and make them
+pass.
 
 ## Phase 4 — The trip-control line, new words and the removed state, on screen (visual)
 
@@ -447,6 +479,13 @@ Android board baselines phase 2a changed.
 Gate: the `visual-regression` skill for every affected screen on web,
 Android and iOS, with every reported difference judged from its composite.
 The lead then checks a handful of frames against the exemplar.
+
+Split per client after the context overruns (lead's decision, 2026-10-02).
+4a is the web, run beside the Fable review on `cr-web`: the experiment removal,
+the line, the words, the stopped-state removal, ruling 21, the commute-feedback
+recapture and the line exemplars. 4b (Android) and 4c (iOS, including the
+Live Activity button and its exemplar) follow, briefed from 4a's report and in
+parallel through the gate lock.
 
 Done marker: `Phase 4 done: <commit>`.
 
