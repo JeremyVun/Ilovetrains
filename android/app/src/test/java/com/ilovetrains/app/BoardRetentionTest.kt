@@ -13,6 +13,24 @@ class BoardRetentionTest {
     private val previous = BoardData(townHall, rhodes, listOf(t9), now, source = "live", homeJourneyKey = t9.key)
     private val localT9 = Journey(t9.legs.map { it.copy(identity = TripIdentity("sydneytrains", "T9.42", "2026-09-07", townHall.id, rhodes.id)) })
 
+    @Test fun aTimetableBoardMergesTheNextDeparturesWithTheLastFifteenMinutes() {
+        fun t1(departure: Long) = Journey(listOf(Leg("T1", "train", "Emu Plains", townHall, rhodes, departure, departure + 30 * 60_000)))
+        val departed = (14 downTo 1).map { t1(now - it * 60_000L) }
+        val ahead = (0 until 24).map { t1(now + it * 60_000L) }
+        val recent = BoardData(townHall, rhodes, departed + ahead.take(10), now - 900_000, offline = true)
+        val upcoming = BoardData(townHall, rhodes, ahead, now - 900_000, offline = true,
+            recommendation = RecommendationResult(ahead.first(), recent))
+        val merged = mergeTimetablePlans(upcoming, recent)
+        assertEquals((departed + ahead).map { it.key }, merged.journeys.map { it.key })
+        assertEquals(ahead.first(), merged.recommendation?.journey)
+        assertEquals("schedule", merged.source)
+        assertTrue(merged.offline)
+
+        val observed = upcoming.copy(source = "live", offline = false, generatedAt = now - 5_000)
+        assertTrue(mergeTimetablePlans(observed, recent).isLive(now))
+        assertEquals(departed.map { it.key }, mergeTimetablePlans(upcoming.copy(journeys = emptyList()), recent.copy(journeys = departed)).journeys.map { it.key })
+    }
+
     @Test fun offlinePinKeepsItsLastKnownDelayAndArrivalAcrossRestart() {
         val focus = FocusedJourney("trip", false, t9, previous).lastKnown()
         val restored = Wire.user(JSONObject(Wire.user(UserData(focus = focus)).toString())).focus!!

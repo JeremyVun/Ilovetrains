@@ -104,7 +104,8 @@ export function inferTravel(doc, nowMs, fix) {
   if (departure === null || arrival === null || !Number.isFinite(seenAt)) return null;
   if (nowMs < departure || nowMs > arrival + TRAVEL_LATE_MS) return null;
   if (!last.station || last.station.id !== ends.from.id) return null;
-  if (departure - seenAt > TRAVEL_SEEN_MS) return null;
+  // A record written after its train left is a retained answer, not evidence of boarding.
+  if (departure - seenAt < 0 || departure - seenAt > TRAVEL_SEEN_MS) return null;
 
   const left = distanceKm(fix, origin);
   if (left === null) return null;
@@ -135,6 +136,26 @@ export function declineFocus(doc, focus, nowMs) {
     tripId: focus.tripId, direction: focus.direction, departure: departureKey(focus.journey),
     arrivalMs: arrivalMs(composedJourney(focus))
   }, nowMs);
+}
+
+function savedLeg(doc, ends) {
+  if (!ends || !ends.from || !ends.to) return null;
+  for (const trip of doc.trips || []) {
+    const direction = DIRECTIONS.find((value) => {
+      const pair = leg(trip, value);
+      return pair.from.id === ends.from.id && pair.to.id === ends.to.id;
+    });
+    if (direction) return { tripId: trip.id, direction };
+  }
+  return null;
+}
+
+// Ruling 23: any stop on a saved pair declines it, or the next train-speed fix guesses a rider still riding back in.
+export function stoppedTrip(doc, focus, ends, nowMs) {
+  const guessed = focus.by === 'inferred';
+  const owner = guessed ? { tripId: focus.tripId, direction: focus.direction } : savedLeg(doc, ends);
+  const stopped = clearFocus(doc);
+  return { doc: owner ? declineFocus(stopped, { ...focus, ...owner }, nowMs) : stopped, declinedInferred: guessed };
 }
 
 // The window auto-start uses for "seen at the platform".
@@ -186,6 +207,15 @@ export function replacesLastOpen(doc, incoming, nowMs, sightingAtMs = null) {
 
 export function writeLastOpen(doc, record, nowMs, sightingAtMs = null) {
   return replacesLastOpen(doc, record, nowMs, sightingAtMs) ? recordLastOpen(doc, record, nowMs) : doc;
+}
+
+// Ruling 2: seen at the origin a minute after the snapshot's train left, the rider did not board it.
+export function retiresSnapshot(doc, snapshot, incoming, sightingAtMs = null) {
+  const trip = snapshot && findTrip(doc, snapshot.tripId);
+  const departure = trip ? departureMs(snapshot.journey) : null;
+  return departure !== null && Boolean(incoming && incoming.station)
+    && incoming.station.id === leg(trip, snapshot.direction).from.id
+    && Number.isFinite(sightingAtMs) && sightingAtMs >= departure + HOLD_SIGHTING_AFTER_MS;
 }
 
 export function tickNeedsFix(doc, nowMs, shownLeadDepartures, fix, previousFix) {
@@ -259,8 +289,9 @@ export function onBoardRequests(doc, nowMs, fix, previousFix = null, cached = {}
   return candidates.sort((a, b) => a.ratio - b.ratio || a.index - b.index)
     .slice(0, ON_BOARD_CANDIDATES).map(({ trip, direction }) => {
       const key = `${trip.id}|${direction}`;
-      const longest = Math.max(-Infinity, ...(cached[key] || []).map(durationOf).filter((value) => value !== null));
-      const ride = Number.isFinite(longest) ? longest : ON_BOARD_DEFAULT_RIDE_MS;
+      const durations = (cached[key] || []).map(durationOf).filter((value) => value !== null).sort((a, b) => a - b);
+      // The median, lower middle for an even count: one long offline itinerary cannot push the window past every service.
+      const ride = durations.length ? durations[Math.floor((durations.length - 1) / 2)] : ON_BOARD_DEFAULT_RIDE_MS;
       const ends = leg(trip, direction);
       return {
         key, tripId: trip.id, direction, from: ends.from.id, to: ends.to.id,

@@ -45,13 +45,14 @@ class InferenceTest {
         assertEquals(seen, data.copy(lastAnswer = null).withLastAnswer(seen, null).lastAnswer)
     }
 
-    @Test fun aRecordWrittenAfterItsTrainLeftCanStillEnter() {
+    @Test fun aRecordWrittenAfterItsTrainLeftDoesNotEnter() {
         val left = journey(now - 5 * minute, 27)
-        val written = LastAnswer(trip.id, false, now - 2 * minute, rhodes.id, BoardData(rhodes, townHall, listOf(left), now), left)
+        val written = LastAnswer(trip.id, false, now - 5 * minute + 1, rhodes.id, BoardData(rhodes, townHall, listOf(left), now), left)
         val onTheWay = Fix(-33.85, 151.13, now, accuracyMetres = 10.0)
-        assertEquals(left.key, inferredFocus(UserData(trips = listOf(trip), lastAnswer = written), onTheWay, now)?.journey?.key)
-        assertEquals("the open's snapshot enters the same way", left.key,
-            inferFromRecords(UserData(trips = listOf(trip)), written, now, onTheWay)?.journey?.key)
+        assertNull(inferredFocus(UserData(trips = listOf(trip), lastAnswer = written), onTheWay, now))
+        assertNull("nor does the open's snapshot", inferFromRecords(UserData(trips = listOf(trip)), written, now, onTheWay))
+        val asItLeaves = written.copy(at = now - 5 * minute)
+        assertEquals(left.key, inferredFocus(UserData(trips = listOf(trip), lastAnswer = asItLeaves), onTheWay, now)?.journey?.key)
     }
 
     private fun riding(pinned: Boolean): FocusedJourney {
@@ -70,12 +71,39 @@ class InferenceTest {
             stopped.inferenceDeclined)
     }
 
-    @Test fun stoppingAStartedTripRecordsNoRideAndNoDecline() {
+    @Test fun stoppingAStartedTripDeclinesTheSavedTripOnItsPairAndRecordsNoRide() {
+        val started = riding(pinned = true)
         val earlier = Ride("other", false, now - 120 * minute, now - 90 * minute)
-        val stopped = UserData(trips = listOf(trip), rides = listOf(earlier), focus = riding(pinned = true)).withTripStopped(now)
+        val stopped = UserData(trips = listOf(trip), rides = listOf(earlier), focus = started).withTripStopped(now)
         assertNull(stopped.focus)
         assertEquals(listOf(earlier), stopped.rides)
-        assertNull(stopped.inferenceDeclined)
+        assertEquals(InferenceDecline(trip.id, false, now, started.journey.departureKey, started.composed.effectiveArrival),
+            stopped.inferenceDeclined)
+
+        val back = started.copy(tripId = "elsewhere", board = started.board.copy(from = townHall, to = rhodes))
+        assertEquals("the pair's reverse declines the saved trip in reverse", InferenceDecline(trip.id, true, now,
+            back.journey.departureKey, back.composed.effectiveArrival), UserData(trips = listOf(trip), focus = back).withTripStopped(now).inferenceDeclined)
+    }
+
+    @Test fun stoppingAStartedTripOnAnUnsavedPairKeepsTheOlderDecline() {
+        val strathfield = Station("213510", "Strathfield Station", -33.871778, 151.094325, setOf("train"))
+        val started = riding(pinned = true).let { it.copy(board = it.board.copy(to = strathfield)) }
+        val older = InferenceDecline("other", false, now - 30 * minute, "T9:${now - 60 * minute}", now - 38 * minute)
+        val stopped = UserData(trips = listOf(trip), focus = started, inferenceDeclined = older).withTripStopped(now)
+        assertNull(stopped.focus)
+        assertEquals(older, stopped.inferenceDeclined)
+    }
+
+    @Test fun expiryClearsOnlyARecordNamingTheExpiredTripDirectionAndJourney() {
+        val expired = riding(pinned = false)
+        val named = LastAnswer(trip.id, false, now - 12 * minute, rhodes.id, expired.board, expired.journey)
+        assertNull(UserData(trips = listOf(trip), focus = expired, lastAnswer = named).withFocusExpired(expired).lastAnswer)
+        val next = journey(now + 8 * minute, 27)
+        for (other in listOf(named.copy(journey = next), named.copy(reverse = true), named.copy(tripId = "other"))) {
+            val kept = UserData(trips = listOf(trip), focus = expired, lastAnswer = other).withFocusExpired(expired)
+            assertNull(kept.focus)
+            assertEquals(other, kept.lastAnswer)
+        }
     }
 
     @Test fun startingTheGuessedJourneyKeepsItsGuardAndAnyOtherStartReplacesIt() {

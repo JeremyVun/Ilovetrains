@@ -574,7 +574,7 @@ class TrainViewModel private constructor(
                 val request = generation; val pair = ends(); val modes = data.modes.toSet()
                 // Replanning on a failed fetch would republish the same rows from the realtime the app already had.
                 if (fetched && pair != null && modes.isNotEmpty() && mutable.value.board?.isLive(mutable.value.now) != true) {
-                    val local = planner.planWithRecommendation(pair.first, pair.second, mutable.value.now - 900_000, modes, 24, data.offlineMaxTransfers, recommendationAt = mutable.value.now).board
+                    val local = planner.planBoard(pair.first, pair.second, mutable.value.now, modes, data.offlineMaxTransfers)
                     if (local.journeys.isNotEmpty()) {
                         val prior = mutable.value.board?.takeIf { it.from.id == pair.first.id && it.to.id == pair.second.id }
                         publishBoard(mergeBoardResults(prior, local, null, mutable.value.now, requestFailed = false), request)
@@ -638,7 +638,7 @@ class TrainViewModel private constructor(
             supervisorScope {
                 var onlineCompletedAt = 0L
                 val local = async {
-                    try { initialized.await(); planner.planWithRecommendation(from, to, mutable.value.now - 15 * 60_000, modes, 24, data.offlineMaxTransfers, recommendationAt = mutable.value.now).board }
+                    try { initialized.await(); planner.planBoard(from, to, mutable.value.now, modes, data.offlineMaxTransfers) }
                     catch (e: CancellationException) { throw e }
                     catch (_: Exception) { null }
                 }
@@ -682,8 +682,10 @@ class TrainViewModel private constructor(
                         timetable = localResult)
                     if (evidence != null) {
                         val sighted = sightingOf(here(data, stations, fix, now, previousHomeFix), fix)
+                        val sightingAt = fix?.at?.takeIf { sighted != null }
+                        if (retiresSnapshot(data, openSnapshot, sighted?.id, sightingAt)) openSnapshot = null
                         val written = data.withLastAnswer(LastAnswer(selectedId, reversed, now, sighted?.id, evidence.board, evidence.journey),
-                            sightingAt = fix?.at?.takeIf { sighted != null })
+                            sightingAt)
                         if (written !== data) { data = written; persist(); syncPersonal() }
                     }
                 }
@@ -887,9 +889,7 @@ class TrainViewModel private constructor(
                     data = data.copy(rides = before.settled(updatedFocus, true, ends(updatedFocus.tripId, updatedFocus.reverse)))
                     noteRide(before, updatedFocus, result.basis)
                 }
-                data = data.copy(focus = null, lastAnswer = data.lastAnswer?.takeUnless {
-                    it.tripId == updatedFocus.tripId && it.reverse == updatedFocus.reverse
-                })
+                data = data.withFocusExpired(updatedFocus)
                 openSnapshot = null
                 arrivalResult = null
                 changed = true
@@ -913,7 +913,7 @@ class TrainViewModel private constructor(
             focus.journey.cancelled || mutable.value.now < focus.journey.effectiveDeparture ||
             arrivalResult?.state == ArrivalState.Arrived) return
         val identity = focusIdentity(focus)
-        beginEvidenceWait("$identity#$foregroundVisit")
+        beginEvidenceWait(evidenceVisit(focus))
         val started = onArrivalMonitoring?.invoke {
             if (data.focus?.let(::focusIdentity) != identity) return@invoke
             evaluateArrival(monitoringOverride = true)
@@ -922,6 +922,8 @@ class TrainViewModel private constructor(
         arrivalMonitoring = started
         if (started) settleWhenEvidenceWaitEnds() else evaluateArrival()
     }
+
+    private fun evidenceVisit(focus: FocusedJourney) = "${focusIdentity(focus)}#$foregroundVisit"
 
     /** Once per focus and foreground visit, so a provider failure restarting monitoring cannot extend it. */
     private fun beginEvidenceWait(visit: String) {
@@ -972,8 +974,11 @@ class TrainViewModel private constructor(
     private fun resetArrivalTracking() {
         stopArrivalMonitoring(clearWindow = true)
         arrivalResult = null
-        arrivalResumeWaitUntil = null
-        evidenceWaitFor = null
+        // A preference change, flag read or deletion within the same focus and visit must not restart the wait.
+        if (evidenceWaitFor != data.focus?.let(::evidenceVisit)) {
+            arrivalResumeWaitUntil = null
+            evidenceWaitFor = null
+        }
         if (activityForeground && mutable.value.locationGranted) ensureArrivalMonitoring()
     }
     fun permission(granted: Boolean, denied: Boolean) {

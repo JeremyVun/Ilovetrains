@@ -12,8 +12,8 @@ import { journeyDetail, journeyKey, departureKey, arrivalMs, departureMs } from 
 import {
   focusOf, visibleFocus, setFocus, clearFocus, isFocused, focusExpired, matchJourney,
   applyFocusSnapshot, applyArrivalResult, composedJourney, recoveryModel, recoveryOf,
-  inferFromRecords, inferOnBoard, onBoardRequests, writeLastOpen, tickNeedsFix,
-  declineFocus, runningJourney, journeyCancelled, pinResult, rideAdded, rideRecorded,
+  inferFromRecords, inferOnBoard, onBoardRequests, writeLastOpen, retiresSnapshot, tickNeedsFix,
+  stoppedTrip, runningJourney, journeyCancelled, pinResult, rideAdded, rideRecorded,
   TRAVEL_LATE_MS
 } from './focus.js';
 import * as Board from './board.js';
@@ -678,9 +678,10 @@ function noteLastOpen() {
   if (!journey) return;
   const fix = stationFix();
   const station = sightingOf(here(state.doc, state.stations, fix), fix);
-  const next = writeLastOpen(state.doc, {
-    station, tripId: state.selection.tripId, direction: state.selection.direction, journey
-  }, now(), station ? fix.at : null);
+  const record = { station, tripId: state.selection.tripId, direction: state.selection.direction, journey };
+  const sightingAt = station ? fix.at : null;
+  if (retiresSnapshot(state.doc, state.previousOpen, record, sightingAt)) state.previousOpen = null;
+  const next = writeLastOpen(state.doc, record, now(), sightingAt);
   if (next !== state.doc) ctx.update(next);
 }
 
@@ -1527,11 +1528,10 @@ function renderDetail() {
 function stopTrip() {
   const focus = focusOf(state.doc);
   if (!focus) return;
-  const guessed = focus.by === 'inferred';
-  const stopped = forgetLastOpen(clearFocus(state.doc));
-  // Declined, so the same guess cannot come straight back.
-  ctx.update(guessed ? declineFocus(stopped, focus, now()) : stopped);
-  if (guessed) analytics.track('declined_inferred');
+  const trip = findTrip(state.doc, focus.tripId);
+  const stopped = stoppedTrip(state.doc, focus, trip && leg(trip, focus.direction), now());
+  ctx.update(forgetLastOpen(stopped.doc));
+  if (stopped.declinedInferred) analytics.track('declined_inferred');
   if (focusInflight) focusInflight.abort();
   focusInflight = null;
   if (recoveryInflight) recoveryInflight.abort();

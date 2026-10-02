@@ -168,22 +168,32 @@ class CommuteReliabilityControllerTest {
         assertNull("the declined trip was guessed again one fix later", model.state.value.focus)
     }
 
-    @Test fun aStartedTripStoppedOfflineLeavesNoRideNoDeclineAndNoEvent() {
-        val at = morningDeparture() - 2 * minute
-        val model = open(UserData(trips = listOf(trip), modes = setOf("train"), useLocation = true), at)
-        val journey = upcomingOnTheBoard(model, at)
-        onMain { model.boardRowTapped(journey) }
-        assertEquals(Screen.Detail, model.state.value.screen)
-        onMain { model.startTrip(journey) }
-        assertTrue(requireNotNull(model.state.value.focus).pinned)
+    /** Ruling 23: a rider who stops a trip they started while still riding is not guessed back in by the next fix. */
+    @Test fun aStartedTripStoppedOfflineIsDeclinedUnreportedAndTheNextFixCannotGuessItAgain() {
+        val running = morningDirect()
+        val now = running.effectiveDeparture + (running.effectiveArrival - running.effectiveDeparture) / 2
+        val model = open(UserData(trips = listOf(trip), modes = setOf("train"), useLocation = true), now)
+        onMain { model.openTrip(trip.id) }
+        waitFor("the board to plan the running service", 60_000) { model.state.value.board?.journeys?.any { it.key == running.key } == true }
+        onMain { model.boardRowTapped(model.state.value.board!!.journeys.first { it.key == running.key }) }
+        val started = requireNotNull(model.state.value.focus).also { assertTrue(it.pinned) }
 
         onMain { model.stopTrip() }
         assertNull(model.state.value.focus)
-        waitFor("the stop to persist") { stored().focus == null }
-        settle()
-        assertNull(stored().inferenceDeclined)
+        waitFor("the stop to persist") { stored().focus == null && stored().inferenceDeclined != null }
+        assertEquals(InferenceDecline(trip.id, false, now, started.journey.departureKey, started.composed.effectiveArrival),
+            stored().inferenceDeclined)
         assertTrue(stored().rides.isEmpty())
-        assertFalse("stopping a started trip emits nothing", events().contains("declined_inferred"))
+
+        val later = now + minute
+        val (lat, lon) = along(0.55)
+        onMain {
+            model.debugSetTrackerClock(later)
+            model.location(Fix(lat, lon, later, speed = 15.0, accuracyMetres = 10.0, bearing = bearing(lat, lon, central)))
+        }
+        settle()
+        assertNull("the stopped trip was guessed again one fix later", model.state.value.focus)
+        assertFalse("stopping a started trip is not reported as a declined guess", events().contains("declined_inferred"))
     }
 
     @Test fun aRunningRowStartsTheTripOfflineAndAnUpcomingRowOpensDetail() {
@@ -277,6 +287,20 @@ class CommuteReliabilityControllerTest {
         assertEquals(trip.id, model.state.value.selectedTripId)
     }
 
+    /** Ruling 24: at the peak on a busy corridor the last 15 minutes alone fill a plan of 24, and the board still offers trains to take. */
+    @Test fun aBusyCorridorAtThePeakOffersUpcomingTrainsOffline() {
+        val parramatta = stations.first { it.id == "215020" }
+        val peak = weekday(8, 0)
+        val model = open(UserData(trips = listOf(SavedTrip("central-parramatta", central, parramatta)), modes = setOf("train"),
+            useLocation = true), peak)
+        val board = requireNotNull(model.state.value.board)
+        assertEquals(central.id, board.from.id)
+        assertTrue("the board lost the services of the last 15 minutes", board.journeys.any { it.effectiveDeparture in peak - 15 * minute until peak })
+        assertTrue("the board offers no train still to leave", board.journeys.any { it.effectiveDeparture >= peak })
+        val lead = requireNotNull(nextHomeJourney(board, peak)) { "Home has no train to offer" }
+        assertTrue("Home's train has left", lead.effectiveDeparture >= peak)
+    }
+
     /** A fix at train speed [share] of the way from Rhodes to Central enters the service the timetable has running. */
     private fun enterOnBoard(model: TrainViewModel, now: Long, share: Double): FocusedJourney {
         val (lat, lon) = along(share)
@@ -348,12 +372,17 @@ class CommuteReliabilityControllerTest {
 
     private fun morningDeparture(): Long = morningDirect().effectiveDeparture
 
-    /** The first direct T9 from Rhodes to Central after 07:50 on a weekday the bundled timetable covers. */
-    private fun morningDirect(): Journey = runBlocking {
+    /** A clock on the first weekday the bundled timetable covers. */
+    private fun weekday(hour: Int, minute: Int): Long {
         val manifest = JSONObject(context.assets.open("timetable-manifest.json").bufferedReader().use { it.readText() })
         var day = LocalDate.parse(manifest.getString("serviceDateFrom"), DateTimeFormatter.BASIC_ISO_DATE).plusDays(1)
         while (day.dayOfWeek == DayOfWeek.SATURDAY || day.dayOfWeek == DayOfWeek.SUNDAY) day = day.plusDays(1)
-        val after = day.atTime(7, 50).atZone(Sydney).toInstant().toEpochMilli()
+        return day.atTime(hour, minute).atZone(Sydney).toInstant().toEpochMilli()
+    }
+
+    /** The first direct T9 from Rhodes to Central after 07:50 on a weekday the bundled timetable covers. */
+    private fun morningDirect(): Journey = runBlocking {
+        val after = weekday(7, 50)
         val planner = OfflinePlanner(context, File(root, "search-timetable")).apply { initialize() }
         planner.plan(rhodes, central, after, setOf("train"), 30, 2).journeys
             .filter { it.legs.size == 1 && it.effectiveDeparture >= after }.minBy { it.effectiveDeparture }

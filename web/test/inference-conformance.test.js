@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  inferFromRecords, inferOnBoard, onBoardRequests, replacesLastOpen, runningJourney, startable, writeLastOpen
+  inferFromRecords, inferOnBoard, onBoardRequests, replacesLastOpen, retiresSnapshot, runningJourney, startable,
+  stoppedTrip, writeLastOpen
 } from '../js/focus.js';
 import { trainSpeed } from '../js/stations.js';
 
@@ -22,9 +23,13 @@ for (const value of fixture.holdCases.cases) {
 
 function entered(value) {
   let doc = value.doc;
-  for (const write of value.writes) doc = writeLastOpen(doc, write.record, write.nowMs, write.sightingAt);
+  let snapshot = value.snapshot;
+  for (const write of value.writes) {
+    if (retiresSnapshot(doc, snapshot, write.record, write.sightingAt)) snapshot = null;
+    doc = writeLastOpen(doc, write.record, write.nowMs, write.sightingAt);
+  }
   const described = (via, focus) => focus && { via, tripId: focus.tripId, direction: focus.direction, journeyKey: keyOf(focus.journey) };
-  const platform = inferFromRecords(doc, value.snapshot, value.nowMs, value.fix);
+  const platform = inferFromRecords(doc, snapshot, value.nowMs, value.fix);
   if (platform) return described('platform', platform);
   if (value.expectedRequests) {
     assert.deepEqual(onBoardRequests(doc, value.nowMs, value.fix, value.previousFix, value.cached)
@@ -45,4 +50,17 @@ for (const value of fixture.startCases.cases) {
 for (const value of fixture.runningCases.cases) {
   test(`running row: ${value.name}`, () => assert.equal(
     runningJourney(value.journey, value.nowMs, value.enabledModes || ['train', 'metro', 'ferry']), value.expectedRunning));
+}
+
+for (const value of fixture.stopCases.cases) {
+  test(`stop trip: ${value.name}`, () => {
+    const legs = value.focus.journey.legDetail;
+    const stopped = stoppedTrip({ ...value.doc, focus: value.focus }, value.focus,
+      { from: legs[0].from, to: legs[legs.length - 1].to }, value.nowMs);
+    const decline = stopped.doc.inferenceDeclined;
+    assert.equal(stopped.doc.focus, undefined);
+    assert.deepEqual(decline ? { ...decline, arrival: Date.parse(decline.arrival), at: Date.parse(decline.at) } : null,
+      value.expectedDecline);
+    assert.equal(stopped.declinedInferred, value.expectedEvent);
+  });
 }
