@@ -106,6 +106,7 @@ struct LineChip: View {
     var text: String? = nil
     var height: CGFloat = 22
     var horizontalPadding: CGFloat = 7
+    var minWidth: CGFloat? = nil
     @Environment(\.trainColors) private var colors
 
     var body: some View {
@@ -114,6 +115,7 @@ struct LineChip: View {
             .foregroundStyle(chipInk(line, mode: mode, colors: colors))
             .lineLimit(1)
             .padding(.horizontal, horizontalPadding)
+            .frame(minWidth: minWidth)
             .frame(height: height)
             .background(lineColor(line, mode: mode, colors: colors, fill: true), in: RoundedRectangle(cornerRadius: lineChipCornerRadius))
     }
@@ -220,13 +222,14 @@ struct JourneyAxis: View {
     var recoveryChangeIndex: Int? = nil
     @State private var trainEnabled = false
     @Environment(\.trainColors) private var colors
+    @Environment(\.phoneSizes) private var sizes
 
     var body: some View {
         if let first = journey.legs.first {
             JourneyAxisLayout(journey: journey, large: large, progress: progress) {
                 if showCap, let title = departurePlatformText(first.fromPlatform, mode: first.mode) {
                     LineChip(line: first.line, mode: first.mode, text: title,
-                             height: large ? 24 : 22, horizontalPadding: large ? 10 : 7)
+                             height: large ? 24 : 22, horizontalPadding: large ? 10 : sizes.capPadding)
                         .fixedSize().layoutValue(key: AxisItemKey.self, value: .cap)
                 }
                 // Paint the entire time axis before any text-bearing marker.
@@ -311,7 +314,8 @@ struct JourneyAxis: View {
 
     private func pin(_ leg: Leg, platform: String) -> some View {
         LineChip(line: leg.line, mode: leg.mode, text: platform,
-                 height: large ? 24 : 22, horizontalPadding: 5)
+                 height: large ? 24 : 22, horizontalPadding: large ? 5 : sizes.pinPadding,
+                 minWidth: large ? nil : sizes.pinMinWidth)
             .fixedSize()
             .zIndex(2)
     }

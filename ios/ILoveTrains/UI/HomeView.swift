@@ -143,6 +143,7 @@ private struct SmartHeader: View {
     let journey: Journey
     let cancelledLeadTime: Millis?
     @Environment(\.trainColors) private var colors
+    @Environment(\.phoneSizes) private var sizes
 
     private var first: Leg { journey.legs[0] }
     private var focus: FocusedJourney? { model.state.focus }
@@ -190,14 +191,14 @@ private struct SmartHeader: View {
             HStack(alignment: .top, spacing: 14) {
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(alignment: .lastTextBaseline, spacing: 2) {
-                        Text(displayFigure.value).font(.system(size: figureUsesCompactType(displayFigure) ? 50 : 64, weight: .ultraLight))
+                        Text(displayFigure.value).font(.system(size: figureUsesCompactType(displayFigure) ? sizes.homeWideFigure : sizes.homeFigure, weight: .ultraLight))
                             .tracking(-2).foregroundStyle(late ? colors.warning : colors.ink).lineLimit(1).minimumScaleFactor(0.7)
                         Text(displayFigure.unit).font(.system(size: 12, weight: .medium)).foregroundStyle(colors.ink2)
                     }.tabular()
                     if !displayFigure.provenance.lowercased().contains("scheduled"), !displayFigure.provenance.isEmpty {
                         TrainLabel(text: displayFigure.provenance, color: (late || journey.cancelled) ? colors.warning : colors.ink3)
                     }
-                }.frame(width: 104, alignment: .leading)
+                }.frame(width: sizes.homeFigureColumn, alignment: .leading)
                 HStack(alignment: .top, spacing: 8) {
                     endpoint(first.from.shortName, clockTime(rendered.effectiveDeparture), arrival: false)
                     arrivalEndpoint
@@ -324,7 +325,7 @@ private struct SmartHeader: View {
         let clocks = plan.map { focusArrivalClocks($0, followed: journey) }
             ?? FocusArrivalClocks(shown: clockTime(journey.effectiveArrival))
         return VStack(alignment: .trailing, spacing: 7) {
-            Text(rendered.legs.last?.to.shortName ?? "").font(.system(size: 16, weight: .light))
+            Text(rendered.legs.last?.to.shortName ?? "").font(.system(size: sizes.homeStationName, weight: .light))
                 .foregroundStyle(colors.ink2).lineLimit(2).minimumScaleFactor(0.72)
             HStack(alignment: .firstTextBaseline, spacing: 7) {
                 if let struck = clocks.struck, clocks.shown != nil {
@@ -341,7 +342,7 @@ private struct SmartHeader: View {
 
     private func endpoint(_ station: String, _ time: String, arrival: Bool) -> some View {
         VStack(alignment: arrival ? .trailing : .leading, spacing: arrival ? 7 : 3) {
-            Text(station).font(.system(size: 16, weight: .light)).foregroundStyle(arrival ? colors.ink2 : colors.ink)
+            Text(station).font(.system(size: sizes.homeStationName, weight: .light)).foregroundStyle(arrival ? colors.ink2 : colors.ink)
                 .lineLimit(2).minimumScaleFactor(0.72)
             Text(time).font(.system(size: arrival ? 20 : 25, weight: arrival ? .light : .regular))
                 .foregroundStyle(arrival ? colors.ink2 : (late ? colors.warning : colors.ink)).tabular()

@@ -8,7 +8,7 @@ struct TrainAppView: View {
             TrainTheme(appearance: model.state.appearance) {
                 TrainAppContent(model: model)
             }
-            .environment(\.pageMargin, pageMargin(windowWidth: window.size.width))
+            .environment(\.phoneSizes, PhoneSizes(windowWidth: window.size.width))
         }
     }
 }
