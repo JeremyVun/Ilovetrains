@@ -28,10 +28,11 @@ class ReviewInferenceTest {
     /** Lead suspect 1: a same-origin sighting 60 s after departure means the rider did not board, so the open's snapshot must not enter that train either. */
     @Test fun aPlatformSightingAfterDepartureRetiresTheDepartedTrainFromTheSnapshotToo() {
         val departed = record(t9(eight, eight + 27 * minute), at = eight - 2 * minute)
-        val snapshot = departed
         var data = UserData(trips = listOf(trip), lastAnswer = departed, useLocation = true)
         val sightingAt = eight + 70_000
-        data = data.withLastAnswer(record(t9(eight + 8 * minute, eight + 35 * minute), at = sightingAt), sightingAt)
+        val incoming = record(t9(eight + 8 * minute, eight + 35 * minute), at = sightingAt)
+        val snapshot = departed.takeUnless { retiresSnapshot(data, it, incoming.stationId, sightingAt) }
+        data = data.withLastAnswer(incoming, sightingAt)
         assertEquals("the hold rule replaces the stored record with the next train", eight + 8 * minute, data.lastAnswer?.journey?.departure)
 
         val now = eight + 12 * minute
