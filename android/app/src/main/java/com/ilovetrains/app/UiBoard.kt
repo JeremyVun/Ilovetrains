@@ -127,15 +127,18 @@ private fun BoardMast(board: BoardData?, now: Long, awaiting: Boolean, actions: 
             Freshness(board, now, awaiting)
         }
         if (board != null) {
+            val narrow = NarrowPhone
+            val titleSize = if (narrow) 24.sp else 25.sp
+            val titleLineHeight = if (narrow) 25.sp else 26.sp
             Row(Modifier.fillMaxWidth().heightIn(min = 69.dp).padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(board.from.shortName, Modifier.weight(1f), color = c.ink, fontSize = 25.sp,
-                    fontWeight = FontWeight.Light, lineHeight = 26.sp, maxLines = 3, overflow = TextOverflow.Clip)
-                Row(Modifier.width(44.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(board.from.shortName, Modifier.weight(1f), color = c.ink, fontSize = titleSize,
+                    fontWeight = FontWeight.Light, lineHeight = titleLineHeight, maxLines = 3, overflow = TextOverflow.Clip)
+                Row(Modifier.width(if (narrow) 36.dp else 44.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f).height(1.dp).background(c.rule2))
                     Text("›", color = c.ink3, fontSize = 18.sp)
                 }
-                Text(board.to.shortName, Modifier.weight(1f), color = c.ink, fontSize = 25.sp,
-                    fontWeight = FontWeight.Light, lineHeight = 26.sp, textAlign = TextAlign.End,
+                Text(board.to.shortName, Modifier.weight(1f), color = c.ink, fontSize = titleSize,
+                    fontWeight = FontWeight.Light, lineHeight = titleLineHeight, textAlign = TextAlign.End,
                     maxLines = 3, overflow = TextOverflow.Clip)
             }
         } else Spacer(Modifier.height(56.dp))

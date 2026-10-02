@@ -203,10 +203,12 @@ class UiCalibrationTest {
         }
         frame("home-lost-riding") {
             compose.runOnIdle { state.value = fixture.lostRidingState }
+            assertReplacedArrivalPrintsOnOneLine()
             capture("home-lost-riding")
         }
         frame("home-lost-dwell") {
             compose.runOnIdle { state.value = fixture.lostDwellState }
+            assertReplacedArrivalPrintsOnOneLine()
             capture("home-lost-dwell")
         }
         frame("home-lost-none") {
@@ -267,6 +269,7 @@ class UiCalibrationTest {
         frame("home-guessed-stress") {
             compose.runOnIdle { state.value = fixture.guessedStressState }
             assertGuessedQuestionPrintsWhole()
+            assertReplacedArrivalPrintsOnOneLine()
             capture("home-guessed-stress")
         }
         frame("home-checking-arrival") {
@@ -806,6 +809,22 @@ class UiCalibrationTest {
         val detail = "box=${question.size.width / dp}dp natural=${natural / dp}dp gapToStop=${gap / dp}dp"
         println("Guessed question $detail")
         if (compose.density.fontScale == 1f) assertFalse("guessed question ellipsized: $detail", layout.isLineEllipsized(0))
+    }
+
+    private fun assertReplacedArrivalPrintsOnOneLine() {
+        val struck = compose.onNodeWithTag("home-arrival-struck", useUnmergedTree = true).fetchSemanticsNode()
+        val shown = compose.onNodeWithTag("home-arrival", useUnmergedTree = true).fetchSemanticsNode()
+        val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        assertTrue(checkNotNull(shown.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action)(results))
+        val layout = results.single()
+        val dp = compose.density.density
+        val detail = "lines=${layout.lineCount} struck=${struck.boundsInRoot.left / dp}..${struck.boundsInRoot.right / dp}dp " +
+            "shown=${shown.boundsInRoot.left / dp}..${shown.boundsInRoot.right / dp}dp"
+        println("Replaced arrival $detail")
+        if (compose.density.fontScale == 1f) {
+            assertEquals("replaced arrival wraps: $detail", 1, layout.lineCount)
+            assertEquals("replaced arrival leaves the struck line: $detail", struck.boundsInRoot.top, shown.boundsInRoot.top, 1f)
+        }
     }
 
     private fun assertDetailGeometryAndPixels() {
