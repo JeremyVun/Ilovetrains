@@ -394,10 +394,14 @@ const onBoardCases = [
     doc: commuteDoc({ trips: [...commuteTrips, ...extraTrips] }), fix: onBoardFix('08:10', { heading: 90 }),
     boards: morningBoards(), expectedRequests: [ask('rb', '07:00'), ask('ra', '07:00'), ask('rr', '07:00')],
     expected: onBoard(t9('08:00', REDFERN), 'rr') },
-  { name: 'on board: the cached board\'s longest ride sets how far back to look',
-    cached: { 'rt|forward': [t9('07:30'), t9('07:38', TOWN_HALL, { rideMinutes: 31 })] },
+  { name: 'on board: the cached board\'s median ride sets how far back to look, so one long itinerary cannot',
+    cached: { 'rt|forward': [t9('07:30'), t9('07:20', TOWN_HALL, { rideMinutes: 99 }), t9('07:38', TOWN_HALL, { rideMinutes: 31 })] },
     fix: onBoardFix('08:10', { heading: 90 }), boards: morningBoards(),
     expectedRequests: [ask('rr', '07:00'), ask('rt', '07:29')], expected: onBoard(t9('08:00')) },
+  { name: 'on board: an even count of cached rides takes the lower middle one',
+    cached: { 'rt|forward': [t9('07:38', TOWN_HALL, { rideMinutes: 31 }), t9('07:30')] },
+    fix: onBoardFix('08:10', { heading: 90 }), boards: morningBoards(),
+    expectedRequests: [ask('rr', '07:00'), ask('rt', '07:33')], expected: onBoard(t9('08:00')) },
   { name: 'on board: a platform-sighted record enters first', snapshot: SEEN,
     fix: onBoardFix('08:10', { heading: 90 }), boards: morningBoards(), expected: platform(t9('08:00')) },
   { name: 'on board: an unexpired focus blocks entry',
@@ -492,7 +496,9 @@ const inference = {
       + 'the stored doc.lastOpen. Only when neither enters and the fix is at train speed (given previousFix), '
       + 'on-board entry: expectedRequests, when present, is the ordered list of departures requests '
       + '(from and to are station ids, at is epoch ms, limit the journey count) built from doc, fix, previousFix and '
-      + 'cached (each pair\'s cached journeys, keyed <tripId>|<direction>); boards answers each request by the same '
+      + 'cached (each pair\'s cached journeys, keyed <tripId>|<direction>; at = nowMs - (median + 10 min), the median '
+      + 'being of the effective durations A - D >= 0 there, the lower middle for an even count, 60 min when none); '
+      + 'boards answers each request by the same '
       + 'key with the journeys it returned. expected is null or the entered focus: via (platform or onBoard), '
       + 'tripId, direction and journeyKey.',
     cases: entryCases

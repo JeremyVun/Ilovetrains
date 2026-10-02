@@ -269,8 +269,9 @@ export function onBoardRequests(doc, nowMs, fix, previousFix = null, cached = {}
   return candidates.sort((a, b) => a.ratio - b.ratio || a.index - b.index)
     .slice(0, ON_BOARD_CANDIDATES).map(({ trip, direction }) => {
       const key = `${trip.id}|${direction}`;
-      const longest = Math.max(-Infinity, ...(cached[key] || []).map(durationOf).filter((value) => value !== null));
-      const ride = Number.isFinite(longest) ? longest : ON_BOARD_DEFAULT_RIDE_MS;
+      const durations = (cached[key] || []).map(durationOf).filter((value) => value !== null).sort((a, b) => a - b);
+      // The median, lower middle for an even count: one long offline itinerary cannot push the window past every service.
+      const ride = durations.length ? durations[Math.floor((durations.length - 1) / 2)] : ON_BOARD_DEFAULT_RIDE_MS;
       const ends = leg(trip, direction);
       return {
         key, tripId: trip.id, direction, from: ends.from.id, to: ends.to.id,

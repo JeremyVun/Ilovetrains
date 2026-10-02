@@ -717,11 +717,16 @@ records has not entered, and only for a fix at train speed. Let `P` be the fix.
    keep coming).
 3. *Running journeys*: the three decided candidates with the smallest corridor
    ratio (saved-trip order breaks a tie) each make one departures request
-   `O → Z` with `at = now − (Δ + 10 min)`, where `Δ` is the longest effective
-   duration in that pair's cached board (else 60 min), limit 10, under the
-   current modes and cap. Native also plans the same window from the offline
-   timetable (limit 30) and merges by journey key, online first. Keep journeys
-   with `D ≤ now ≤ A`, not cancelled, modes and cap allowed.
+   `O → Z` with `at = now − (Δ + 10 min)`, where `Δ` is the median effective
+   duration in that pair's cached board (the lower middle value for an even
+   count; else 60 min), limit 10, under the current modes and cap. Native
+   also plans the same window from the offline timetable (limit 30) and merges
+   by journey key, online first. Keep journeys with `D ≤ now ≤ A`, not
+   cancelled, modes and cap allowed. `Δ` is not the longest duration: one
+   99-minute offline itinerary pushed the window back past everything ten
+   services could reach. On a very frequent line a rider a few minutes out can
+   fall after the tenth service; a later fix catches them as the train ages
+   into the window, and the native timetable plan of 30 covers it at once.
 4. *Match*: time progress `f_t = (now − D) / (A − D)` and position progress
    `f_p = d(O, P) / (d(O, P) + d(P, Z))`; a journey matches when
    `|f_t − f_p| ≤ 0.25`. With trains eight minutes apart on a 25-minute ride,
