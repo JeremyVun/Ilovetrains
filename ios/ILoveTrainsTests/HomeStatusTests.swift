@@ -36,10 +36,39 @@ final class HomeStatusTests: XCTestCase {
     }
 
     func testPageMarginNarrowsOnPhonesUpTo375Wide() {
-        XCTAssertEqual(pageMargin(windowWidth: 320), 18)
-        XCTAssertEqual(pageMargin(windowWidth: 375), 18)
-        XCTAssertEqual(pageMargin(windowWidth: 390), 22)
-        XCTAssertEqual(pageMargin(windowWidth: 402), 22)
+        XCTAssertEqual(PhoneSizes(windowWidth: 320).pageMargin, 18)
+        XCTAssertEqual(PhoneSizes(windowWidth: 375).pageMargin, 18)
+        XCTAssertEqual(PhoneSizes(windowWidth: 390).pageMargin, 22)
+        XCTAssertEqual(PhoneSizes(windowWidth: 402).pageMargin, 22)
+    }
+
+    func testHeaderSizesNarrowOnPhonesUpTo375Wide() {
+        for width: CGFloat in [320, 375] {
+            let sizes = PhoneSizes(windowWidth: width)
+            XCTAssertEqual(sizes.homeFigureColumn, 92)
+            XCTAssertEqual(sizes.homeFigure, 56)
+            XCTAssertEqual(sizes.homeWideFigure, 44)
+            XCTAssertEqual(sizes.homeStationName, 15)
+            XCTAssertEqual(sizes.boardTitle, 24)
+            XCTAssertEqual(sizes.boardTitleGap, 7)
+            XCTAssertEqual(sizes.boardTitleArrow, 40)
+            XCTAssertEqual(sizes.capPadding, 6)
+            XCTAssertEqual(sizes.pinPadding, 4)
+            XCTAssertEqual(sizes.pinMinWidth, 17)
+        }
+        for width: CGFloat in [390, 402] {
+            let sizes = PhoneSizes(windowWidth: width)
+            XCTAssertEqual(sizes.homeFigureColumn, 104)
+            XCTAssertEqual(sizes.homeFigure, 64)
+            XCTAssertEqual(sizes.homeWideFigure, 50)
+            XCTAssertEqual(sizes.homeStationName, 16)
+            XCTAssertEqual(sizes.boardTitle, 25)
+            XCTAssertEqual(sizes.boardTitleGap, 9)
+            XCTAssertEqual(sizes.boardTitleArrow, 44)
+            XCTAssertEqual(sizes.capPadding, 7)
+            XCTAssertEqual(sizes.pinPadding, 5)
+            XCTAssertNil(sizes.pinMinWidth)
+        }
     }
 
     func testExceptionalStatusesOutrankRunning() {

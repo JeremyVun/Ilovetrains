@@ -1,14 +1,35 @@
 import SwiftUI
 
-/// The web's page margin (ui.md): narrow phones give the type more room instead of smaller type.
-func pageMargin(windowWidth: CGFloat) -> CGFloat { windowWidth <= 375 ? 18 : 22 }
+/// The web's `@media (max-width: 375px)` sizes (ui.md): narrow phones give the type more room.
+struct PhoneSizes: Equatable {
+    var pageMargin: CGFloat = 22
+    var homeFigureColumn: CGFloat = 104
+    var homeFigure: CGFloat = 64
+    var homeWideFigure: CGFloat = 50
+    var homeStationName: CGFloat = 16
+    var boardTitle: CGFloat = 25
+    var boardTitleGap: CGFloat = 9
+    var boardTitleArrow: CGFloat = 44
+    var capPadding: CGFloat = 7
+    var pinPadding: CGFloat = 5
+    var pinMinWidth: CGFloat? = nil
+}
+
+extension PhoneSizes {
+    static let narrow = PhoneSizes(
+        pageMargin: 18, homeFigureColumn: 92, homeFigure: 56, homeWideFigure: 44, homeStationName: 15,
+        boardTitle: 24, boardTitleGap: 7, boardTitleArrow: 40, capPadding: 6, pinPadding: 4, pinMinWidth: 17
+    )
+
+    init(windowWidth: CGFloat) { self = windowWidth <= 375 ? .narrow : PhoneSizes() }
+}
 
 private struct TrainColorsKey: EnvironmentKey {
     static let defaultValue = TrainColors.darkPalette
 }
 
-private struct PageMarginKey: EnvironmentKey {
-    static let defaultValue: CGFloat = 22
+private struct PhoneSizesKey: EnvironmentKey {
+    static let defaultValue = PhoneSizes()
 }
 
 extension EnvironmentValues {
@@ -17,17 +38,17 @@ extension EnvironmentValues {
         set { self[TrainColorsKey.self] = newValue }
     }
 
-    var pageMargin: CGFloat {
-        get { self[PageMarginKey.self] }
-        set { self[PageMarginKey.self] = newValue }
+    var phoneSizes: PhoneSizes {
+        get { self[PhoneSizesKey.self] }
+        set { self[PhoneSizesKey.self] = newValue }
     }
 }
 
 private struct PagePadding: ViewModifier {
     let edges: Edge.Set
-    @Environment(\.pageMargin) private var margin
+    @Environment(\.phoneSizes) private var sizes
 
-    func body(content: Content) -> some View { content.padding(edges, margin) }
+    func body(content: Content) -> some View { content.padding(edges, sizes.pageMargin) }
 }
 
 extension View {

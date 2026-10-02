@@ -65,17 +65,18 @@ private struct BoardMast: View {
     let awaiting: Bool
     let back: () -> Void
     @Environment(\.trainColors) private var colors
+    @Environment(\.phoneSizes) private var sizes
 
     var body: some View {
         VStack(spacing: 0) {
             HStack { BackControl(label: "Home", action: back); Spacer(); FreshnessView(board: board, now: now, awaiting: awaiting) }
             if let board {
-                HStack(spacing: 9) {
+                HStack(spacing: sizes.boardTitleGap) {
                     Text(board.from.shortName).frame(maxWidth: .infinity, alignment: .leading)
-                    HStack(spacing: 0) { Rectangle().fill(colors.rule2).frame(height: 1); Text("›").foregroundStyle(colors.ink3) }.frame(width: 44)
+                    HStack(spacing: 0) { Rectangle().fill(colors.rule2).frame(height: 1); Text("›").foregroundStyle(colors.ink3) }.frame(width: sizes.boardTitleArrow)
                     Text(board.to.shortName).frame(maxWidth: .infinity, alignment: .trailing).multilineTextAlignment(.trailing)
                 }
-                .font(.system(size: 25, weight: .light)).lineLimit(3).minimumScaleFactor(0.72).frame(minHeight: 69)
+                .font(.system(size: sizes.boardTitle, weight: .light)).lineLimit(3).minimumScaleFactor(0.72).frame(minHeight: 69)
             } else { Spacer().frame(height: 56) }
             TrainRule(heavy: true)
         }.pagePadding().padding(.top, 8)

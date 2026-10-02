@@ -68,6 +68,18 @@ iOS implementation requested on 2026-09-07.
   shift to avoid overlap and stay within the device, while service-time coordinates
   stay proportional. Each transfer station sits beneath its dwell midpoint,
   clamped within the device and wrapped or stacked when names collide.
+- At 375pt and narrower iOS takes the web's narrow-phone sizes (owner ruling
+  26, 2026-10-03), so the Home header prints `Bondi Junction` on one line.
+  Three things stay native. The board title's arrow is a 44pt hairline and
+  chevron, narrowed by the web's 4pt to 40pt, where the web draws 26px and
+  22px. Journey-line pins have no minimum width above 375pt, so a `1` pin is
+  17pt wide at every width; the web's is 19px, then 17px. The Home header
+  keeps its vertical rhythm, which the rule does not touch: the station names
+  sit 7.5pt further below the status line than the web's, and the figure,
+  set in its full SwiftUI line box rather than the web's 0.84em, starts 10 to
+  12pt below the names instead of level with them. The header is 8pt taller
+  than `home-guessed-375x667`, and 12pt taller at 402pt than the 390
+  exemplar.
 - The promoted Detail row is plain content, not a disabled button. Its chips
   keep their full fill and text colours; cancellation fades the composited
   journey device once so underlying bars cannot bleed through the labels.
