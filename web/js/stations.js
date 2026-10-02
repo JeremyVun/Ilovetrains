@@ -73,19 +73,33 @@ export function nearest(stations, fix, withinKm) {
  */
 export function here(doc, stations, fix, previousFix = null) {
   if (!stations || !fix || trainSpeed(fix, previousFix)) return null;
+  const saved = savedEnds(doc, stations);
+  const standing = nearest(saved, fix, SAVED_STATION_KM) || nearest(stations, fix, AT_STATION_KM);
+  return standing ? { station: standing.station, tier: 1 } : farther(saved, stations, fix);
+}
 
+// Adding a trip asks where the user stands, not which saved trip they mean (ruling 22).
+export function setupHere(doc, stations, fix) {
+  if (!stations || !fix) return null;
+  const saved = savedEnds(doc, stations);
+  const ids = new Set(saved.map((station) => station.id));
+  const standing = nearest(stations.filter((station) => ids.has(station.id)), fix, AT_STATION_KM)
+    || nearest(stations, fix, AT_STATION_KM);
+  return standing ? { station: standing.station, tier: 1 } : farther(saved, stations, fix);
+}
+
+function savedEnds(doc, stations) {
   const ends = new Map();
   for (const trip of (doc && doc.trips) || []) {
     for (const stop of [trip.from, trip.to]) ends.set(stop.id, stop);
   }
   const indexed = new Map(stations.map((station) => [station.id, station]));
-  const saved = [...ends.values()].map((stop) => indexed.get(stop.id) || stop);
-  const standing = nearest(saved, fix, SAVED_STATION_KM) || nearest(stations, fix, AT_STATION_KM);
-  if (standing) return { station: standing.station, tier: 1 };
+  return [...ends.values()].map((stop) => indexed.get(stop.id) || stop);
+}
 
+function farther(saved, stations, fix) {
   const near = nearest(saved, fix, NEAR_STATION_KM);
   if (near) return { station: near.station, tier: 2 };
-
   const any = nearest(stations, fix, NEAR_STATION_KM);
   return any ? { station: any.station, tier: 3 } : null;
 }

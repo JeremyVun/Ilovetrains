@@ -4,8 +4,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  AT_STATION_KM, NEAR_STATION_KM, SIGHTING_KM, distanceKm, here, loadStations, nearest, sightingOf,
-  trainSpeed
+  AT_STATION_KM, NEAR_STATION_KM, SIGHTING_KM, distanceKm, here, loadStations, nearest, setupHere,
+  sightingOf, trainSpeed
 } from '../js/stations.js';
 import { emptyDoc } from '../js/storage.js';
 import { locate, scoreAll } from '../js/predict.js';
@@ -93,6 +93,15 @@ test('a saved station within 400 m beats a stranger within 200 m (the Gadigal ca
   assert.equal(here(emptyDoc(), CITY, NEAR_GADIGAL).station.id, GADIGAL.id, 'unsaved, the nearer station answers');
   assert.equal(locate(commute, Date.parse('2026-10-01T17:30:00+10:00'), { fix: NEAR_GADIGAL, stations: CITY }).direction,
     'reverse', 'the way back from Town Hall');
+});
+
+test('setup keeps the 200 m rule: a new trip starts where the user stands', () => {
+  for (const fix of [NEAR_GADIGAL, FURTHER_EAST]) {
+    assert.equal(setupHere(commute, CITY, fix).station.id, GADIGAL.id);
+  }
+  const atTownHall = { ...TOWN_HALL.location, speed: 12 };
+  assert.equal(setupHere(commute, CITY, atTownHall).station.id, TOWN_HALL.id, 'setup has no train-speed rule');
+  assert.deepEqual(setupHere(commute, CITY, { lat: -33.8738, lon: 151.2180 }), { station: TOWN_HALL, tier: 2 });
 });
 
 test('the sighting is here within 300 m of its point, and nothing further', () => {
