@@ -7,7 +7,8 @@
   bundles and uninstalls the app and UI runner from the simulator: incremental
   rebuilds have run test code one or two edits old with no error. A direct
   `xcodebuild test` keeps that trap, so run tests through the helper. The fresh
-  install also re-extracts the bundled timetable as the host app launches. Also
+  install re-extracts the bundled timetable as the host app launches; a test's
+  own `OfflinePlanner` waits its turn for that directory rather than racing it. Also
   supports `--simulator`, `--device` and `--unsigned-archive`; see
   [iOS operations](../docs/operations/ios.md) for signing and installation.
 - `generate-ios-project.rb` — regenerate the checked-in Xcode project after adding
