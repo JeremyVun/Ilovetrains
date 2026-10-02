@@ -161,6 +161,15 @@ recreation for that focus without clearing the journey, and an old activity's
 tap cannot restore a replaced focus. Session persistence is defined in
 [client-storage.md](client-storage.md#native-tracker-sessions).
 
+The Live Activity's Stop trip is an iOS 17 `LiveActivityIntent`
+(`StopTripIntent` in `ios/Shared/`, compiled into the app and the widget
+extension). iOS runs it in the app process, launching the app in the
+background if needed; the app registers its handler at launch and waits for
+the stored document before acting. It carries the tracker session ID and is
+honoured only while that session is still current and undismissed, like a
+surface tap, with exactly Stop trip's effects, including the decline and
+`declined_inferred` for a guessed trip.
+
 Calibration exemplars are the real ActivityKit captures in
 `assets/comps/latest/travel-tracker/ios/`, reproduced with
 `tools/shoot-travel-tracker-ios.sh` on a freshly created simulator. They cover
