@@ -714,3 +714,43 @@ Phase 4d iOS done: `a034d73` on `cr-margin-ios`, merged into main as `fa709f1`.
   `Bondi Junction` at 375, where the web narrows its header at 375 and below
   (iOS never ported that). The second change's cap in `detail-two-change`
   still cuts `· P…`.
+
+Phase 4d Android done: `943486f` on `cr-margin-android`, merged into main.
+- `PagePadding` is a composable getter that reads the window width:
+  18 dp at 375 and below, 22 otherwise. All 40 call sites are unchanged.
+- At 360 the guessed line is within 1 dp of every Roboto exemplar, and the
+  question prints whole. The new `assertGuessedQuestionPrintsWhole` in
+  `UiCalibrationTest` guards it.
+- Visual regression `/tmp/ilt-cr-margin-android-vr3`: 68 same. The 3 DIFFs
+  are the known keyboard-timing and notification-icon flakes; nothing was
+  accepted.
+- It found two things at 360:
+  - the header split, which became ruling 26;
+  - journey detail capping the boarding instruction at 3 lines
+    (`UiDetail.kt:142` `maxLines = 3`), so `PLATFORM 13` and `SIDE B` are
+    lost. The web has no cap, so it is a parity fix, folded into 4e Android.
+
+Production timetable refresh, outside this item. The owner asked for the
+investigation and approved the fix on 2026-10-03.
+- Cause: `tools/compile-timetable.py` stages files in the container's `/tmp`
+  and `os.replace`s them into the `/data` volume. That fails with EXDEV, so
+  production had never published a timetable since 7 September and served
+  the 2026-09-05 bootstrap, which expires 2026-10-04.
+- Fix: infra `efbd09b` sets `TMPDIR: "/data"`. It was deployed (job
+  `104f32bb`), and the live manifest now carries package `a101a8d9…`,
+  generated 2026-10-02T23:00Z, covering 20261003–20261101.
+- The permanent code fix ships in this release (owner: "Fold into this
+  release"): the Go refresh gives the compiler a temp directory on `/data`,
+  with a regression test.
+- Monitoring is written up separately.
+
+Phase 4e, narrow-phone header (ruling 26). Android and iOS each get one
+visual agent, on branches from main. Each ports every remaining
+`@media (max-width: 375px)` web rule for its client:
+- Home `--figtrack 92px`, `--fign 56px`, `--fign-wide 44px`, `--stn 15px`;
+- board `.sy-h1` grid `1fr 22px 1fr`, gap 7, 24 px;
+- `.sy-cap` padding 6, and `.sy-bar .sy-p` padding 4 with a 17 px minimum.
+
+Android also removes the detail line cap. Each verifies on its narrow device
+(360×780 and `ilt-cr-ios-se`) against the exemplars, especially the stress
+and lost states, and visual regression at 390/402 must stay unchanged.

@@ -25,8 +25,8 @@ measurements in [comps/MEASUREMENTS.md](comps/MEASUREMENTS.md).
 
 ## Owner rulings
 
-Rulings 1-7 are from 2026-10-01 and 8-24 from 2026-10-02 and 25 from 2026-10-03, answering options
-laid out in the design session (21-25 during the build). Quoted text is the option label and
+Rulings 1-7 are from 2026-10-01 and 8-24 from 2026-10-02 and 25-26 from 2026-10-03, answering options
+laid out in the design session (21-26 during the build). Quoted text is the option label and
 description the owner chose, or the owner's own words.
 
 1. Trip end: “End after estimate (Recommended)” — “3 min after the last arrival
@@ -132,6 +132,13 @@ description the owner chose, or the owner's own words.
     the question needs 337 of a 331 pt track; its stopgap shrank the
     question's font). The lead applied the ruling to iOS too: 18 pt at 375 pt
     and narrower, and the font stopgap goes.
+26. Narrow-phone header, asked during the build after phase 4d showed a
+    replaced arrival time split as `10:1` over `8` in the 360 dp Android
+    header (iOS at 375 wraps `Bondi Junction`): “Port it in this item
+    (Recommended)” — Android and iOS use the web's narrow-phone sizes at 375
+    and below (`web/app.css` `@media (max-width: 375px)`: Home figure column
+    92, figure 56, wide figure 44, station names 15; the board title and bar
+    rules), as ruling 25 did for the margin; 390 and above are unchanged.
 
 The owner's regression concern in ruling 13 is binding: automatic trip starts
 that work today must keep working. Every rule below only adds ways in, and the
