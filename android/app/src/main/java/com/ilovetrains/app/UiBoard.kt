@@ -10,6 +10,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
@@ -65,39 +66,53 @@ fun BoardScreen(state: AppState, actions: UiActions) {
                 }
             }
         }
-        LazyColumn(Modifier.weight(1f).fillMaxWidth().nestedScroll(pullAtTop).testTag("board-list"), state = listState) {
-            items(past, key = { it.key }) { journey ->
-                BoardRow(journey, board, state.now, onClick = { actions.openJourney(journey) })
-            }
-            item(key = "now") {
-                Column(Modifier.fillMaxWidth().height(32.dp).testTag("board-now").padding(horizontal = PagePadding)) {
-                    Label("Now · ${clockTime(state.now)}", Modifier.padding(top = 9.dp), color = c.ink, size = 11)
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+            val viewport = maxHeight
+            LazyColumn(Modifier.fillMaxSize().nestedScroll(pullAtTop).testTag("board-list"), state = listState) {
+                items(past, key = { it.key }) { journey ->
+                    BoardRow(journey, board, state.now, onClick = { actions.openJourney(journey) })
                 }
-            }
-            items(future, key = { it.key }) { journey ->
-                BoardRow(journey, board, state.now, onClick = { actions.openJourney(journey) })
-            }
-            if (visibleJourneys.isEmpty()) item(key = "empty") {
-                Column(Modifier.fillMaxWidth().padding(horizontal = PagePadding, vertical = 22.dp)) {
-                    Text(board.error ?: if (board.offline) "No services on the last board we could load"
-                        else "No services in the next few hours",
-                        color = if (board.error != null) c.warning else c.ink2,
-                        fontSize = 16.sp, fontWeight = FontWeight.Light, lineHeight = 23.sp)
-                    if (board.error != null) Label("Update timetable",
-                        Modifier.heightIn(min = 44.dp).clickable(role = Role.Button, onClick = actions::updateTimetable)
-                            .wrapContentHeight(Alignment.CenterVertically), color = c.ink, size = 11)
-                }
-            }
-            if (visibleJourneys.isNotEmpty()) item(key = "end") {
-                Column(Modifier.fillMaxWidth().padding(horizontal = PagePadding, vertical = 15.dp)) {
-                Label(if (visibleJourneys.size == 6) "— Six services shown" else "— End of board")
-                    if (visibleJourneys.size <= 3) {
-                        Text("Nothing scheduled after ${visibleJourneys.lastOrNull()?.let { clockTime(it.effectiveDeparture) } ?: clockTime(state.now)}.",
-                            color = c.ink3, fontSize = 14.sp, fontWeight = FontWeight.Light,
-                            modifier = Modifier.padding(top = 8.dp))
+                // One item at least a screen tall, so NOW can rest at the top of a short board while rows arrive above.
+                item(key = "now") {
+                    Column(Modifier.fillMaxWidth().heightIn(min = viewport)) {
+                        Column(Modifier.fillMaxWidth().height(32.dp).testTag("board-now").padding(horizontal = PagePadding)) {
+                            Label("Now · ${clockTime(state.now)}", Modifier.padding(top = 9.dp), color = c.ink, size = 11)
+                        }
+                        future.forEach { journey ->
+                            key(journey.key) { BoardRow(journey, board, state.now, onClick = { actions.openJourney(journey) }) }
+                        }
+                        if (visibleJourneys.isEmpty()) BoardEmpty(board, actions)
+                        else BoardEnd(visibleJourneys, state.now)
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun BoardEmpty(board: BoardData, actions: UiActions) {
+    val c = LocalTrainColors.current
+    Column(Modifier.fillMaxWidth().padding(horizontal = PagePadding, vertical = 22.dp)) {
+        Text(board.error ?: if (board.offline) "No services on the last board we could load"
+            else "No services in the next few hours",
+            color = if (board.error != null) c.warning else c.ink2,
+            fontSize = 16.sp, fontWeight = FontWeight.Light, lineHeight = 23.sp)
+        if (board.error != null) Label("Update timetable",
+            Modifier.heightIn(min = 44.dp).clickable(role = Role.Button, onClick = actions::updateTimetable)
+                .wrapContentHeight(Alignment.CenterVertically), color = c.ink, size = 11)
+    }
+}
+
+@Composable
+private fun BoardEnd(journeys: List<Journey>, now: Long) {
+    val c = LocalTrainColors.current
+    Column(Modifier.fillMaxWidth().padding(horizontal = PagePadding, vertical = 15.dp)) {
+        Label(if (journeys.size == 6) "— Six services shown" else "— End of board")
+        if (journeys.size <= 3) {
+            Text("Nothing scheduled after ${journeys.lastOrNull()?.let { clockTime(it.effectiveDeparture) } ?: clockTime(now)}.",
+                color = c.ink3, fontSize = 14.sp, fontWeight = FontWeight.Light,
+                modifier = Modifier.padding(top = 8.dp))
         }
     }
 }

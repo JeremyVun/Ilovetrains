@@ -17,6 +17,8 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -310,6 +312,31 @@ class ControllerParityInstrumentedTest {
         assertFalse(model.state.value.focusComplete)
         assertTrue(storedAfterWrites().rides.isEmpty())
         assertTrue("provider stop callback was not invoked", stopCalls >= 3)
+    }
+
+    @Test fun cancellingSetupLocationLeavesArrivalMonitoringRunning() = runBlocking {
+        val now = System.currentTimeMillis()
+        val journey = journey(primaryTrip.from, primaryTrip.to, now - 600_000, now + 1_200_000, "T1")
+        val board = BoardData(primaryTrip.from, primaryTrip.to, listOf(journey), now, source = "live")
+        val model = model(UserData(trips = listOf(primaryTrip), useLocation = true,
+            focus = FocusedJourney(primaryTrip.id, false, journey, board, pinned = false)))
+        var listening = false
+        var setupCancels = 0
+        withContext(Dispatchers.Main) {
+            model.attachActivity(Any(), {}, {}, { listening = false }, { setupCancels++ },
+                { beforeStart -> beforeStart(); listening = true; true }, { listening = false }, {})
+            model.activityResumed()
+            model.permission(granted = true, denied = false)
+            assertTrue(listening && model.arrivalMonitoringActive)
+
+            model.newTrip()
+            model.requestLocation()
+            model.setupOriginQueryChanged()
+            model.back()
+        }
+        assertTrue("setup location was never cancelled", setupCancels >= 3)
+        assertTrue("cancelling setup location stopped arrival monitoring", listening)
+        assertEquals(listening, model.arrivalMonitoringActive)
     }
 
     @Test fun expiredGuardWaitsForResumeEvidenceThenCountsTheRideInsteadOfReviving() = runBlocking {
