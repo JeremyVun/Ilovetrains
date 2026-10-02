@@ -12,7 +12,10 @@ final class PredictionTests: XCTestCase {
             let fix = fixture.fix.map { $0.fix(defaultAt: now) }
             let previousFix = fixture.previousFix.map { $0.fix(defaultAt: now) }
             let result = predict(data: data, stations: stations, fix: fix, previousFix: previousFix, now: now)
-            let here = locateHere(data: data, stations: stations, fix: fix, previousFix: previousFix, now: now)
+            // The web's here is geometry alone; the location preference gates its callers.
+            var located = data
+            located.useLocation = true
+            let here = locateHere(data: located, stations: stations, fix: fix, previousFix: previousFix, now: now)
 
             XCTAssertEqual(here?.station.id, fixture.expected.here?.stationId, fixture.name)
             XCTAssertEqual(here?.tier, fixture.expected.here?.tier, fixture.name)

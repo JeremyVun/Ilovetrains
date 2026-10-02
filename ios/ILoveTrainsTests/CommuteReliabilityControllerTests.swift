@@ -8,6 +8,8 @@ import XCTest
 final class CommuteReliabilityControllerTests: XCTestCase {
     private var models: [TrainViewModel] = []
     private let analytics = makeAnalytics(debug: true)
+    private var origin: Station!
+    private var destination: Station!
     private var rhodes: Station!
     private var townHall: Station!
 
@@ -15,6 +17,8 @@ final class CommuteReliabilityControllerTests: XCTestCase {
         try await super.setUp()
         OfflineTransport.reset()
         let stations = try await DeviceStore(directory: temporaryDirectory()).stations()
+        origin = try XCTUnwrap(stations.first { $0.id == "200060" })
+        destination = try XCTUnwrap(stations.first { $0.id == "215020" })
         rhodes = try XCTUnwrap(stations.first { $0.id == "213820" })
         townHall = try XCTUnwrap(stations.first { $0.id == "200070" })
     }
@@ -30,8 +34,8 @@ final class CommuteReliabilityControllerTests: XCTestCase {
         let planner = OfflinePlanner()
         let boarded = try await firstDirect(planner, at: mondayMorning)
         let clock = TestClock(boarded.effectiveDeparture + 180_000)
-        let seen = LastAnswer(tripId: "rt", reverse: false, at: boarded.effectiveDeparture - 120_000, stationId: rhodes.id,
-                              board: BoardData(from: rhodes, to: townHall, journeys: [boarded], generatedAt: 0, offline: true),
+        let seen = LastAnswer(tripId: "rt", reverse: false, at: boarded.effectiveDeparture - 120_000, stationId: origin.id,
+                              board: BoardData(from: origin, to: destination, journeys: [boarded], generatedAt: 0, offline: true),
                               journey: boarded)
         let location = ScriptedLocation()
         let (store, model) = try await model(UserData(trips: [commute], lastAnswer: seen), planner: planner, clock: clock, location: location)
@@ -41,7 +45,7 @@ final class CommuteReliabilityControllerTests: XCTestCase {
         XCTAssertNotEqual(model.state.recommendation?.journey.key, boarded.key, "the open's refresh answers with a later train")
         let stored = await store.load().lastAnswer
         XCTAssertEqual(stored?.journey.key, boarded.key, "an unsighted record cannot replace the held one")
-        XCTAssertEqual(stored?.stationId, rhodes.id)
+        XCTAssertEqual(stored?.stationId, origin.id)
         XCTAssertFalse(location.requests.isEmpty)
         XCTAssertTrue(location.requests.allSatisfy { $0 }, "the open asks for a precise fix while the snapshot's train is under way")
 
@@ -61,8 +65,8 @@ final class CommuteReliabilityControllerTests: XCTestCase {
         model.resume()
         try await refreshWritten(model, store)
 
-        model.receiveLocation(Fix(at: (rhodes.lat, rhodes.lon), time: clock.now, speed: 0))
-        try await until { await store.load().lastAnswer?.stationId == self.rhodes.id }
+        model.receiveLocation(Fix(at: (origin.lat, origin.lon), time: clock.now, speed: 0))
+        try await until { await store.load().lastAnswer?.stationId == self.origin.id }
         let shown = try XCTUnwrap(model.state.recommendation?.journey)
         let sighted = await store.load().lastAnswer
         XCTAssertEqual(sighted?.journey.key, shown.key)
@@ -117,36 +121,48 @@ final class CommuteReliabilityControllerTests: XCTestCase {
     }
 
     func testOfflineOnBoardEntryMatchesTheRunningTimetableService() async throws {
+        // The owner's commute; every bundled service changes on the way. Late in the ride, thirty planned
+        // services from even a long cached lookback still reach the train under way.
         let planner = OfflinePlanner()
-        let riding = try await firstDirect(planner, at: mondayMorning)
-        let halfway = riding.effectiveDeparture + (riding.effectiveArrival - riding.effectiveDeparture) / 2
-        let clock = TestClock(halfway - 30_000)
-        let (store, model) = try await model(UserData(trips: [commute]), planner: planner, clock: clock, location: ScriptedLocation())
+        try await planner.initialize()
+        let planned = try await planner.plan(from: rhodes, to: townHall, at: mondayMorning, modes: allModes,
+                                             limit: timetablePageLimit, maxTransfers: 2)
+        let riding = try XCTUnwrap(planned.journeys.first { !$0.cancelled })
+        let progress = 0.8
+        let ridingNow = riding.effectiveDeparture + (riding.effectiveArrival - riding.effectiveDeparture) * progress
+        let clock = TestClock(ridingNow - 30_000)
+        let trip = SavedTrip(id: "rt", from: rhodes, to: townHall)
+        let (store, model) = try await model(UserData(trips: [trip]), planner: planner, clock: clock, location: ScriptedLocation())
         model.resume()
-        try await refreshWritten(model, store)
+        try await refreshWritten(model, store, from: rhodes, to: townHall)
+        let along = { (fraction: Double) in
+            (self.rhodes.lat + (self.townHall.lat - self.rhodes.lat) * fraction, self.rhodes.lon + (self.townHall.lon - self.rhodes.lon) * fraction)
+        }
 
-        model.receiveLocation(Fix(at: along(0.46), time: clock.now, speed: 14))
+        model.receiveLocation(Fix(at: along(progress - 0.04), time: clock.now, speed: 14))
         XCTAssertNil(model.state.focus, "one fix with no heading cannot tell the direction")
-        clock.now = halfway
-        model.receiveLocation(Fix(at: along(0.5), time: clock.now, speed: 14))
+        clock.now = ridingNow
+        let asked = OfflineTransport.requests().count
+        model.receiveLocation(Fix(at: along(progress), time: clock.now, speed: 14))
         try await until(seconds: 30) { model.state.focus != nil }
 
-        XCTAssertEqual(model.state.focus?.journey.key, riding.key)
+        XCTAssertEqual(model.state.focus?.journey.key, riding.key,
+                       "\(planned.journeys.prefix(8).map { "\($0.key) \(clockTime($0.effectiveDeparture))-\(clockTime($0.effectiveArrival))" })")
         XCTAssertEqual(model.state.focus?.pinned, false)
         XCTAssertEqual(model.state.focus?.board.from.id, rhodes.id)
         XCTAssertEqual(analytics.ledger.filter { $0.t == "entered_inferred" }.count, 1)
-        let lookback = iso(halfway - onBoardDefaultRide - onBoardLookbackMargin)
-        XCTAssertTrue(OfflineTransport.requests().contains { $0.query?.contains("at=\(lookback)") == true },
-                      "the running services are asked for online too, and that request fails")
+        let asks = OfflineTransport.requests().dropFirst(asked).compactMap(\.query)
+        XCTAssertTrue(asks.contains { $0.contains("at=") && $0.contains("limit=\(onBoardLimit)") && !$0.contains("at=\(iso(riding.departure))") },
+                      "the running services are asked for online too, and that request fails: \(asks)")
     }
 
     func testTheEvidenceWaitHoldsOnceAVisitAndARestartCannotExtendIt() async throws {
         let now = mondayMorning
         let clock = TestClock(now)
-        let journey = Journey(legs: [Leg(line: "T9", mode: "train", headsign: "Town Hall", from: rhodes, to: townHall,
+        let journey = Journey(legs: [Leg(line: "T1", mode: "train", headsign: "Parramatta", from: origin, to: destination,
                                          departure: now - 2_400_000, arrival: now - 600_000)])
         let focus = FocusedJourney(tripId: "rt", reverse: false, journey: journey,
-                                   board: BoardData(from: rhodes, to: townHall, journeys: [journey], generatedAt: now - 2_400_000),
+                                   board: BoardData(from: origin, to: destination, journeys: [journey], generatedAt: now - 2_400_000),
                                    pinned: false, arrivalGuard: ArrivalGuard(armed: true, retainedAt: now - 300_000))
         let location = ScriptedLocation()
         let (store, model) = try await model(UserData(trips: [commute], focus: focus), clock: clock, location: location, network: false)
@@ -175,13 +191,13 @@ final class CommuteReliabilityControllerTests: XCTestCase {
         let clock = TestClock(mondayMorning + 600_000)
         try await planner.initialize()
         let anchor = clock.now - firstPastPageLookback
-        let planned = try await planner.plan(from: rhodes, to: townHall, at: anchor, modes: allModes, limit: timetablePageLimit, maxTransfers: 2)
+        let planned = try await planner.plan(from: origin, to: destination, at: anchor, modes: allModes, limit: timetablePageLimit, maxTransfers: 2)
             .journeys.filter { $0.effectiveDeparture < clock.now - 900_000 }
         XCTAssertGreaterThanOrEqual(planned.count, 2)
         var online = planned[0]
         online.legs[0].estimatedDeparture = online.legs[0].departure + 120_000
         online.legs[0].fromPlatform = "9"
-        let onlineOnly = Journey(legs: [Leg(line: "T9X", mode: "train", headsign: "Town Hall", from: rhodes, to: townHall,
+        let onlineOnly = Journey(legs: [Leg(line: "T1X", mode: "train", headsign: "Parramatta", from: origin, to: destination,
                                             departure: anchor + 60_000, arrival: anchor + 1_500_000)])
         OfflineTransport.setPast(departures([online, onlineOnly], generatedAt: clock.now))
         let (_, model) = try await model(UserData(trips: [commute]), planner: planner, clock: clock, location: ScriptedLocation())
@@ -230,7 +246,7 @@ final class CommuteReliabilityControllerTests: XCTestCase {
         XCTAssertNil(mergedPage(online: nil, timetable: nil))
     }
 
-    private var commute: SavedTrip { SavedTrip(id: "rt", from: rhodes, to: townHall) }
+    private var commute: SavedTrip { SavedTrip(id: "rt", from: origin, to: destination) }
 
     /// A weekday morning inside the bundled timetable's coverage.
     private var mondayMorning: Millis {
@@ -238,13 +254,14 @@ final class CommuteReliabilityControllerTests: XCTestCase {
     }
 
     private func along(_ fraction: Double) -> (Double, Double) {
-        (rhodes.lat + (townHall.lat - rhodes.lat) * fraction, rhodes.lon + (townHall.lon - rhodes.lon) * fraction)
+        (origin.lat + (destination.lat - origin.lat) * fraction, origin.lon + (destination.lon - origin.lon) * fraction)
     }
 
     private func firstDirect(_ planner: OfflinePlanner, at: Millis) async throws -> Journey {
         try await planner.initialize()
-        let board = try await planner.plan(from: rhodes, to: townHall, at: at, modes: ["train"], limit: timetablePageLimit, maxTransfers: 2)
-        return try XCTUnwrap(board.journeys.first { $0.legs.count == 1 && !$0.cancelled && $0.effectiveDeparture >= at })
+        let board = try await planner.plan(from: origin, to: destination, at: at, modes: ["train"], limit: timetablePageLimit, maxTransfers: 2)
+        return try XCTUnwrap(board.journeys.first { $0.legs.count == 1 && !$0.cancelled && $0.effectiveDeparture >= at },
+                             "\(board.error ?? "") \(board.journeys.prefix(6).map { "\($0.legs.map(\.line)) \(clockTime($0.effectiveDeparture))" })")
     }
 
     private func model(
@@ -271,9 +288,10 @@ final class CommuteReliabilityControllerTests: XCTestCase {
     }
 
     /// The refresh writes `lastAnswer` after it caches its board; an unchanged record is never saved, so wait past both.
-    private func refreshWritten(_ model: TrainViewModel, _ store: DeviceStore) async throws {
+    private func refreshWritten(_ model: TrainViewModel, _ store: DeviceStore, from: Station? = nil, to: Station? = nil) async throws {
+        let pair = (from ?? origin!, to ?? destination!)
         try await until { !model.state.refreshing && model.state.recommendation != nil }
-        try await until { await store.cached(from: self.rhodes, to: self.townHall, modes: allModes) != nil }
+        try await until { await store.cached(from: pair.0, to: pair.1, modes: allModes) != nil }
         try await Task.sleep(for: .milliseconds(300))
     }
 
@@ -310,7 +328,7 @@ final class CommuteReliabilityControllerTests: XCTestCase {
             }]
         }
         return try! JSONSerialization.data(withJSONObject: [
-            "from": stop(rhodes), "to": stop(townHall), "generatedAt": time(generatedAt), "journeys": rows
+            "from": stop(origin), "to": stop(destination), "generatedAt": time(generatedAt), "journeys": rows
         ])
     }
 }
