@@ -164,11 +164,9 @@ Keep the chronological board route and its existing limits. A separate
 recommendation result retains its own source in the planner/controller envelope
 so it is not lost by the board's prefix limit. Reuse loaded connections and
 realtime overlays; do not reload the timetable for each objective.
-Home recommends from the current time. The offline board is two plans merged
-by journey key: the next 24 departures from now, and 24 from 15 minutes
-earlier to retain recently departed services (owner ruling 24, 2026-10-02).
-The earlier plan alone filled with trains that had left on a busy corridor:
-Central → Parramatta at 08:00 offered nothing after 07:59.
+Home recommends from the current time, even though the board's local plan
+also keeps the 15 minutes before it (two merged plans, described with the
+board cache below).
 
 The recommendation pass examines the first 72 distinct eligible origin
 services in effective-departure order, without the board pass's sparse hourly
