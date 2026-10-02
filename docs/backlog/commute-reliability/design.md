@@ -317,10 +317,26 @@ Inference evaluates two records, and either may enter: the snapshot taken when
 this Home open began, before any write of this open, and the stored record.
 The web already infers from its `previousOpen` snapshot; that stays exactly
 as it is. Platform-sighted entry's "seen at the platform" condition is
-`D − at ≤ 15 min` with no lower bound on every client, as `client-storage.md`
-states and the web does. Both natives carried an extra `0 ≤ D − at`. Phase 2b
-found it, and the lead removed it on 2026-10-02 for parity: it only adds
-entries. Android and iOS gain the same snapshot, which is what fixes the
+`0 ≤ D − at ≤ 15 min` on every client: a record written after its train left
+is a retained answer, not evidence of boarding. The lead briefly removed the
+natives' lower bound for parity with the contract text (phases 2c and 3b). The
+Fable review then showed that offline Android keeps the departed train as
+Home's lead, re-records it at `D + 70 s` and entered it after the rider boarded
+the next train. The web never writes such a record, because its lead always
+departs at or after now, so the bound was the web's behaviour all along. It
+is restored on all three clients and written into `client-storage.md`. This
+also reconciles `native-data.md` (an offline retained answer "does not … infer
+boarding") with this rule (lead's decision, 2026-10-02).
+
+A record sighted at the origin at least 60 s after the snapshot journey's
+effective departure also retires the open snapshot, not only the stored record:
+being seen at the platform again means the rider did not board that train
+(ruling 2). The review confirmed on all three clients that otherwise a rider
+who let the 08:00 go and boarded the 08:08 after reopening the app was
+entered on the 08:00. Stop trip and the other explicit clears clear `lastOpen`
+and the snapshot unconditionally, and expiry clears a record only when it
+names the expired trip, direction and journey (the web's rule; the natives
+matched trip and direction only). Android and iOS gain the same snapshot, which is what fixes the
 open race on its own. The hold rule protects the stored record for an app that
 stays open. Keeping both is deliberate (ruling 13): today's working auto-start
 path is untouched, and the new rule can only add entries. The 60 s margin
