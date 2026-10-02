@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  inferFromRecords, inferOnBoard, onBoardRequests, replacesLastOpen, runningJourney, startable, writeLastOpen
+  inferFromRecords, inferOnBoard, onBoardRequests, replacesLastOpen, retiresSnapshot, runningJourney, startable,
+  writeLastOpen
 } from '../js/focus.js';
 import { trainSpeed } from '../js/stations.js';
 
@@ -22,9 +23,13 @@ for (const value of fixture.holdCases.cases) {
 
 function entered(value) {
   let doc = value.doc;
-  for (const write of value.writes) doc = writeLastOpen(doc, write.record, write.nowMs, write.sightingAt);
+  let snapshot = value.snapshot;
+  for (const write of value.writes) {
+    if (retiresSnapshot(doc, snapshot, write.record, write.sightingAt)) snapshot = null;
+    doc = writeLastOpen(doc, write.record, write.nowMs, write.sightingAt);
+  }
   const described = (via, focus) => focus && { via, tripId: focus.tripId, direction: focus.direction, journeyKey: keyOf(focus.journey) };
-  const platform = inferFromRecords(doc, value.snapshot, value.nowMs, value.fix);
+  const platform = inferFromRecords(doc, snapshot, value.nowMs, value.fix);
   if (platform) return described('platform', platform);
   if (value.expectedRequests) {
     assert.deepEqual(onBoardRequests(doc, value.nowMs, value.fix, value.previousFix, value.cached)

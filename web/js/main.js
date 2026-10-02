@@ -12,7 +12,7 @@ import { journeyDetail, journeyKey, departureKey, arrivalMs, departureMs } from 
 import {
   focusOf, visibleFocus, setFocus, clearFocus, isFocused, focusExpired, matchJourney,
   applyFocusSnapshot, applyArrivalResult, composedJourney, recoveryModel, recoveryOf,
-  inferFromRecords, inferOnBoard, onBoardRequests, writeLastOpen, tickNeedsFix,
+  inferFromRecords, inferOnBoard, onBoardRequests, writeLastOpen, retiresSnapshot, tickNeedsFix,
   declineFocus, runningJourney, startable, journeyCancelled, pinResult, rideAdded, rideRecorded,
   TRAVEL_LATE_MS
 } from './focus.js';
@@ -678,9 +678,10 @@ function noteLastOpen() {
   if (!journey) return;
   const fix = stationFix();
   const station = sightingOf(here(state.doc, state.stations, fix), fix);
-  const next = writeLastOpen(state.doc, {
-    station, tripId: state.selection.tripId, direction: state.selection.direction, journey
-  }, now(), station ? fix.at : null);
+  const record = { station, tripId: state.selection.tripId, direction: state.selection.direction, journey };
+  const sightingAt = station ? fix.at : null;
+  if (retiresSnapshot(state.doc, state.previousOpen, record, sightingAt)) state.previousOpen = null;
+  const next = writeLastOpen(state.doc, record, now(), sightingAt);
   if (next !== state.doc) ctx.update(next);
 }
 

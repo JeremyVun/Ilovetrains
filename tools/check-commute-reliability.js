@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 
 /*
- * Usage: node tools/check-commute-reliability.js [--out DIR] [--only past,arrival,reopen,start,boarding,onboard]
+ * Usage: node tools/check-commute-reliability.js [--out DIR] [--only past,arrival,reopen,start,boarding,snapshot,onboard]
  *
  * Builds the TfNSW stub and the server into a temporary directory, boots both
  * on free loopback ports with no API key (fixtures only), and drives this
  * checkout's web client in headless Chrome through the commute-reliability
  * rules: the board's first past page, a guarded trip settling by estimate, the
  * ten-minute new open, running-row starts and Stop trip, Home left open
- * through boarding, and on-board entry. Screens land in --out.
+ * through boarding, the open snapshot retired by a platform sighting after its
+ * train left, and on-board entry. Screens land in --out.
  *
  * The clock, location permission, geolocation provider and page visibility are
  * page-side adapters installed before the app loads. Departures go to the real
@@ -35,7 +36,7 @@ const option = (flag, fallback) => {
   return index >= 0 ? argv[index + 1] : fallback;
 };
 const outDir = path.resolve(option('--out', path.join(os.tmpdir(), 'ilovetrains-commute-reliability')));
-const CASES = ['past', 'arrival', 'reopen', 'start', 'boarding', 'onboard'];
+const CASES = ['past', 'arrival', 'reopen', 'start', 'boarding', 'snapshot', 'onboard'];
 const only = option('--only', CASES.join(',')).split(',');
 for (const name of only) if (!CASES.includes(name)) throw new Error(`--only takes ${CASES.join(',')}`);
 
@@ -423,6 +424,52 @@ async function checkBoarding(base) {
   });
 }
 
+/* Rule 3 and ruling 2 (the adversarial review's finding 1): Home opens on
+   Central's platform before the 23:03 and a quick app switch snapshots that
+   record. Still on the platform 70 s after the 23:03 left, the rider did not
+   board it: the refresh records the next train and retires the snapshot, so
+   boarding that train enters it rather than the departed 23:03. */
+async function checkSnapshot(base) {
+  await withPage(async (page) => {
+    await open(page, base, { now: at('23:00:30'), doc: documentWith(), fastRefresh: 400,
+      answer: { lat: CENTRAL.location.lat, lon: CENTRAL.location.lon, accuracy: 10, speed: 0 } });
+    const result = await evaluate(page, async () => {
+      const h = window.__reliability;
+      const t = window.__trains;
+      const departureOf = (record) => record?.journey?.departure?.scheduled || null;
+      const seen = await window.__wait(() => t.state.doc.lastOpen?.station?.id === '200060' && t.state.doc.lastOpen,
+        'no sighted record at Central');
+      const first = departureOf(seen);
+      h.setHidden(true);
+      h.clock.now += 20_000;
+      h.setHidden(false);
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      const snapshot = departureOf(t.state.previousOpen);
+      h.clock.now = Date.parse(first) + 70_000;
+      const held = await window.__wait(() => departureOf(t.state.doc.lastOpen) !== first && t.state.doc.lastOpen,
+        'the platform sighting after departure did not replace the record', 400);
+      const stored = departureOf(held);
+      const snapshotAfter = departureOf(t.state.previousOpen);
+      h.clock.now = Date.parse(stored) + 120_000;
+      h.geo.answer = { lat: -33.8772, lon: 151.1855, accuracy: 10, speed: 15, heading: 290 };
+      await window.__wait(() => t.state.doc.focus, 'no trip mode after boarding the next train', 400);
+      return { first, snapshot, stored, heldAt: held.station?.id, snapshotAfter,
+        entered: departureOf(t.state.doc.focus), by: t.state.doc.focus.by };
+    });
+    if (Date.parse(result.first) !== at('23:03:00') || result.snapshot !== result.first) {
+      throw new Error(`the return did not snapshot the 23:03 record: ${JSON.stringify(result)}`);
+    }
+    if (result.heldAt !== CENTRAL.id || result.snapshotAfter !== null) {
+      throw new Error(`the sighting after departure did not retire the snapshot: ${JSON.stringify(result)}`);
+    }
+    if (result.entered !== result.stored || result.by !== 'inferred') {
+      throw new Error(`entered the departed ${result.entered}, not the boarded ${result.stored}: ${JSON.stringify(result)}`);
+    }
+    await shoot(page, 'snapshot-retired-entered');
+    console.log(`PASS rule 3 snapshot: seen at Central 70 s after the 23:03 left, the snapshot retired and boarding entered the ${result.stored}`);
+  });
+}
+
 /* Rule 5: opened on a moving train with no record, 10.75 km from Central and
    9.16 km from Parramatta (position progress 0.54), the fix matches the 23:12
    (time progress 0.54) over the 23:03 (0.71) and the 23:18 (0.24). */
@@ -454,7 +501,7 @@ let stack = null;
 try {
   stack = await bootStack(work);
   const checks = { past: checkPast, arrival: checkArrival, reopen: checkReopen, start: checkStart,
-    boarding: checkBoarding, onboard: checkOnBoard };
+    boarding: checkBoarding, snapshot: checkSnapshot, onboard: checkOnBoard };
   for (const name of only) await checks[name](stack.base);
   console.log(`screens in ${outDir}`);
 } finally {

@@ -188,6 +188,15 @@ export function writeLastOpen(doc, record, nowMs, sightingAtMs = null) {
   return replacesLastOpen(doc, record, nowMs, sightingAtMs) ? recordLastOpen(doc, record, nowMs) : doc;
 }
 
+// Ruling 2: seen at the origin a minute after the snapshot's train left, the rider did not board it.
+export function retiresSnapshot(doc, snapshot, incoming, sightingAtMs = null) {
+  const trip = snapshot && findTrip(doc, snapshot.tripId);
+  const departure = trip ? departureMs(snapshot.journey) : null;
+  return departure !== null && Boolean(incoming && incoming.station)
+    && incoming.station.id === leg(trip, snapshot.direction).from.id
+    && Number.isFinite(sightingAtMs) && sightingAtMs >= departure + HOLD_SIGHTING_AFTER_MS;
+}
+
 export function tickNeedsFix(doc, nowMs, shownLeadDepartures, fix, previousFix) {
   if (shownLeadDepartures.some((departure) => nowMs >= departure && nowMs - departure <= SHOWN_DEPARTURE_FIX_MS)) return true;
   const stored = doc && doc.lastOpen;

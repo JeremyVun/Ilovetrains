@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { predict, locate, scoreCandidate, historyEvidence, automaticHomeOf } from '../web/js/predict.js';
 import { here, sightingOf, trainSpeed } from '../web/js/stations.js';
 import {
-  inferFromRecords, inferOnBoard, onBoardRequests, replacesLastOpen, runningJourney, startable, writeLastOpen
+  inferFromRecords, inferOnBoard, onBoardRequests, replacesLastOpen, retiresSnapshot, runningJourney, startable,
+  writeLastOpen
 } from '../web/js/focus.js';
 import { readFileSync } from 'node:fs';
 import { boardModel } from '../web/js/rowmodel.js';
@@ -277,13 +278,32 @@ const entryCases = [
   { name: 'a journey whose mode is turned off cannot be entered', snapshot: SEEN,
     doc: commuteDoc({ lastOpen: SEEN, preferences: { useLocation: true, enabledModes: ['metro', 'ferry'] } }),
     nowMs: ms('08:10'), fix: fixAtPlace(STRATHFIELD, '08:10'), expected: null },
+  { name: 'snapshot: a same-origin sighting 60 s after departure retires the departed train from the snapshot too',
+    snapshot: SEEN, doc: commuteDoc({ lastOpen: SEEN }), writes: [writeOf('08:01:10', t9('08:08'), {}, '08:01:10')],
+    nowMs: ms('08:12'), fix: fixAtPlace(STRATHFIELD, '08:12', { speed: 14 }), expected: platform(t9('08:08')) },
+  { name: 'snapshot: a same-origin sighting fix taken 59.999 s after departure keeps it, though written later',
+    snapshot: SEEN, doc: commuteDoc(), writes: [writeOf('08:01', t9('08:08'), {}, '08:00:59.999')],
+    nowMs: ms('08:12'), fix: fixAtPlace(STRATHFIELD, '08:12', { speed: 14 }), expected: platform(t9('08:00')) },
+  { name: 'snapshot: a same-origin sighting fix taken exactly 60 s after departure retires it',
+    snapshot: SEEN, doc: commuteDoc(), writes: [writeOf('08:01', t9('08:08'), {}, '08:01')],
+    nowMs: ms('08:12'), fix: fixAtPlace(STRATHFIELD, '08:12', { speed: 14 }), expected: platform(t9('08:08')) },
+  { name: 'snapshot: a sighting at an intermediate station keeps it',
+    snapshot: SEEN, doc: commuteDoc(), writes: [writeOf('08:06', t9('08:08'), { station: STRATHFIELD }, '08:06')],
+    nowMs: ms('08:12'), fix: fixAtPlace(STRATHFIELD, '08:12', { speed: 14 }), expected: platform(t9('08:00')) },
+  { name: 'snapshot: a same-origin sighting recording another saved trip retires it',
+    snapshot: SEEN, doc: commuteDoc(), writes: [writeOf('08:01:10', t9('08:04', REDFERN), { tripId: 'rr' }, '08:01:10')],
+    nowMs: ms('08:12'), fix: fixAtPlace(STRATHFIELD, '08:12', { speed: 14 }), expected: platform(t9('08:04', REDFERN), 'rr') },
 ].map((value) => ({ writes: [], previousFix: null, boards: {}, cached: {}, ...value }));
 
 function enteredBy(value) {
   let doc = value.doc;
-  for (const write of value.writes) doc = writeLastOpen(doc, write.record, write.nowMs, write.sightingAt);
+  let snapshot = value.snapshot;
+  for (const write of value.writes) {
+    if (retiresSnapshot(doc, snapshot, write.record, write.sightingAt)) snapshot = null;
+    doc = writeLastOpen(doc, write.record, write.nowMs, write.sightingAt);
+  }
   const described = (via, focus) => focus && { via, tripId: focus.tripId, direction: focus.direction, journeyKey: keyOf(focus.journey) };
-  const platformEntry = inferFromRecords(doc, value.snapshot, value.nowMs, value.fix);
+  const platformEntry = inferFromRecords(doc, snapshot, value.nowMs, value.fix);
   if (platformEntry) return described('platform', platformEntry);
   if (value.expectedRequests) {
     const asked = onBoardRequests(doc, value.nowMs, value.fix, value.previousFix, value.cached)
@@ -456,8 +476,12 @@ const inference = {
     cases: holdCases
   },
   entryCases: {
-    run: 'Apply each write in order through the hold rule (a write that replaces sets lastOpen = {at: its nowMs '
-      + 'as ISO, ...record}). Then evaluate a Home fix at nowMs: platform-sighted inference from snapshot, then from '
+    run: 'Apply each write in order. A write whose record is sighted at the origin of the snapshot\'s '
+      + 'leg(trip, direction) on the saved trip (record.station.id equal to that origin\'s id), by a fix taken at '
+      + 'sightingAt >= the snapshot journey\'s effective departure + 60 s, retires the snapshot: it is null from then '
+      + 'on, whether or not the hold rule lets the write replace the stored record. The write\'s nowMs plays no part '
+      + 'in retirement. Then the write goes through the hold rule (a write that replaces sets lastOpen = {at: its '
+      + 'nowMs as ISO, ...record}). Then evaluate a Home fix at nowMs: platform-sighted inference from snapshot, then from '
       + 'the stored doc.lastOpen. Only when neither enters and the fix is at train speed (given previousFix), '
       + 'on-board entry: expectedRequests, when present, is the ordered list of departures requests '
       + '(from and to are station ids, at is epoch ms, limit the journey count) built from doc, fix, previousFix and '

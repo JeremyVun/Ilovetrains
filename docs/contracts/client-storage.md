@@ -617,8 +617,16 @@ stopping a trip, the return offer, deletion and expiry clear the record.
 
 **Two records.** Inference evaluates the snapshot taken when this Home open
 began, before any write of this open, and then the stored record; either may
-enter. Every client keeps the snapshot (web `previousOpen`, unchanged since
-before this rule), which on its own closes the race where an open's own
+enter. A record sighted at the origin `O` of the snapshot's
+`leg(trip, direction)` by a fix taken at least 60 s after the snapshot
+journey's effective departure retires the snapshot for the rest of the visit,
+whether or not the hold rule lets that record replace the stored one: seen at
+the platform again, the rider did not board that train (owner ruling 2,
+2026-10-01). As in the hold rule the clock is the sighting fix's, not the
+write's, and the record may name any trip from `O`. Without this, a rider who
+let the shown train go and boarded the next after a return to the app was
+entered on the train they let go. Every client keeps the snapshot (web
+`previousOpen`), which on its own closes the race where an open's own
 refresh overwrites the record before the fix arrives; the hold rule protects
 the stored record for an app that stays open. Keeping both is deliberate
 (owner ruling 13, 2026-10-02): the working automatic start is untouched and
@@ -677,9 +685,13 @@ as it does a hand-focused journey. Condition 3 is what stops a walk back home
 for a forgotten laptop reading as a ride. There is no history term: a waiver
 would buy wrong entries for people whose days vary.
 
-Inference attaches to the journey that was SHOWN, so a rider who missed it and
-took the next one gets directions one service off. That is a known and accepted
-gap, not a defect.
+Inference attaches to the journey that was SHOWN. When a record sighted at its
+origin a minute after it left is written, the snapshot retires and the hold
+rule lets that record replace a stored record naming the train, so neither
+names it. A rider who missed it
+unseen, or seen only while no record could be written (the web offline), and
+took the next one gets directions one service off: a known and accepted gap,
+not a defect.
 
 **On-board entry** (owner rulings 5 and 6, 2026-10-01) is evaluated on every
 Home fix when nothing is focused, after platform-sighted inference from both

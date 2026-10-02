@@ -1,10 +1,12 @@
-/* Adversarial probes for commute-reliability rules 3, 5 and 6 (pure focus.js).
-   Each test states the behaviour design.md and client-storage.md require; a
-   failing test is a defect or a contract contradiction, recorded in REVIEW.md. */
+/* The adversarial review's probes for commute-reliability rules 3, 5 and 6
+   (pure focus.js), kept as regressions. Each states what design.md and
+   client-storage.md require. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { inferFromRecords, inferOnBoard, inferenceDeclinedFor, writeLastOpen, PROGRESS_WINDOW } from '../js/focus.js';
+import {
+  inferFromRecords, inferOnBoard, inferenceDeclinedFor, retiresSnapshot, writeLastOpen, PROGRESS_WINDOW
+} from '../js/focus.js';
 import { distanceKm } from '../js/stations.js';
 import { journeyKey } from '../js/journey.js';
 
@@ -46,14 +48,16 @@ test('review: a platform sighting after departure retires the departed train fro
   const snapshot = clone(departed);
   // 70 s after the 08:00 left, a refresh with a fresh platform fix records the 08:08 (fixture hold case: replaces).
   const sightingAt = ms('2026-10-01T08:01:10+10:00');
-  const doc = writeLastOpen(clone(base.doc), record(t9('2026-10-01T08:08:00+10:00', '2026-10-01T08:35:00+10:00')),
-    sightingAt, sightingAt);
+  const next = record(t9('2026-10-01T08:08:00+10:00', '2026-10-01T08:35:00+10:00'));
+  // The controller's write step: the same sighting retires the snapshot before the hold rule writes.
+  const kept = retiresSnapshot(base.doc, snapshot, next, sightingAt) ? null : snapshot;
+  const doc = writeLastOpen(clone(base.doc), next, sightingAt, sightingAt);
   assert.equal(journeyKey(doc.lastOpen.journey), journeyKey(t9('2026-10-01T08:08:00+10:00', '2026-10-01T08:35:00+10:00')),
     'the hold rule replaces the stored record with the next train');
 
   // The rider boards the 08:08; a tick fix a few km along at train speed.
   const now = ms('2026-10-01T08:12:00+10:00');
-  const entered = inferFromRecords(doc, snapshot, now, { ...base.fix, at: now, speed: 14 });
+  const entered = inferFromRecords(doc, kept, now, { ...base.fix, at: now, speed: 14 });
   assert.ok(entered, 'the moving fix enters trip mode');
   assert.equal(journeyKey(entered.journey), journeyKey(doc.lastOpen.journey),
     `entered the departed ${entered.journey.departure.scheduled} instead of the boarded ${doc.lastOpen.journey.departure.scheduled}`);
