@@ -7,7 +7,7 @@ export const SAVED_STATION_KM = 0.4;
 // Platforms reach about 150 m from a station's point, and a Home fix may be 200 m inaccurate.
 export const SIGHTING_KM = 0.3;
 export const NEAR_STATION_KM = 2;
-/* About 30 km/h: faster than anyone walks or runs on a platform. */
+// About 30 km/h: faster than anyone walks or runs on a platform.
 export const TRAIN_SPEED_MPS = 8;
 export const PREVIOUS_FIX_MIN_MS = 15_000;
 export const PREVIOUS_FIX_MAX_MS = 120_000;
@@ -30,8 +30,7 @@ export function previousFixUsable(fix, previous) {
 
 const known = (accuracy) => Number.isFinite(accuracy) && accuracy >= 0;
 
-/** A reported speed decides; without one, only a displacement no position
-    error could produce does (client-storage.md, Train speed). */
+// Without a usable speed, only a displacement no position error could produce counts.
 export function trainSpeed(fix, previous = null) {
   if (!fix) return false;
   if (Number.isFinite(fix.speed) && fix.speed >= 0) return fix.speed >= TRAIN_SPEED_MPS;
@@ -91,7 +90,6 @@ export function here(doc, stations, fix, previousFix = null) {
   return any ? { station: any.station, tier: 3 } : null;
 }
 
-/** The station a `lastOpen` record may claim the phone was seen at. */
 export function sightingOf(spot, fix) {
   const km = spot ? distanceKm(fix, spot.station.location) : null;
   return km !== null && km <= SIGHTING_KM ? spot.station : null;

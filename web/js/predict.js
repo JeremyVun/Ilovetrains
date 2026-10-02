@@ -96,8 +96,7 @@ export function locationFactor(fix, origin) {
    0.01 × 1.0. Any real history dwarfs it. */
 export const PREDICT_FLOOR = 0.01;
 
-/* A fix at train speed says where the train is, not where the rider is
-   starting from (client-storage.md, Train speed). */
+// At train speed a fix says where the train is, not where the rider starts from.
 function startingFix(doc, opts) {
   return preferencesOf(doc).useLocation && !trainSpeed(opts.fix, opts.previousFix) ? opts.fix : null;
 }

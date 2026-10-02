@@ -461,7 +461,6 @@ export function recordLastOpen(doc, { station, tripId, direction, journey }, now
   };
 }
 
-/** One decline at a time: a new one replaces it (client-storage.md, Stop trip). */
 export function recordDecline(doc, { tripId, direction, departure, arrivalMs }, nowMs) {
   if (typeof tripId !== 'string' || !DIRECTIONS.includes(direction) || !departure || !Number.isFinite(arrivalMs)) return doc;
   return {

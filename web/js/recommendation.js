@@ -23,7 +23,6 @@ function compareIdentity(x, y) {
   return x.length - y.length;
 }
 
-/** The stable cross-client journey order (client-storage.md, Journey recommendation). */
 export function compareJourneyIdentity(a, b) {
   return compareIdentity(identity(serviceLegs(journeyOf(a))), identity(serviceLegs(journeyOf(b))));
 }

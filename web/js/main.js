@@ -11,10 +11,9 @@ import { boardModel, promotedRow } from './rowmodel.js';
 import { journeyDetail, journeyKey, departureKey, arrivalMs, departureMs } from './journey.js';
 import {
   focusOf, visibleFocus, setFocus, clearFocus, isFocused, focusExpired, matchJourney,
-  applyFocusSnapshot, applyArrivalResult, composedJourney, declineFocus, recoveryModel, recoveryOf,
-  runningJourney, startable,
-  inferFromRecords, inferOnBoard, journeyCancelled, onBoardRequests, pinResult, rideAdded, rideRecorded,
-  tickNeedsFix, writeLastOpen,
+  applyFocusSnapshot, applyArrivalResult, composedJourney, recoveryModel, recoveryOf,
+  inferFromRecords, inferOnBoard, onBoardRequests, writeLastOpen, tickNeedsFix,
+  declineFocus, runningJourney, startable, journeyCancelled, pinResult, rideAdded, rideRecorded,
   TRAVEL_LATE_MS
 } from './focus.js';
 import * as Board from './board.js';
@@ -47,10 +46,9 @@ const RECOMMENDATION_PAGES = 2;
 const RECOMMENDATION_DEADLINE_MS = 12_000;
 const RECOMMENDATION_THROTTLE_MS = 60_000;
 const LOOKUP_TIMEOUT_MS = 15_000;
-/* Owner ruling 3: a return this long after leaving is a new open. */
 const NEW_OPEN_AFTER_MS = 10 * 60_000;
 const PAST_STEP_MS = 60 * 60_000;
-// The first past page reaches the trains that just left, where a rider on one looks (ui.md, Departure board).
+// Reaches the trains that just left, the ones a rider on board looks for.
 const FIRST_PAST_PAGE_MS = 30 * 60_000;
 const FIRST_PAST_PAGE_LIMIT = 10;
 const PAST_BOUND_MS = 24 * 60 * 60_000;
@@ -539,8 +537,7 @@ function movingFix() {
   return trainSpeed(validFix(), state.previousFix);
 }
 
-/* The fix that may say where the rider is; at train speed it only says where
-   the train is (client-storage.md, Train speed). */
+// At train speed a fix says where the train is, not where the rider is.
 function stationFix() {
   return movingFix() ? null : validFix();
 }
@@ -860,9 +857,6 @@ function cachedJourneys(doc) {
   return cached;
 }
 
-/* A fix at train speed that no sighted record explains: look for the running
-   service that matches where the phone is along a saved trip (client-storage.md,
-   On-board entry). One request per candidate, at most three. */
 async function enterOnBoard(fix) {
   const at = now();
   const current = focusOf(state.doc);
@@ -887,7 +881,7 @@ async function enterOnBoard(fix) {
       bodies[request.key] = body;
       boards[request.key] = body.journeys || [];
     } catch (_) {
-      // A candidate whose board failed simply cannot match this fix.
+      // A candidate whose board failed cannot match this fix.
     }
   }));
   if (onBoardInflight !== controller) return;
@@ -1526,13 +1520,12 @@ function renderDetail() {
   patchFresh(state.root.querySelector('[data-t="footer"]'), freshness);
 }
 
-/* Stop trip ends any trip mode without writing a ride (owner rulings 8-10). A
-   guessed trip is also declined, so the same guess cannot come straight back. */
 function stopTrip() {
   const focus = focusOf(state.doc);
   if (!focus) return;
   const guessed = focus.by === 'inferred';
   const stopped = forgetLastOpen(clearFocus(state.doc));
+  // Declined, so the same guess cannot come straight back.
   ctx.update(guessed ? declineFocus(stopped, focus, now()) : stopped);
   if (guessed) analytics.track('declined_inferred');
   if (focusInflight) focusInflight.abort();
@@ -1557,9 +1550,6 @@ function stopTrip() {
   fetchLive();
 }
 
-/* Start trip starts exactly the journey it is attached to, replacing any trip
-   mode, and lands on Home. Starting the guessed journey itself keeps its
-   arrival evidence and only makes it the rider's own. */
 function startTrip(selection, journey) {
   if (state.headerKind && state.headerKind !== 'setup') {
     if (selection.tripId === state.headerTripId && selection.direction === state.headerDirection) {
@@ -1580,6 +1570,7 @@ function startTrip(selection, journey) {
     state.arrivalDecision = null;
     state.recovery = null;
   }
+  // Starting the guessed journey itself keeps its arrival evidence.
   const started = same ? { ...state.doc, focus: { ...current, by: 'focus' } }
     : setFocus(state.doc, selection, journey, now());
   ctx.update(forgetLastOpen(started));
@@ -1593,8 +1584,7 @@ function detailAction(action) {
   if (action === 'focus') return startTrip(state.selection, state.journey);
 }
 
-/* Starting or stopping a trip and the return offer clear the evidence, so a
-   later fix cannot infer a journey the rider has already settled. */
+// So a later fix cannot infer a journey the rider has already settled.
 function forgetLastOpen(doc) {
   const next = { ...doc };
   delete next.lastOpen;
@@ -1936,8 +1926,7 @@ function startTimers(recordBoardView) {
   if (recordBoardView) timers.view = setTimeout(qualifyView, VIEW_QUALIFIES_MS);
 }
 
-/* The fix's own handling refreshes the board, so a tick that takes one makes
-   no second request. */
+// The fix's handling refreshes the board, so a tick that takes one makes no second request.
 function tickFix() {
   const focus = focusOf(state.doc);
   if (state.view !== 'home' || (focus && !focusExpired(focus, now()))
@@ -2024,8 +2013,6 @@ document.addEventListener('visibilitychange', () => {
   silentFix();
 });
 
-/* Home with a fresh, location-aware answer, as on a cold open; the open path
-   in showHome takes the snapshot, the fix and the refresh. */
 function reopen() {
   state.selection = null;
   state.journey = null;
@@ -2065,7 +2052,6 @@ if (location.hostname === 'localhost') {
     renderCurrent();
     return true;
   };
-  // Phase 4 draws the trip-control line; until then these reach the behaviour.
   window.__trains.startTrip = () => {
     if (state.view !== 'home' || !lastHome?.startable) return false;
     startTrip(lastHome.selected, lastHome.journey);

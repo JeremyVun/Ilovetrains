@@ -33,15 +33,12 @@ export const TRAVEL_LATE_MS = 30 * 60_000;
 export const TRAVEL_SEEN_MS = 15 * 60_000;
 export const TRAVEL_MOVED_KM = 1;
 export const TRAVEL_SPEED_MOVED_KM = 0.2;
-/* A train pulling out is still within 300 m of the platform for its first
-   20-30 s, so only a later sighting shows the rider stayed. */
+// A train pulling out stays within 300 m of the platform for its first 20-30 s.
 export const HOLD_SIGHTING_AFTER_MS = 60_000;
-/* By then a departed train is kilometres out, so a fix either reads train
-   speed or finds the rider still on the platform. */
+// By then a departed train is kilometres out: a fix reads train speed or finds the rider still waiting.
 export const SHOWN_DEPARTURE_FIX_MS = 5 * 60_000;
 export const MOVING_FIX_FRESH_MS = 2 * 60_000;
-/* On-board entry (client-storage.md). The corridor bounds how far a route may
-   bend: Rhodes → Redfern and Town Hall → Rhodes measure 1.27 and 1.2. */
+// Rhodes → Redfern and Town Hall → Rhodes bend to 1.27 and 1.2 of the straight line.
 export const CORRIDOR_RATIO = 1.5;
 export const HEADING_WINDOW_DEG = 90;
 export const CLOSING_KM = 0.2;
@@ -49,9 +46,9 @@ export const ON_BOARD_CANDIDATES = 3;
 export const ON_BOARD_LIMIT = 10;
 export const ON_BOARD_LOOKBACK_MARGIN_MS = 10 * 60_000;
 export const ON_BOARD_DEFAULT_RIDE_MS = 60 * 60_000;
-/* Eight-minute headways on a 25-minute ride put neighbouring services 0.32 apart. */
+// Eight-minute headways on a 25-minute ride put neighbouring services 0.32 apart.
 export const PROGRESS_WINDOW = 0.25;
-/* A car following the line would otherwise match the next train along one fix later. */
+// A car following the line would otherwise match the next train along one fix later.
 export const DECLINE_HOLD_MS = 60 * 60_000;
 /* Exit: at the destination, the trip is over as the rider steps off. */
 export const ARRIVED_KM = 0.2;
@@ -126,9 +123,6 @@ export function inferTravel(doc, nowMs, fix) {
   };
 }
 
-/** A guessed trip the rider stopped: no inferred entry for that saved trip in
-    either direction for the hour, or until its journey would have ended, and
-    never again for the declined departure. */
 export function inferenceDeclinedFor(doc, tripId, nowMs, journey = null) {
   const decline = doc && doc.inferenceDeclined;
   if (!decline || decline.tripId !== tripId) return false;
@@ -143,15 +137,13 @@ export function declineFocus(doc, focus, nowMs) {
   }, nowMs);
 }
 
-/** Start trip on Home is offered for the header's train only while it leaves
-    within the window auto-start uses for "seen at the platform". */
+// The window auto-start uses for "seen at the platform".
 export function startable(journey, nowMs) {
   const departure = departureMs(journey);
   return departure !== null && !journeyCancelled(journey)
     && departure - nowMs >= 0 && departure - nowMs <= TRAVEL_SEEN_MS;
 }
 
-/** A board row on its way: tapping it starts the trip at once (owner ruling 12). */
 export function runningJourney(journey, nowMs, modes, maxTransfers = null) {
   const departure = departureMs(journey);
   const arrival = arrivalMs(journey);
@@ -159,7 +151,6 @@ export function runningJourney(journey, nowMs, modes, maxTransfers = null) {
     && !journeyCancelled(journey) && journeyAllowed(journey, modes, maxTransfers);
 }
 
-/** A ride already recorded for this trip, direction and scheduled departure. */
 export function rideRecorded(doc, selection) {
   if (!selection || !selection.journey) return false;
   const first = legsOf(selection.journey)[0] || {};
@@ -171,7 +162,6 @@ export function rideRecorded(doc, selection) {
     && (ride.scheduledDeparture || ride.departedAt) === departure);
 }
 
-/** A `lastOpen` record inference could still use (client-storage.md, Travel mode). */
 export function lastOpenInferable(doc, record, nowMs) {
   const trip = record && findTrip(doc, record.tripId);
   if (!trip || !record.station) return false;
@@ -183,8 +173,7 @@ export function lastOpenInferable(doc, record, nowMs) {
     && lead >= 0 && lead <= TRAVEL_SEEN_MS && nowMs <= arrival + TRAVEL_LATE_MS;
 }
 
-/** The hold rule: an unsighted record, or one sighted anywhere but the held
-    record's origin, proves nothing and cannot erase the evidence. */
+// A record unsighted or sighted anywhere but the held origin proves nothing, so it cannot erase evidence.
 export function replacesLastOpen(doc, incoming, nowMs, sightingAtMs = null) {
   const stored = doc && doc.lastOpen;
   if (!lastOpenInferable(doc, stored, nowMs)) return true;
@@ -199,22 +188,14 @@ export function writeLastOpen(doc, record, nowMs, sightingAtMs = null) {
   return replacesLastOpen(doc, record, nowMs, sightingAtMs) ? recordLastOpen(doc, record, nowMs) : doc;
 }
 
-/**
- * Whether a refresh tick on an unfocused Home takes a fix (client-storage.md,
- * Fixes while Home stays open). `shownDepartures` are the effective departures
- * of the leads Home displayed during this foreground visit.
- */
-export function tickNeedsFix(doc, nowMs, shownDepartures, fix, previousFix) {
-  if (shownDepartures.some((departure) => nowMs >= departure && nowMs - departure <= SHOWN_DEPARTURE_FIX_MS)) return true;
+export function tickNeedsFix(doc, nowMs, shownLeadDepartures, fix, previousFix) {
+  if (shownLeadDepartures.some((departure) => nowMs >= departure && nowMs - departure <= SHOWN_DEPARTURE_FIX_MS)) return true;
   const stored = doc && doc.lastOpen;
   if (lastOpenInferable(doc, stored, nowMs) && departureMs(stored.journey) <= nowMs) return true;
   return Boolean(fix) && nowMs - fix.at <= MOVING_FIX_FRESH_MS && trainSpeed(fix, previousFix);
 }
 
-/**
- * Platform-sighted entry: the snapshot taken when this Home open began, then
- * the stored record, and either may enter (owner ruling 13).
- */
+// Owner ruling 13: the open's snapshot, unchanged, and then the stored record may each enter.
 export function inferFromRecords(doc, snapshot, nowMs, fix) {
   const focus = focusOf(doc);
   if (focus && !focusExpired(focus, nowMs)) return null;
@@ -239,7 +220,6 @@ function bearingDegrees(from, to) {
 
 const turn = (a, b) => Math.abs(((a - b) % 360 + 540) % 360 - 180);
 
-/* The one direction the evidence singles out, or null while it is undecided. */
 function directionOf(trip, fix, previousFix) {
   const destination = { forward: trip.to.location, reverse: trip.from.location };
   const pick = (test) => {
@@ -259,12 +239,7 @@ const durationOf = (journey) => {
   return departure !== null && arrival !== null && arrival >= departure ? arrival - departure : null;
 };
 
-/**
- * The departure requests on-board entry makes for a fix at train speed: at most
- * three decided candidates, smallest corridor ratio first. `doc` holds only
- * compatible trips; `cached` maps `<tripId>|<direction>` to that pair's cached
- * journeys, whose longest effective duration sets how far back to look.
- */
+// The caller passes only compatible trips, as it does to `locate`.
 export function onBoardRequests(doc, nowMs, fix, previousFix = null, cached = {}) {
   if (!fix || !trainSpeed(fix, previousFix)) return [];
   const candidates = [];
@@ -294,12 +269,6 @@ export function onBoardRequests(doc, nowMs, fix, previousFix = null, cached = {}
     });
 }
 
-/**
- * On-board entry (client-storage.md, Travel mode): the running journey whose
- * time progress matches the fix's position along its trip, from the boards
- * fetched for `onBoardRequests`. History breaks a tie between saved trips that
- * share a train.
- */
 export function inferOnBoard(doc, nowMs, fix, previousFix, boards, cached = {}) {
   const focus = focusOf(doc);
   if (focus && !focusExpired(focus, nowMs)) return null;
@@ -323,6 +292,7 @@ export function inferOnBoard(doc, nowMs, fix, previousFix, boards, cached = {}) 
       if (gap <= PROGRESS_WINDOW) matches.push({ ...selection, score, gap, order: doc.trips.indexOf(trip) });
     }
   }
+  // History separates saved trips that share a train.
   const best = matches.sort((a, b) => b.score - a.score || a.gap - b.gap
     || compareJourneyIdentity(a.journey, b.journey) || a.order - b.order
     || DIRECTIONS.indexOf(a.direction) - DIRECTIONS.indexOf(b.direction))[0];
