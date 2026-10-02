@@ -11,7 +11,8 @@ import { boardModel, promotedRow } from './rowmodel.js';
 import { journeyDetail, journeyKey, departureKey, arrivalMs, departureMs } from './journey.js';
 import {
   focusOf, visibleFocus, setFocus, clearFocus, isFocused, focusExpired, matchJourney,
-  applyFocusSnapshot, applyArrivalResult, composedJourney, recoveryModel, recoveryOf,
+  applyFocusSnapshot, applyArrivalResult, composedJourney, declineFocus, recoveryModel, recoveryOf,
+  runningJourney, startable,
   inferFromRecords, inferOnBoard, journeyCancelled, onBoardRequests, pinResult, rideAdded, rideRecorded,
   tickNeedsFix, writeLastOpen,
   TRAVEL_LATE_MS
@@ -1142,6 +1143,7 @@ function renderHome() {
     recoveryResponse: focusRecoveryResponse(),
     stripVariant: activeVariant('strip-placement')
   });
+  home.startable = !home.focus && startable(home.journey, now());
   lastHome = home;
   if (!home.focus && home.journey) state.shownDepartures.set(journeyKey(home.journey), departureMs(home.journey));
   if (kind) trackShown(kind, home.selected, home.journey);
@@ -1313,7 +1315,7 @@ function wireTimeline() {
 }
 
 function homeAction(action, element) {
-  if (action === 'unpin' && lastHome?.pinned) return unpinService();
+  if (action === 'unpin' && lastHome?.pinned) return stopTrip();
   if (action === 'settings') return ctx.go('#/settings');
   if (action === 'recommendation-detail') {
     const journey = lastHome?.directions?.journey;
@@ -1424,14 +1426,15 @@ function boardAction(action, element) {
   qualifyView();
   const journeys = [
     ...((state.body && state.body.journeys) || []),
-    ...state.pastBodies.flatMap((page) => page.journeys || [])
+    ...state.pastBodies.flatMap((page) => page.journeys || []),
+    ...state.seenLive.values()
   ];
   const journey = journeys.find((item) => journeyKey(item) === element.dataset.match);
-  if (journey) {
-    state.journey = journey;
-    state.detailSource = null;
-    ctx.go('#/journey');
-  }
+  if (!journey) return;
+  if (runningJourney(journey, now(), enabledModes(), maxTransfers())) return startTrip(state.selection, journey);
+  state.journey = journey;
+  state.detailSource = null;
+  ctx.go('#/journey');
 }
 
 function showDetail(root) {
@@ -1517,16 +1520,22 @@ function renderDetail() {
   patchFresh(state.root.querySelector('[data-t="footer"]'), freshness);
 }
 
-function unpinService() {
-  if (!focusOf(state.doc) || focusOf(state.doc).by === 'inferred') return;
-  settleArrival();
-  ctx.update(forgetLastOpen(clearFocus(state.doc)));
+/* Stop trip ends any trip mode without writing a ride (owner rulings 8-10). A
+   guessed trip is also declined, so the same guess cannot come straight back. */
+function stopTrip() {
+  const focus = focusOf(state.doc);
+  if (!focus) return;
+  const guessed = focus.by === 'inferred';
+  const stopped = forgetLastOpen(clearFocus(state.doc));
+  ctx.update(guessed ? declineFocus(stopped, focus, now()) : stopped);
+  if (guessed) analytics.track('declined_inferred');
   if (focusInflight) focusInflight.abort();
   focusInflight = null;
   if (recoveryInflight) recoveryInflight.abort();
   recoveryInflight = null;
   state.recovery = null;
   stopArrivalMonitoring();
+  state.arrivalDecision = null;
   state.focusBody = null;
   state.focusIdentity = null;
   state.focusOffline = false;
@@ -1542,28 +1551,40 @@ function unpinService() {
   fetchLive();
 }
 
-function detailAction(action) {
-  if (action === 'unpin' && isFocused(state.doc, state.journey)) return unpinService();
-  if (action === 'board') return ctx.go('#/board');
-  if (action === 'focus') {
-    if (state.headerKind && state.headerKind !== 'setup') {
-      if (state.selection.tripId === state.headerTripId
-        && state.selection.direction === state.headerDirection) {
-        analytics.track('hit_' + state.headerKind);
-      }
-      const answer = {
-        tripId: state.headerTripId, direction: state.headerDirection, journeyKey: state.headerJourneyKey
-      };
-      const r = pinResult(answer, state.selection, state.journey);
-      if (r) analytics.track('pinned_' + state.headerKind, { r });
+/* Start trip starts exactly the journey it is attached to, replacing any trip
+   mode, and lands on Home. Starting the guessed journey itself keeps its
+   arrival evidence and only makes it the rider's own. */
+function startTrip(selection, journey) {
+  if (state.headerKind && state.headerKind !== 'setup') {
+    if (selection.tripId === state.headerTripId && selection.direction === state.headerDirection) {
+      analytics.track('hit_' + state.headerKind);
     }
-    state.headerKind = null;
+    const answer = {
+      tripId: state.headerTripId, direction: state.headerDirection, journeyKey: state.headerJourneyKey
+    };
+    const r = pinResult(answer, selection, journey);
+    if (r) analytics.track('pinned_' + state.headerKind, { r });
+  }
+  state.headerKind = null;
+  const current = focusOf(state.doc);
+  const same = current && current.tripId === selection.tripId && current.direction === selection.direction
+    && journeyKey(current.journey) === journeyKey(journey);
+  if (!same) {
     stopArrivalMonitoring();
     state.arrivalDecision = null;
     state.recovery = null;
-    ctx.update(forgetLastOpen(setFocus(state.doc, state.selection, state.journey, now())));
-    return ctx.go('#/');
   }
+  const started = same ? { ...state.doc, focus: { ...current, by: 'focus' } }
+    : setFocus(state.doc, selection, journey, now());
+  ctx.update(forgetLastOpen(started));
+  state.selection = { tripId: selection.tripId, direction: selection.direction };
+  return ctx.go('#/');
+}
+
+function detailAction(action) {
+  if (action === 'unpin' && isFocused(state.doc, state.journey)) return stopTrip();
+  if (action === 'board') return ctx.go('#/board');
+  if (action === 'focus') return startTrip(state.selection, state.journey);
 }
 
 /* Starting or stopping a trip and the return offer clear the evidence, so a
@@ -2018,6 +2039,17 @@ if (location.hostname === 'localhost') {
     if (!experiment || !experiment.variants.includes(value)) return false;
     forcedVariants.set(id, value);
     renderCurrent();
+    return true;
+  };
+  // Phase 4 draws the trip-control line; until then these reach the behaviour.
+  window.__trains.startTrip = () => {
+    if (state.view !== 'home' || !lastHome?.startable) return false;
+    startTrip(lastHome.selected, lastHome.journey);
+    return true;
+  };
+  window.__trains.stopTrip = () => {
+    if (!focusOf(state.doc)) return false;
+    stopTrip();
     return true;
   };
   window.__trains.resetAnalyticsForTest = () => {

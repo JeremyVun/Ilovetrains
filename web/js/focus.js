@@ -12,12 +12,12 @@
 
 import { clock, minutesUntil, countdownFigure } from './time.js';
 import {
-  boardingLabel, changesOf, journeyDetail, journeyKey, legsOf, arrivalMs, departureMs, effective,
+  boardingLabel, changesOf, departureKey, journeyDetail, journeyKey, legsOf, arrivalMs, departureMs, effective,
   modeWords, withLegs, RECOVERY_FLOOR_MIN
 } from './journey.js';
 import { shortName } from './dom.js';
 import { distanceKm, previousFixUsable, trainSpeed, TRAIN_SPEED_MPS } from './stations.js';
-import { correctRide, DIRECTIONS, findTrip, leg, recordLastOpen, recordRide } from './storage.js';
+import { correctRide, DIRECTIONS, findTrip, leg, recordDecline, recordLastOpen, recordRide } from './storage.js';
 import { effectiveCap, journeyAllowed, preferencesOf, tripAllowed } from './preferences.js';
 import { scoreCandidate } from './predict.js';
 import { compareJourneyIdentity } from './recommendation.js';
@@ -51,6 +51,8 @@ export const ON_BOARD_LOOKBACK_MARGIN_MS = 10 * 60_000;
 export const ON_BOARD_DEFAULT_RIDE_MS = 60 * 60_000;
 /* Eight-minute headways on a 25-minute ride put neighbouring services 0.32 apart. */
 export const PROGRESS_WINDOW = 0.25;
+/* A car following the line would otherwise match the next train along one fix later. */
+export const DECLINE_HOLD_MS = 60 * 60_000;
 /* Exit: at the destination, the trip is over as the rider steps off. */
 export const ARRIVED_KM = 0.2;
 export const ARRIVED_EARLY_MS = 5 * 60_000;
@@ -124,8 +126,37 @@ export function inferTravel(doc, nowMs, fix) {
   };
 }
 
-function inferenceDeclinedFor() {
-  return false;
+/** A guessed trip the rider stopped: no inferred entry for that saved trip in
+    either direction for the hour, or until its journey would have ended, and
+    never again for the declined departure. */
+export function inferenceDeclinedFor(doc, tripId, nowMs, journey = null) {
+  const decline = doc && doc.inferenceDeclined;
+  if (!decline || decline.tripId !== tripId) return false;
+  if (journey && departureKey(journey) === decline.departure) return true;
+  return nowMs < Math.max(Date.parse(decline.at) + DECLINE_HOLD_MS, Date.parse(decline.arrival) + TRAVEL_LATE_MS);
+}
+
+export function declineFocus(doc, focus, nowMs) {
+  return recordDecline(doc, {
+    tripId: focus.tripId, direction: focus.direction, departure: departureKey(focus.journey),
+    arrivalMs: arrivalMs(composedJourney(focus))
+  }, nowMs);
+}
+
+/** Start trip on Home is offered for the header's train only while it leaves
+    within the window auto-start uses for "seen at the platform". */
+export function startable(journey, nowMs) {
+  const departure = departureMs(journey);
+  return departure !== null && !journeyCancelled(journey)
+    && departure - nowMs >= 0 && departure - nowMs <= TRAVEL_SEEN_MS;
+}
+
+/** A board row on its way: tapping it starts the trip at once (owner ruling 12). */
+export function runningJourney(journey, nowMs, modes, maxTransfers = null) {
+  const departure = departureMs(journey);
+  const arrival = arrivalMs(journey);
+  return departure !== null && arrival !== null && departure <= nowMs && nowMs < arrival
+    && !journeyCancelled(journey) && journeyAllowed(journey, modes, maxTransfers);
 }
 
 /** A ride already recorded for this trip, direction and scheduled departure. */
@@ -189,7 +220,8 @@ export function inferFromRecords(doc, snapshot, nowMs, fix) {
   if (focus && !focusExpired(focus, nowMs)) return null;
   const modes = preferencesOf(doc).enabledModes;
   for (const record of [snapshot, doc.lastOpen]) {
-    if (!record || rideRecorded(doc, record) || !journeyAllowed(record.journey, modes, effectiveCap(doc))) continue;
+    if (!record || rideRecorded(doc, record) || !journeyAllowed(record.journey, modes, effectiveCap(doc))
+      || inferenceDeclinedFor(doc, record.tripId, nowMs, record.journey)) continue;
     const entered = inferTravel({ ...doc, lastOpen: record }, nowMs, fix);
     if (entered) return entered;
   }

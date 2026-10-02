@@ -121,6 +121,10 @@ read/write atomic and migration simple):
     "journey": {"…": "verbatim snapshot of the header's lead journey"}
   },
   "lastViewed": {"tripId": "uuid", "direction": "forward"},
+  "inferenceDeclined": {"tripId": "uuid", "direction": "forward",
+                        "at": "2026-09-05T08:13:00+10:00",
+                        "departure": "[\"T9\",\"2026-09-05T08:05:00+10:00\"]",
+                        "arrival": "2026-09-05T08:32:00+10:00"},
   "locationAsk": {"declinedAt": "2026-09-01T09:21:00+10:00"},
   "telemetry": {"opens": 12, "bucket": 37},
   "preferences": {
@@ -224,6 +228,14 @@ read/write atomic and migration simple):
   has left the live board. Preference-caused recomputation does not rewrite
   it; the next independent refresh resumes normal recording. Its writers are
   subject to the hold rule under "Travel mode". Deleting the trip deletes it.
+- `inferenceDeclined` is optional and holds the one guessed trip the rider
+  stopped (see "Stop trip" under "Focused journey"): the saved trip and
+  direction, when it was stopped, the declined journey's `departureKey` (its
+  first service leg's line name and scheduled departure) and that journey's
+  effective arrival when it was stopped. The arrival is what lets the decline
+  outlast a long ride. A new decline replaces it, deleting the trip deletes it,
+  and a malformed record is dropped. Native documents keep the same fields in
+  their own time encoding.
 - `locationAsk` is optional and holds only the time the user last declined the
   location panel. Absence means never declined; a malformed value is dropped,
   not repaired.
@@ -328,7 +340,7 @@ read them in a different order:
 
 The explicit selection is the trip whose saved-trip row the user tapped. It
 lasts for the page load and is never persisted, and it never writes `focus`.
-Unpinning clears it on the Home it returns to. A
+Stop trip clears it on the Home it returns to. A
 location fix arriving afterwards re-predicts only when nothing explicit was
 chosen.
 
@@ -400,18 +412,36 @@ The document may contain an optional `focus` field for a pinned or inferred serv
 }
 ```
 
-- `by` is `"focus"` when the user tapped `Pin this train` and `"inferred"`
-  when the app entered travel mode from a fix. A focus written before `by`
-  shipped reads as `"focus"`; any other value drops the focus.
-- Written by `Pin this train` (`Pin this ferry` for a ferry-first journey) on journey detail and by inferred entry below;
-  nothing else writes it. `Pinned` on home and `Unpin this train` (or ferry)
-  in detail remove an explicit focus without deleting the saved trip. They
-  clear the in-memory followed source and persisted `lastOpen` evidence so
-  a subsequent fix cannot immediately restore the released journey. Releasing
-  a pin is not a trip choice: a Home that shows the release answers again from
-  the prediction, where the phone is now, rather than holding the released
-  trip and direction as an explicit selection. Accepting
-  the return offer clears completed focus. Completed or never-guarded focus
+- `by` is `"focus"` when the rider started the trip and `"inferred"` when the
+  app entered travel mode from a fix. A focus written before `by` shipped
+  reads as `"focus"`; any other value drops the focus.
+- Written by Start trip and by inferred entry below; nothing else writes it.
+  **Start trip** starts exactly the journey it is attached to, replacing any
+  focus, and returns Home (owner rulings 11-14, 2026-10-02): journey detail's
+  start action on that journey; Home's lead journey while it has not departed
+  and leaves within 15 minutes and is not cancelled (`0 ≤ D − now ≤ 15 min`,
+  the window auto-start uses for "seen at the platform"; never a later train or
+  one that has left); and a departures-board row whose journey is on its way
+  (`D ≤ now < A` on effective times, not cancelled, modes and cap allowed),
+  which starts at once instead of opening detail. A running row therefore
+  corrects a wrong guess to the right train. Starting the guessed journey
+  itself keeps its arrival metadata and only changes `by` to `"focus"`.
+- **Stop trip** ends any trip mode, started or guessed, without deleting the
+  saved trip and without writing a ride. It clears the in-memory followed
+  source, the persisted `lastOpen` evidence and the open snapshot so a
+  subsequent fix cannot immediately restore the released journey, and stops
+  arrival monitoring and the tracker session. Stopping is not a trip choice: a
+  Home that shows the stop answers again from the prediction, where the phone
+  is now, rather than holding the stopped trip and direction as an explicit
+  selection. On a guessed trip it also writes `inferenceDeclined`: while it is
+  active, no inferred entry (platform or on-board) happens for that saved trip
+  in either direction until the later of `at + 60 min` and the declined
+  journey's arrival + 30 min, and the declined departure is never inferred
+  again for that trip, however late it runs. The hour exists because a car
+  following the line would otherwise be matched to the next train along one
+  fix later. A rider who stopped by mistake restarts with Start trip or a
+  running row; there is no undo. Accepting the return offer clears completed
+  focus. Completed or never-guarded focus
   expires at effective arrival plus 30 minutes; unresolved armed focus follows
   the later retention deadline in the final-arrival contract below.
 - `journey` is a full snapshot so directions and detail stay viewable after
@@ -682,8 +712,8 @@ travel mode on the same departure toward the new destination when a journey
 matches the first service’s line name and scheduled departure, and opens
 that pair's board when none does. `departureKey` owns this identity, independently
 of the full-journey key used for refreshes and board rows. Browsing another trip
-never exits travel mode, and there is no "not on it" control: a wrong entry
-that is not a redirect ends by expiry or by `Pin this train`.
+never exits travel mode. Any other wrong entry ends with Stop trip, which
+declines it, or is replaced by starting the right train.
 
 ## Final-arrival decision
 
@@ -842,9 +872,9 @@ restore preserves a legacy ride even before ETA; a successful matching refresh
 that moves ETA into the future may withdraw it under the existing correction
 rule. A stale render or unmatched/failed refresh cannot perform that withdrawal.
 
-No new “I'm not on this” or “I've arrived” control. Explicit pins retain their
-existing unpin action. Pinning another service, inferred Change destination,
-and deletion keep their existing correction roles. New focus identity clears
+No “I've arrived” control. Stop trip ends either kind of trip mode; starting
+another service, inferred Change destination, and deletion keep their
+correction roles. New focus identity clears
 the old guard/window and starts independently. Browsing another board does
 not complete, replace or renew focus by itself.
 
@@ -1150,9 +1180,8 @@ same-identity ride with no arrival metadata restores legacy completion rather
 than being revoked by migration.
 
 The return offer requires the shared arrived result. It fetches a real opposite
-direction journey and uses that response's platforms. Explicit pins retain
-Unpin, inferred focus retains Change destination; no additional correction
-control is introduced.
+direction journey and uses that response's platforms. Stop trip ends either
+kind of focus, and inferred focus keeps Change destination.
 
 Invariants:
 - Deterministic given (storage document, current time) — testable.

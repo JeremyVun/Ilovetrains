@@ -35,10 +35,15 @@ zone.
   explicit selection and never changes the focused journey; browsing therefore
   never replaces the focused train.
 - Tapping a board row opens the journey detail view, whose back control reads
-  `← <departure station> departures` and returns to that board.
-- `Pin this train` on journey detail is the only control that focuses a
-  journey. It returns home and pins that service in the smart header;
-  directions begin when it departs. Tapping `Pinned` on home or `Unpin this
+  `← <departure station> departures` and returns to that board. A row whose
+  journey is on its way (left but not arrived, not cancelled, modes and cap
+  allowed) instead starts trip mode on it at once and lands on Home, replacing
+  any current trip mode; that is how a wrong guess is corrected to the right
+  train (owner ruling 12, 2026-10-02). Upcoming and arrived rows still open
+  detail.
+- `Pin this train` on journey detail and a running board row are the controls
+  that start a trip on a journey. Each returns home and follows that service
+  in the smart header; directions begin when it departs. Tapping `Pinned` on home or `Unpin this
   train` in detail clears the explicit pin and returns to the ordinary home
   answer for that trip. The board never shows a separate focus strip.
 - An explicitly pinned journey has an `Unpin this train` (or ferry) action

@@ -90,7 +90,8 @@ Setup is a separate answer kind with setup-specific events.
 | `hit_<kind>` | First home trip-row tap matches the displayed answer; also focusing a journey matching home's last shown trip and direction | — |
 | `miss_<kind>` | First home trip-row tap chooses a different trip or direction | — |
 | `change_inferred` | Inferred strip's CHANGE action, before navigation | — |
-| `entered_inferred` | Travel inference writes a focus, once per entry | — |
+| `entered_inferred` | Travel inference writes a focus, platform-sighted or on board, once per entry | — |
+| `declined_inferred` | Stop trip ends a guessed trip (`by: "inferred"`), from Home or the lock screen, once per stop | — |
 | `back_focus`, `back_inferred` | Accepting the corresponding way-back offer | — |
 | `asked_panel` | Home location panel first appears in this page load | — |
 | `granted_panel`, `denied_panel` | Outcome of an explicit home location request | — |
@@ -100,13 +101,13 @@ Setup is a separate answer kind with setup-specific events.
 | `granted_setup`, `denied_setup` | Outcome of an explicit setup location request | — |
 | `saved_setup` | Setup saves a valid pair, after resolving a redirect if present | `f`: `location`, `nearby`, `search`, `redirect`, `redirect_lost` |
 | `opened` | First answer reaches an open milestone | `m`: one of the milestone strings above |
-| `pinned_<kind>` | Explicit pin while home's own answer is attributed this open, after any `hit_<kind>` for the same pin | `r`: `same`, `service`, `trip`; composite `pl.r` |
+| `pinned_<kind>` | Explicit start (journey detail's start action, Home's Start trip or a running board row) while home's own answer is attributed this open, after any `hit_<kind>` for the same start | `r`: `same`, `service`, `trip`; composite `pl.r` |
 | `rode_pin`, `rode_auto` | Arrival settlement appends a ride absent from `rides` before that write; `pin` for `by: "focus"`, `auto` for `by: "inferred"` | `b`: `location`, `estimate`; composite `pl.b` |
 
 Android and iOS send `opened`, `shown_<kind>`, `hit_<kind>`, `miss_<kind>`,
-`pinned_<kind>`, `rode_pin` and `rode_auto` under the same rules. Setup,
-location-panel, `entered_inferred`, `back_*` and `change_inferred` events are
-web-only. Native derives the kind as the web does: a visible focus is
+`pinned_<kind>`, `rode_pin`, `rode_auto`, `entered_inferred` and
+`declined_inferred` under the same rules. Setup, location-panel, `back_*` and
+`change_inferred` events are web-only. Native derives the kind as the web does: a visible focus is
 `inferred` or `focus` by its `by`; a trip home saved automatically from here
 during this open is `pair` while it is the answer; with no station here the
 answer is `predicted`; with a station here, the homeward candidate chosen
@@ -121,8 +122,9 @@ means another trip or direction; `same` means the same trip and direction with
 an equal identity key (every service leg's line and scheduled departure:
 `journeyKey` on web, `Journey.key` on native); `service` means the same trip
 and direction with another key. A same-trip pin when home displayed no lead
-journey emits nothing. Each pin action emits at most once; unpinning emits
-nothing. `rode_*` never fires for a correction of an existing ride or a legacy
+journey emits nothing. Each start emits at most once; stopping a trip the
+rider started emits nothing, and stopping a guessed trip emits only
+`declined_inferred`. `rode_*` never fires for a correction of an existing ride or a legacy
 ride restored by migration; a withdrawn estimate ride recorded again counts
 again.
 
@@ -239,8 +241,10 @@ Per platform `P`, with the composites composed at emit time:
   corrected by pinning.
 - Zero-tap rides: `rode_auto[pl=P]`, with its location-confirmed share
   `rode_auto[pl.b=P.location] / rode_auto[pl=P]`. Automatic entry needs a
-  platform sighting, so these rides follow location answers; compare with
-  `shown_usual + shown_home` for a lower-bound rate.
+  platform sighting or a fix on board, so these rides follow location answers;
+  compare with `shown_usual + shown_home` for a lower-bound rate.
+- Wrong entries: `declined_inferred[pl=P] / entered_inferred[pl=P]`, the share
+  of guessed trips the rider stopped.
 - Pin follow-through: `rode_pin[pl=P] / Σ_k pinned_k[pl=P]`.
 
 These count answers, pins and recorded rides, not people. Location
@@ -278,4 +282,4 @@ record. Submission errors never display upstream response text. Operator
 listing, export and deletion stay behind the analytics service's existing
 Authelia gate; no operator credential is shipped to the browser.
 
-Unpinning a service emits no prediction hit or miss and no new event.
+Stopping a trip emits no prediction hit or miss.

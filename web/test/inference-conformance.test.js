@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { inferFromRecords, inferOnBoard, onBoardRequests, replacesLastOpen, writeLastOpen } from '../js/focus.js';
+import {
+  inferFromRecords, inferOnBoard, onBoardRequests, replacesLastOpen, runningJourney, startable, writeLastOpen
+} from '../js/focus.js';
 import { trainSpeed } from '../js/stations.js';
 
 process.env.TZ = 'Australia/Sydney';
@@ -34,4 +36,13 @@ function entered(value) {
 
 for (const value of fixture.entryCases.cases) {
   test(`entry: ${value.name}`, () => assert.deepEqual(entered(value), value.expected));
+}
+
+for (const value of fixture.startCases.cases) {
+  test(`start trip: ${value.name}`, () => assert.equal(startable(value.journey, value.nowMs), value.expectedStartable));
+}
+
+for (const value of fixture.runningCases.cases) {
+  test(`running row: ${value.name}`, () => assert.equal(
+    runningJourney(value.journey, value.nowMs, value.enabledModes || ['train', 'metro', 'ferry']), value.expectedRunning));
 }

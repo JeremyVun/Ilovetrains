@@ -5,7 +5,9 @@ process.env.TZ = 'Australia/Sydney';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { tickNeedsFix } from '../js/focus.js';
+import {
+  declineFocus, inferenceDeclinedFor, runningJourney, startable, tickNeedsFix, DECLINE_HOLD_MS
+} from '../js/focus.js';
 import { emptyDoc, recordLastOpen } from '../js/storage.js';
 
 const at = (hhmmss) => Date.parse(`2026-10-01T${hhmmss}+10:00`);
@@ -48,4 +50,40 @@ test('a tick keeps looking while the last Home fix, under two minutes old, was a
   assert.equal(tickNeedsFix(doc, now, [], { ...moving, at: now - 120_001 }, null), false);
   assert.equal(tickNeedsFix(doc, now, [], { ...moving, speed: 1 }, null), false);
   assert.equal(tickNeedsFix(doc, now, [], null, null), false);
+});
+
+test('a decline holds a trip in both directions for the later of an hour and arrival + 30 min', () => {
+  const ride = journey(at('08:00:00'));
+  const focus = { tripId: 'rt', direction: 'forward', focusedAt: iso(at('08:01:00')), by: 'inferred', journey: ride };
+  const doc = declineFocus({ ...emptyDoc(), trips }, focus, at('08:05:00'));
+  assert.equal(doc.inferenceDeclined.departure, JSON.stringify(['T9', iso(at('08:00:00'))]));
+  assert.equal(inferenceDeclinedFor(doc, 'rt', at('09:04:59.999')), true);
+  assert.equal(inferenceDeclinedFor(doc, 'rt', at('08:05:00') + DECLINE_HOLD_MS), false);
+  assert.equal(inferenceDeclinedFor(doc, 'other', at('08:10:00')), false);
+  const late = declineFocus({ ...emptyDoc(), trips }, { ...focus, journey: journey(at('08:00:00'), 70) }, at('08:05:00'));
+  assert.equal(inferenceDeclinedFor(late, 'rt', at('09:39:59')), true, 'arrival 09:10 + 30 min');
+  assert.equal(inferenceDeclinedFor(late, 'rt', at('09:40:00')), false);
+  assert.equal(inferenceDeclinedFor(doc, 'rt', at('20:00:00'), ride), true, 'that departure, never again');
+  assert.equal(inferenceDeclinedFor(doc, 'rt', at('20:00:00'), journey(at('08:08:00'))), false);
+});
+
+test('Start trip is offered from 15 minutes before the train leaves until it leaves', () => {
+  const train = journey(at('08:15:00'));
+  assert.equal(startable(train, at('08:00:00')), true, 'exactly 15 minutes');
+  assert.equal(startable(train, at('07:59:59')), false, '15 minutes and a second');
+  assert.equal(startable(train, at('08:15:00')), true, 'as it leaves');
+  assert.equal(startable(train, at('08:15:01')), false, 'once it has left');
+  assert.equal(startable({ ...train, cancelled: true }, at('08:10:00')), false);
+  assert.equal(startable(null, at('08:10:00')), false);
+});
+
+test('a board row is on its way from its departure until its arrival', () => {
+  const train = journey(at('08:00:00'));
+  const modes = ['train', 'metro', 'ferry'];
+  assert.equal(runningJourney(train, at('07:59:59'), modes), false);
+  assert.equal(runningJourney(train, at('08:00:00'), modes), true);
+  assert.equal(runningJourney(train, at('08:26:59'), modes), true);
+  assert.equal(runningJourney(train, at('08:27:00'), modes), false, 'arrived');
+  assert.equal(runningJourney({ ...train, cancelled: true }, at('08:10:00'), modes), false);
+  assert.equal(runningJourney(train, at('08:10:00'), ['ferry']), false, 'mode turned off');
 });
