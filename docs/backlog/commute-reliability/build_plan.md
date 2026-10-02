@@ -600,3 +600,26 @@ offline, so regenerate the bootstrap (compiler in `native-data.md`) before
 building the release, if it has not already been done.
 
 Done marker: the folder's deletion.
+
+Android fix done: `9cefe11` on `cr-fix-android`.
+- Every reviewer probe passes. `tools/build-android.sh` passes with 281 unit
+  tests, and the instrumented `ReviewCommuteReliabilityTest` (2),
+  `CommuteReliabilityControllerTest` (12), `ControllerParity` (13),
+  `BoardPastPaging` (3), `SetupLocationController` (1) and
+  `TravelTrackerIntegrationTest` (25) all pass.
+- Ruling 24's old single plan showed 0 upcoming services on Central →
+  Parramatta at 08:00, so Android had the defect.
+- Offline Home still keeps the departed train as its lead and re-records it
+  after departure; the restored lower bound is what stops it entering. Do not
+  change that lead without revisiting finding 2.
+- Each board refresh now runs two timetable plans; phase 5 checks
+  `OfflinePlannerPerformanceInstrumentedTest`.
+- `am instrument` exits 0 even when tests fail, so grep its output for `OK (`.
+
+Integration branch `cr-int` (`5e70222`, worktree `/private/tmp/ilt-cr-int`):
+main with 4a, plus `cr-fix-android`, which carries the review probes and the
+web fix. `web/js/main.js` keeps `retiresSnapshot`/`stoppedTrip`, and
+`web/sw.js` is at v74. On it: web 637 pass, the playtest exits 0 and
+`check-commute-reliability.js` passes all seven checks. Phase 4b runs on
+`cr-android4`, branched from `cr-int`. `cr-fix-ios` merges into `cr-int` when
+it lands, then `cr-int` merges to main.
