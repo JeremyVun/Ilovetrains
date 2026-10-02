@@ -184,17 +184,13 @@ private extension WidgetLockSentence {
 }
 
 struct WidgetStatus: Equatable, Sendable {
-    var text: String?
-    var pinned: Bool
+    var text: String
     var warns: Bool
 }
 
 func widgetStatus(_ content: WidgetContent) -> WidgetStatus? {
-    guard let focus = content.answer?.focus, let lead = content.lead else { return nil }
-    if content.replaced != nil || lead.cancelled { return WidgetStatus(text: "Cancelled", pinned: false, warns: true) }
+    guard content.answer?.focus != nil, let lead = content.lead else { return nil }
+    if content.replaced != nil || lead.cancelled { return WidgetStatus(text: "Cancelled", warns: true) }
     if widgetNextStep(widgetSteps(lead), now: content.date) == nil { return nil }
-    if lead.effectiveDeparture > content.date {
-        return focus.pinned ? WidgetStatus(text: nil, pinned: true, warns: false) : WidgetStatus(text: "Running", pinned: false, warns: false)
-    }
-    return WidgetStatus(text: "Running", pinned: focus.pinned, warns: false)
+    return WidgetStatus(text: "Running", warns: false)
 }

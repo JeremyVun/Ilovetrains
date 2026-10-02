@@ -17,15 +17,25 @@ final class HomeStatusTests: XCTestCase {
         XCTAssertFalse(freshnessRests(saved, now: now, awaiting: false))
     }
 
-    func testFuturePinnedHeaderReadsPinned() {
+    func testStartedTripBeforeDepartureReadsTheServiceStatus() {
         let now: Millis = 1_000_000
-        let presentation = focusStatusPresentation(makeFocus(now: now), now: now, complete: false)
-
-        XCTAssertEqual(presentation.text, "Pinned")
-        XCTAssertTrue(presentation.pinIcon)
+        XCTAssertEqual(focusStatus(makeFocus(now: now), now: now, complete: false), "Running")
     }
 
-    func testExceptionalStatusesOutrankFuturePin() {
+    func testTripControlLineFollowsTheTripMode() {
+        let now: Millis = 1_000_000
+        let started = makeFocus(now: now)
+        var guessed = started
+        guessed.pinned = false
+
+        XCTAssertEqual(tripControlLine(focus: started, startable: nil, over: false), .started)
+        XCTAssertEqual(tripControlLine(focus: guessed, startable: started.journey, over: false), .guessed)
+        XCTAssertEqual(tripControlLine(focus: nil, startable: started.journey, over: false), .startable(started.journey))
+        XCTAssertNil(tripControlLine(focus: nil, startable: nil, over: false))
+        XCTAssertNil(tripControlLine(focus: started, startable: nil, over: true), "the trip-over offer replaces the line")
+    }
+
+    func testExceptionalStatusesOutrankRunning() {
         let now: Millis = 1_000_000
         var cancelled = makeFocus(now: now)
         cancelled.journey.legs[0].cancelled = true
@@ -47,16 +57,16 @@ final class HomeStatusTests: XCTestCase {
 
         var unavailable = focus
         unavailable.board.offline = true
-        XCTAssertEqual(focusStatus(unavailable, now: now, complete: false), "Pinned")
+        XCTAssertEqual(focusStatus(unavailable, now: now, complete: false), "Running")
         unavailable = focus
         unavailable.board.source = "schedule"
-        XCTAssertEqual(focusStatus(unavailable, now: now, complete: false), "Pinned")
+        XCTAssertEqual(focusStatus(unavailable, now: now, complete: false), "Running")
         unavailable = focus
         unavailable.board.generatedAt = now - 90_001
-        XCTAssertEqual(focusStatus(unavailable, now: now, complete: false), "Pinned")
+        XCTAssertEqual(focusStatus(unavailable, now: now, complete: false), "Running")
         unavailable = focus
         unavailable.journey.retained = true
-        XCTAssertEqual(focusStatus(unavailable, now: now, complete: false), "Pinned")
+        XCTAssertEqual(focusStatus(unavailable, now: now, complete: false), "Running")
     }
 
     func testEveryLegMustBeEnabledForSuggestions() {

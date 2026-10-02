@@ -208,7 +208,7 @@ final class WidgetSnapshotTests: XCTestCase {
         let matched = widgetContent(snapshot, sources: [request.key: widgetSource(request, fetched: board)], at: now)
         XCTAssertEqual(matched.lead, delayed)
         XCTAssertEqual(matched.freshness?.text, "Last updated 08:19")
-        XCTAssertEqual(widgetStatus(matched), WidgetStatus(text: "Running", pinned: true, warns: false))
+        XCTAssertEqual(widgetStatus(matched), WidgetStatus(text: "Running", warns: false))
 
         var gone = board
         gone.journeys = [service(rhodes, central, departs: now, minutes: 25)]
@@ -298,7 +298,7 @@ final class WidgetSnapshotTests: XCTestCase {
         let content = widgetContent(snapshot, sources: [request.key: widgetSource(request, fetched: board)], at: now)
         XCTAssertEqual(content.lead?.key, next.key)
         XCTAssertEqual(content.replaced?.key, pinned.key)
-        XCTAssertEqual(widgetStatus(content), WidgetStatus(text: "Cancelled", pinned: false, warns: true))
+        XCTAssertEqual(widgetStatus(content), WidgetStatus(text: "Cancelled", warns: true))
         let lock = widgetLockSentence(content)
         XCTAssertEqual(lock.subject, "T9 leaves in ")
         XCTAssertEqual(lock.deadline, next.effectiveDeparture)

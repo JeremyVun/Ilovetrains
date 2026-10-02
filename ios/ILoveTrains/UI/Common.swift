@@ -183,7 +183,7 @@ func directionFigureFor(_ journey: Journey, now: Millis) -> Figure? {
 
 func arrivalFigure(_ arrival: ArrivalResult?, journey: Journey, now: Millis) -> Figure? {
     guard let arrival, arrival.state == .checkingArrival || arrival.state == .arrivalUnconfirmed else { return nil }
-    if arrival.moving {
+    if arrival.state == .arrivalUnconfirmed {
         let elapsed = max(0, Int(floor((now - journey.effectiveArrival) / 60_000)))
         return elapsed == 0
             ? Figure(value: "—", provenance: "Past estimate")
@@ -196,8 +196,7 @@ func arrivalInstruction(_ arrival: ArrivalResult?, destination: String) -> Strin
     guard let arrival else { return nil }
     switch arrival.state {
     case .checkingArrival: return "Checking arrival at \(destination)."
-    case .arrivalUnconfirmed where arrival.moving: return "Still on the way to \(destination)."
-    case .arrivalUnconfirmed: return "Arrival time needs an update."
+    case .arrivalUnconfirmed: return "Still on the way to \(destination)."
     default: return nil
     }
 }

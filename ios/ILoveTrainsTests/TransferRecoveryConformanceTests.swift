@@ -60,7 +60,8 @@ final class TransferRecoveryConformanceTests: XCTestCase {
 
             XCTAssertEqual(focusStatus(settled, plan: after, now: now, complete: false).uppercased(),
                            expected["status"] as! String, name)
-            XCTAssertEqual(focusStatusPresentation(settled, now: now, complete: false).pinIcon,
+            // The shared field predates Start and Stop trip: a started trip stops from its line.
+            XCTAssertEqual(tripControlLine(focus: settled, startable: nil, over: false) == .started,
                            expected["pinIcon"] as! Bool, name)
             XCTAssertEqual(
                 after.composed.legs.indices.dropLast().map {

@@ -262,7 +262,6 @@ final class TrainViewModel: ObservableObject {
         }
         let now = state.now
         let arrivalState = state.arrival?.state
-        let arrivalMoving = state.arrival?.moving ?? false
         let complete = storedFocus.map { focus in
             data.rides.contains { $0.tripId == focus.tripId && $0.reverse == focus.reverse && $0.departure == focus.journey.departure }
         } ?? false
@@ -293,7 +292,6 @@ final class TrainViewModel: ObservableObject {
                 now: now,
                 recordedComplete: complete,
                 arrivalState: arrivalState,
-                arrivalMoving: arrivalMoving,
                 journeyAlerts: alerts,
                 background: inBackground,
                 debugStaticCountdown: debugCountdown
@@ -1740,6 +1738,10 @@ private extension TrainViewModel {
             state.now = departure
             board.generatedAt = departure
         }
+        if name.contains("far"), let departure = board.journeys.first?.effectiveDeparture {
+            state.now = departure - 25 * 60_000
+            board.generatedAt = state.now
+        }
         if name.contains("hours"), let departure = board.journeys.first?.effectiveDeparture {
             state.now = departure - 187 * 60_000
             board.generatedAt = state.now
@@ -1810,6 +1812,7 @@ private extension TrainViewModel {
             if name.contains("before") { state.now = journey.legs[0].effectiveArrival - 60_000 }
             else if name.contains("during") { state.now = journey.legs[0].effectiveArrival + 60_000 }
             else if name.contains("after") { state.now = journey.legs[1].effectiveDeparture + 60_000 }
+            else if name.contains("checking") { state.now = journey.effectiveArrival + 60_000 }
             else { state.now = journey.effectiveArrival + 300_000 }
             let metadata = ArrivalGuard(armed: true, retainedAt: state.now)
             data.focus = FocusedJourney(tripId: trip.id, reverse: false, journey: journey, board: board, arrivalGuard: metadata)

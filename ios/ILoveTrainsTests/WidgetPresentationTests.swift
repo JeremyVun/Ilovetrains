@@ -49,7 +49,7 @@ final class WidgetPresentationTests: XCTestCase {
         XCTAssertEqual(boarding.deadline, journey.effectiveDeparture)
         XCTAssertEqual(boarding.instruction, [WidgetSentenceRun(text: "Go to "), WidgetSentenceRun(text: "Platform 1", strong: true)])
         XCTAssertEqual(boarding.arrival, "Bondi Junction about 10:08")
-        XCTAssertEqual(widgetStatus(before), WidgetStatus(text: nil, pinned: true, warns: false))
+        XCTAssertEqual(widgetStatus(before), WidgetStatus(text: "Running", warns: false))
 
         let riding = content(journey, at: now + 12 * 60_000)
         XCTAssertEqual(widgetNextStep(steps, now: riding.date), 1)
@@ -57,7 +57,7 @@ final class WidgetPresentationTests: XCTestCase {
         XCTAssertEqual(alighting.subject, "Town Hall in ")
         XCTAssertEqual(alighting.deadline, journey.legs[0].effectiveArrival)
         XCTAssertEqual(alighting.instruction.map(\.text).joined(), "Get off on Platform 3")
-        XCTAssertEqual(widgetStatus(riding), WidgetStatus(text: "Running", pinned: true, warns: false))
+        XCTAssertEqual(widgetStatus(riding), WidgetStatus(text: "Running", warns: false))
 
         let changing = widgetLockSentence(content(journey, at: journey.legs[0].effectiveArrival + 60_000))
         XCTAssertEqual(changing.subject, "T4 leaves in ")
