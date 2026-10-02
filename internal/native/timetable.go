@@ -263,7 +263,8 @@ func (s *timetableStore) refresh(ctx context.Context) error {
 	defer cancel()
 	command := exec.CommandContext(compileCtx, "python3", s.compilerPath,
 		"--input-dir", inputDir, "--output-dir", outputDir)
-	command.Env = withoutAPIKey(os.Environ())
+	// The compiler renames staged files into outputDir, which fails across filesystems.
+	command.Env = append(withoutAPIKey(os.Environ()), "TMPDIR="+workDir)
 	if output, err := command.CombinedOutput(); err != nil {
 		if len(output) > 4096 {
 			output = output[len(output)-4096:]
