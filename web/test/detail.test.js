@@ -164,10 +164,13 @@ test('the detail view writes focus once and never clears it', () => {
   const action = /function detailAction\(action\) \{[\s\S]*?\n\}/.exec(main);
 
   assert.ok(action, 'main.js has a detailAction');
-  assert.equal((action[0].match(/setFocus\(/g) || []).length, 1);
-  assert.doesNotMatch(action[0], /clearFocus\(/);
+  assert.match(action[0], /action === 'focus'\) return startTrip\(state\.selection, state\.journey\)/);
   assert.match(action[0], /action === 'board'\) return ctx\.go\('#\/board'\)/);
-  assert.match(action[0], /ctx\.go\('#\/'\)/);
+  const start = /function startTrip\(selection, journey\) \{[\s\S]*?\n\}/.exec(main);
+  assert.ok(start, 'main.js has a startTrip');
+  assert.equal((start[0].match(/setFocus\(/g) || []).length, 1);
+  assert.doesNotMatch(start[0], /clearFocus\(/);
+  assert.match(start[0], /ctx\.go\('#\/'\)/);
 });
 
 test('detail renders the composed journey with the receipt as its summary and no recovery control', () => {

@@ -200,6 +200,8 @@
         "direction": "forward"
       },
       "home": "213820",
+      "here": null,
+      "sighting": null,
       "scores": [
         {
           "tripId": "a",
@@ -413,6 +415,8 @@
         "direction": "reverse"
       },
       "home": "213820",
+      "here": null,
+      "sighting": null,
       "scores": [
         {
           "tripId": "a",
@@ -586,6 +590,8 @@
         "direction": "forward"
       },
       "home": "213820",
+      "here": null,
+      "sighting": null,
       "scores": [
         {
           "tripId": "a",
@@ -746,6 +752,8 @@
         "direction": "forward"
       },
       "home": "213820",
+      "here": null,
+      "sighting": null,
       "scores": [
         {
           "tripId": "a",
@@ -1002,6 +1010,11 @@
         "direction": "forward"
       },
       "home": "200060",
+      "here": {
+        "stationId": "213820",
+        "tier": 1
+      },
+      "sighting": "213820",
       "scores": [
         {
           "tripId": "a",
@@ -1213,6 +1226,11 @@
         "direction": "forward"
       },
       "home": "200060",
+      "here": {
+        "stationId": "213820",
+        "tier": 1
+      },
+      "sighting": "213820",
       "scores": [
         {
           "tripId": "a",
@@ -1373,6 +1391,8 @@
         "direction": "forward"
       },
       "home": "213820",
+      "here": null,
+      "sighting": null,
       "scores": [
         {
           "tripId": "a",
@@ -1533,6 +1553,8 @@
         "direction": "forward"
       },
       "home": "213820",
+      "here": null,
+      "sighting": null,
       "scores": [
         {
           "tripId": "a",
@@ -1693,6 +1715,8 @@
         "direction": "forward"
       },
       "home": "213820",
+      "here": null,
+      "sighting": null,
       "scores": [
         {
           "tripId": "a",
@@ -1853,6 +1877,8 @@
         "direction": "forward"
       },
       "home": "213820",
+      "here": null,
+      "sighting": null,
       "scores": [
         {
           "tripId": "a",
@@ -1998,6 +2024,8 @@
         "direction": "forward"
       },
       "home": "213820",
+      "here": null,
+      "sighting": null,
       "scores": [
         {
           "tripId": "a",
@@ -2146,6 +2174,8 @@
         "direction": "reverse"
       },
       "home": "213820",
+      "here": null,
+      "sighting": null,
       "scores": [
         {
           "tripId": "a",
@@ -2307,6 +2337,8 @@
         "direction": "forward"
       },
       "home": "213820",
+      "here": null,
+      "sighting": null,
       "scores": [
         {
           "tripId": "a",
@@ -2455,6 +2487,11 @@
         "direction": "forward"
       },
       "home": "213820",
+      "here": {
+        "stationId": "200060",
+        "tier": 1
+      },
+      "sighting": "200060",
       "scores": [
         {
           "tripId": "a",
@@ -2603,6 +2640,11 @@
         "direction": "forward"
       },
       "home": "213820",
+      "here": {
+        "stationId": "200060",
+        "tier": 1
+      },
+      "sighting": "200060",
       "scores": [
         {
           "tripId": "a",
@@ -2767,6 +2809,11 @@
         "direction": "forward"
       },
       "home": "213820",
+      "here": {
+        "stationId": "213820",
+        "tier": 1
+      },
+      "sighting": "213820",
       "scores": [
         {
           "tripId": "a",
@@ -2958,6 +3005,11 @@
         "direction": "forward"
       },
       "home": "202210",
+      "here": {
+        "stationId": "213820",
+        "tier": 1
+      },
+      "sighting": "213820",
       "scores": [
         {
           "tripId": "a",
@@ -3109,6 +3161,8 @@
         "direction": "forward"
       },
       "home": "213820",
+      "here": null,
+      "sighting": null,
       "scores": [
         {
           "tripId": "a",
@@ -3137,6 +3191,922 @@
           "value": 0.9995770449223291,
           "days": 1,
           "receiptDays": 1
+        }
+      ]
+    }
+  },
+  {
+    "doc": {
+      "schemaVersion": 1,
+      "trips": [
+        {
+          "id": "th",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes Station",
+            "location": {
+              "lat": -33.83053,
+              "lon": 151.087032
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "200070",
+            "name": "Town Hall Station",
+            "location": {
+              "lat": -33.873596,
+              "lon": 151.206899
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        }
+      ],
+      "history": [],
+      "rides": [],
+      "homeVotes": [],
+      "preferences": {
+        "useLocation": true
+      },
+      "lastViewed": null
+    },
+    "now": "2026-10-01T17:30:00+10:00",
+    "stations": [
+      {
+        "id": "200070",
+        "name": "Town Hall Station",
+        "location": {
+          "lat": -33.873596,
+          "lon": 151.206899
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200066",
+        "name": "Gadigal Station",
+        "location": {
+          "lat": -33.873866,
+          "lon": 151.208509
+        },
+        "modes": [
+          "metro"
+        ]
+      },
+      {
+        "id": "213820",
+        "name": "Rhodes Station",
+        "location": {
+          "lat": -33.83053,
+          "lon": 151.087032
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200060",
+        "name": "Central Station",
+        "location": {
+          "lat": -33.883882,
+          "lon": 151.205829
+        },
+        "modes": [
+          "train"
+        ]
+      }
+    ],
+    "name": "a saved station at 269 m beats an unsaved one at 119 m",
+    "fix": {
+      "lat": -33.8738,
+      "lon": 151.209799,
+      "at": 1790839800000,
+      "accuracy": 10
+    },
+    "wanted": [
+      "th",
+      true
+    ],
+    "expected": {
+      "selection": {
+        "tripId": "th",
+        "reverse": true
+      },
+      "noLocation": {
+        "tripId": "th",
+        "direction": "forward"
+      },
+      "home": "213820",
+      "here": {
+        "stationId": "200070",
+        "tier": 1
+      },
+      "sighting": "200070",
+      "scores": [
+        {
+          "tripId": "th",
+          "reverse": false,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "th",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        }
+      ]
+    }
+  },
+  {
+    "doc": {
+      "schemaVersion": 1,
+      "trips": [
+        {
+          "id": "th",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes Station",
+            "location": {
+              "lat": -33.83053,
+              "lon": 151.087032
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "200070",
+            "name": "Town Hall Station",
+            "location": {
+              "lat": -33.873596,
+              "lon": 151.206899
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        }
+      ],
+      "history": [],
+      "rides": [],
+      "homeVotes": [],
+      "preferences": {
+        "useLocation": true
+      },
+      "lastViewed": null
+    },
+    "now": "2026-10-01T17:30:00+10:00",
+    "stations": [
+      {
+        "id": "200070",
+        "name": "Town Hall Station",
+        "location": {
+          "lat": -33.873596,
+          "lon": 151.206899
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200066",
+        "name": "Gadigal Station",
+        "location": {
+          "lat": -33.873866,
+          "lon": 151.208509
+        },
+        "modes": [
+          "metro"
+        ]
+      },
+      {
+        "id": "213820",
+        "name": "Rhodes Station",
+        "location": {
+          "lat": -33.83053,
+          "lon": 151.087032
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200060",
+        "name": "Central Station",
+        "location": {
+          "lat": -33.883882,
+          "lon": 151.205829
+        },
+        "modes": [
+          "train"
+        ]
+      }
+    ],
+    "name": "a saved station at 342 m is here but no sighting",
+    "fix": {
+      "lat": -33.8738,
+      "lon": 151.210599,
+      "at": 1790839800000,
+      "accuracy": 10
+    },
+    "wanted": [
+      "th",
+      true
+    ],
+    "expected": {
+      "selection": {
+        "tripId": "th",
+        "reverse": true
+      },
+      "noLocation": {
+        "tripId": "th",
+        "direction": "forward"
+      },
+      "home": "213820",
+      "here": {
+        "stationId": "200070",
+        "tier": 1
+      },
+      "sighting": null,
+      "scores": [
+        {
+          "tripId": "th",
+          "reverse": false,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "th",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        }
+      ]
+    }
+  },
+  {
+    "doc": {
+      "schemaVersion": 1,
+      "trips": [
+        {
+          "id": "cr",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes Station",
+            "location": {
+              "lat": -33.83053,
+              "lon": 151.087032
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "200060",
+            "name": "Central Station",
+            "location": {
+              "lat": -33.883882,
+              "lon": 151.205829
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        }
+      ],
+      "history": [],
+      "rides": [],
+      "homeVotes": [],
+      "preferences": {
+        "useLocation": true
+      },
+      "lastViewed": null
+    },
+    "now": "2026-10-01T17:30:00+10:00",
+    "stations": [
+      {
+        "id": "200070",
+        "name": "Town Hall Station",
+        "location": {
+          "lat": -33.873596,
+          "lon": 151.206899
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200066",
+        "name": "Gadigal Station",
+        "location": {
+          "lat": -33.873866,
+          "lon": 151.208509
+        },
+        "modes": [
+          "metro"
+        ]
+      },
+      {
+        "id": "213820",
+        "name": "Rhodes Station",
+        "location": {
+          "lat": -33.83053,
+          "lon": 151.087032
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200060",
+        "name": "Central Station",
+        "location": {
+          "lat": -33.883882,
+          "lon": 151.205829
+        },
+        "modes": [
+          "train"
+        ]
+      }
+    ],
+    "name": "an unsaved station within 200 m answers when no saved end is within 400 m",
+    "fix": {
+      "lat": -33.8738,
+      "lon": 151.209799,
+      "at": 1790839800000,
+      "accuracy": 10
+    },
+    "expected": {
+      "selection": null,
+      "noLocation": {
+        "tripId": "cr",
+        "direction": "forward"
+      },
+      "home": "213820",
+      "here": {
+        "stationId": "200066",
+        "tier": 1
+      },
+      "sighting": "200066",
+      "scores": [
+        {
+          "tripId": "cr",
+          "reverse": false,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "cr",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        }
+      ]
+    }
+  },
+  {
+    "doc": {
+      "schemaVersion": 1,
+      "trips": [
+        {
+          "id": "th",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes Station",
+            "location": {
+              "lat": -33.83053,
+              "lon": 151.087032
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "200070",
+            "name": "Town Hall Station",
+            "location": {
+              "lat": -33.873596,
+              "lon": 151.206899
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        }
+      ],
+      "history": [],
+      "rides": [],
+      "homeVotes": [],
+      "preferences": {
+        "useLocation": true
+      },
+      "lastViewed": null
+    },
+    "now": "2026-10-01T17:30:00+10:00",
+    "stations": [
+      {
+        "id": "200070",
+        "name": "Town Hall Station",
+        "location": {
+          "lat": -33.873596,
+          "lon": 151.206899
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200066",
+        "name": "Gadigal Station",
+        "location": {
+          "lat": -33.873866,
+          "lon": 151.208509
+        },
+        "modes": [
+          "metro"
+        ]
+      },
+      {
+        "id": "213820",
+        "name": "Rhodes Station",
+        "location": {
+          "lat": -33.83053,
+          "lon": 151.087032
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200060",
+        "name": "Central Station",
+        "location": {
+          "lat": -33.883882,
+          "lon": 151.205829
+        },
+        "modes": [
+          "train"
+        ]
+      }
+    ],
+    "name": "a fix reporting train speed has no here",
+    "fix": {
+      "lat": -33.873596,
+      "lon": 151.206899,
+      "at": 1790839800000,
+      "accuracy": 10,
+      "speed": 12
+    },
+    "wanted": [
+      "th",
+      false
+    ],
+    "expected": {
+      "selection": {
+        "tripId": "th",
+        "reverse": false
+      },
+      "noLocation": {
+        "tripId": "th",
+        "direction": "forward"
+      },
+      "home": "213820",
+      "here": null,
+      "sighting": null,
+      "scores": [
+        {
+          "tripId": "th",
+          "reverse": false,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "th",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        }
+      ]
+    }
+  },
+  {
+    "doc": {
+      "schemaVersion": 1,
+      "trips": [
+        {
+          "id": "th",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes Station",
+            "location": {
+              "lat": -33.83053,
+              "lon": 151.087032
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "200070",
+            "name": "Town Hall Station",
+            "location": {
+              "lat": -33.873596,
+              "lon": 151.206899
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        }
+      ],
+      "history": [],
+      "rides": [],
+      "homeVotes": [],
+      "preferences": {
+        "useLocation": true
+      },
+      "lastViewed": null
+    },
+    "now": "2026-10-01T17:30:00+10:00",
+    "stations": [
+      {
+        "id": "200070",
+        "name": "Town Hall Station",
+        "location": {
+          "lat": -33.873596,
+          "lon": 151.206899
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200066",
+        "name": "Gadigal Station",
+        "location": {
+          "lat": -33.873866,
+          "lon": 151.208509
+        },
+        "modes": [
+          "metro"
+        ]
+      },
+      {
+        "id": "213820",
+        "name": "Rhodes Station",
+        "location": {
+          "lat": -33.83053,
+          "lon": 151.087032
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200060",
+        "name": "Central Station",
+        "location": {
+          "lat": -33.883882,
+          "lon": 151.205829
+        },
+        "modes": [
+          "train"
+        ]
+      }
+    ],
+    "name": "a fix 600 m on from one 30 s earlier is at train speed",
+    "fix": {
+      "lat": -33.873596,
+      "lon": 151.206899,
+      "at": 1790839800000,
+      "accuracy": 10
+    },
+    "previousFix": {
+      "lat": -33.879,
+      "lon": 151.2069,
+      "at": 1790839770000,
+      "accuracy": 10
+    },
+    "wanted": [
+      "th",
+      false
+    ],
+    "expected": {
+      "selection": {
+        "tripId": "th",
+        "reverse": false
+      },
+      "noLocation": {
+        "tripId": "th",
+        "direction": "forward"
+      },
+      "home": "213820",
+      "here": null,
+      "sighting": null,
+      "scores": [
+        {
+          "tripId": "th",
+          "reverse": false,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "th",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        }
+      ]
+    }
+  },
+  {
+    "doc": {
+      "schemaVersion": 1,
+      "trips": [
+        {
+          "id": "th",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes Station",
+            "location": {
+              "lat": -33.83053,
+              "lon": 151.087032
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "200070",
+            "name": "Town Hall Station",
+            "location": {
+              "lat": -33.873596,
+              "lon": 151.206899
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        }
+      ],
+      "history": [],
+      "rides": [],
+      "homeVotes": [],
+      "preferences": {
+        "useLocation": true
+      },
+      "lastViewed": null
+    },
+    "now": "2026-10-01T17:30:00+10:00",
+    "stations": [
+      {
+        "id": "200070",
+        "name": "Town Hall Station",
+        "location": {
+          "lat": -33.873596,
+          "lon": 151.206899
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200066",
+        "name": "Gadigal Station",
+        "location": {
+          "lat": -33.873866,
+          "lon": 151.208509
+        },
+        "modes": [
+          "metro"
+        ]
+      },
+      {
+        "id": "213820",
+        "name": "Rhodes Station",
+        "location": {
+          "lat": -33.83053,
+          "lon": 151.087032
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200060",
+        "name": "Central Station",
+        "location": {
+          "lat": -33.883882,
+          "lon": 151.205829
+        },
+        "modes": [
+          "train"
+        ]
+      }
+    ],
+    "name": "a walking pair of fixes keeps here",
+    "fix": {
+      "lat": -33.873596,
+      "lon": 151.206899,
+      "at": 1790839800000,
+      "accuracy": 10
+    },
+    "previousFix": {
+      "lat": -33.8738,
+      "lon": 151.2069,
+      "at": 1790839770000,
+      "accuracy": 10
+    },
+    "wanted": [
+      "th",
+      true
+    ],
+    "expected": {
+      "selection": {
+        "tripId": "th",
+        "reverse": true
+      },
+      "noLocation": {
+        "tripId": "th",
+        "direction": "forward"
+      },
+      "home": "213820",
+      "here": {
+        "stationId": "200070",
+        "tier": 1
+      },
+      "sighting": "200070",
+      "scores": [
+        {
+          "tripId": "th",
+          "reverse": false,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "th",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        }
+      ]
+    }
+  },
+  {
+    "doc": {
+      "schemaVersion": 1,
+      "trips": [
+        {
+          "id": "th",
+          "from": {
+            "id": "213820",
+            "name": "Rhodes Station",
+            "location": {
+              "lat": -33.83053,
+              "lon": 151.087032
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "to": {
+            "id": "200070",
+            "name": "Town Hall Station",
+            "location": {
+              "lat": -33.873596,
+              "lon": 151.206899
+            },
+            "modes": [
+              "train"
+            ]
+          },
+          "createdAt": "2026-09-01T00:00:00+10:00"
+        }
+      ],
+      "history": [],
+      "rides": [],
+      "homeVotes": [],
+      "preferences": {
+        "useLocation": true
+      },
+      "lastViewed": null
+    },
+    "now": "2026-10-01T17:30:00+10:00",
+    "stations": [
+      {
+        "id": "200070",
+        "name": "Town Hall Station",
+        "location": {
+          "lat": -33.873596,
+          "lon": 151.206899
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200066",
+        "name": "Gadigal Station",
+        "location": {
+          "lat": -33.873866,
+          "lon": 151.208509
+        },
+        "modes": [
+          "metro"
+        ]
+      },
+      {
+        "id": "213820",
+        "name": "Rhodes Station",
+        "location": {
+          "lat": -33.83053,
+          "lon": 151.087032
+        },
+        "modes": [
+          "train"
+        ]
+      },
+      {
+        "id": "200060",
+        "name": "Central Station",
+        "location": {
+          "lat": -33.883882,
+          "lon": 151.205829
+        },
+        "modes": [
+          "train"
+        ]
+      }
+    ],
+    "name": "a previous fix over 120 s old cannot derive train speed",
+    "fix": {
+      "lat": -33.873596,
+      "lon": 151.206899,
+      "at": 1790839800000,
+      "accuracy": 10
+    },
+    "previousFix": {
+      "lat": -33.92,
+      "lon": 151.2069,
+      "at": 1790839679999,
+      "accuracy": 10
+    },
+    "wanted": [
+      "th",
+      true
+    ],
+    "expected": {
+      "selection": {
+        "tripId": "th",
+        "reverse": true
+      },
+      "noLocation": {
+        "tripId": "th",
+        "direction": "forward"
+      },
+      "home": "213820",
+      "here": {
+        "stationId": "200070",
+        "tier": 1
+      },
+      "sighting": "200070",
+      "scores": [
+        {
+          "tripId": "th",
+          "reverse": false,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
+        },
+        {
+          "tripId": "th",
+          "reverse": true,
+          "value": 0,
+          "days": 0,
+          "receiptDays": 0
         }
       ]
     }

@@ -2,17 +2,19 @@
 
 import {
   loadDoc, saveDoc, addTrip, findTrip, leg, cacheKey, putCache, getCache, recordView,
-  recordHomeVote, recordLastOpen, updateStop, declineLocation, newTripId,
+  recordHomeVote, updateStop, declineLocation, newTripId,
   recordOpen, milestone, LOCATION_ASK_QUIET_MS
 } from './storage.js';
 import { distanceKm, homeOf, locate, predict } from './predict.js';
-import { here, loadStations } from './stations.js';
+import { here, loadStations, sightingOf, trainSpeed } from './stations.js';
 import { boardModel, promotedRow } from './rowmodel.js';
-import { journeyDetail, journeyKey, departureKey, legsOf, arrivalMs, departureMs } from './journey.js';
+import { journeyDetail, journeyKey, departureKey, arrivalMs, departureMs } from './journey.js';
 import {
   focusOf, visibleFocus, setFocus, clearFocus, isFocused, focusExpired, matchJourney,
   applyFocusSnapshot, applyArrivalResult, composedJourney, recoveryModel, recoveryOf,
-  inferTravel, journeyCancelled, pinResult, rideAdded, TRAVEL_LATE_MS
+  inferFromRecords, inferOnBoard, onBoardRequests, writeLastOpen, tickNeedsFix,
+  declineFocus, runningJourney, startable, journeyCancelled, pinResult, rideAdded, rideRecorded,
+  TRAVEL_LATE_MS
 } from './focus.js';
 import * as Board from './board.js';
 import { clampJourneyBars } from './journeybar.js';
@@ -28,7 +30,7 @@ import {
   tripAllowed, tripsForModes, stationAllowed, SUPPORTED_MODES,
   preferencesOf, setPreferences, setFlags, effectiveCap, journeyAllowed, filterBody
 } from './preferences.js';
-import { reduceArrival } from './arrival.js';
+import { ARRIVAL, reduceArrival } from './arrival.js';
 import { earliestAlternative, nextRecommendationCursor, selectRecommendation } from './recommendation.js';
 import {
   createAnalytics, install as installAnalytics, isEnabled, variant, EXPERIMENTS
@@ -43,8 +45,12 @@ const RECOMMENDATION_LIMIT = 10;
 const RECOMMENDATION_PAGES = 2;
 const RECOMMENDATION_DEADLINE_MS = 12_000;
 const RECOMMENDATION_THROTTLE_MS = 60_000;
-const ARRIVAL_RESUME_WAIT_MS = 15_000;
+const LOOKUP_TIMEOUT_MS = 15_000;
+const NEW_OPEN_AFTER_MS = 10 * 60_000;
 const PAST_STEP_MS = 60 * 60_000;
+// Reaches the trains that just left, the ones a rider on board looks for.
+const FIRST_PAST_PAGE_MS = 30 * 60_000;
+const FIRST_PAST_PAGE_LIMIT = 10;
 const PAST_BOUND_MS = 24 * 60 * 60_000;
 const FIX_MAX_AGE_MS = 5 * 60_000;
 const DISSOLVE_HOLD_MS = 260;
@@ -105,6 +111,7 @@ const state = {
   loadingPast: false,
   pastExhausted: false,
   fix: null,
+  previousFix: null,
   stations: null,
   loadedAt: Date.now(),
   leap: null,
@@ -132,6 +139,10 @@ state.recommendationPages = [];
 state.arrivalDecision = null;
 state.arrivalWindow = null;
 state.arrivalResumeWaitUntil = null;
+state.evidenceWaitFor = null;
+state.foregroundVisit = 0;
+state.shownDepartures = new Map();
+state.hiddenAt = null;
 state.arrivalPermissionPending = false;
 state.focusRefreshPending = null;
 state.recovery = null;
@@ -183,6 +194,8 @@ let pastInflight = null;
 let focusInflight = null;
 let recoveryInflight = null;
 let recommendationInflight = null;
+let onBoardInflight = null;
+let onBoardFix = null;
 let requestGeneration = 0;
 let answeredKey = null;
 let preserveSelection = false;
@@ -236,7 +249,7 @@ const ctx = {
     suppressPreferenceEvents = true;
     if (before.useLocation !== after.useLocation) {
       geoGeneration += 1;
-      state.fix = null;
+      clearFix();
       stopArrivalMonitoring();
     }
     if (before.homeOverride?.id !== after.homeOverride?.id || before.useLocation !== after.useLocation) {
@@ -475,8 +488,8 @@ function locateSelection() {
   const doc = tripsForModes(state.doc, state.stations);
   if (!doc.trips.length) { state.leap = null; return null; }
   const stations = state.stations?.filter((station) => stationAllowed(station, enabledModes()));
-  const hasHere = Boolean(here(doc, stations, validFix()));
-  const answer = locate(doc, now(), { fix: validFix(), stations, home: homeOf(state.doc) });
+  const hasHere = Boolean(here(doc, stations, stationFix()));
+  const answer = locate(doc, now(), { fix: stationFix(), stations, home: homeOf(state.doc) });
   state.leap = answer.kind === 'pair' ? 'pair' : hasHere ? answer.leap || null : null;
   if (answer.kind === 'trip') return { tripId: answer.tripId, direction: answer.direction };
   if (answer.kind === 'pair' && tripAllowed(answer, enabledModes(), state.stations)) {
@@ -485,12 +498,12 @@ function locateSelection() {
     });
   }
   state.leap = null;
-  return predict(doc, now(), { fix: validFix() });
+  return predict(doc, now(), { fix: stationFix() });
 }
 
 function explicitSelection() {
   return (suggestionAllowed(savedSelection()) ? savedSelection() : null)
-    || focusSelection() || predict(tripsForModes(state.doc, state.stations), now(), { fix: validFix() });
+    || focusSelection() || predict(tripsForModes(state.doc, state.stations), now(), { fix: stationFix() });
 }
 
 /* Hiding, restoring or ending a followed journey reconciles the selected
@@ -503,7 +516,7 @@ function reconcileSuggestionSelection(released = false) {
   if (!followed && !released && suggestionAllowed(state.selection)) return false;
   state.leap = null;
   const next = followed || (released ? locateSelection()
-    : predict(tripsForModes(state.doc, state.stations), now(), { fix: validFix() }));
+    : predict(tripsForModes(state.doc, state.stations), now(), { fix: stationFix() }));
   if (!state.selection && !next) return false;
   invalidateSuggestions();
   state.selection = next;
@@ -519,6 +532,25 @@ function reconcileSuggestionSelection(released = false) {
 
 function validFix() {
   return preferencesOf(state.doc).useLocation && fixIsValid(state.fix) ? state.fix : null;
+}
+
+function movingFix() {
+  return trainSpeed(validFix(), state.previousFix);
+}
+
+// At train speed a fix says where the train is, not where the rider is.
+function stationFix() {
+  return movingFix() ? null : validFix();
+}
+
+function setHomeFix(fix) {
+  state.previousFix = state.fix;
+  state.fix = fix;
+}
+
+function clearFix() {
+  state.fix = null;
+  state.previousFix = null;
 }
 
 function loadSelectedCache() {
@@ -587,7 +619,7 @@ function setRecommendationCandidates(sources, offline = false) {
 function showHome(root) {
   state.view = 'home';
   state.detailSource = null;
-  state.fix = null;
+  clearFix();
   state.previousOpen = state.doc.lastOpen || null;
   state.selection = chooseSelection();
   if (state.selection) loadSelectedCache();
@@ -644,13 +676,12 @@ function noteLastOpen() {
   const journey = state.recommendation?.journey
     || selectRecommendation(journeys, now(), { modes: enabledModes(), maxTransfers: maxTransfers() });
   if (!journey) return;
-  const spot = here(state.doc, state.stations, validFix());
-  ctx.update(recordLastOpen(state.doc, {
-    station: spot && spot.tier === 1 ? spot.station : null,
-    tripId: state.selection.tripId,
-    direction: state.selection.direction,
-    journey
-  }, now()));
+  const fix = stationFix();
+  const station = sightingOf(here(state.doc, state.stations, fix), fix);
+  const next = writeLastOpen(state.doc, {
+    station, tripId: state.selection.tripId, direction: state.selection.direction, journey
+  }, now(), station ? fix.at : null);
+  if (next !== state.doc) ctx.update(next);
 }
 
 /* An already-granted permission is not a prompt: home may use the fix it can
@@ -675,7 +706,7 @@ async function silentFix() {
   }
   const fix = await takeFix({ enableHighAccuracy: underWay(), maximumAge: 0 });
   if (generation !== geoGeneration || state.view !== 'home' || !fix) return;
-  state.fix = fix;
+  setHomeFix(fix);
   useFix();
 }
 
@@ -711,7 +742,7 @@ async function takeContextFix(options = {}) {
     void ensureArrivalMonitoring();
     return null;
   }
-  state.fix = fix;
+  setHomeFix(fix);
   void ensureArrivalMonitoring();
   return fix;
 }
@@ -721,12 +752,13 @@ function fixIsValid(fix) {
 }
 
 function fixOf(position) {
-  const speed = position.coords.speed;
+  const { speed, heading } = position.coords;
   return {
     lat: position.coords.latitude,
     lon: position.coords.longitude,
     accuracy: position.coords.accuracy,
     speed: Number.isFinite(speed) ? speed : undefined,
+    heading: Number.isFinite(heading) ? heading : undefined,
     at: Number.isFinite(position.timestamp) ? position.timestamp : NaN
   };
 }
@@ -735,7 +767,7 @@ function permissionChanged() {
   state.geoPermission = geoPermissionStatus?.state || 'prompt';
   state.arrivalPermissionPending = false;
   geoGeneration += 1;
-  state.fix = null;
+  clearFix();
   stopArrivalMonitoring();
   syncArrivalMonitoring();
   renderCurrent();
@@ -783,33 +815,91 @@ function useFix() {
   if (state.view !== 'home') return;
   const fix = validFix();
   if (!fix) return;
-  const spot = here(state.doc, state.stations, fix);
+  const moving = movingFix();
+  const spot = here(state.doc, state.stations, stationFix());
   if (spot) {
     const voted = recordHomeVote(state.doc, spot.station, now());
     if (voted !== state.doc) ctx.update(voted);
   }
-  // Compare with the opening record before the cache paint replaced it.
-  const storedFocus = focusOf(state.doc);
-  const entered = (storedFocus && !focusExpired(storedFocus, now()))
-    || rideRecorded(state.doc, state.previousOpen) ? null
-    : journeyAllowed(state.previousOpen?.journey, enabledModes(), maxTransfers())
-      ? inferTravel({ ...state.doc, lastOpen: state.previousOpen }, now(), fix) : null;
-  if (entered) {
-    stopArrivalMonitoring();
-    state.arrivalDecision = null;
-    ctx.update(setFocus(state.doc, entered, entered.journey, now(), 'inferred'));
-    state.predicted = false;
-    state.leap = null;
-    state.selection = { tripId: entered.tripId, direction: entered.direction };
-    openForAnalytics();
-    analytics.track('entered_inferred');
-  } else if (state.predicted) {
+  const entered = inferFromRecords(state.doc, state.previousOpen, now(), fix);
+  if (entered) enterInferred(entered);
+  else if (state.predicted && !moving) {
     const answer = locateSelection();
     state.selection = answer;
     if (!answer) { state.body = null; renderHome(); return; }
   }
   settleArrival({ sample: fix });
   loadSelectedCache();
+  renderHome();
+  fetchLive();
+  if (!entered && moving) void enterOnBoard(fix);
+}
+
+function enterInferred(focus) {
+  stopArrivalMonitoring();
+  state.arrivalDecision = null;
+  ctx.update(setFocus(state.doc, focus, focus.journey, now(), 'inferred'));
+  state.predicted = false;
+  state.leap = null;
+  state.selection = { tripId: focus.tripId, direction: focus.direction };
+  openForAnalytics();
+  analytics.track('entered_inferred');
+}
+
+function cachedJourneys(doc) {
+  const cached = {};
+  for (const trip of doc.trips) {
+    for (const direction of ['forward', 'reverse']) {
+      const ends = leg(trip, direction);
+      const entry = getCache(doc, cacheKey(ends.from.id, ends.to.id, enabledModes()))
+        || getCache(doc, cacheKey(ends.from.id, ends.to.id));
+      cached[`${trip.id}|${direction}`] = entry?.body?.journeys || [];
+    }
+  }
+  return cached;
+}
+
+async function enterOnBoard(fix) {
+  const at = now();
+  const current = focusOf(state.doc);
+  if (current && !focusExpired(current, at)) return;
+  const previous = state.previousFix;
+  const doc = tripsForModes(state.doc, state.stations);
+  const cached = cachedJourneys(doc);
+  const requests = onBoardRequests(doc, at, fix, previous, cached);
+  if (!requests.length || (onBoardInflight && onBoardFix === fix)) return;
+  onBoardInflight?.abort();
+  const controller = new AbortController();
+  onBoardInflight = controller;
+  onBoardFix = fix;
+  const generation = geoGeneration;
+  const boards = {};
+  const bodies = {};
+  await Promise.all(requests.map(async (request) => {
+    try {
+      const { body } = await getDepartures(request.from, request.to, {
+        at: request.at, limit: request.limit, modes: enabledModes(), transferLimit: transferLimit(),
+        signal: controller.signal
+      });
+      bodies[request.key] = body;
+      boards[request.key] = body.journeys || [];
+    } catch (_) {
+      // A candidate whose board failed cannot match this fix.
+    }
+  }));
+  if (onBoardInflight !== controller) return;
+  onBoardInflight = null;
+  if (controller.signal.aborted || generation !== geoGeneration || state.view !== 'home') return;
+  const focus = inferOnBoard(tripsForModes(state.doc, state.stations), at, fix, previous, boards, cached);
+  if (!focus) return;
+  enterInferred(focus);
+  const body = bodies[`${focus.tripId}|${focus.direction}`];
+  state.focusBody = body;
+  state.focusIdentity = identityOfFocus(focusOf(state.doc));
+  state.focusOffline = false;
+  state.focusServerStale = false;
+  loadSelectedCache();
+  syncArrivalMonitoring();
   renderHome();
   fetchLive();
 }
@@ -916,6 +1006,12 @@ function syncArrivalMonitoring() {
     return;
   }
   const generation = ++arrivalGeneration;
+  // Once per focus and foreground visit, so a provider error restarting the watch cannot extend it.
+  const visit = `${identityOfFocus(focusOf(state.doc))}#${state.foregroundVisit}`;
+  if (state.evidenceWaitFor !== visit) {
+    state.evidenceWaitFor = visit;
+    beginEvidenceWait();
+  }
   settleArrival({ monitoring: true });
   if (generation !== arrivalGeneration || !arrivalMonitorEligible() || !focusOf(state.doc)) return;
   try {
@@ -928,15 +1024,19 @@ function syncArrivalMonitoring() {
     }, (error) => {
       if (generation !== arrivalGeneration) return;
       if (error?.code === 1) state.geoPermission = 'denied';
-      state.fix = null;
+      clearFix();
       stopArrivalMonitoring();
       settleArrival();
       renderCurrent();
-    }, { enableHighAccuracy: true, timeout: ARRIVAL_RESUME_WAIT_MS, maximumAge: 0 });
+    }, { enableHighAccuracy: true, timeout: LOOKUP_TIMEOUT_MS, maximumAge: 0 });
   } catch (_) {
     arrivalWatch = null;
     settleArrival();
   }
+}
+
+function beginEvidenceWait() {
+  state.arrivalResumeWaitUntil = now() + ARRIVAL.evidenceWait;
 }
 
 async function ensureArrivalMonitoring() {
@@ -1025,7 +1125,7 @@ function renderHome() {
   const home = Home.homeModel(state.doc, state.selection, state.body, now(), {
     stations: state.stations,
     resumeWaitUntilMs: state.arrivalResumeWaitUntil,
-    fix: validFix(),
+    fix: stationFix(),
     stale: focused ? focusModel.stale : candidateModel.stale,
     offline: focused ? !followed || followed.offline : state.offline,
     awaiting: awaitingAnswer(),
@@ -1046,7 +1146,9 @@ function renderHome() {
     recoveryResponse: focusRecoveryResponse(),
     stripVariant: activeVariant('strip-placement')
   });
+  home.startable = !home.focus && startable(home.journey, now());
   lastHome = home;
+  if (!home.focus && home.journey) state.shownDepartures.set(journeyKey(home.journey), departureMs(home.journey));
   if (kind) trackShown(kind, home.selected, home.journey);
   if (askLocation && !state.askedPanel) {
     state.askedPanel = true;
@@ -1103,7 +1205,7 @@ function restoreHomeAttribution() {
 }
 
 function leaveDistance() {
-  const fix = validFix();
+  const fix = stationFix();
   if (!fix || !selectedTrip()) return '';
   const origin = currentLeg().from;
   const distanceKmFromOrigin = distanceKm(fix, origin.location);
@@ -1216,7 +1318,7 @@ function wireTimeline() {
 }
 
 function homeAction(action, element) {
-  if (action === 'unpin' && lastHome?.pinned) return unpinService();
+  if (action === 'unpin' && lastHome?.pinned) return stopTrip();
   if (action === 'settings') return ctx.go('#/settings');
   if (action === 'recommendation-detail') {
     const journey = lastHome?.directions?.journey;
@@ -1259,7 +1361,7 @@ function homeAction(action, element) {
     }
     state.headerKind = null;
     settleArrival();
-    state.doc = clearFocus(state.doc);
+    state.doc = forgetLastOpen(clearFocus(state.doc));
     stopArrivalMonitoring();
     state.selection = {
       tripId: state.selection.tripId,
@@ -1311,7 +1413,6 @@ async function requestLocation() {
   if (generation !== geoGeneration || state.view !== 'home') return;
   if (fix) {
     analytics.track('granted_panel');
-    state.fix = fix;
     useFix();
   } else {
     analytics.track('denied_panel');
@@ -1328,14 +1429,15 @@ function boardAction(action, element) {
   qualifyView();
   const journeys = [
     ...((state.body && state.body.journeys) || []),
-    ...state.pastBodies.flatMap((page) => page.journeys || [])
+    ...state.pastBodies.flatMap((page) => page.journeys || []),
+    ...state.seenLive.values()
   ];
   const journey = journeys.find((item) => journeyKey(item) === element.dataset.match);
-  if (journey) {
-    state.journey = journey;
-    state.detailSource = null;
-    ctx.go('#/journey');
-  }
+  if (!journey) return;
+  if (runningJourney(journey, now(), enabledModes(), maxTransfers())) return startTrip(state.selection, journey);
+  state.journey = journey;
+  state.detailSource = null;
+  ctx.go('#/journey');
 }
 
 function showDetail(root) {
@@ -1421,24 +1523,25 @@ function renderDetail() {
   patchFresh(state.root.querySelector('[data-t="footer"]'), freshness);
 }
 
-function unpinService() {
-  if (!focusOf(state.doc) || focusOf(state.doc).by === 'inferred') return;
-  settleArrival();
-  const released = clearFocus(state.doc);
-  delete released.lastOpen;
-  ctx.update(released);
+function stopTrip() {
+  const focus = focusOf(state.doc);
+  if (!focus) return;
+  const guessed = focus.by === 'inferred';
+  const stopped = forgetLastOpen(clearFocus(state.doc));
+  // Declined, so the same guess cannot come straight back.
+  ctx.update(guessed ? declineFocus(stopped, focus, now()) : stopped);
+  if (guessed) analytics.track('declined_inferred');
   if (focusInflight) focusInflight.abort();
   focusInflight = null;
   if (recoveryInflight) recoveryInflight.abort();
   recoveryInflight = null;
   state.recovery = null;
   stopArrivalMonitoring();
+  state.arrivalDecision = null;
   state.focusBody = null;
   state.focusIdentity = null;
   state.focusOffline = false;
   state.focusServerStale = false;
-  // A subsequent location fix must not immediately infer the released ride.
-  state.previousOpen = null;
   state.headerKind = null;
   if (state.view !== 'home') {
     state.selection = null;
@@ -1450,28 +1553,46 @@ function unpinService() {
   fetchLive();
 }
 
-function detailAction(action) {
-  if (action === 'unpin' && isFocused(state.doc, state.journey)) return unpinService();
-  if (action === 'board') return ctx.go('#/board');
-  if (action === 'focus') {
-    if (state.headerKind && state.headerKind !== 'setup') {
-      if (state.selection.tripId === state.headerTripId
-        && state.selection.direction === state.headerDirection) {
-        analytics.track('hit_' + state.headerKind);
-      }
-      const answer = {
-        tripId: state.headerTripId, direction: state.headerDirection, journeyKey: state.headerJourneyKey
-      };
-      const r = pinResult(answer, state.selection, state.journey);
-      if (r) analytics.track('pinned_' + state.headerKind, { r });
+function startTrip(selection, journey) {
+  if (state.headerKind && state.headerKind !== 'setup') {
+    if (selection.tripId === state.headerTripId && selection.direction === state.headerDirection) {
+      analytics.track('hit_' + state.headerKind);
     }
-    state.headerKind = null;
+    const answer = {
+      tripId: state.headerTripId, direction: state.headerDirection, journeyKey: state.headerJourneyKey
+    };
+    const r = pinResult(answer, selection, journey);
+    if (r) analytics.track('pinned_' + state.headerKind, { r });
+  }
+  state.headerKind = null;
+  const current = focusOf(state.doc);
+  const same = current && current.tripId === selection.tripId && current.direction === selection.direction
+    && journeyKey(current.journey) === journeyKey(journey);
+  if (!same) {
     stopArrivalMonitoring();
     state.arrivalDecision = null;
     state.recovery = null;
-    ctx.update(setFocus(state.doc, state.selection, state.journey, now()));
-    return ctx.go('#/');
   }
+  // Starting the guessed journey itself keeps its arrival evidence.
+  const started = same ? { ...state.doc, focus: { ...current, by: 'focus' } }
+    : setFocus(state.doc, selection, journey, now());
+  ctx.update(forgetLastOpen(started));
+  state.selection = { tripId: selection.tripId, direction: selection.direction };
+  return ctx.go('#/');
+}
+
+function detailAction(action) {
+  if (action === 'unpin' && isFocused(state.doc, state.journey)) return stopTrip();
+  if (action === 'board') return ctx.go('#/board');
+  if (action === 'focus') return startTrip(state.selection, state.journey);
+}
+
+// So a later fix cannot infer a journey the rider has already settled.
+function forgetLastOpen(doc) {
+  const next = { ...doc };
+  delete next.lastOpen;
+  state.previousOpen = null;
+  return next;
 }
 
 /* The recovery pair is the one extra request a refresh may make (ui.md), and
@@ -1565,14 +1686,12 @@ async function refreshFollowed() {
   state.focusRefreshPending = identity;
   const departure = departureMs(focus.journey);
   if (now() >= (arrivalMs(composedJourney(focus)) ?? Infinity)
-      && !Number.isFinite(state.arrivalResumeWaitUntil)) {
-    state.arrivalResumeWaitUntil = now() + ARRIVAL_RESUME_WAIT_MS;
-  }
+      && !Number.isFinite(state.arrivalResumeWaitUntil)) beginEvidenceWait();
   let timedOut = false;
   const timeout = setTimeout(() => {
     timedOut = true;
     controller.abort();
-  }, ARRIVAL_RESUME_WAIT_MS);
+  }, LOOKUP_TIMEOUT_MS);
   try {
     const { body, serverStale } = await getDepartures(ends.from.id, ends.to.id, {
       limit: LIMIT, modes: SUPPORTED_MODES, signal: controller.signal,
@@ -1744,17 +1863,6 @@ async function fetchRecommendationPages({ base, ends, key, generation, modes, fi
   }
 }
 
-function rideRecorded(doc, selection) {
-  if (!selection || !selection.journey) return false;
-  const first = legsOf(selection.journey)[0] || {};
-  const departure = (first.departure || {}).scheduled
-    || ((selection.journey.departure || {}).scheduled);
-  if (!departure) return false;
-  return (doc.rides || []).some((ride) => ride.tripId === selection.tripId
-    && ride.direction === selection.direction
-    && (ride.scheduledDeparture || ride.departedAt) === departure);
-}
-
 async function fetchPast(initial) {
   if (state.view !== 'board' || state.loadingPast || state.pastExhausted || !enabledModes().length) return;
   state.loadingPast = true;
@@ -1763,7 +1871,8 @@ async function fetchPast(initial) {
   const all = state.pastBodies.flatMap((page) => page.journeys || []);
   const earliest = all.map((journey) => Date.parse((journey.departure || {}).scheduled))
     .filter(Number.isFinite).sort((a, b) => a - b)[0];
-  const at = initial || !Number.isFinite(earliest) ? now() - PAST_STEP_MS : earliest - PAST_STEP_MS;
+  const first = !Number.isFinite(earliest);
+  const at = first ? now() - FIRST_PAST_PAGE_MS : earliest - PAST_STEP_MS;
   if (now() - at > PAST_BOUND_MS) {
     state.pastExhausted = true;
     state.loadingPast = false;
@@ -1774,7 +1883,7 @@ async function fetchPast(initial) {
   const generation = routeGeneration;
   try {
     const { body } = await getDepartures(ends.from.id, ends.to.id, {
-      limit: LIMIT,
+      limit: first ? FIRST_PAST_PAGE_LIMIT : LIMIT,
       at, modes: enabledModes(), transferLimit: transferLimit(),
       signal: controller.signal
     });
@@ -1813,11 +1922,28 @@ function startTimers(recordBoardView) {
   timers.tick = setInterval(tickCurrent, TICK_MS);
   timers.refresh = setInterval(() => {
     if (!document.hidden) {
-      fetchLive({ independent: true });
+      if (!tickFix()) fetchLive({ independent: true });
       loadFlags();
     }
   }, REFRESH_MS);
   if (recordBoardView) timers.view = setTimeout(qualifyView, VIEW_QUALIFIES_MS);
+}
+
+// The fix's handling refreshes the board, so a tick that takes one makes no second request.
+function tickFix() {
+  const focus = focusOf(state.doc);
+  if (state.view !== 'home' || (focus && !focusExpired(focus, now()))
+      || !preferencesOf(state.doc).useLocation || state.geoPermission !== 'granted'
+      || !tickNeedsFix(state.doc, now(), [...state.shownDepartures.values()], validFix(), state.previousFix)) return false;
+  const generation = ++geoGeneration;
+  takeFix({ enableHighAccuracy: true, maximumAge: 0 }).then((fix) => {
+    if (generation !== geoGeneration || state.view !== 'home') return;
+    suppressPreferenceEvents = false;
+    if (!fix) return fetchLive({ independent: true });
+    setHomeFix(fix);
+    useFix();
+  });
+  return true;
 }
 
 function stopTimers() {
@@ -1855,6 +1981,7 @@ async function backfillCoordinates() {
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
+    state.hiddenAt = now();
     invalidateSuggestions();
     stopTimers();
     stopArrivalMonitoring();
@@ -1867,17 +1994,20 @@ document.addEventListener('visibilitychange', () => {
     return;
   }
   loadFlags();
+  state.foregroundVisit += 1;
+  state.shownDepartures = new Map();
+  const away = state.hiddenAt === null ? 0 : now() - state.hiddenAt;
+  state.hiddenAt = null;
+  const focus = focusOf(state.doc);
+  if (focus?.arrivalGuard?.armed && !focus.arrivalGuard.basis
+      && now() >= (arrivalMs(composedJourney(focus)) ?? Infinity)) beginEvidenceWait();
+  if (away >= NEW_OPEN_AFTER_MS) return reopen();
   if (!onLiveView() && state.view !== 'settings') return;
   if (state.selection) awaitFirstAnswers();
   suppressPreferenceEvents = false;
   if (state.view === 'home') {
-    state.fix = null;
+    clearFix();
     state.previousOpen = state.doc.lastOpen || null;
-  }
-  const focus = focusOf(state.doc);
-  if (focus?.arrivalGuard?.armed && !focus.arrivalGuard.basis
-      && now() >= (arrivalMs(composedJourney(focus)) ?? Infinity)) {
-    state.arrivalResumeWaitUntil = now() + ARRIVAL_RESUME_WAIT_MS;
   }
   startTimers(state.view === 'board');
   fetchLive();
@@ -1885,6 +2015,17 @@ document.addEventListener('visibilitychange', () => {
   if (state.view !== 'home') return;
   silentFix();
 });
+
+function reopen() {
+  state.selection = null;
+  state.journey = null;
+  state.detailHandoff = null;
+  state.detailSource = null;
+  state.prefill = null;
+  suppressPreferenceEvents = false;
+  ctx.go('#/');
+}
+
 window.addEventListener('hashchange', route);
 
 window.__trains = {
@@ -1912,6 +2053,16 @@ if (location.hostname === 'localhost') {
     if (!experiment || !experiment.variants.includes(value)) return false;
     forcedVariants.set(id, value);
     renderCurrent();
+    return true;
+  };
+  window.__trains.startTrip = () => {
+    if (state.view !== 'home' || !lastHome?.startable) return false;
+    startTrip(lastHome.selected, lastHome.journey);
+    return true;
+  };
+  window.__trains.stopTrip = () => {
+    if (!focusOf(state.doc)) return false;
+    stopTrip();
     return true;
   };
   window.__trains.resetAnalyticsForTest = () => {

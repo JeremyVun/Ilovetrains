@@ -670,7 +670,8 @@ test('the controller records the chosen journey after cache, base and lookahead 
   assert.ok(body, 'the controller still has noteLastOpen');
   assert.match(body[1], /state\.view !== 'home' \|\| focusSelection\(\)/);
   assert.match(body[1], /selectRecommendation\(journeys/, 'fallback uses the same eligibility and cost rule');
-  assert.match(body[1], /spot && spot\.tier === 1 \? spot\.station : null/);
+  assert.match(body[1], /sightingOf\(here\(state\.doc, state\.stations, fix\), fix\)/,
+    'the sighting is here within 300 m');
   assert.equal(main.match(/^\s*noteLastOpen\(\);$/gm).length, 4,
     'cache paint, first page, improved lookahead and retired supplementary pages');
   assert.ok(!/renderHome\(\)[\s\S]{0,40}noteLastOpen/.test(
@@ -927,8 +928,8 @@ test('every departures request carries the cap except the focus refresh', () => 
   const main = readFileSync(join(import.meta.dirname, '..', 'js', 'main.js'), 'utf8');
   const calls = main.match(/getDepartures\([\s\S]*?\n?\s*\}\);/g);
 
-  assert.equal(calls.length, 6);
-  assert.equal(calls.filter((call) => call.includes('transferLimit:')).length, 5);
+  assert.equal(calls.length, 7, 'including the on-board entry search');
+  assert.equal(calls.filter((call) => call.includes('transferLimit:')).length, 6);
   const refresh = /async function refreshFollowed\(\) \{([\s\S]*?)\n\}/.exec(main)[1];
   assert.match(refresh, /modes: SUPPORTED_MODES/);
   assert.doesNotMatch(refresh, /transferLimit/);

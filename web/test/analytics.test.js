@@ -107,7 +107,7 @@ test('only the fixed event and caller-dimension vocabulary reaches the ledger', 
     ...['predicted', 'focus', 'usual', 'home', 'pair', 'inferred']
       .flatMap((kind) => ['shown_' + kind, 'hit_' + kind, 'miss_' + kind])
       .map((name) => [name, {}]),
-    ['change_inferred', {}], ['entered_inferred', {}],
+    ['change_inferred', {}], ['entered_inferred', {}], ['declined_inferred', {}],
     ['back_focus', {}], ['back_inferred', {}],
     ['asked_panel', {}], ['granted_panel', {}], ['denied_panel', {}], ['later_panel', {}],
     ['asked_setup', {}], ['granted_setup', {}], ['denied_setup', {}],

@@ -12,8 +12,23 @@ const codePoints = (a, b) => {
   return left.length - right.length;
 };
 
+const serviceLegs = journey => legsOf(journey).filter(leg => leg.line?.mode !== 'walk');
+const identity = legs => legs.map(leg => [leg.line?.name || '', Date.parse(leg.departure?.scheduled)]);
+
+function compareIdentity(x, y) {
+  for (let i = 0; i < Math.min(x.length, y.length); i++) {
+    const order = codePoints(x[i][0], y[i][0]) || x[i][1] - y[i][1];
+    if (order) return order;
+  }
+  return x.length - y.length;
+}
+
+export function compareJourneyIdentity(a, b) {
+  return compareIdentity(identity(serviceLegs(journeyOf(a))), identity(serviceLegs(journeyOf(b))));
+}
+
 function tuple(journey) {
-  const legs = legsOf(journey).filter(leg => leg.line?.mode !== 'walk');
+  const legs = serviceLegs(journey);
   const departure = effective(legs[0]?.departure), arrival = effective(legs.at(-1)?.arrival);
   const count = journey.legs === undefined ? legs.length : journey.legs;
   if (!Number.isInteger(count) || count < 1 || (journey.legDetail?.length && count !== legs.length)) return null;
@@ -22,8 +37,7 @@ function tuple(journey) {
       || effective(leg.arrival) === null || effective(leg.arrival) < effective(leg.departure)
       || !Number.isFinite(Date.parse(leg.departure?.scheduled)))
     || legs.some((leg, index) => index > 0 && effective(leg.departure) < effective(legs[index - 1].arrival))) return null;
-  return [arrival + (count - 1) * TRANSFER_PENALTY_MS, count - 1, arrival, departure,
-    legs.map(leg => [leg.line?.name || '', Date.parse(leg.departure.scheduled)])];
+  return [arrival + (count - 1) * TRANSFER_PENALTY_MS, count - 1, arrival, departure, identity(legs)];
 }
 
 export function recommendationCost(journey) { return tuple(journey)?.[0] ?? null; }
@@ -32,12 +46,7 @@ export function compareRecommendations(a, b) {
   const left = tuple(journeyOf(a)), right = tuple(journeyOf(b));
   if (!left || !right) return left ? -1 : right ? 1 : 0;
   for (let i = 0; i < 4; i++) if (left[i] !== right[i]) return left[i] - right[i];
-  const x = left[4], y = right[4];
-  for (let i = 0; i < Math.min(x.length, y.length); i++) {
-    const order = codePoints(x[i][0], y[i][0]) || x[i][1] - y[i][1];
-    if (order) return order;
-  }
-  return x.length - y.length;
+  return compareIdentity(left[4], right[4]);
 }
 
 function eligible(candidates, nowMs, options) {

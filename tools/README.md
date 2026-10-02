@@ -40,6 +40,24 @@
   Serve `web/` on a private loopback server first. Provider evidence passes
   through callbacks; the checker never assigns a final arrival state. Synthetic
   networking sends no real API, feedback or analytics request.
+- `check-commute-reliability.js [--out DIR] [--only past,arrival,reopen,start,boarding,onboard]`
+  — builds the TfNSW stub and the server into a temporary directory, boots
+  both on free loopback ports with no API key, checks with `lsof` that the
+  listener's cwd is this checkout, and drives the real web client in headless
+  Chrome through trip mode: the board's first past page (`at = now − 30 min`,
+  limit 10, reaching the services of the last half hour), a guarded trip
+  reading `Checking arrival` through the 45 s evidence wait and then settling
+  by estimate, a 9-minute return keeping the board while a 10-minute return
+  lands on Home, running-row starts and Stop trip (silent on a started trip,
+  declining a guessed one), Home left open through boarding, and on-board
+  entry. Each check states which guard it proves. The clock, permission,
+  geolocation provider and visibility are page-side adapters; the refresh tick
+  is shortened only in the boarding check. Trap: the stub serves fixtures
+  verbatim and the server refuses an `at` older than 24 hours, so the checker
+  moves a fixture-era `at` inside the server's window and keeps only the
+  journeys departing at or after the requested time (now when none), as the
+  live planner does. Screens land in `--out` (default the system temporary
+  directory); the stack is torn down on exit.
 - `check-habit-learning.mjs` — own private server and synthetic responses;
   `node tools/check-habit-learning.mjs --out /tmp/habit-check` drives learned
   Home selection, conservative fallback, receipt evidence, reload and one-tap
@@ -63,6 +81,14 @@
   values from the code under test.
 - `export-android-conformance.mjs` — regenerate committed prediction and row
   expectations from the web implementation: `node tools/export-android-conformance.mjs`.
+  It also writes `fixtures/conformance/inference.json` (the `lastOpen` hold
+  rule, platform and on-board entry, the decline, the Start trip window and
+  running rows): its inputs are built from compact builders, but every expected
+  value is declared by hand and only checked against the web, and the export
+  fails rather than write when they disagree. The file's own `description`,
+  `encoding` and per-section `run` fields are the seam the native tests read.
+  `prediction.json` cases also carry `expected.here` and `expected.sighting`,
+  and the train-speed cases a `previousFix`.
   Node and Android JVM tests consume the same JSON under `fixtures/conformance/`.
   Android's production `JSONArray.readEach` drops entries whose callback throws,
   including assertion failures. Test fixture assertions must use ordinary loops;
@@ -730,7 +756,8 @@ first detail paint and becomes stale only after its refresh fails.
 `mascot-home-unpin` proves that releasing a future service restores the earliest
 answer without shifting the header; `mascot-active-unpin-location` uses the real
 clock and a granted moving fix to prove stale `lastOpen` evidence cannot infer
-the released ride again. `detail-unpin-flow` exercises the matching detail
+the released ride again, and that a fix at train speed saves no
+passing-station pair. `detail-unpin-flow` exercises the matching detail
 action, while `detail-inferred` proves an inferred journey offers neither a pin
 nor an unpin action.
 Every `detail-*` state reaches the view by CLICKING a board row, so each one is

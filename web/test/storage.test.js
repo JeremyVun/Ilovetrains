@@ -8,7 +8,7 @@ import {
   addTrip, removeTrip, moveTrip, recordView, recordSearch, recordRide, updateStop,
   putCache, getCache, loadDoc, saveDoc, declineLocation, LOCATION_ASK_QUIET_MS,
   recordOpen, band, milestone,
-  recordHomeVote, recordLastOpen, HOME_VOTES_CAP
+  recordHomeVote, recordLastOpen, recordDecline, HOME_VOTES_CAP
 } from '../js/storage.js';
 
 const CENTRAL = { id: '200060', name: 'Central Station' };
@@ -457,4 +457,29 @@ test('the recovery record rides with the focus, and a malformed one is dropped',
     assert.equal(doc.focus.recovery, undefined, JSON.stringify(broken));
     assert.deepEqual(doc.focus.journey, focus.journey, 'the focus survives its record');
   }
+});
+
+test('a decline survives a round trip, one at a time, and leaves with its trip', () => {
+  const declined = recordDecline(docWithTrips(), {
+    tripId: 't1', direction: 'forward', departure: '["T1","2026-08-31T22:48:00+10:00"]',
+    arrivalMs: Date.parse('2026-08-31T23:17:00+10:00')
+  }, Date.parse('2026-08-31T22:55:00+10:00'));
+  assert.deepEqual(declined.inferenceDeclined, {
+    tripId: 't1', direction: 'forward', at: '2026-08-31T12:55:00.000Z',
+    departure: '["T1","2026-08-31T22:48:00+10:00"]', arrival: '2026-08-31T13:17:00.000Z'
+  });
+  assert.deepEqual(parseDoc(serializeDoc(declined)).inferenceDeclined, declined.inferenceDeclined);
+  const replaced = recordDecline(declined, {
+    tripId: 't2', direction: 'reverse', departure: '["T1","2026-08-31T23:03:00+10:00"]', arrivalMs: 0
+  }, Date.parse('2026-08-31T23:00:00+10:00'));
+  assert.equal(replaced.inferenceDeclined.tripId, 't2', 'a new decline replaces the old one');
+  assert.equal(removeTrip(replaced, 't2').inferenceDeclined, undefined);
+  assert.deepEqual(removeTrip(declined, 't2').inferenceDeclined, declined.inferenceDeclined);
+  for (const broken of [{ ...declined.inferenceDeclined, direction: 'sideways' },
+    { ...declined.inferenceDeclined, at: 'later' }, { ...declined.inferenceDeclined, departure: '' },
+    { ...declined.inferenceDeclined, arrival: undefined }, 'no']) {
+    assert.equal(parseDoc(JSON.stringify({ ...JSON.parse(serializeDoc(declined)), inferenceDeclined: broken }))
+      .inferenceDeclined, undefined, 'a malformed decline is dropped');
+  }
+  assert.equal(parseDoc(serializeDoc(docWithTrips())).inferenceDeclined, undefined);
 });
