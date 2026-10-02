@@ -293,6 +293,13 @@ const entryCases = [
   { name: 'snapshot: a same-origin sighting recording another saved trip retires it',
     snapshot: SEEN, doc: commuteDoc(), writes: [writeOf('08:01:10', t9('08:04', REDFERN), { tripId: 'rr' }, '08:01:10')],
     nowMs: ms('08:12'), fix: fixAtPlace(STRATHFIELD, '08:12', { speed: 14 }), expected: platform(t9('08:04', REDFERN), 'rr') },
+  { name: 'a record written after its train left does not enter', doc: commuteDoc({ lastOpen: record('08:01:10', t9('08:00')) }),
+    snapshot: null, nowMs: ms('08:10'), fix: fixAtPlace(STRATHFIELD, '08:10'), expected: null },
+  { name: 'a record written as its train leaves still enters', doc: commuteDoc({ lastOpen: record('08:00', t9('08:00')) }),
+    snapshot: null, nowMs: ms('08:10'), fix: fixAtPlace(STRATHFIELD, '08:10'), expected: platform(t9('08:00')) },
+  { name: 'a platform sighting that re-records the departed train after it left enters it from neither record',
+    snapshot: SEEN, doc: commuteDoc({ lastOpen: SEEN }), writes: [writeOf('08:01:10', t9('08:00'), {}, '08:01:10')],
+    nowMs: ms('08:12'), fix: fixAtPlace(STRATHFIELD, '08:12', { speed: 14 }), expectedRequests: [], expected: null },
 ].map((value) => ({ writes: [], previousFix: null, boards: {}, cached: {}, ...value }));
 
 function enteredBy(value) {

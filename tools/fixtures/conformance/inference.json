@@ -5487,6 +5487,520 @@
         }
       },
       {
+        "writes": [],
+        "previousFix": null,
+        "boards": {},
+        "cached": {},
+        "name": "a record written after its train left does not enter",
+        "doc": {
+          "schemaVersion": 1,
+          "trips": [
+            {
+              "id": "rt",
+              "from": {
+                "id": "213820",
+                "name": "Rhodes Station",
+                "location": {
+                  "lat": -33.83053,
+                  "lon": 151.087032
+                }
+              },
+              "to": {
+                "id": "200070",
+                "name": "Town Hall Station",
+                "location": {
+                  "lat": -33.873596,
+                  "lon": 151.206899
+                }
+              },
+              "createdAt": "2026-09-01T00:00:00+10:00"
+            },
+            {
+              "id": "rr",
+              "from": {
+                "id": "213820",
+                "name": "Rhodes Station",
+                "location": {
+                  "lat": -33.83053,
+                  "lon": 151.087032
+                }
+              },
+              "to": {
+                "id": "201510",
+                "name": "Redfern Station",
+                "location": {
+                  "lat": -33.89237,
+                  "lon": 151.198485
+                }
+              },
+              "createdAt": "2026-09-01T00:00:00+10:00"
+            }
+          ],
+          "history": [],
+          "rides": [],
+          "searches": {
+            "from": [],
+            "to": []
+          },
+          "homeVotes": [],
+          "lastOpen": {
+            "at": "2026-10-01T08:01:10+10:00",
+            "station": {
+              "id": "213820",
+              "name": "Rhodes Station"
+            },
+            "tripId": "rt",
+            "direction": "forward",
+            "journey": {
+              "departure": {
+                "scheduled": "2026-10-01T08:00:00+10:00",
+                "estimated": "2026-10-01T08:00:00+10:00",
+                "platform": "Platform 1"
+              },
+              "arrival": {
+                "scheduled": "2026-10-01T08:27:00+10:00",
+                "estimated": "2026-10-01T08:27:00+10:00"
+              },
+              "line": {
+                "name": "T9",
+                "mode": "train"
+              },
+              "destinationHeadsign": "Hornsby via Strathfield",
+              "stopsAway": null,
+              "cancelled": false,
+              "legs": 1,
+              "legDetail": [
+                {
+                  "line": {
+                    "name": "T9",
+                    "mode": "train"
+                  },
+                  "headsign": "Hornsby via Strathfield",
+                  "from": {
+                    "id": "213820",
+                    "name": "Rhodes Station",
+                    "platform": "Platform 1"
+                  },
+                  "to": {
+                    "id": "200070",
+                    "name": "Town Hall Station",
+                    "platform": "Platform 3"
+                  },
+                  "departure": {
+                    "scheduled": "2026-10-01T08:00:00+10:00",
+                    "estimated": "2026-10-01T08:00:00+10:00"
+                  },
+                  "arrival": {
+                    "scheduled": "2026-10-01T08:27:00+10:00",
+                    "estimated": "2026-10-01T08:27:00+10:00"
+                  },
+                  "cancelled": false
+                }
+              ]
+            }
+          },
+          "lastViewed": null,
+          "preferences": {
+            "useLocation": true
+          },
+          "cache": {}
+        },
+        "snapshot": null,
+        "nowMs": 1790806200000,
+        "fix": {
+          "lat": -33.87181,
+          "lon": 151.094427,
+          "at": 1790806200000,
+          "accuracy": 10
+        },
+        "expected": null
+      },
+      {
+        "writes": [],
+        "previousFix": null,
+        "boards": {},
+        "cached": {},
+        "name": "a record written as its train leaves still enters",
+        "doc": {
+          "schemaVersion": 1,
+          "trips": [
+            {
+              "id": "rt",
+              "from": {
+                "id": "213820",
+                "name": "Rhodes Station",
+                "location": {
+                  "lat": -33.83053,
+                  "lon": 151.087032
+                }
+              },
+              "to": {
+                "id": "200070",
+                "name": "Town Hall Station",
+                "location": {
+                  "lat": -33.873596,
+                  "lon": 151.206899
+                }
+              },
+              "createdAt": "2026-09-01T00:00:00+10:00"
+            },
+            {
+              "id": "rr",
+              "from": {
+                "id": "213820",
+                "name": "Rhodes Station",
+                "location": {
+                  "lat": -33.83053,
+                  "lon": 151.087032
+                }
+              },
+              "to": {
+                "id": "201510",
+                "name": "Redfern Station",
+                "location": {
+                  "lat": -33.89237,
+                  "lon": 151.198485
+                }
+              },
+              "createdAt": "2026-09-01T00:00:00+10:00"
+            }
+          ],
+          "history": [],
+          "rides": [],
+          "searches": {
+            "from": [],
+            "to": []
+          },
+          "homeVotes": [],
+          "lastOpen": {
+            "at": "2026-10-01T08:00:00+10:00",
+            "station": {
+              "id": "213820",
+              "name": "Rhodes Station"
+            },
+            "tripId": "rt",
+            "direction": "forward",
+            "journey": {
+              "departure": {
+                "scheduled": "2026-10-01T08:00:00+10:00",
+                "estimated": "2026-10-01T08:00:00+10:00",
+                "platform": "Platform 1"
+              },
+              "arrival": {
+                "scheduled": "2026-10-01T08:27:00+10:00",
+                "estimated": "2026-10-01T08:27:00+10:00"
+              },
+              "line": {
+                "name": "T9",
+                "mode": "train"
+              },
+              "destinationHeadsign": "Hornsby via Strathfield",
+              "stopsAway": null,
+              "cancelled": false,
+              "legs": 1,
+              "legDetail": [
+                {
+                  "line": {
+                    "name": "T9",
+                    "mode": "train"
+                  },
+                  "headsign": "Hornsby via Strathfield",
+                  "from": {
+                    "id": "213820",
+                    "name": "Rhodes Station",
+                    "platform": "Platform 1"
+                  },
+                  "to": {
+                    "id": "200070",
+                    "name": "Town Hall Station",
+                    "platform": "Platform 3"
+                  },
+                  "departure": {
+                    "scheduled": "2026-10-01T08:00:00+10:00",
+                    "estimated": "2026-10-01T08:00:00+10:00"
+                  },
+                  "arrival": {
+                    "scheduled": "2026-10-01T08:27:00+10:00",
+                    "estimated": "2026-10-01T08:27:00+10:00"
+                  },
+                  "cancelled": false
+                }
+              ]
+            }
+          },
+          "lastViewed": null,
+          "preferences": {
+            "useLocation": true
+          },
+          "cache": {}
+        },
+        "snapshot": null,
+        "nowMs": 1790806200000,
+        "fix": {
+          "lat": -33.87181,
+          "lon": 151.094427,
+          "at": 1790806200000,
+          "accuracy": 10
+        },
+        "expected": {
+          "via": "platform",
+          "tripId": "rt",
+          "direction": "forward",
+          "journeyKey": [
+            [
+              "T9",
+              "2026-10-01T08:00:00+10:00"
+            ]
+          ]
+        }
+      },
+      {
+        "writes": [
+          {
+            "nowMs": 1790805670000,
+            "record": {
+              "station": {
+                "id": "213820",
+                "name": "Rhodes Station"
+              },
+              "tripId": "rt",
+              "direction": "forward",
+              "journey": {
+                "departure": {
+                  "scheduled": "2026-10-01T08:00:00+10:00",
+                  "estimated": "2026-10-01T08:00:00+10:00",
+                  "platform": "Platform 1"
+                },
+                "arrival": {
+                  "scheduled": "2026-10-01T08:27:00+10:00",
+                  "estimated": "2026-10-01T08:27:00+10:00"
+                },
+                "line": {
+                  "name": "T9",
+                  "mode": "train"
+                },
+                "destinationHeadsign": "Hornsby via Strathfield",
+                "stopsAway": null,
+                "cancelled": false,
+                "legs": 1,
+                "legDetail": [
+                  {
+                    "line": {
+                      "name": "T9",
+                      "mode": "train"
+                    },
+                    "headsign": "Hornsby via Strathfield",
+                    "from": {
+                      "id": "213820",
+                      "name": "Rhodes Station",
+                      "platform": "Platform 1"
+                    },
+                    "to": {
+                      "id": "200070",
+                      "name": "Town Hall Station",
+                      "platform": "Platform 3"
+                    },
+                    "departure": {
+                      "scheduled": "2026-10-01T08:00:00+10:00",
+                      "estimated": "2026-10-01T08:00:00+10:00"
+                    },
+                    "arrival": {
+                      "scheduled": "2026-10-01T08:27:00+10:00",
+                      "estimated": "2026-10-01T08:27:00+10:00"
+                    },
+                    "cancelled": false
+                  }
+                ]
+              }
+            },
+            "sightingAt": 1790805670000
+          }
+        ],
+        "previousFix": null,
+        "boards": {},
+        "cached": {},
+        "name": "a platform sighting that re-records the departed train after it left enters it from neither record",
+        "snapshot": {
+          "at": "2026-10-01T07:58:00+10:00",
+          "station": {
+            "id": "213820",
+            "name": "Rhodes Station"
+          },
+          "tripId": "rt",
+          "direction": "forward",
+          "journey": {
+            "departure": {
+              "scheduled": "2026-10-01T08:00:00+10:00",
+              "estimated": "2026-10-01T08:00:00+10:00",
+              "platform": "Platform 1"
+            },
+            "arrival": {
+              "scheduled": "2026-10-01T08:27:00+10:00",
+              "estimated": "2026-10-01T08:27:00+10:00"
+            },
+            "line": {
+              "name": "T9",
+              "mode": "train"
+            },
+            "destinationHeadsign": "Hornsby via Strathfield",
+            "stopsAway": null,
+            "cancelled": false,
+            "legs": 1,
+            "legDetail": [
+              {
+                "line": {
+                  "name": "T9",
+                  "mode": "train"
+                },
+                "headsign": "Hornsby via Strathfield",
+                "from": {
+                  "id": "213820",
+                  "name": "Rhodes Station",
+                  "platform": "Platform 1"
+                },
+                "to": {
+                  "id": "200070",
+                  "name": "Town Hall Station",
+                  "platform": "Platform 3"
+                },
+                "departure": {
+                  "scheduled": "2026-10-01T08:00:00+10:00",
+                  "estimated": "2026-10-01T08:00:00+10:00"
+                },
+                "arrival": {
+                  "scheduled": "2026-10-01T08:27:00+10:00",
+                  "estimated": "2026-10-01T08:27:00+10:00"
+                },
+                "cancelled": false
+              }
+            ]
+          }
+        },
+        "doc": {
+          "schemaVersion": 1,
+          "trips": [
+            {
+              "id": "rt",
+              "from": {
+                "id": "213820",
+                "name": "Rhodes Station",
+                "location": {
+                  "lat": -33.83053,
+                  "lon": 151.087032
+                }
+              },
+              "to": {
+                "id": "200070",
+                "name": "Town Hall Station",
+                "location": {
+                  "lat": -33.873596,
+                  "lon": 151.206899
+                }
+              },
+              "createdAt": "2026-09-01T00:00:00+10:00"
+            },
+            {
+              "id": "rr",
+              "from": {
+                "id": "213820",
+                "name": "Rhodes Station",
+                "location": {
+                  "lat": -33.83053,
+                  "lon": 151.087032
+                }
+              },
+              "to": {
+                "id": "201510",
+                "name": "Redfern Station",
+                "location": {
+                  "lat": -33.89237,
+                  "lon": 151.198485
+                }
+              },
+              "createdAt": "2026-09-01T00:00:00+10:00"
+            }
+          ],
+          "history": [],
+          "rides": [],
+          "searches": {
+            "from": [],
+            "to": []
+          },
+          "homeVotes": [],
+          "lastOpen": {
+            "at": "2026-10-01T07:58:00+10:00",
+            "station": {
+              "id": "213820",
+              "name": "Rhodes Station"
+            },
+            "tripId": "rt",
+            "direction": "forward",
+            "journey": {
+              "departure": {
+                "scheduled": "2026-10-01T08:00:00+10:00",
+                "estimated": "2026-10-01T08:00:00+10:00",
+                "platform": "Platform 1"
+              },
+              "arrival": {
+                "scheduled": "2026-10-01T08:27:00+10:00",
+                "estimated": "2026-10-01T08:27:00+10:00"
+              },
+              "line": {
+                "name": "T9",
+                "mode": "train"
+              },
+              "destinationHeadsign": "Hornsby via Strathfield",
+              "stopsAway": null,
+              "cancelled": false,
+              "legs": 1,
+              "legDetail": [
+                {
+                  "line": {
+                    "name": "T9",
+                    "mode": "train"
+                  },
+                  "headsign": "Hornsby via Strathfield",
+                  "from": {
+                    "id": "213820",
+                    "name": "Rhodes Station",
+                    "platform": "Platform 1"
+                  },
+                  "to": {
+                    "id": "200070",
+                    "name": "Town Hall Station",
+                    "platform": "Platform 3"
+                  },
+                  "departure": {
+                    "scheduled": "2026-10-01T08:00:00+10:00",
+                    "estimated": "2026-10-01T08:00:00+10:00"
+                  },
+                  "arrival": {
+                    "scheduled": "2026-10-01T08:27:00+10:00",
+                    "estimated": "2026-10-01T08:27:00+10:00"
+                  },
+                  "cancelled": false
+                }
+              ]
+            }
+          },
+          "lastViewed": null,
+          "preferences": {
+            "useLocation": true
+          },
+          "cache": {}
+        },
+        "nowMs": 1790806320000,
+        "fix": {
+          "lat": -33.87181,
+          "lon": 151.094427,
+          "at": 1790806320000,
+          "accuracy": 10,
+          "speed": 14
+        },
+        "expectedRequests": [],
+        "expected": null
+      },
+      {
         "doc": {
           "schemaVersion": 1,
           "trips": [

@@ -672,7 +672,13 @@ destination of `leg(trip, record.direction)` on the saved trip:
 
 1. under way: `D ≤ now ≤ A + 30 min`;
 2. seen at the platform: `record.station.id == O.id` and
-   `D − record.at ≤ 15 min`;
+   `0 ≤ D − record.at ≤ 15 min`. A record written after its train left is a
+   retained answer, not evidence of boarding: offline native Home keeps the
+   departed train as its lead until arrival + 30 min (native-data.md), and
+   without the lower bound a platform sighting 70 s after departure
+   re-recorded that train and entered it once the rider boarded the next. The
+   web never writes such a record, since its lead departs at or after now;
+   the bound is the same on every client;
 3. moved toward: `distance(fix, O) ≥ 1 km` and
    `distance(fix, Z) ≤ distance(O, Z) − 1 km`;
    or instead of 3: the fix reports `speed ≥ 8 m/s` (about 30 km/h) and

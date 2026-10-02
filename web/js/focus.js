@@ -104,7 +104,8 @@ export function inferTravel(doc, nowMs, fix) {
   if (departure === null || arrival === null || !Number.isFinite(seenAt)) return null;
   if (nowMs < departure || nowMs > arrival + TRAVEL_LATE_MS) return null;
   if (!last.station || last.station.id !== ends.from.id) return null;
-  if (departure - seenAt > TRAVEL_SEEN_MS) return null;
+  // A record written after its train left is a retained answer, not evidence of boarding.
+  if (departure - seenAt < 0 || departure - seenAt > TRAVEL_SEEN_MS) return null;
 
   const left = distanceKm(fix, origin);
   if (left === null) return null;
