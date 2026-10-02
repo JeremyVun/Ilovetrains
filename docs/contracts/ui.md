@@ -21,7 +21,10 @@ zone.
 
 - Home is the open state. Its smart header is the zero-tap answer for the
   predicted or focused trip; saved trips sit immediately below it under the
-  `MY TRIPS` anchor. The saved list ends with `— End of trips`.
+  `MY TRIPS` anchor. The saved list ends with `— End of trips`. A return to the
+  app after at least 10 minutes in the background is a new open and lands on
+  Home with a fresh, location-aware answer; quicker app switches keep the
+  board or detail the rider was on (client-storage.md, Trip selection).
 - The smart header is a section, not a single tap target: the
   saved-trip row is the affordance, and the header's own trip carries the same
   `DEPARTURES ›` cue as every other row. A journey the app inferred rather than
@@ -35,12 +38,17 @@ zone.
   explicit selection and never changes the focused journey; browsing therefore
   never replaces the focused train.
 - Tapping a board row opens the journey detail view, whose back control reads
-  `← <departure station> departures` and returns to that board.
-- `Pin this train` on journey detail is the only control that focuses a
-  journey. It returns home and pins that service in the smart header;
-  directions begin when it departs. Tapping `Pinned` on home or `Unpin this
-  train` in detail clears the explicit pin and returns to the ordinary home
-  answer for that trip. The board never shows a separate focus strip.
+  `← <departure station> departures` and returns to that board. A row whose
+  journey is on its way (left but not arrived, not cancelled, modes and cap
+  allowed) instead starts trip mode on it at once and lands on Home, replacing
+  any current trip mode; that is how a wrong guess is corrected to the right
+  train (owner ruling 12, 2026-10-02). Upcoming and arrived rows still open
+  detail.
+- `Pin this train` on journey detail and a running board row are the controls
+  that start a trip on a journey. Each returns home and follows that service
+  in the smart header; directions begin when it departs. Tapping `Pinned` on
+  home or `Unpin this train` in detail clears the explicit pin and returns to
+  the ordinary home answer for that trip. The board never shows a separate focus strip.
 - An explicitly pinned journey has an `Unpin this train` (or ferry) action
   rail, including when cancelled. Other cancelled or inferred journeys carry
   no action rail; the back control is the way out.
@@ -445,6 +453,20 @@ When the flag is off, the trip line remains unchanged and does no animation work
   scroll affordance (`EARLIER`, `NOW`), and no reverse control anywhere in the
   client: the smart header offers the return direction itself once a focused
   trip is over. The anchor reads `NOW · HH:MM`.
+- Past departures arrive in pages. The first past page of a board is anchored
+  at `now − 30 min` with limit 10, so the services that just left, the ones a
+  rider on board is looking for, are reached first; each later page asks from
+  the earliest loaded departure − 60 min. Web and Android request the first
+  page as the board opens, and reaching the top of the list requests the next
+  page whenever none is in flight, retrying after a failure, with or without
+  past rows already on the board. A board refresh never cancels or discards a
+  past page in flight; the page merges into the current board for the same
+  pair, and the list keeps the `NOW` anchor in place as rows arrive above it.
+  Native clients merge every past page with the offline timetable plan for the
+  same `at` (limit 30): online rows win by journey key, either alone is used
+  when the other fails, and a timetable-only past row uses the scheduled
+  register. iOS keeps pull-to-refresh at the top as its past-paging gesture
+  (ios-deviations.md).
 - Rows rank by effective departure. Past and future rows use the same grammar
   and equal height; past rows are distinguished through type colour, not
   container opacity.

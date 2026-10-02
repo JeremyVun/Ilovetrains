@@ -1,3 +1,5 @@
+import { TRAIN_SPEED_MPS } from './stations.js';
+
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
 const finite = Number.isFinite;
@@ -7,7 +9,7 @@ const iso = value => new Date(value).toISOString();
 
 export const ARRIVAL = Object.freeze({ sampleInterval: 5000, maxAge: 30000,
   futureAllowance: 5000, window: 120000, maxSamples: 24, maxGap: 30000,
-  checking: 180000, retention: 7200000, expiry: 1800000 });
+  checking: 180000, evidenceWait: 45000, retention: 7200000, expiry: 1800000 });
 
 export function distanceMetres(a, b) {
   if (![a?.lat, a?.lon, b?.lat, b?.lon].every(finite)) return null;
@@ -92,12 +94,12 @@ export function reduceArrival(input) {
   const fresh = last && now - last.at <= ARRIVAL.maxAge;
   const distance = fresh ? distanceMetres(last, input.destination) : null;
   const away = distance !== null && distance - last.accuracy >= 300;
-  const moving = away && (meanSpeed(samples, now) ?? -1) >= 8;
+  const moving = away && (meanSpeed(samples, now) ?? -1) >= TRAIN_SPEED_MPS;
   const nearPosition = sample => {
     const d = distanceMetres(sample, input.destination);
     return d !== null && sample.accuracy <= 50 && d + sample.accuracy <= 200;
   };
-  const deadline = () => guard?.armed && !confirmed && !legacy
+  const deadline = () => guard?.armed && !guard.basis && !legacy
     ? Math.max(arrival + ARRIVAL.expiry, time(guard.retainedAt) + ARRIVAL.retention)
     : arrival + ARRIVAL.expiry;
   // Only a ride still moving, or a later estimate, keeps an unconfirmed trip; an overdue one never revives.
@@ -105,8 +107,8 @@ export function reduceArrival(input) {
       && now - time(guard.retainedAt) >= MINUTE && now <= deadline()) {
     guard = { ...guard, retainedAt: iso(now) };
   }
-  const expiryDeadline = deadline();
-  const expired = now > expiryDeadline && !(finite(input.resumeWaitUntilMs) && now < input.resumeWaitUntilMs);
+  const waiting = finite(input.resumeWaitUntilMs) && now < input.resumeWaitUntilMs;
+  const expired = now > deadline() && !waiting;
   if (input.cancelled) return result(expired ? 'expiredUnconfirmed' : 'travelling', null,
     expired ? 'expire' : input.legacyCompleted ? 'withdraw' : 'none');
   if ((confirmed || legacy) && now > arrival + ARRIVAL.expiry) return result('expiredUnconfirmed', null, 'expire');
@@ -135,9 +137,14 @@ export function reduceArrival(input) {
     if (guard?.basis === 'estimate') { guard = { ...guard }; delete guard.basis; }
     return result('travelling', null, input.legacyCompleted ? 'withdraw' : 'none', away, moving);
   }
-  if (!guard?.armed && !input.permissionPending) {
+  const settle = () => {
     guard = { ...guard, basis: 'estimate' };
     return result('arrived', 'estimate', input.legacyCompleted ? 'correct' : 'record');
-  }
-  return result(away || now >= arrival + ARRIVAL.checking ? 'arrivalUnconfirmed' : 'checkingArrival', null, 'none', away, moving);
+  };
+  const checking = () => result('checkingArrival', null, 'none', away, moving);
+  if (!guard?.armed) return input.permissionPending ? checking() : settle();
+  if (guard.basis === 'estimate') return settle();
+  if (moving) return result('arrivalUnconfirmed', null, 'none', away, moving);
+  if (now < arrival + ARRIVAL.checking || input.permissionPending || waiting) return checking();
+  return settle();
 }

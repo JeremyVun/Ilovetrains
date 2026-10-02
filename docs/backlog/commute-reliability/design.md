@@ -25,8 +25,8 @@ measurements in [comps/MEASUREMENTS.md](comps/MEASUREMENTS.md).
 
 ## Owner rulings
 
-Rulings 1-7 are from 2026-10-01 and 8-20 from 2026-10-02, answering options
-laid out in the design session. Quoted text is the option label and
+Rulings 1-7 are from 2026-10-01 and 8-22 from 2026-10-02, answering options
+laid out in the design session (21 and 22 during the build). Quoted text is the option label and
 description the owner chose, or the owner's own words.
 
 1. Trip end: “End after estimate (Recommended)” — “3 min after the last arrival
@@ -101,6 +101,17 @@ description the owner chose, or the owner's own words.
 20. Status before departure: “Service status (Recommended)” — a started trip
     shows the service's own status (`RUNNING`, `RUNNING LATE`, `CANCELLED`)
     where it showed `PINNED`.
+21. Estimate ending, asked during the build after the web drive showed the
+    sign `The last arrival estimate has passed. The return t…` cut at 390 px
+    above the offer `Trip over · You’ve arrived. The return trip is ready when
+    you are.`: “Drop 'You've arrived' (Recommended)” — on an estimate ending
+    the offer reads `The return trip is ready when you are.`; a
+    location-confirmed ending keeps `You’ve arrived.` The sign wraps instead
+    of cutting. No new words.
+22. Setup, asked during the build: “Setup keeps nearest (Recommended)” —
+    setup's “Use my location” keeps picking the nearest station within
+    200 m, as before; the 400 m saved-station preference shapes only Home's
+    answer and trip-mode inference.
 
 The owner's regression concern in ruling 13 is binding: automatic trip starts
 that work today must keep working. Every rule below only adds ways in, and the
@@ -211,7 +222,9 @@ armed guard resolves as follows:
 | `now < A + 3 min`, or permission pending, or inside the evidence wait | `checkingArrival` |
 | Otherwise | `arrived`, basis `estimate`; guard basis becomes `estimate`; `record` (`correct` when the ride exists) |
 
-Never-armed behaviour is unchanged: estimate completion at `A`.
+Never-armed behaviour is unchanged: estimate completion at `A`. A never-armed
+guard with permission pending reads `checkingArrival` at any time, since no
+stopped `arrivalUnconfirmed` is left to fall to (web build reading).
 
 `arrivalUnconfirmed` therefore always means moving. The stopped/ambiguous row
 of the guarded-arrival table (`Arrival unconfirmed` / `Arrival time needs an
@@ -227,7 +240,10 @@ for the focus (not only on resume), replacing the 15 s lookup. Android's
 wait exists because sustained movement needs three speed samples spanning
 30 s: without it a rider who opens the app on a late, still-moving train
 would be settled before the evidence could show movement. The wait also
-continues to hold an overdue expiry, as it does today.
+continues to hold an overdue expiry, as it does today. As built on the web:
+the wait starts once per focus identity per foreground visit when monitoring
+starts, and again at an open or return past `A`; a watch-error restart within
+the visit does not extend it.
 
 **Expiry.** The retention deadline `max(A + 30 min, retainedAt + 2 h)`
 applies only while the guard is armed and unsettled (no basis). A settled
@@ -250,12 +266,17 @@ already honest about this: it says the estimate passed, not that you arrived.
 - Tiers 2 and 3 are unchanged (nearest saved end within 2 km, then nearest
   index station within 2 km).
 
+Setup's “Use my location” is not `here` (ruling 22): it keeps the previous
+order, a saved end within 200 m, then any eligible station within 200 m,
+then the 2 km tiers, with no train-speed rule (web `setupHere`).
+
 **Sighting.** The station recorded in `lastOpen`/`lastAnswer` is `here`'s
 station when the fix is within **300 m** of it, else null. This replaces both
 "tier 1" (web) and the 200 m check (native).
 
 **Train speed.** A fix is at train speed when its reported speed is finite
-and at least 8 m/s. A fix without a usable speed is at train speed when the
+and at least 8 m/s. A negative speed counts as no speed, and an accuracy is
+known when finite and non-negative. A fix without a usable speed is at train speed when the
 previous Home fix, taken 15-120 s earlier with both accuracies known, is at
 least `8 m/s × Δt + accuracy₁ + accuracy₂` away. That bound subtracts the
 worst-case error of both positions, so GPS jitter cannot produce it. The
@@ -332,7 +353,9 @@ not entered, and only for a fix at train speed. Let `P` be the fix.
    direction whose destination bears within 90° of the heading. Otherwise the
    previous Home fix taken 15-120 s earlier decides: the direction whose
    destination came at least 200 m closer. With neither, the candidate is
-   undecided and waits for the next fix (rule 4 keeps fixes coming).
+   undecided and waits for the next fix (rule 4 keeps fixes coming). Each
+   test decides only when exactly one direction passes it; otherwise the next
+   test applies.
 3. **Running journeys** for each decided (trip, direction): request
    departures `O → Z` with `at = now − (Δ + 10 min)`, where `Δ` is the longest
    effective duration in that pair's cached board (else 60 min), limit 10,
@@ -340,14 +363,15 @@ not entered, and only for a fix at train speed. Let `P` be the fix.
    offline timetable (limit 30) and merges by journey key, online first. Keep
    journeys with `D ≤ now ≤ A`, not cancelled, modes and cap allowed. At most
    one request per candidate; at most the three candidates with the smallest
-   corridor ratio are evaluated.
+   corridor ratio are evaluated, after trips under an active decline are
+   removed.
 4. **Match.** For each journey, time progress `f_t = (now − D) / (A − D)`.
    Position progress `f_p = d(O, P) / (d(O, P) + d(P, Z))`. A journey matches
    when `|f_t − f_p| ≤ 0.25`.
 5. **Choice.** Among matching (trip, direction, journey) triples, the highest
    base history score for that trip and direction at this hour (the existing
    no-location score), then the smallest `|f_t − f_p|`, then the stable
-   journey key. History breaks the case where two saved trips share a train
+   journey key, then saved-trip order, then forward before reverse. History breaks the case where two saved trips share a train
    (Rhodes → Town Hall and Rhodes → Redfern on the same T9).
 6. **Exclusions.** A recorded ride for the same trip, direction and scheduled
    departure; and an active decline (rule 6).
@@ -396,7 +420,11 @@ train` does today: it writes a focus with `by: "focus"`, replacing any focus,
 and returns Home. On Home it is attached to the header's lead journey. It is
 shown only while that journey has not departed and departs within 15 minutes
 (`0 ≤ D − now ≤ 15 min`), the same window auto-start uses for "seen at the
-platform". It is never shown for a later train or one that has left.
+platform", and is not cancelled. It is never shown for a later train or one
+that has left. Starting the guessed journey itself only turns `by` into
+`focus` and keeps its arrival guard. Starting any trip and accepting the
+return offer clear `lastOpen` and the open snapshot (the explicit clears of
+rule 3).
 
 **Running rows on the board.** Tapping a board row whose journey is on its way
 starts trip mode on it at once, exactly as `Start trip` would, and lands on
@@ -418,8 +446,11 @@ intents. On a guessed trip it also persists the decline below and sends
 
 **The decline**, for guessed trips only. `inferenceDeclined` in the personal
 document: `{"tripId": "uuid", "direction": "forward", "at": "…ISO…",
-"departure": "<departureKey of the declined journey>"}`; native documents use
-their existing time encoding. While it is active, no inferred entry (platform
+"departure": "<departureKey of the declined journey>", "arrival": "…ISO…"}`,
+where `arrival` is the declined journey's composed effective arrival when
+stopped (added in the web build: without it the arrival + 30 min bound cannot
+be computed). All five fields are required. Native documents use their
+existing time encoding. While it is active, no inferred entry (platform
 or on-board) happens for that saved trip in either direction until the later
 of `at + 60 min` and the declined journey's effective arrival + 30 min. The
 declined departure key is never inferred again for that trip. One record; a

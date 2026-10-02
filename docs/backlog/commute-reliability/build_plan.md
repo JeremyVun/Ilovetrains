@@ -9,16 +9,33 @@ the shared fixtures define the behaviour the native phases match.
 - The build runs in a fresh context through the `backlog-item` skill.
 - Phase 2 is split (lead's decision, 2026-10-02). Phase 2a, Android rules 8
   and 9 (board paging and location plumbing), depends on nothing in phase 1
-  and runs in parallel with it on branch `cr-android`. Phase 2b, Android rules
-  1-7, continues on that branch after phase 1 merges, in parallel with
-  phase 3. Phase 4 needs the comp verdict recorded in design.md. Phase 5
-  closes the item.
+  and runs in parallel with it on branch `cr-android`. Phase 4 needs the comp
+  verdict recorded in design.md. Phase 5 closes the item.
+- Phase 1's agent ended at about 676k context, past the 650k ceiling, so the
+  remaining native work is split along the logic/actions seam (lead's
+  decision, 2026-10-02):
+  - 2b: Android rules 1-5, plus the decline record and its suppression in
+    inference, on `cr-android` after 2a.
+  - 2c: Android rules 6 (actions) and 7, on 2b's branch.
+  - 3a: iOS rules 1-5, the decline record and suppression, and rule 8.
+  - 3b: iOS rules 6 (actions, `LiveActivityIntent`) and 7, on 3a's branch.
+
+  2b and 3a run together, then 2c and 3b.
+- Concurrent Android and iOS agents serialise every Gradle and `xcodebuild`
+  run through `/private/tmp/ilt-cr-gate.sh <command…>`, a lock the lead made.
 - At most two build agents at a time alongside peer sessions. Each agent
   works in its own worktree under `/private/tmp` created by the lead (verify
   with a landmark file), commits after every step, runs gates in the
   foreground, and reports once.
-- Nonvisual phases go to Opus. Phase 4 is visual and goes to Opus or Astra
-  (Astra needs the owner's approval for that assignment).
+- Nonvisual phases go to Opus. Phase 4 is visual and goes to Opus (owner,
+  2026-10-02: “Opus (Recommended)”).
+- Adversarial review (owner, 2026-10-02: “Yes, one Fable reviewer”): after
+  phases 2 and 3 land, one Fable reviewer attacks the hold rule, the
+  auto-start regressions, on-board matching and arrival settlement across the
+  three clients in its own worktree, committing probe tests as soon as they
+  compile and flagging contract contradictions for an owner ruling. An Opus
+  fix agent then takes those probes as its acceptance suite and keeps them as
+  permanent regressions. Opus is the fallback if Fable is cut off.
 - iOS gates run one at a time and never in loops (see the
   `no-unattended-test-loops` memory). Android and iOS gates never run
   concurrently.
@@ -118,6 +135,69 @@ message.
 
 Done marker: `Phase 1 done: <commit>` appended here.
 
+Phase 1 done: `00bfa19`, merged to main as `51fea60`; ruling 22 (setup keeps
+200 m, web `setupHere`) followed on main as `397cb58` and `df823a4`. The
+readings it made are folded into design.md rules 1, 2, 5 and 6. Its handoff for
+the native phases:
+
+- `inference.json` (authored in `tools/export-android-conformance.mjs`,
+  expectations declared by hand and checked against the web). Top-level times
+  (`nowMs`, `sightingAt`, `writes[].nowMs`, `fix.at`) are epoch ms; inside
+  `doc`, records and journeys, times are API ISO strings. Unknown fix fields
+  are omitted, never zero. `journeyKey` is `[[line, scheduledIso], …]`.
+  `doc.inferenceDeclined.departure` is the web departureKey (a JSON string).
+  Sections: `holdCases` (15) `{name, doc, nowMs, incoming, sightingAt,
+  expectedKept}`; `entryCases` (35) `{name, doc, snapshot, writes[{nowMs,
+  record, sightingAt}], nowMs, fix, previousFix, boards{"tripId|direction"},
+  cached{same key}, expectedRequests?[{tripId, direction, from, to, at,
+  limit}], expected: null | {via: platform|onBoard, tripId, direction,
+  journeyKey}}`; `startCases` (6) `{name, nowMs, journey,
+  expectedStartable}`; `runningCases` (7) `{name, nowMs, journey,
+  enabledModes|null, expectedRunning}`. Each section's `run` field states the
+  evaluation order.
+- `prediction.json`: every case now carries `expected.here {stationId,
+  tier}|null` and `expected.sighting`; seven new cases use the real Town Hall
+  and Gadigal points, reported and derived speed, a walking pair and a stale
+  previous fix. Native prediction tests must read fix `speed/at/accuracy` and
+  `previousFix`; Android's `HeaderKindTest` expects "predicted" for the new
+  cases unless its map gains them.
+- `commute-feedback.json`: new cases `A10-permission-pending-past-buffer` and
+  `A13-*`; `A1-delayed-beyond-thirty` and `A11-moving-retains` gained a
+  `resumeWaitUntilDelta` input (not a new expectation).
+- Ordering the natives must match: platform inference (snapshot, then stored
+  record) runs before on-board, and on-board only on a train-speed fix; entry
+  evaluates at the fix-handling clock; re-handling the same fix must not start
+  a second search; a matching focus refresh in flight still holds settlement
+  as permission-pending.
+- Web named constants: `ARRIVAL.evidenceWait` 45000; `SAVED_STATION_KM` 0.4,
+  `SIGHTING_KM` 0.3, `AT_STATION_KM` 0.2, `TRAIN_SPEED_MPS` 8,
+  `PREVIOUS_FIX_MIN_MS`/`MAX_MS` 15 s/120 s; `HOLD_SIGHTING_AFTER_MS` 60 s,
+  `SHOWN_DEPARTURE_FIX_MS` 5 min, `MOVING_FIX_FRESH_MS` 2 min,
+  `CORRIDOR_RATIO` 1.5, `HEADING_WINDOW_DEG` 90, `CLOSING_KM` 0.2,
+  `ON_BOARD_CANDIDATES` 3, `ON_BOARD_LIMIT` 10, `ON_BOARD_LOOKBACK_MARGIN_MS`
+  10 min, `ON_BOARD_DEFAULT_RIDE_MS` 60 min, `PROGRESS_WINDOW` 0.25,
+  `DECLINE_HOLD_MS` 60 min, `NEW_OPEN_AFTER_MS` 10 min, `FIRST_PAST_PAGE_MS`
+  30 min, `FIRST_PAST_PAGE_LIMIT` 10; reused `TRAVEL_MOVED_KM` 1,
+  `TRAVEL_SEEN_MS` 15 min, `TRAVEL_LATE_MS` 30 min.
+- Contracts done in phase 1: `client-storage.md`, `ui.md` (new open,
+  running-row starts, past paging) and `analytics.md` (`declined_inferred`,
+  `entered_inferred` on all platforms). Left for phase 4: the trip-control
+  line, Start/Stop words and rails, `PINNED`, `strip-placement` removal
+  (including `x.*` in the client-storage queue example), the guarded-arrival
+  presentation table's stopped row, lock-screen Stop trip presentation.
+- Web test hooks on localhost: `__trains.startTrip()` / `stopTrip()`;
+  `lastHome.startable` is computed for phase 4.
+- Instruments: `tools/check-commute-reliability.js` (new; drives the three
+  gate checks plus running-row start, Stop trip, held-record and on-board
+  entry). Pre-existing failures identical at `9a3f8b3`:
+  `check-controller-lifecycle.js` arrival persistence, and `shoot-states`
+  states mascot-stale-before, mascot-next-focus-source-handoff, home-over,
+  home-five-trips, home-arrived, past-register, past-register-scrolled,
+  detail-unpin-flow, focus-returns-home, reverse-real-platforms (the sweep
+  stops at the first failure, so run states one at a time).
+  `tools/check-commute-feedback.js --only screens` still asserts the removed
+  stopped state; its recapture is phase 4's.
+
 ## Phase 2 — Android
 
 Owns: `android/app/src/main/java/com/ilovetrains/app/{Arrival,Prediction,
@@ -129,8 +209,13 @@ and the copied fixtures under test resources.
 
 Work: rules 1-9 for Android, with the decline as a view-model action (no
 visual control yet). Phase 2a builds rules 8 and 9, with the instrumented
-board test and the setup-cancellation test. Phase 2b builds rules 1-7 and
-the remaining tests on top of 2a.
+board test and the setup-cancellation test. Phase 2b builds rules 1-5, the
+`inferenceDeclined` record and its suppression, the commute-feedback,
+prediction and inference (hold and entry) fixture tests and the open-race
+test. Phase 2c builds rule 6's actions (start, stop, decline write, running-row
+tap, notification Stop action, `entered_inferred`/`declined_inferred`), rule
+7, the start and running fixture cases, the 10-minute reset test, and runs the
+full Android gate. Setup's location pick keeps the 200 m order (ruling 22).
 
 - Rule 1: the reducer and `focusExpiry`, and the 45 s timer replacing the
   15 s `arrivalLookupComplete` post, also set whenever monitoring starts.
@@ -163,7 +248,17 @@ Gate: `tools/build-android.sh --unit` during iteration; the full
 `tools/build-android.sh` once on final sources, on the agent's own AVD started
 with `tools/start-android-emulator.sh` and a distinct port.
 
-Done markers: `Phase 2a done: <commit>`, then `Phase 2 done: <commit>`.
+Done markers: `Phase 2a done: <commit>`, `Phase 2b done: <commit>`, then
+`Phase 2 done: <commit>`.
+
+Phase 2a done: `473e1f6` on `cr-android` (not yet merged). Beyond its brief it
+made the board's NOW item, future rows and footer one list item at least a
+screen tall (the web's `.sy-fwd { min-height: 100% }`), so NOW stays put as
+past rows arrive. Lead reviewed the before/after frames on 2026-10-02 and
+accepted it. Phase 4 re-accepts the Android `board-transfer`,
+`board-transfer-light` (now opening at NOW), `board-now`, `board-now-light`
+and `board-light` (12 px tuck under the rule gone) baselines on the baseline
+device.
 
 ## Phase 3 — iOS
 
@@ -181,7 +276,13 @@ override `onOpenURL` tracker or widget routes. Rule 6 adds `stopTrip` and
 `startTrip`, the running-row tap, and a `LiveActivityIntent` that the Live
 Activity's Stop trip button will invoke. The intent runs in the app process,
 checks the session identity, and ends the focus through the controller.
-Phase 4 draws the button.
+Phase 4 draws the button. Phase 3a builds rules 1-5, the
+`inferenceDeclined` record and suppression, rule 8, the three-fixture XCTest
+runs (hold and entry cases) and the open-race and evidence-wait tests. Phase
+3b builds rule 6's actions and the `LiveActivityIntent`, rule 7, the start
+and running cases, the 10-minute reset test, the `TravelTrackerFlowTests`
+update, and runs `tools/build-ios.sh --test`. Setup's location pick keeps the
+200 m order (ruling 22).
 
 Tests: XCTest runs every case in the three shared fixtures, plus controller
 tests for the open race, the 10-minute reset with a tracker URL, and the
@@ -192,7 +293,7 @@ state, not deleted.
 Gate: `tools/build-ios.sh --unit` during iteration (one at a time, no loops);
 `tools/build-ios.sh --test` once on final sources.
 
-Done marker: `Phase 3 done: <commit>`.
+Done markers: `Phase 3a done: <commit>`, then `Phase 3 done: <commit>`.
 
 ## Phase 4 — The trip-control line, new words and the removed state, on screen (visual)
 
@@ -224,7 +325,11 @@ code with test-hook states and is not merged. Remove
 action label. Remove the stopped `Arrival unconfirmed` presentation.
 Recapture the commute-feedback missing-telemetry frames with
 `tools/check-commute-feedback.js`, and update the comps README and
-`verification.json`.
+`verification.json`. Ruling 21: on an estimate ending, the trip-over offer
+drops `You’ve arrived.` (location endings keep it), and the Home sign wraps
+instead of cutting `The last arrival estimate has passed. The return trip is
+ready.` (web cut it at 390 px; check every client). Re-accept the five
+Android board baselines phase 2a changed.
 
 Gate: the `visual-regression` skill for every affected screen on web,
 Android and iOS, with every reported difference judged from its composite.

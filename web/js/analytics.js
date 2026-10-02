@@ -39,7 +39,7 @@ const OWN_DIMS = [
 const COMPOSED = new Set(['r', 'b']);
 const EVENT_NAMES = new Set([
   ...HEADER_KINDS.flatMap((kind) => ['shown_' + kind, 'hit_' + kind, 'miss_' + kind, 'pinned_' + kind]),
-  'rode_pin', 'rode_auto', 'change_inferred', 'entered_inferred', 'back_focus', 'back_inferred',
+  'rode_pin', 'rode_auto', 'change_inferred', 'entered_inferred', 'declined_inferred', 'back_focus', 'back_inferred',
   'asked_panel', 'granted_panel', 'denied_panel', 'later_panel',
   'asked_setup', 'granted_setup', 'denied_setup',
   'opened', 'shown_setup', 'saved_setup'

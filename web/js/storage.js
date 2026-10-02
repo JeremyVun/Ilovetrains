@@ -186,6 +186,15 @@ export function parseDoc(raw) {
     const recovery = normalizeRecovery(f.recovery, f.journey);
     if (recovery) doc.focus.recovery = recovery;
   }
+  const decline = v.inferenceDeclined;
+  if (decline && typeof decline.tripId === 'string' && DIRECTIONS.includes(decline.direction)
+      && typeof decline.departure === 'string' && decline.departure !== ''
+      && [decline.at, decline.arrival].every((value) => typeof value === 'string' && Number.isFinite(Date.parse(value)))) {
+    doc.inferenceDeclined = {
+      tripId: decline.tripId, direction: decline.direction, at: decline.at,
+      departure: decline.departure, arrival: decline.arrival
+    };
+  }
   if (v.locationAsk && typeof v.locationAsk.declinedAt === 'string') {
     doc.locationAsk = { declinedAt: v.locationAsk.declinedAt };
   }
@@ -227,6 +236,7 @@ export function serializeDoc(doc) {
     cache: doc.cache
   };
   if (doc.focus) out.focus = doc.focus;
+  if (doc.inferenceDeclined) out.inferenceDeclined = doc.inferenceDeclined;
   if (doc.locationAsk) out.locationAsk = doc.locationAsk;
   if (doc.telemetry) out.telemetry = doc.telemetry;
   if (doc.preferences) out.preferences = preferencesOf(doc);
@@ -343,6 +353,7 @@ export function removeTrip(doc, tripId) {
     removeCachePairVariants(next.cache, trip.to.id, trip.from.id);
   }
   if (next.focus && next.focus.tripId === tripId) delete next.focus;
+  if (next.inferenceDeclined && next.inferenceDeclined.tripId === tripId) delete next.inferenceDeclined;
   return next;
 }
 
@@ -446,6 +457,16 @@ export function recordLastOpen(doc, { station, tripId, direction, journey }, now
       tripId,
       direction,
       journey
+    }
+  };
+}
+
+export function recordDecline(doc, { tripId, direction, departure, arrivalMs }, nowMs) {
+  if (typeof tripId !== 'string' || !DIRECTIONS.includes(direction) || !departure || !Number.isFinite(arrivalMs)) return doc;
+  return {
+    ...doc,
+    inferenceDeclined: {
+      tripId, direction, at: new Date(nowMs).toISOString(), departure, arrival: new Date(arrivalMs).toISOString()
     }
   };
 }

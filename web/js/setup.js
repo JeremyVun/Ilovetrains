@@ -5,7 +5,7 @@ import { esc, mount, onAction, shortName } from './dom.js';
 import { getStops } from './api.js';
 import { preferencesOf } from './preferences.js';
 import { newTripId, recordSearch } from './storage.js';
-import { here, loadStations, nearest, NEAR_STATION_KM } from './stations.js';
+import { setupHere, loadStations, nearest, NEAR_STATION_KM } from './stations.js';
 import { MIN_QUERY, createSearcher, hintFor, queryKey, rankStops, fuzzyScore, topPick } from './search.js';
 
 export const SEARCH_DEBOUNCE_MS = 300;
@@ -25,7 +25,7 @@ export async function renderSetup(root, ctx, { origin, redirect } = {}) {
         ctx.fix({ maximumAge: 0 }), loadStations()
       ]);
       if (!isCurrent()) return;
-      const spot = initialFix && initialStations ? here(ctx.doc, initialStations, initialFix) : null;
+      const spot = initialFix && initialStations ? setupHere(ctx.doc, initialStations, initialFix) : null;
       if (spot) origin = spot.station;
     }
   }
@@ -230,7 +230,7 @@ export async function renderSetup(root, ctx, { origin, redirect } = {}) {
     ctx.track(fix ? 'granted_setup' : 'denied_setup');
     if (!stations) stations = await loadStations();
     if (!isCurrent() || generation !== locationGeneration) return;
-    const spot = fix && stations ? here(ctx.doc, stations, fix) : null;
+    const spot = fix && stations ? setupHere(ctx.doc, stations, fix) : null;
     if (!spot) {
       askable = false;
       paintResults();
@@ -244,7 +244,7 @@ export async function renderSetup(root, ctx, { origin, redirect } = {}) {
      they are; everyone else is offered the station rather than given it. */
   function settleLocation() {
     if (picked.from || inputs.from.value.trim()) return;
-    const spot = fix && stations ? here(ctx.doc, stations, fix) : null;
+    const spot = fix && stations ? setupHere(ctx.doc, stations, fix) : null;
     if (spot && !ctx.doc.trips.length) {
       active = 'from';
       pick(spot.station, 'location');
