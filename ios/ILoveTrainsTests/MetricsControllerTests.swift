@@ -181,7 +181,7 @@ private final class QuietLocation: LocationProviding {
     var isMonitoring = false
     func refreshPermission() { onPermission?(true, false) }
     func openSettings() {}
-    func request(prompt: Bool) {}
+    func request(prompt: Bool, precise: Bool) {}
     func monitoringPermitted() async -> Bool { false }
     func startMonitoring() -> Bool { false }
     func stop() {}

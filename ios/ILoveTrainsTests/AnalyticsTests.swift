@@ -71,8 +71,10 @@ final class AnalyticsTests: XCTestCase {
     func testTheNativeVocabularyIsClosedAndCarriesNoExperiment() {
         let kinds = ["predicted", "focus", "usual", "home", "pair", "inferred"]
         let expected = Set(kinds.flatMap { k in ["shown_\(k)", "hit_\(k)", "miss_\(k)", "pinned_\(k)"] })
-            .union(["opened", "rode_pin", "rode_auto"])
+            .union(["opened", "rode_pin", "rode_auto", "entered_inferred"])
         XCTAssertEqual(analyticsEventNames, expected)
+        XCTAssertTrue(validAnalyticsEvent("entered_inferred", iosDims("2-5")))
+        XCTAssertFalse(validAnalyticsEvent("entered_inferred", iosDims("2-5", ["b": "estimate", "pl.b": "ios.estimate"])))
         XCTAssertTrue(validAnalyticsEvent("shown_pair", iosDims("6-10")))
         XCTAssertFalse(validAnalyticsEvent("shown_setup", iosDims("1", ["f": "empty"])))
         XCTAssertFalse(validAnalyticsEvent("change_inferred", iosDims("1")))

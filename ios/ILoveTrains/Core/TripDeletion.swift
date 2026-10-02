@@ -8,6 +8,7 @@ struct PendingDeletion: Equatable {
     let history: [ViewEvent]
     let focus: FocusedJourney?
     let lastAnswer: LastAnswer?
+    let inferenceDeclined: InferenceDecline?
     let lastTripId: String?
 }
 
@@ -19,6 +20,7 @@ extension UserData {
         let pending = PendingDeletion(
             trip: trips[index], index: index, history: history.filter { $0.tripId == id },
             focus: focus?.tripId == id ? focus : nil, lastAnswer: lastAnswer?.tripId == id ? lastAnswer : nil,
+            inferenceDeclined: inferenceDeclined?.tripId == id ? inferenceDeclined : nil,
             lastTripId: lastTripId == id ? lastTripId : nil
         )
         var remaining = self
@@ -26,6 +28,7 @@ extension UserData {
         remaining.history.removeAll { $0.tripId == id }
         if remaining.focus?.tripId == id { remaining.focus = nil }
         if remaining.lastAnswer?.tripId == id { remaining.lastAnswer = nil }
+        if remaining.inferenceDeclined?.tripId == id { remaining.inferenceDeclined = nil }
         if remaining.lastTripId == id { remaining.lastTripId = nil }
         return (remaining, pending)
     }
@@ -38,6 +41,7 @@ extension UserData {
         restored.history = Array((history + pending.history).suffix(500))
         restored.focus = focus ?? pending.focus
         restored.lastAnswer = lastAnswer ?? pending.lastAnswer
+        restored.inferenceDeclined = inferenceDeclined ?? pending.inferenceDeclined
         restored.lastTripId = lastTripId ?? pending.lastTripId
         return restored
     }

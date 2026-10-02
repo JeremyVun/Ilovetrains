@@ -27,7 +27,7 @@ func widgetSchedule(data: UserData, stations: [Station], now: Millis) -> [Widget
 func widgetFocusExpiry(_ focus: FocusedJourney, now: Millis) -> Millis {
     let arrival = focus.composedJourney.effectiveArrival
     let guardState = normalizeArrivalGuard(focus.arrivalGuard)
-    guard guardState?.armed == true, guardState?.basis != .location else { return arrival + ArrivalRules.expiry }
+    guard guardState?.armed == true, guardState?.basis == nil else { return arrival + ArrivalRules.expiry }
     return max(arrival + ArrivalRules.expiry, (guardState?.retainedAt ?? min(arrival, now)) + ArrivalRules.retention)
 }
 

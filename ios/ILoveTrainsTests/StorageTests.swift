@@ -250,6 +250,51 @@ final class StorageTests: XCTestCase {
         XCTAssertNil(recovered.focus?.recovery)
     }
 
+    func testTheDeclineSurvivesARestartAndAMalformedOneIsDropped() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let from = Station(id: "a", name: "A")
+        let to = Station(id: "b", name: "B")
+        let journey = Journey(legs: [Leg(line: "T9", mode: "train", headsign: "B", from: from, to: to,
+                                         departure: 600_000, arrival: 1_800_000, estimatedArrival: 1_860_000)])
+        let focus = FocusedJourney(tripId: "t", reverse: true, journey: journey,
+                                   board: BoardData(from: from, to: to, journeys: [journey], generatedAt: 1), pinned: false)
+        let decline = inferenceDecline(of: focus, at: 900_000)
+        XCTAssertEqual(decline, InferenceDecline(tripId: "t", reverse: true, at: 900_000, departure: "T9:600000", arrival: 1_860_000))
+        let data = UserData(trips: [SavedTrip(id: "t", from: from, to: to)], inferenceDeclined: decline)
+        let store = DeviceStore(directory: directory)
+        try await store.save(data)
+        let restored = await store.load()
+        XCTAssertEqual(restored.inferenceDeclined, decline)
+
+        let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(data)) as? [String: Any])
+        let fields = try XCTUnwrap(encoded["inferenceDeclined"] as? [String: Any])
+        for (key, broken) in [("tripId", nil), ("reverse", "forward"), ("at", "soon"), ("departure", ""), ("arrival", nil)] as [(String, Any?)] {
+            var raw = encoded
+            var record = fields
+            record[key] = broken
+            raw["inferenceDeclined"] = record
+            let read = try JSONDecoder().decode(UserData.self, from: JSONSerialization.data(withJSONObject: raw))
+            XCTAssertNil(read.inferenceDeclined, key)
+            XCTAssertEqual(read.trips.map(\.id), ["t"], key)
+        }
+    }
+
+    func testDeletingTheTripDeletesItsDeclineAndUndoRestoresIt() throws {
+        let from = Station(id: "a", name: "A")
+        let decline = InferenceDecline(tripId: "t", reverse: false, at: 1, departure: "T9:2", arrival: 3)
+        let data = UserData(trips: [SavedTrip(id: "t", from: from, to: Station(id: "b", name: "B")),
+                                    SavedTrip(id: "u", from: from, to: Station(id: "c", name: "C"))],
+                            inferenceDeclined: decline)
+        let (remaining, pending) = try XCTUnwrap(data.beginningDeletion(of: "t"))
+        XCTAssertNil(remaining.inferenceDeclined)
+        XCTAssertEqual(remaining.restoring(pending).inferenceDeclined, decline)
+        XCTAssertEqual(try XCTUnwrap(data.beginningDeletion(of: "u")).0.inferenceDeclined, decline)
+        var orphaned = data
+        orphaned.trips.removeAll { $0.id == "t" }
+        XCTAssertNil(orphaned.normalized().inferenceDeclined)
+    }
+
     func testTripCapUsesLatestHistoryThenCreationInsteadOfLegacyLastViewed() {
         let from = Station(id: "a", name: "A")
         let trips = (0..<11).map { SavedTrip(

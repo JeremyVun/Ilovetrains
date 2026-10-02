@@ -149,6 +149,37 @@ struct LastAnswer: Codable, Equatable, Sendable {
     }
 }
 
+/// A guessed trip the rider stopped (client-storage.md, Stop trip).
+struct InferenceDecline: Codable, Equatable, Sendable {
+    var tripId: String
+    var reverse: Bool
+    var at: Millis
+    var departure: String
+    var arrival: Millis
+
+    init(tripId: String, reverse: Bool, at: Millis, departure: String, arrival: Millis) {
+        self.tripId = tripId
+        self.reverse = reverse
+        self.at = at
+        self.departure = departure
+        self.arrival = arrival
+    }
+
+    private enum CodingKeys: String, CodingKey { case tripId, reverse, at, departure, arrival }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        tripId = try container.decode(String.self, forKey: .tripId)
+        reverse = try container.decode(Bool.self, forKey: .reverse)
+        at = try container.decode(Millis.self, forKey: .at)
+        departure = try container.decode(String.self, forKey: .departure)
+        arrival = try container.decode(Millis.self, forKey: .arrival)
+        guard !tripId.isEmpty, !departure.isEmpty, validTransitMillis(at), validTransitMillis(arrival) else {
+            throw DecodingError.dataCorruptedError(forKey: .departure, in: container, debugDescription: "Malformed inference decline")
+        }
+    }
+}
+
 struct UserData: Codable, Equatable, Sendable {
     var trips: [SavedTrip]
     var history: [ViewEvent]
@@ -158,6 +189,7 @@ struct UserData: Codable, Equatable, Sendable {
     var lastReverse: Bool
     var focus: FocusedJourney?
     var lastAnswer: LastAnswer?
+    var inferenceDeclined: InferenceDecline?
     var appearance: Appearance
     var modes: Set<String>
     var transferLimit: TransferLimit
@@ -177,6 +209,7 @@ struct UserData: Codable, Equatable, Sendable {
         lastReverse: Bool = false,
         focus: FocusedJourney? = nil,
         lastAnswer: LastAnswer? = nil,
+        inferenceDeclined: InferenceDecline? = nil,
         appearance: Appearance = .system,
         modes: Set<String> = allModes,
         transferLimit: TransferLimit = .two,
@@ -195,6 +228,7 @@ struct UserData: Codable, Equatable, Sendable {
         self.lastReverse = lastReverse
         self.focus = focus
         self.lastAnswer = lastAnswer
+        self.inferenceDeclined = inferenceDeclined
         self.appearance = appearance
         self.modes = modes
         self.transferLimit = transferLimit
@@ -207,7 +241,7 @@ struct UserData: Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, trips, history, rides, votes, lastTripId, lastReverse, focus, lastAnswer
+        case schemaVersion, trips, history, rides, votes, lastTripId, lastReverse, focus, lastAnswer, inferenceDeclined
         case appearance, modes, transferLimit, flags, useLocation, journeyAlerts, home, recentFrom, recentTo
     }
 
@@ -224,6 +258,7 @@ struct UserData: Codable, Equatable, Sendable {
         lastReverse = (try? container.decodeIfPresent(Bool.self, forKey: .lastReverse)) ?? false
         focus = try? container.decodeIfPresent(FocusedJourney.self, forKey: .focus)
         lastAnswer = try? container.decodeIfPresent(LastAnswer.self, forKey: .lastAnswer)
+        inferenceDeclined = try? container.decodeIfPresent(InferenceDecline.self, forKey: .inferenceDeclined)
         appearance = (try? container.decodeIfPresent(Appearance.self, forKey: .appearance)) ?? .system
         if let values = try? container.decodeIfPresent([String].self, forKey: .modes) {
             modes = Set(values.filter { allModes.contains($0) })
@@ -252,6 +287,7 @@ struct UserData: Codable, Equatable, Sendable {
         try container.encode(value.lastReverse, forKey: .lastReverse)
         try container.encodeIfPresent(value.focus, forKey: .focus)
         try container.encodeIfPresent(value.lastAnswer, forKey: .lastAnswer)
+        try container.encodeIfPresent(value.inferenceDeclined, forKey: .inferenceDeclined)
         try container.encode(value.appearance, forKey: .appearance)
         try container.encode(value.modes, forKey: .modes)
         try container.encode(value.transferLimit, forKey: .transferLimit)
@@ -285,6 +321,7 @@ struct UserData: Codable, Equatable, Sendable {
         if let lastTripId = value.lastTripId, !tripIDs.contains(lastTripId) { value.lastTripId = nil }
         if let focus = value.focus, !tripIDs.contains(focus.tripId) { value.focus = nil }
         if let answer = value.lastAnswer, !tripIDs.contains(answer.tripId) { value.lastAnswer = nil }
+        if let decline = value.inferenceDeclined, !tripIDs.contains(decline.tripId) { value.inferenceDeclined = nil }
         return value
     }
 

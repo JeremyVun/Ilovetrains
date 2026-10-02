@@ -95,6 +95,9 @@ final class WidgetSnapshotTests: XCTestCase {
         var confirmed = focus
         confirmed.arrivalGuard = ArrivalGuard(armed: true, retainedAt: now - 60_000, basis: .location, confirmedAt: now - 30_000)
         XCTAssertEqual(widgetFocusExpiry(confirmed, now: now), journey.effectiveArrival + 1_800_000)
+        var settled = focus
+        settled.arrivalGuard = ArrivalGuard(armed: true, retainedAt: now - 60_000, basis: .estimate)
+        XCTAssertEqual(widgetFocusExpiry(settled, now: now), journey.effectiveArrival + 1_800_000)
     }
 
     func testPastTheScheduleEndTheSameWeekdayAndHourAnswers() {

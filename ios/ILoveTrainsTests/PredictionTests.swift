@@ -9,16 +9,27 @@ final class PredictionTests: XCTestCase {
             let now = epoch(fixture.now)
             let data = fixture.doc.userData()
             let stations = fixture.stations.map { $0.station }
-            let fix = fixture.fix.map { Fix(lat: $0.lat, lon: $0.lon, at: now) }
-            let result = predict(data: data, stations: stations, fix: fix, now: now)
+            let fix = fixture.fix.map { $0.fix(defaultAt: now) }
+            let previousFix = fixture.previousFix.map { $0.fix(defaultAt: now) }
+            let result = predict(data: data, stations: stations, fix: fix, previousFix: previousFix, now: now)
+            let here = locateHere(data: data, stations: stations, fix: fix, previousFix: previousFix, now: now)
 
-            XCTAssertEqual(result?.tripId, fixture.expected.selection?.tripId, fixture.name)
-            XCTAssertEqual(result?.reverse, fixture.expected.selection?.reverse, fixture.name)
+            XCTAssertEqual(here?.station.id, fixture.expected.here?.stationId, fixture.name)
+            XCTAssertEqual(here?.tier, fixture.expected.here?.tier, fixture.name)
+            XCTAssertEqual(sighting(here, fix: fix)?.id, fixture.expected.sighting, fixture.name)
+            if let selection = fixture.expected.selection {
+                XCTAssertEqual(result?.tripId, selection.tripId, fixture.name)
+                XCTAssertEqual(result?.reverse, selection.reverse, fixture.name)
+                XCTAssertNil(homewardPair(data: data, here: here?.station), fixture.name)
+            } else {
+                // The web saves a pair here; native saves the same pair as the fix lands.
+                XCTAssertEqual(homewardPair(data: data, here: here?.station)?.from.id, fixture.expected.here?.stationId, fixture.name)
+            }
             XCTAssertEqual(automaticHome(data: data)?.id, fixture.expected.home, fixture.name)
 
             var withoutLocation = data
             withoutLocation.useLocation = false
-            let noLocation = predict(data: withoutLocation, stations: stations, fix: fix, now: now)
+            let noLocation = predict(data: withoutLocation, stations: stations, fix: fix, previousFix: previousFix, now: now)
             XCTAssertEqual(noLocation?.tripId, fixture.expected.noLocation?.tripId, fixture.name)
             XCTAssertEqual(noLocation?.reverse, fixture.expected.noLocation?.direction == "reverse", fixture.name)
 
@@ -54,10 +65,10 @@ final class PredictionTests: XCTestCase {
             )
         )
 
-        XCTAssertNil(inferredFocus(data: data, fix: Fix(lat: rhodes.lat, lon: rhodes.lon, at: now), now: now))
-        XCTAssertNil(inferredFocus(data: data, fix: Fix(lat: -33.85, lon: 151.13, at: now - 300_001), now: now))
+        XCTAssertNil(inferredFocus(data: data, record: data.lastAnswer, fix: Fix(lat: rhodes.lat, lon: rhodes.lon, at: now), now: now))
+        XCTAssertNil(inferredFocus(data: data, record: data.lastAnswer, fix: Fix(lat: -33.85, lon: 151.13, at: now - 300_001), now: now))
         XCTAssertEqual(
-            inferredFocus(data: data, fix: Fix(lat: -33.85, lon: 151.13, at: now), now: now)?.pinned,
+            inferredFocus(data: data, record: data.lastAnswer, fix: Fix(lat: -33.85, lon: 151.13, at: now), now: now)?.pinned,
             false
         )
     }
@@ -88,6 +99,7 @@ private struct PredictionFixture: Decodable {
     var name: String
     var doc: FixtureDocument
     var fix: FixtureFix?
+    var previousFix: FixtureFix?
     var now: String
     var stations: [FixtureStation]
     var expected: FixtureExpected
@@ -190,12 +202,27 @@ private struct FixtureStation: Decodable {
 private struct FixtureFix: Decodable {
     var lat: Double
     var lon: Double
+    var at: Millis?
+    var accuracy: Double?
+    var speed: Double?
+    var heading: Double?
+
+    func fix(defaultAt now: Millis) -> Fix {
+        Fix(lat: lat, lon: lon, at: at ?? now, speed: speed, accuracyMetres: accuracy, course: heading)
+    }
+}
+
+private struct FixtureHere: Decodable {
+    var stationId: String
+    var tier: Int
 }
 
 private struct FixtureExpected: Decodable {
     var selection: FixtureSelection?
     var noLocation: FixtureSelection?
     var home: String?
+    var here: FixtureHere?
+    var sighting: String?
     var scores: [FixtureScore]
 }
 
