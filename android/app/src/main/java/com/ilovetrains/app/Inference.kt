@@ -87,6 +87,18 @@ fun replacesLastAnswer(data: UserData, incomingStationId: String?, now: Long, si
     return now < departure || sightingAt != null && sightingAt >= departure + HoldSightingAfterMillis
 }
 
+// By then a departed train is kilometres out: a fix reads train speed or finds the rider still waiting.
+const val ShownDepartureFixMillis = 5 * 60_000L
+const val MovingFixFreshMillis = 2 * 60_000L
+
+/** Rule 4: whether a refresh tick with Home open takes a fix, given the departures of leads Home showed this visit. */
+fun tickNeedsFix(data: UserData, now: Long, shownDepartures: Collection<Long>, fix: Fix?, previousFix: Fix?): Boolean {
+    if (shownDepartures.any { now >= it && now - it <= ShownDepartureFixMillis }) return true
+    val stored = data.lastAnswer
+    if (stored != null && lastAnswerInferable(data, stored, now) && stored.journey.effectiveDeparture <= now) return true
+    return fix != null && now - fix.at <= MovingFixFreshMillis && trainSpeed(fix, previousFix)
+}
+
 /** Writes [record], taken at its own `at`, unless the stored record could still be ridden and this one cannot erase it. */
 fun UserData.withLastAnswer(record: LastAnswer, sightingAt: Long?): UserData =
     if (replacesLastAnswer(this, record.stationId, record.at, sightingAt)) copy(lastAnswer = record) else this

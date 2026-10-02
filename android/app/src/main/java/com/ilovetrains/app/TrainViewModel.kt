@@ -47,6 +47,8 @@ class TrainViewModel private constructor(
     private var openSnapshot: LastAnswer? = null
     private var onBoardJob: Job? = null
     private var onBoardFix: Fix? = null
+    private val shownDepartures = mutableMapOf<String, Long>()
+    private var tickFixPending = false
     private var explicit = false
     private var generation = 0L
     private var answeredPair: String? = null
@@ -247,6 +249,7 @@ class TrainViewModel private constructor(
         arrivalPermissionPending = true
         if (returning) {
             foregroundVisit++
+            shownDepartures.clear()
             val focus = data.focus
             if (focus?.arrivalGuard?.let { it.armed == true && it.basis == null } == true &&
                 trackerNow() >= focus.composed.effectiveArrival) {
@@ -449,15 +452,26 @@ class TrainViewModel private constructor(
             while (isActive) {
                 delay(1000); mutable.value = mutable.value.copy(now = trackerNow())
                 ensureArrivalMonitoring()
-                if (++ticks % 30 == 0 && mutable.value.ready) {
-                    refreshSharedData()
-                    // A restart would cancel an offline plan that takes longer than one tick, so it could never finish.
-                    if (boardJob?.isActive != true) refresh()
-                    readFlags()
-                }
+                if (++ticks % 30 == 0 && mutable.value.ready) refreshTick()
                 else if (data.focus != null) evaluateArrival()
             }
         }
+    }
+    internal fun refreshTick() {
+        refreshSharedData()
+        // A restart would cancel an offline plan that takes longer than one tick, so it could never finish.
+        if (!tickFix() && boardJob?.isActive != true) refresh()
+        readFlags()
+    }
+    /** Rule 4: Home left open around a departure takes a fix each tick, and that fix's handling refreshes in its place. */
+    private fun tickFix(): Boolean {
+        val stalled = tickFixPending
+        tickFixPending = false
+        if (stalled || mutable.value.screen != Screen.Home || data.focus != null || !data.useLocation || !mutable.value.locationGranted ||
+            !tickNeedsFix(data, mutable.value.now, shownDepartures.values, fix, previousHomeFix)) return false
+        tickFixPending = true
+        requestHomeFix()
+        return true
     }
     /** The activity left the screen for real, not for a configuration change: the next resume is a new open. */
     fun backgrounded() { metrics.backgrounded() }
@@ -468,6 +482,7 @@ class TrainViewModel private constructor(
         try {
             if (shown.screen == Screen.Setup && !shown.selectingHome) metrics.setupShown(newVisit = previous != Screen.Setup)
             if (shown.screen != Screen.Home) return
+            if (shown.focus == null) displayedHomeLead(shown)?.let { shownDepartures[it.key] = it.effectiveDeparture }
             val focus = shown.focus
             val tripId = focus?.tripId ?: shown.selectedTripId ?: return
             val reverse = focus?.reverse ?: shown.reverse
@@ -499,6 +514,7 @@ class TrainViewModel private constructor(
     fun pause() {
         refreshLoop?.cancel(); refreshLoop = null; boardJob?.cancel(); pastPages.cancel(); focusJob?.cancel(); historyJob?.cancel(); realtimeJob?.cancel(); generation++
         onBoardJob?.cancel()
+        tickFixPending = false
         answeredPair = null
         mutable.value = mutable.value.copy(refreshing = false, distanceMetres = null, nearestStation = null)
         fix = null
@@ -935,6 +951,8 @@ class TrainViewModel private constructor(
         val receivedAt = trackerNow()
         if (!data.useLocation) return
         if (receivedAt - value.at !in 0..300_000) { locationFailed(SetupLocationStatus.Unavailable); return }
+        val fromTick = tickFixPending
+        tickFixPending = false
         mutable.value = mutable.value.copy(now = receivedAt)
         val previous = fix
         fix = value
@@ -956,6 +974,7 @@ class TrainViewModel private constructor(
             return
         }
         previousHomeFix = previous
+        val answered = mutable.value.selectedTripId to mutable.value.reverse
         val moving = trainSpeed(value, previous)
         val here = stationHere(data, stations, value, mutable.value.now, previous)
         val day = Instant.ofEpochMilli(mutable.value.now).atZone(Sydney).toLocalDate().toString()
@@ -976,7 +995,10 @@ class TrainViewModel private constructor(
         val origin = visibleFocus()?.journey?.legs?.firstOrNull()?.from ?: ends()?.first
         mutable.value = mutable.value.copy(distanceMetres = origin?.takeUnless { moving }
             ?.let { distanceMetres(value, it).takeIf { d -> d.isFinite() }?.roundToInt() })
-        refresh()
+        // A tick's fix refreshes in the tick's place, so it must not restart that pair's offline plan either.
+        val planning = fromTick && inferred == null && boardJob?.isActive == true &&
+            answered == (mutable.value.selectedTripId to mutable.value.reverse)
+        if (!planning) refresh()
         if (inferred == null && moving) enterOnBoard(value, previous)
     }
 
@@ -1220,6 +1242,10 @@ class TrainViewModel private constructor(
         if (data.useLocation) onLocationRequest?.invoke()
     }
     fun locationFailed(status: SetupLocationStatus) {
+        if (tickFixPending) {
+            tickFixPending = false
+            if (boardJob?.isActive != true) refresh()
+        }
         if (setupLocationRequested && mutable.value.screen == Screen.Setup && !mutable.value.selectingHome && mutable.value.setupFrom == null) {
             mutable.value = mutable.value.copy(setupLocationStatus = status)
             if (status == SetupLocationStatus.Unavailable) { setupLocationRequested = false; setupLocationResolved = true }
