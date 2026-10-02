@@ -887,8 +887,7 @@ final class TrainViewModel: ObservableObject {
             window: arrivalWindow,
             sample: sample,
             monitoring: monitoring ?? location.isMonitoring,
-            permissionPending: arrivalPermissionPending
-                || (focusRefreshPending && !matchingRefresh && focus.arrivalGuard?.armed != true),
+            permissionPending: arrivalPermissionPending || (focusRefreshPending && !matchingRefresh),
             legacyCompleted: legacyCompleted,
             cancelled: focus.journey.cancelled,
             matchingRefresh: matchingRefresh,

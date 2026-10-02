@@ -91,7 +91,7 @@ func inferredFocus(data: UserData, record: LastAnswer?, fix: Fix, now: Millis) -
     let from = origin(trip, reverse: last.reverse)
     let to = destination(trip, reverse: last.reverse)
     let journey = last.journey
-    guard (journey.effectiveDeparture...(journey.effectiveArrival + travelLate)).contains(now),
+    guard now >= journey.effectiveDeparture, now <= journey.effectiveArrival + travelLate,
           last.stationId == from.id,
           (0...travelSeen).contains(journey.effectiveDeparture - last.at) else { return nil }
 
