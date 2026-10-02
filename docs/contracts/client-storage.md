@@ -339,7 +339,18 @@ read them in a different order:
   user made one, else the focus, else the prediction.
 
 The explicit selection is the trip whose saved-trip row the user tapped. It
-lasts for the page load and is never persisted, and it never writes `focus`.
+lasts for the session and is never persisted, and it never writes `focus`.
+
+**A return after 10 minutes is a new open** on every client (owner ruling 3,
+2026-10-01). A return to the foreground after at least 10 minutes in the
+background lands on Home (setup when no trip is saved): it clears the explicit
+selection, drops board, detail, setup and settings navigation state, and runs
+the normal open path (the open snapshot, prediction, silent fix and refresh).
+Background means web `document.hidden`, Android `onStop` without a
+configuration change (its `backgrounded()` call) and iOS scene phase
+`.background`. A tracker notification, Live Activity or widget tap that
+brought the app forward still lands where it points; the reset never overrides
+it. Shorter absences keep the screen the rider left.
 Stop trip clears it on the Home it returns to. A
 location fix arriving afterwards re-predicts only when nothing explicit was
 chosen.

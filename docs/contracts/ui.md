@@ -21,7 +21,10 @@ zone.
 
 - Home is the open state. Its smart header is the zero-tap answer for the
   predicted or focused trip; saved trips sit immediately below it under the
-  `MY TRIPS` anchor. The saved list ends with `— End of trips`.
+  `MY TRIPS` anchor. The saved list ends with `— End of trips`. A return to the
+  app after at least 10 minutes in the background is a new open and lands on
+  Home with a fresh, location-aware answer; quicker app switches keep the
+  board or detail the rider was on (client-storage.md, Trip selection).
 - The smart header is a section, not a single tap target: the
   saved-trip row is the affordance, and the header's own trip carries the same
   `DEPARTURES ›` cue as every other row. A journey the app inferred rather than

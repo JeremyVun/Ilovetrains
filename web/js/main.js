@@ -47,6 +47,8 @@ const RECOMMENDATION_PAGES = 2;
 const RECOMMENDATION_DEADLINE_MS = 12_000;
 const RECOMMENDATION_THROTTLE_MS = 60_000;
 const LOOKUP_TIMEOUT_MS = 15_000;
+/* Owner ruling 3: a return this long after leaving is a new open. */
+const NEW_OPEN_AFTER_MS = 10 * 60_000;
 const PAST_STEP_MS = 60 * 60_000;
 const PAST_BOUND_MS = 24 * 60 * 60_000;
 const FIX_MAX_AGE_MS = 5 * 60_000;
@@ -139,6 +141,7 @@ state.arrivalResumeWaitUntil = null;
 state.evidenceWaitFor = null;
 state.foregroundVisit = 0;
 state.shownDepartures = new Map();
+state.hiddenAt = null;
 state.arrivalPermissionPending = false;
 state.focusRefreshPending = null;
 state.recovery = null;
@@ -1982,6 +1985,7 @@ async function backfillCoordinates() {
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
+    state.hiddenAt = now();
     invalidateSuggestions();
     stopTimers();
     stopArrivalMonitoring();
@@ -1996,6 +2000,12 @@ document.addEventListener('visibilitychange', () => {
   loadFlags();
   state.foregroundVisit += 1;
   state.shownDepartures = new Map();
+  const away = state.hiddenAt === null ? 0 : now() - state.hiddenAt;
+  state.hiddenAt = null;
+  const focus = focusOf(state.doc);
+  if (focus?.arrivalGuard?.armed && !focus.arrivalGuard.basis
+      && now() >= (arrivalMs(composedJourney(focus)) ?? Infinity)) beginEvidenceWait();
+  if (away >= NEW_OPEN_AFTER_MS) return reopen();
   if (!onLiveView() && state.view !== 'settings') return;
   if (state.selection) awaitFirstAnswers();
   suppressPreferenceEvents = false;
@@ -2003,15 +2013,25 @@ document.addEventListener('visibilitychange', () => {
     clearFix();
     state.previousOpen = state.doc.lastOpen || null;
   }
-  const focus = focusOf(state.doc);
-  if (focus?.arrivalGuard?.armed && !focus.arrivalGuard.basis
-      && now() >= (arrivalMs(composedJourney(focus)) ?? Infinity)) beginEvidenceWait();
   startTimers(state.view === 'board');
   fetchLive();
   void ensureArrivalMonitoring();
   if (state.view !== 'home') return;
   silentFix();
 });
+
+/* Home with a fresh, location-aware answer, as on a cold open; the open path
+   in showHome takes the snapshot, the fix and the refresh. */
+function reopen() {
+  state.selection = null;
+  state.journey = null;
+  state.detailHandoff = null;
+  state.detailSource = null;
+  state.prefill = null;
+  suppressPreferenceEvents = false;
+  ctx.go('#/');
+}
+
 window.addEventListener('hashchange', route);
 
 window.__trains = {
