@@ -266,6 +266,28 @@ final class TravelTrackerFlowTests: XCTestCase {
     }
 
     @MainActor
+    func testLiveActivityStopTripEndsTheTrip() {
+        // The intent runs in a background launch without test arguments, so it must find the default store.
+        let domain: String? = nil
+        var app = launch(["--tracker-debug", "dismiss-start"], domain: domain)
+        assertStatus(app, contains: ["activities=1", "focus=dismiss-original"])
+        app.terminate()
+        showNotificationCenter()
+        let card = assertNotificationCard()
+        let stop = XCUIApplication(bundleIdentifier: springboardBundle).buttons["Stop trip"]
+        if stop.waitForExistence(timeout: 2) {
+            stop.tap()
+        } else {
+            // iOS 26.4 can expose only the host cell; the capsule sits at the card's top trailing content corner.
+            card.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: card.frame.width - 64, dy: 26)).tap()
+        }
+        waitForNotificationCardAbsence()
+
+        app = launch(["--tracker-debug", "inspect"], domain: domain)
+        assertStatus(app, contains: ["focus=none", "activities=0"])
+    }
+
+    @MainActor
     func testLiveActivityDenialPreservesFocus() throws {
         guard environment("TRACKER_EXPECT_PERMISSION_PROMPT", fallback: "0") == "1" else {
             throw XCTSkip("Requires a fresh app install and TRACKER_EXPECT_PERMISSION_PROMPT=1")

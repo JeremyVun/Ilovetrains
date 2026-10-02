@@ -915,8 +915,10 @@ WidgetKit and Pixel launcher renderers.
   carry `N MIN LATE`; scheduled-only rows carry `SCHEDULED`.
 - **Lock screen (iOS, rectangular):** the tracker's three lines,
   `T9 leaves in 2:24`, `Go to Platform 1`, `<destination> about 10:08`.
-- **Pinned and under way:** the status line reads `PINNED` or
-  `RUNNING · PINNED`; once under way the widget shows journey detail's steps
+- **Trip mode and under way:** the status line reads the service's own
+  status, `RUNNING` (before departure included) or `CANCELLED`, for a started
+  or a guessed trip alike, with no pin (owner rulings 14 and 20, 2026-10-02);
+  once under way the widget shows journey detail's steps
   (`GET OFF`, `BOARD T4`, `ARRIVE`). A widget never shows `RUNNING LATE` or
   `Trip over`: its data is never fresh enough to claim either.
 - **Freshness:** every home-screen widget always shows the Live Activity's
@@ -990,6 +992,18 @@ trip line underneath with one progress marker. No app header, repeated platform
 graphics or caption stacks. The OS owns the container, so Android's templates
 and iOS's Island decide the actual geometry. Platform-number boxes on the line
 are an optional visual follow-up, not part of the accepted baseline.
+
+The lock screen carries `Stop trip` (owner ruling 16, 2026-10-02), with Stop
+trip's effects on Home. The iOS Live Activity card and expanded Island are at
+ActivityKit's 160 pt height limit, so the stop takes no row of its own. The
+card puts a worded `■ Stop trip` capsule (iOS's small bordered capsule, 28 pt,
+the tracker ink at 14%) at the trailing end of its headline row; a headline
+that would wrap beside it scales down on its one line instead. The expanded
+Island puts a round 28 pt `stop.fill` button, labelled `Stop trip` for
+VoiceOver, inward of the countdown. The compact and minimal Islands carry no
+button. Each is `Button(intent: StopTripIntent(session:))` and is honoured
+only for the still-current tracker session (ios-deviations.md, Persistent
+travel tracker).
 
 The board, home and detail calibration frames are listed below.
 `tools/check-settings-browser.js --frames assets/comps/latest` adds twelve

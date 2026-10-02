@@ -152,8 +152,8 @@ private struct StopTripRoundButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Stop trip")
-        // Drawn at 28 pt but laid out at the countdown's height, so the region keeps its row.
-        .frame(height: 16)
+        // Drawn at 28 pt, centred on the countdown, but takes no height: the Island is at its height limit.
+        .frame(height: 0)
     }
 }
 

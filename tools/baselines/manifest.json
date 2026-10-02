@@ -10,10 +10,10 @@
     "device": "ilt-field-fixes-iphone17 1206x2622px, content size large · ilt-field-fixes-iphone17 1206x2622px ActivityKit card crops, com.apple.CoreSimulator.SimRuntime.iOS-26-4",
     "simulator": "ilt-field-fixes-iphone17",
     "tracker": {
-      "commit": "116efdc",
-      "date": "2026-09-08",
-      "device": "iPhone 17 Pro iOS 26.4, 402x874 pt, 3x; observed ActivityKit card crops; default text; dark and light simulator appearance",
-      "simulator": "ILoveTrains Tracker Audit 20260908"
+      "commit": "ae3adc8",
+      "date": "2026-10-02",
+      "device": "ilt-cr-ios iPhone 17 Pro 1206x2622px ActivityKit card crops, com.apple.CoreSimulator.SimRuntime.iOS-26-4",
+      "simulator": "ilt-cr-ios"
     }
   },
   "android": {
