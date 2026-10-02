@@ -697,3 +697,20 @@ margin at 375 and narrower, on every screen; 390 and above are unchanged.
   `ilt-cr-ios-se`, an iPhone SE (3rd generation) at 375×667 on iOS 26.4, UDID
   `445F55E5-2C4E-441F-849C-BFE6FC73E589`, created for 4d iOS. Compare against
   the 360 and 375 exemplars. Visual regression at 390/402 must stay unchanged.
+
+Phase 4d iOS done: `a034d73` on `cr-margin-ios`, merged into main as `fa709f1`.
+- `pageMargin(windowWidth:)` and the `\.pageMargin` environment value
+  (`Theme.swift`), set from the window width at the root, replace the global
+  constant in all 38 places; the font stopgap is gone.
+- At 375 the guessed question prints whole at 15 pt, and every edge of the
+  line is within 0.5 pt of `home-guessed-375x667`. The lead checked the
+  side-by-side sheet.
+- Visual regression at 402 (`/tmp/ilt-cr-margin-ios-vr1`) is 40 same. The 20
+  tracker frames were not re-shot: the widget target compiles none of the
+  changed files.
+- A before/after drive of 36 states at 375 found no new clipping, and the
+  detail's `PLATFORM 5` now prints whole.
+- Noted for a later item, unchanged here: the iOS Home header still wraps
+  `Bondi Junction` at 375, where the web narrows its header at 375 and below
+  (iOS never ported that). The second change's cap in `detail-two-change`
+  still cuts `· P…`.
