@@ -162,7 +162,9 @@ private fun SmartHeader(state: AppState, board: BoardData, alternatives: BoardDa
                         modifier = Modifier.padding(start = 2.dp, bottom = 7.dp))
                 }
                 val homeProvenance = directionFigure.provenance.takeUnless { it.equals("Scheduled", true) }.orEmpty()
-                if (homeProvenance.isNotEmpty()) Label(homeProvenance, Modifier.padding(top = 5.dp),
+                // As the web's nowrap .hm-st, a long provenance runs on past the narrow column instead of wrapping.
+                if (homeProvenance.isNotEmpty()) Label(homeProvenance,
+                    Modifier.padding(top = 5.dp).wrapContentWidth(Alignment.Start, unbounded = true),
                     color = if (late || journey.cancelled) c.warning else c.ink3)
             }
             Spacer(Modifier.width(14.dp))
