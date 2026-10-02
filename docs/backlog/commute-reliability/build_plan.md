@@ -526,6 +526,64 @@ recapture and the line exemplars. 4b (Android) and 4c (iOS, including the
 Live Activity button and its exemplar) follow, briefed from 4a's report and in
 parallel through the gate lock.
 
+Phase 4a done: `62ad264` on `cr-web`, merged to main as `20752f2`.
+
+Results:
+- At 375×667 and 390×844, dark and light, every shipped Home state and both
+  rails are pixel-identical to the round 3b exemplars. The lead checked the
+  guessed, startable, started and estimate-ending frames.
+- 614 web tests pass, the playtest exits 0, and `check-commute-reliability.js`
+  and `check-commute-feedback.js` pass.
+- Visual regression run `/tmp/ilt-cr-web-vr/r2` accepted 29 frames, each
+  judged; `r3` was 52 same on final sources.
+- `shoot-states` gained the line's invariants and nine states. Five states
+  that failed at base now pass. `mascot-next-focus-source-handoff`,
+  `home-arrived`, `mascot-stale-before`, `past-register` and
+  `past-register-scrolled` still fail, as at base.
+
+Decisions the lead accepted:
+- A started trip under a cancellation replacement shows ■ STOP TRIP.
+- There is no line once the trip is over.
+- Every Home sign the app writes wraps; only upstream headsigns can still be
+  cut off.
+
+Two fixes outside the brief: "Show the way back" clears the stale arrival
+decision (the return journey flashed `Now AGO`), and the commute-feedback
+missing-telemetry frames are now `c1-fade-*-checking-arrival*`.
+
+`*.png` is gitignored repo-wide. Tracked frames stay tracked, but new ones
+need `git add -f`. The round 3b exemplars in this folder are untracked and
+live only in the main checkout,
+`/Users/jeremy/projects/ilovetrains/docs/backlog/commute-reliability/comps/exemplar/`.
+
+Left for 4b and 4c:
+- the lock-screen Stop trip in `ui.md`'s tracker section;
+- `PINNED` in `ui.md`'s widget section;
+- the `transfer-recovery.json` `pinIcon` field (drop it from the fixture and
+  all three tests once both natives drop the icon);
+- checking whether the natives flash the stale arrival decision on "Show the
+  way back".
+
+For 4b and 4c:
+- **Line:** 48 px plus a 1 px hairline, with the page margin at both ends
+  (22 px, or 18 px at 375 and below).
+- **Text:** the question is 15 px, weight 300, `--ink-2`. Actions are 12 px,
+  weight 600, .14em tracking, uppercase, with 48 px targets.
+- **Guessed:** STOP TRIP in `--ink-2`, a 1×14 `--rule-2` hairline, then
+  CHANGE in `--ink`. STOP and CHANGE sit 22 px apart, and the question gives
+  up 1 px of its gap (13 px minimum).
+- **Lone actions:** in `--ink`, at the right. The 11 px ■/▶ glyph is
+  `--ink-2`, sits 9 px before the word and is centred on the cap height
+  (native `Icons.Filled.Stop`/`PlayArrow`, `stop.fill`/`play.fill`).
+- **Startable:** reads the header lead's effective departure clock. The line
+  moves MY TRIPS down 49 px.
+- **Exemplar fonts:** the 360 and 412 exemplars are Android's Roboto
+  reference; 375 and 390 in SF are iOS's.
+
+At merge, `cr-fix-web` overlaps on the `web/js/main.js` import list: keep
+`retiresSnapshot` and `stoppedTrip`, drop `startable`. Both branches set
+`web/sw.js` to v73, so the combined result needs v74.
+
 Done marker: `Phase 4 done: <commit>`.
 
 ## Phase 5 — Full gates, closeout, release
