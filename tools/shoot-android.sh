@@ -8,7 +8,7 @@ font_scale="${FONT_SCALE:-1.0}"
 out="${OUT:-/tmp/ilovetrains-android-${size}-${font_scale}}"
 adb="${ANDROID_HOME:-$HOME/Library/Android/sdk}/platform-tools/adb"
 
-case "$size" in 390x844|412x732) ;; *) echo "usage: $0 [390x844|412x732]" >&2; exit 2;; esac
+case "$size" in 360x780|390x844|412x732) ;; *) echo "usage: $0 [360x780|390x844|412x732]" >&2; exit 2;; esac
 instrument_class="${INSTRUMENT_CLASS:-com.ilovetrains.app.UiCalibrationTest}"
 instrument_args=()
 if [ -n "${CALIBRATION_SCREENS:-}" ]; then

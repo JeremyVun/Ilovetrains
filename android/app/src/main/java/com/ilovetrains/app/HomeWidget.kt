@@ -21,11 +21,8 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
-import androidx.glance.Image
-import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.clickable
@@ -52,7 +49,6 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
-import androidx.glance.layout.size
 import androidx.glance.layout.width
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -288,24 +284,6 @@ private fun WChip(chip: WidgetChip, modifier: GlanceModifier = GlanceModifier, h
     }
 }
 
-@Composable
-private fun Pin(colors: DayNight = tone(WidgetTone.Ink2)) {
-    Image(ImageProvider(R.drawable.widget_pin), null, GlanceModifier.size(WidgetDimens.PinMark.dp),
-        colorFilter = ColorFilter.tint(colors.provider))
-}
-
-@Composable
-private fun Kicker(kicker: WidgetKicker, modifier: GlanceModifier = GlanceModifier) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        kicker.parts.forEachIndexed { i, part ->
-            if (part == null) {
-                Pin()
-                if (i < kicker.parts.lastIndex) Spacer(GlanceModifier.width(4.dp))
-            } else WText(part)
-        }
-    }
-}
-
 private fun openIntent(context: Context, setup: Boolean) = Intent(context, MainActivity::class.java)
     .putExtra(WidgetOpenExtra, if (setup) WidgetOpenSetup else WidgetOpenHome)
     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -341,7 +319,7 @@ private fun SmallWidget(view: WidgetSmall) {
     Column(GlanceModifier.fillMaxSize().padding(start = d.SmallPadSide.dp, end = d.SmallPadSide.dp, top = d.SmallPadTop.dp,
         bottom = d.SmallPadBottom.dp)) {
         Column(GlanceModifier.fillMaxWidth()) {
-            view.kicker?.let { Kicker(it, GlanceModifier.padding(bottom = (d.KickerGap * g).dp)) }
+            view.kicker?.let { WText(it, GlanceModifier.padding(bottom = (d.KickerGap * g).dp)) }
             view.route?.let { WText(it) }
             view.note?.let { WText(it, GlanceModifier.padding(top = (d.NoteGap * g).dp)) }
             view.clock?.let { WText(it, GlanceModifier.padding(top = (d.ClockGap * g).dp)) }
@@ -401,7 +379,7 @@ private fun BoardWidget(view: WidgetBoard) {
     Column(GlanceModifier.fillMaxSize().padding(top = d.BoardPadTop.dp, bottom = d.BoardPadBottom.dp)) {
         // Layered at measured widths, so a long route wraps before it reaches the countdown.
         Box(side.fillMaxWidth().padding(bottom = d.HeadGap.dp)) {
-            view.kicker?.let { Kicker(it, GlanceModifier.width(view.routeWidth.dp)) }
+            view.kicker?.let { WText(it, GlanceModifier.width(view.routeWidth.dp)) }
             view.route?.let { WText(it, GlanceModifier.width(view.routeWidth.dp)) }
             view.sentence?.let { Box(GlanceModifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) { WSentence(it) } }
         }
@@ -430,10 +408,6 @@ private fun ServiceRow(row: WidgetServiceRow, view: WidgetBoard, modifier: Glanc
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         Row(GlanceModifier.width(view.clockWidth.dp), verticalAlignment = Alignment.CenterVertically) {
             WText(row.clock)
-            if (row.pinned) {
-                Spacer(GlanceModifier.width(d.PinGap.dp))
-                Pin()
-            }
         }
         Spacer(GlanceModifier.width(d.ColumnGap.dp))
         Column(GlanceModifier.width(view.laneWidth.dp)) {

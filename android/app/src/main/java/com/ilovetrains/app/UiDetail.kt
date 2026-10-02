@@ -93,7 +93,7 @@ fun DetailScreen(state: AppState, actions: UiActions) {
             }
         }
         if (pinned || !focused && !journey.cancelled) ActionRail(
-            if (pinned) "Unpin this ${first.modeNameDetail()}" else "Pin this ${first.modeNameDetail()}",
+            if (pinned) "Stop trip" else "Start trip",
             if (pinned) actions::stopTrip else ({ actions.startTrip(journey) }),
             minHeight = 66.dp,
         )
@@ -172,4 +172,3 @@ private fun DetailStep(time: String, station: String, platform: String?, leg: Le
     Rule(Modifier.padding(horizontal = PagePadding), heavy = heavyDivider)
 }
 
-private fun Leg.modeNameDetail() = if (mode.equals("ferry", true)) "ferry" else "train"

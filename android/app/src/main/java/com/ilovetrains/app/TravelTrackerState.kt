@@ -120,19 +120,12 @@ data class TravelTrackerState(
 
             if (now >= projectionEnd && arrival != null) {
                 event = TravelTrackerEvent(TravelTrackerEventKind.Arrival, destination, last.effectiveArrival, null)
-                when {
-                    arrival.state == ArrivalState.CheckingArrival -> {
-                        headline = TravelTrackerHeadline("Checking arrival")
-                        instruction = "Checking arrival at $destination."
-                    }
-                    arrival.moving -> {
-                        headline = TravelTrackerHeadline("Arrival uncertain")
-                        instruction = "Still on the way to $destination."
-                    }
-                    else -> {
-                        headline = TravelTrackerHeadline("Arrival unconfirmed")
-                        instruction = "Arrival time needs an update."
-                    }
+                if (arrival.state == ArrivalState.ArrivalUnconfirmed) {
+                    headline = TravelTrackerHeadline("Arrival uncertain")
+                    instruction = "Still on the way to $destination."
+                } else {
+                    headline = TravelTrackerHeadline("Checking arrival")
+                    instruction = "Checking arrival at $destination."
                 }
                 connection = null
                 tight = false

@@ -98,7 +98,8 @@
   including assertion failures. Test fixture assertions must use ordinary loops;
   a green test that puts assertions inside `readEach` is not conformance evidence.
 - `shoot-android.sh` — build and drive the native renderer on one booted Android
-  emulator: `tools/shoot-android.sh 390x844` or `tools/shoot-android.sh 412x732`.
+  emulator: `tools/shoot-android.sh 390x844`, `412x732` or `360x780` (the
+  Roboto widths of the trip-control line exemplars).
   `FONT_SCALE=1.3` exercises enlarged text; `OUT` selects the capture directory.
   `CALIBRATION_SCREENS=home,board,detail` selects only those canonical frames
   and their setup/assertions. It defaults to the capture method when filtered;

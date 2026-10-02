@@ -79,8 +79,7 @@ fun focusStatus(focus: FocusedJourney, now: Long, complete: Boolean, arrival: Ar
     val journey = focus.composed
     if (complete || arrival?.state == ArrivalState.Arrived) return FocusStatus("Trip over", false)
     if (arrival?.state == ArrivalState.CheckingArrival) return FocusStatus("Checking arrival", false)
-    if (arrival?.state == ArrivalState.ArrivalUnconfirmed) return FocusStatus(
-        if (arrival.moving) "Arrival uncertain" else "Arrival unconfirmed", arrival.moving)
+    if (arrival?.state == ArrivalState.ArrivalUnconfirmed) return FocusStatus("Arrival uncertain", true)
     if (journey.cancelled) return FocusStatus("Cancelled", true)
     val active = relevantLeg(journey, now)
     val delay = maxOf(
@@ -94,7 +93,6 @@ fun focusStatus(focus: FocusedJourney, now: Long, complete: Boolean, arrival: Ar
         return FocusStatus(if (late) "Late · Connection gone" else "Connection gone", true, late)
     }
     if (late) return FocusStatus("Running late", true, true)
-    if (focus.pinned && now < journey.effectiveDeparture) return FocusStatus("Pinned", false)
     return FocusStatus("Running", false)
 }
 
@@ -123,6 +121,19 @@ fun homeAnswer(board: BoardData?, focus: FocusedJourney?, now: Long, modes: Set<
         else -> null
     }
     return HomeAnswer(journey, displayBoard, cancelledLead)
+}
+
+sealed interface TripLine {
+    data object Guessed : TripLine
+    data object Started : TripLine
+    data class Startable(val journey: Journey) : TripLine
+}
+
+/** Home's trip-control line under the heavy rule; the trip-over offer replaces it. */
+fun tripLine(focus: FocusedJourney?, over: Boolean, startable: Journey?): TripLine? = when {
+    over -> null
+    focus != null -> if (focus.pinned) TripLine.Started else TripLine.Guessed
+    else -> startable?.let(TripLine::Startable)
 }
 
 fun figureToken(figure: Figure): String = figure.value + if (figure.unit == "H") "H" else ""
@@ -208,8 +219,6 @@ data class FocusHeader(
     val journey: Journey,
     val recoveryFrom: Int?,
     val status: FocusStatus,
-    val pinIcon: Boolean,
-    val pinWord: Boolean,
     val changeLabels: List<String>,
     val receipt: String,
     val instruction: String,
@@ -304,8 +313,6 @@ fun focusHeader(focus: FocusedJourney, now: Long, complete: Boolean = false, arr
         journey = composed,
         recoveryFrom = recoveryFrom,
         status = status,
-        pinIcon = focus.pinned,
-        pinWord = focus.pinned && !lost,
         changeLabels = states.indices.map { changeLabel(composed, it, recoveryFrom) },
         receipt = receipt,
         instruction = instruction,

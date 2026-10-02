@@ -142,6 +142,30 @@ class CommuteReliabilityControllerTest {
         assertTrue(model.state.value.focusComplete)
     }
 
+    /** The web flashed the ended trip as `Now AGO` with its estimate sign before the way back loaded. */
+    @Test fun theWayBackAfterAnEstimateEndingCarriesNoArrivalDecision() {
+        val now = System.currentTimeMillis()
+        val journey = Journey(listOf(Leg("T9", "train", "Hornsby", rhodes, central, now - 30 * minute, now - 4 * minute)))
+        val focus = FocusedJourney(trip.id, false, journey, BoardData(rhodes, central, listOf(journey), now - 4 * minute, source = "live"))
+        val model = model(UserData(trips = listOf(trip), modes = setOf("train"), useLocation = true, focus = focus), now)
+        waitFor("the model to load") { model.state.value.ready }
+        onMain {
+            model.attachActivity(Any(), {}, {}, {}, {}, { beforeStart -> beforeStart(); true }, {}, {})
+            model.activityResumed()
+            model.permission(granted = true, denied = false)
+        }
+        waitFor("the estimate ending") { model.state.value.arrival?.state == ArrivalState.Arrived }
+        assertEquals(ArrivalBasis.Estimate, model.state.value.arrival?.basis)
+
+        onMain { model.showReturn() }
+        val returning = model.state.value
+        assertNull(returning.focus)
+        assertNull("the ended trip's decision outlived it", returning.arrival)
+        assertFalse(returning.focusComplete)
+        assertTrue(returning.reverse)
+        assertNull("the ended trip's board stayed on Home", returning.homeBoard)
+    }
+
     @Test fun aGuessedTripStoppedOfflineIsDeclinedAndTheNextFixCannotGuessItAgain() {
         val running = morningDirect()
         val now = running.effectiveDeparture + (running.effectiveArrival - running.effectiveDeparture) / 2
