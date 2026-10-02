@@ -273,18 +273,26 @@ function scenarios() {
   ].map(([name, doc, now, opts]) => [name, doc, body, now, opts]);
 }
 
-// The saved-trip list below the header lost its repeated status on 2026-09-23.
-const headerOf = (html) => html.slice(0, html.indexOf('data-t="trip-list"'));
+// Everything above the heavy rule: the trip-control line below it was redrawn
+// by commute reliability's rulings 9-19.
+const headerOf = (html) => html.slice(0, html.indexOf('<div class="hm-rule">'));
+const withoutTopLine = (html) => html.replace(/<div class="hm-top">[\s\S]*?<section/, '<section');
 
 test('the home header is byte-identical to the base commit on every non-lost journey', async () => {
   const base = await baseModules();
   const differences = [];
+  const statusOnly = [];
   for (const [name, doc, body, now, opts] of scenarios()) {
     const before = headerOf(base.home.homeHtml(base.home.homeModel(doc, SELECTION, body, now, opts)));
     const after = headerOf(homeHtml(homeModel(doc, SELECTION, body, now, opts)));
-    if (before !== after) differences.push(name);
+    if (before === after) continue;
+    differences.push(name);
+    if (withoutTopLine(before) === withoutTopLine(after)) statusOnly.push(name);
   }
-  assert.deepEqual(differences, ['riding, arrival-only delay (documented exception)']);
+  assert.deepEqual(differences,
+    ['pre-departure pinned', 'riding pinned', 'riding, arrival-only delay (documented exception)']);
+  // A started trip's status line lost PINNED (rulings 14 and 20); nothing else moved.
+  assert.deepEqual(statusOnly, ['pre-departure pinned', 'riding pinned']);
 });
 
 test('journey detail steps and summary are unchanged on every non-lost journey', async () => {

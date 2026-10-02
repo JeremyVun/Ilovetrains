@@ -450,14 +450,6 @@ body { --sy-pad: 22px; --sy-fig: 72px; --sy-gap: 14px; }
   text-transform: uppercase; color: var(--ink-2);
 }
 .answer-line { line-height: 14px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: clip; }
-.pin-status { position: relative; padding: 0; text-transform: inherit; letter-spacing: inherit; line-height: 14px; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
-.answer-line:has(button) { display: flex; align-items: center; overflow: visible; }
-button.pin-status { height: 44px; margin: -15px 0; }
-.pin-icon { width: 12px; height: 12px; fill: currentColor; flex: none; }
-/* Without its word the icon has no separator to stand off, and the status line
-   is a flex row, so the space is its own. */
-.pin-alone { margin-left: .55em; }
-.pin-separator { margin: 0 .4em; color: var(--ink-3); }
 .answer-kind.status-late, .answer-kind.status-exception, .answer-kind.status-lost { color: var(--warn); }
 .answer-kind.status-uncertain { color: var(--ink-2); }
 .status-copy { white-space: nowrap; }
@@ -517,7 +509,8 @@ button.pin-status { height: 44px; margin: -15px 0; }
   font-size: var(--signf); font-weight: 300; line-height: 1.3; color: var(--ink-2);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.hm-hd .hm-sign.hm-act { color: var(--ink); font-weight: 400; }
+/* Our own sentence wraps rather than cutting; only an upstream headsign may ellipsise. */
+.hm-hd .hm-sign.hm-act { color: var(--ink); font-weight: 400; white-space: normal; }
 .hm-hd .hm-sign.note {
   font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
   line-height: 1.75; color: var(--warn);
@@ -525,17 +518,6 @@ button.pin-status { height: 44px; margin: -15px 0; }
 .hm-rec {
   display: block; grid-column: 1 / -1; grid-row: 4; margin-top: var(--hdgap);
   font-size: 15px; font-weight: 300; line-height: 1.4; color: var(--ink-2);
-}
-.hm-rec-strip {
-  display: flex; align-items: center; justify-content: space-between; gap: 14px;
-  height: 32px; min-width: 0;
-}
-.hm-rec-strip .q {
-  min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.hm-rec-strip button {
-  flex: none; min-height: 44px; white-space: nowrap; font-size: 12px; font-weight: 600;
-  letter-spacing: .14em; text-transform: uppercase; color: var(--ink);
 }
 .hm-offer { flex: none; padding: 0 22px; }
 .hm-offer .r { height: 1px; background: var(--rule-2); margin: 12px 0; }
@@ -561,8 +543,9 @@ button.pin-status { height: 44px; margin: -15px 0; }
 .hm-next-times { display: flex; align-items: center; gap: 7px; justify-self: end; white-space: nowrap; font-size: 15px; font-weight: 300; }
 .hm-next-times > span, .hm-next-go { color: var(--ink-3); }
 .hm-next-go { font-size: 17px; }
-/* The second offer grammar: one line below the heavy rule, question left,
-   action right, so the header above it stays read-only (ui.md, Core flow). */
+/* The trip-control line: the second offer grammar, one line below the heavy
+   rule, question left, actions right, so the header above it stays read-only
+   (ui.md, Core flow). */
 .hm-strip {
   flex: none; display: flex; align-items: center; justify-content: space-between;
   gap: 14px; padding: 0 22px; min-height: 48px; border-bottom: 1px solid var(--rule);
@@ -574,6 +557,21 @@ button.pin-status { height: 44px; margin: -15px 0; }
 .hm-strip button {
   flex: none; min-height: 48px; white-space: nowrap; font-size: 12px; font-weight: 600;
   letter-spacing: .14em; text-transform: uppercase; color: var(--ink);
+}
+/* One pixel off the question's gap lets it print whole in Roboto at 360px;
+   wider, the auto margin before STOP TRIP absorbs it. */
+.hm-strip.guessed .q { margin-right: -1px; }
+.hm-strip .hm-strip-stop { margin-left: auto; color: var(--ink-2); }
+/* The hairline keeps STOP TRIP CHANGE from reading as one phrase. */
+.hm-strip-div { flex: none; width: 1px; height: 14px; margin: 0 -3.5px; background: var(--rule-2); }
+.hm-strip.started { justify-content: flex-end; }
+.hm-strip-act { display: flex; align-items: center; }
+.hm-strip-act > span { display: block; }
+/* Centred on the caps rather than the line box, which in Roboto sits 0.75px
+   below them. */
+.hm-strip-g {
+  display: inline-block; vertical-align: baseline; position: relative; top: calc(5.5px - .5cap);
+  width: 11px; height: 11px; margin-right: 9px; fill: currentColor; color: var(--ink-2);
 }
 .hm-new { font-size: 12px; font-weight: 400; font-style: italic; letter-spacing: 0; text-transform: none; }
 .hm-ix {

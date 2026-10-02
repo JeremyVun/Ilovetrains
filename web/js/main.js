@@ -13,7 +13,7 @@ import {
   focusOf, visibleFocus, setFocus, clearFocus, isFocused, focusExpired, matchJourney,
   applyFocusSnapshot, applyArrivalResult, composedJourney, recoveryModel, recoveryOf,
   inferFromRecords, inferOnBoard, onBoardRequests, writeLastOpen, tickNeedsFix,
-  declineFocus, runningJourney, startable, journeyCancelled, pinResult, rideAdded, rideRecorded,
+  declineFocus, runningJourney, journeyCancelled, pinResult, rideAdded, rideRecorded,
   TRAVEL_LATE_MS
 } from './focus.js';
 import * as Board from './board.js';
@@ -1143,10 +1143,8 @@ function renderHome() {
     loadedAt: state.loadedAt,
     arrivalDecision: state.arrivalDecision,
     leave: leaveDistance(),
-    recoveryResponse: focusRecoveryResponse(),
-    stripVariant: activeVariant('strip-placement')
+    recoveryResponse: focusRecoveryResponse()
   });
-  home.startable = !home.focus && startable(home.journey, now());
   lastHome = home;
   if (!home.focus && home.journey) state.shownDepartures.set(journeyKey(home.journey), departureMs(home.journey));
   if (kind) trackShown(kind, home.selected, home.journey);
@@ -1318,7 +1316,8 @@ function wireTimeline() {
 }
 
 function homeAction(action, element) {
-  if (action === 'unpin' && lastHome?.pinned) return stopTrip();
+  if (action === 'stop-trip' && lastHome?.focus) return stopTrip();
+  if (action === 'start-trip' && lastHome?.startable) return startTrip(lastHome.selected, lastHome.journey);
   if (action === 'settings') return ctx.go('#/settings');
   if (action === 'recommendation-detail') {
     const journey = lastHome?.directions?.journey;
@@ -1363,6 +1362,8 @@ function homeAction(action, element) {
     settleArrival();
     state.doc = forgetLastOpen(clearFocus(state.doc));
     stopArrivalMonitoring();
+    // Until the next tick re-settles, the ended trip's decision would paint the return journey as arrived.
+    state.arrivalDecision = null;
     state.selection = {
       tripId: state.selection.tripId,
       direction: state.selection.direction === 'reverse' ? 'forward' : 'reverse'

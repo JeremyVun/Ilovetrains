@@ -89,7 +89,7 @@ test('ferry detail keeps a full origin and compact transfer chip with full direc
 
   assert.match(html, /data-ferry-location="Wharf 3, Side A" data-role="origin" data-stop="Circular Quay"[^>]*aria-label="Wharf 3, Side A · F1"[^>]*>Wharf 3, Side A<\/b>/);
   assert.match(html, /<span class="lbl p">Wharf 1<\/span>/);
-  assert.match(html, />Pin this ferry<\/button>/);
+  assert.match(html, />Start trip<\/button>/, 'the same words for every mode');
 
   const mixed = mixedJourneys()[1];
   const mixedHtml = detailHtml({
@@ -126,18 +126,20 @@ test('a cancelled journey warns in the summary, strikes its steps and offers no 
   assert.match(html, /Arrive · Journey cancelled/);
   assert.match(html, /<div class="detail-tail cx">/);
   assert.match(html, /<span class="lbl p warn">Journey cancelled<\/span>/);
-  assert.doesNotMatch(html, /data-footer-rail|Pin this train/);
+  assert.doesNotMatch(html, /data-footer-rail|Start trip/);
 });
 
-/* Inferred travel has no pin to release; explicit pins do. */
+/* A guessed trip is stopped from Home and the lock screen; a started one also here. */
 test('the journey already being followed has no action rail either', () => {
   const journey = transferJourneys()[0];
 
-  assert.match(render(journey), /<div class="hm-bar detail-rail" data-footer-rail><button data-act="focus">Pin this train<\/button><\/div>/);
-  assert.doesNotMatch(render(journey, { focused: true }), /data-footer-rail|Pin this train/);
+  assert.match(render(journey), /<div class="hm-bar detail-rail" data-footer-rail><button data-act="focus">Start trip<\/button><\/div>/);
+  assert.doesNotMatch(render(journey, { focused: true }), /data-footer-rail|Start trip|Stop trip/);
   assert.doesNotMatch(render(journey, { focused: true }), /Unfocus/);
-  assert.match(render(journey, { focused: true, pinned: true }), /data-act="unpin">Unpin this train/);
-  assert.match(render({ ...journey, cancelled: true }, { focused: true, pinned: true }), /data-act="unpin">Unpin this train/);
+  assert.match(render(journey, { focused: true, pinned: true }),
+    /<div class="hm-bar detail-rail" data-footer-rail><button data-act="unpin">Stop trip<\/button><\/div>/);
+  assert.match(render({ ...journey, cancelled: true }, { focused: true, pinned: true }), /data-act="unpin">Stop trip/);
+  assert.doesNotMatch(render(journey, { focused: true, pinned: true }), /Pin this|Unpin this/);
 });
 
 test('the tail owns the destination, its time and its platform', () => {
@@ -157,7 +159,7 @@ test('a step behind the rider is quiet, not struck', () => {
   assert.doesNotMatch(html, /dstep[^"]*cancelled/);
 });
 
-/* client-storage.md, Focused journey: `Pin this train` is the only writer of
+/* client-storage.md, Focused journey: `Start trip` is the only writer of
    focus on this screen, and detail never clears it. */
 test('the detail view writes focus once and never clears it', () => {
   const main = readFileSync(fileURLToPath(new URL('../js/main.js', import.meta.url)), 'utf8');
@@ -194,5 +196,5 @@ test('detail renders the composed journey with the receipt as its summary and no
   assert.equal(model.steps[1].station, 'Town Hall · T4 10:08');
   assert.deepEqual(model.steps.map((step) => step.time), ['09:33', '8 min', '10:18']);
   assert.match(html, /Town Hall · T4 10:08/);
-  assert.doesNotMatch(html, /Pin this train/, 'the recovery control stays in the header');
+  assert.doesNotMatch(html, /Start trip/, 'the recovery control stays in the header');
 });

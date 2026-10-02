@@ -32,10 +32,10 @@ enforced by the analytics module; extending them requires a contract change.
 
 `d` contains the usage band `u`, the platform `pl` (`web`, `android` or
 `ios`), the composite `pl.u` (`<pl>.<u>`, for example `ios.6-10`), on the web
-the active experiment dimension `x.strip-placement` (`a3` or `a2`), and the
-event's own keys: setup source `f`, open milestone `m`, pin result `r` with
+a running experiment's dimension `x.<experiment>` (none runs at present), and
+the event's own keys: setup source `f`, open milestone `m`, pin result `r` with
 its composite `pl.r`, or ride basis `b` with its composite `pl.b`. Native
-events never carry `x.*`, which keeps them out of both experiment arms.
+events never carry `x.*`, which keeps them out of every experiment arm.
 Callers cannot override the derived usage band, platform or variant.
 
 ## Device state and assignment
@@ -63,19 +63,21 @@ rule. These are open counts, not calendar weeks or observed rides.
 `250`. It precedes the first `shown_*` event. Each milestone occurs once per
 uninterrupted local record; clearing storage starts a new record.
 
-`EXPERIMENTS` in `web/js/analytics.js` currently contains:
-
-```js
-'strip-placement': { variants: ['a3', 'a2'], offset: 0 }
-```
+`EXPERIMENTS` in `web/js/analytics.js` is empty: no experiment runs. An
+experiment is a row `'<id>': { variants: ['<control>', …], offset: n }`.
 
 Assignment is `variants[(bucket + offset) % variants.length]`. Without an
 enabled client and bucket, the first variant is control. All events carry
-the assigned variant while the experiment runs. A3 places the inferred
-correction below the heavy rule; A2 places it in the receipt slot. Removing
-the experiment row and hard-coding the winner ends the experiment; retain
-the bucket for later experiments. This is a shell deploy with a worker
-version bump, never remote configuration or server-side assignment.
+the assigned variant while the experiment runs. Removing the experiment row
+and hard-coding the winner ends the experiment; retain the bucket for later
+experiments. This is a shell deploy with a worker version bump, never remote
+configuration or server-side assignment. Queued entries that still carry a
+closed experiment's `x.*` dimension are obsolete and are dropped, not sent.
+
+`strip-placement` (A3, the inferred correction below the heavy rule, against
+A2, in the receipt slot) closed on 2026-10-02: the owner read it on the data
+so far and hard-coded A3, which became the trip-control line (ui.md, Smart
+home; owner ruling 15).
 
 ## Event vocabulary and ordering
 
@@ -89,7 +91,7 @@ Setup is a separate answer kind with setup-specific events.
 | `shown_<kind>` | Home displays its own answer; suppress repeats of the immediately previous kind, trip and direction | — |
 | `hit_<kind>` | First home trip-row tap matches the displayed answer; also focusing a journey matching home's last shown trip and direction | — |
 | `miss_<kind>` | First home trip-row tap chooses a different trip or direction | — |
-| `change_inferred` | Inferred strip's CHANGE action, before navigation | — |
+| `change_inferred` | The guessed trip-control line's CHANGE action, before navigation | — |
 | `entered_inferred` | Travel inference writes a focus, platform-sighted or on board, once per entry | — |
 | `declined_inferred` | Stop trip ends a guessed trip (`by: "inferred"`), from Home or the lock screen, once per stop | — |
 | `back_focus`, `back_inferred` | Accepting the corresponding way-back offer | — |
@@ -228,9 +230,9 @@ usage and variant dimensions. For header kind `k`:
 - Milestone reach: `opened[m=N] / opened[m=1]` over the same accumulated
   observation period. This is an approximate device-cohort read, subject to
   resets, delivery loss and devices which started before the period.
-- Strip correction: `change_inferred[x.strip-placement=v] /
-  shown_inferred[x.strip-placement=v]`, comparing `a2` and `a3`. Other
-  counters split by variant show effects on the rest of the flow.
+- Guess correction: `change_inferred / shown_inferred`, the share of guessed
+  headers corrected to another destination. While an experiment runs, the
+  same ratios split by `x.<experiment>` compare its arms.
 
 Per platform `P`, with the composites composed at emit time:
 

@@ -677,8 +677,9 @@ restores the seed, and reruns the route before measuring. It fails if the
 ledger differs, if `trains.analytics.v1` exists, or if fetch/sendBeacon touches
 the analytics origin. This proves local drives record the intended semantics
 while transport stays disabled. On localhost only,
-`__trains.forceVariant('strip-placement', 'a2')` changes rendering for a state;
-it does not enable transport.
+`__trains.forceVariant('<experiment>', '<variant>')` forces a running
+experiment's arm for a state (none runs at present); it does not enable
+transport.
 
 Invariants are checked on every state and reported at `console.error` under the
 shot; a state that means something particular declares it in its own `expect`
@@ -708,8 +709,9 @@ What is checked, with the comp probes the numbers come from:
 - the tight window is painted on the dwell segment alone, never on a ride
   segment and never on a cancelled row;
 - journey detail: steps 72px (change steps 82px), 18px between the summary and
-  the heavy rule, a 66px action rail flush with the frame, and no rail at all
-  when the journey is cancelled or already pinned;
+  the heavy rule, a 66px action rail flush with the frame (`Start trip`, or
+  `Stop trip` on a started journey), and no rail at all on a guessed journey
+  or a cancelled one the rider did not start;
 - home: the endpoint names share a top edge and the clocks share a *baseline*
   (measured with a zero-height inline-block probe, because the two clocks are
   different sizes and a shared box top is not the shared baseline ui.md binds),
@@ -718,8 +720,16 @@ What is checked, with the comp probes the numbers come from:
   that line, one status string appears in both the top line and the focused
   saved-trip row, and a `LIVE` dot stays the live colour however late the
   journey is;
-- home station names, the inferred strip and the complete `Just added` sub line
-  never ellipsise; ordinary saved-row metadata may use its designed ellipsis;
+- home station names, the trip-control line's actions, the app's own
+  instruction and the complete `Just added` sub line never ellipsise; ordinary
+  saved-row metadata may use its designed ellipsis;
+- the trip-control line (`[data-tripline]`, ui.md, Smart home) is 49px,
+  directly under the heavy rule and above `MY TRIPS`, its last action ends at
+  the margin, its question and first action share one line, every action is
+  at least 44px high, its glyphs are `aria-hidden`, and its inks meet the
+  contract's ratios; a state names the line it expects with `tripline`
+  (`guessed`, `started`, `startable` or `null`), `strip` for the guessed line,
+  and `started` for the Stop trip of a trip the rider started;
 - in the light scheme, T1 and BMT fill `#F99D1C` with paper numerals while the
   same codes as bare text stay `#A46204`;
 - tap targets 44px, time-axis segments on scale, no part of a scrolling region
@@ -753,13 +763,25 @@ then 04:53 → 05:56. They keep the short first leg that crowds platforms 1 and
 and marker/stem visibility by journey phase. `mascot-next-focus-source-handoff`
 also proves that a following service from a fresh focused source survives the
 first detail paint and becomes stale only after its refresh fails.
-`mascot-home-unpin` proves that releasing a future service restores the earliest
-answer without shifting the header; `mascot-active-unpin-location` uses the real
+`mascot-home-unpin` proves that Stop trip on a future service restores the
+earliest answer without shifting the header; `mascot-active-unpin-location` uses the real
 clock and a granted moving fix to prove stale `lastOpen` evidence cannot infer
 the released ride again, and that a fix at train speed saves no
 passing-station pair. `detail-unpin-flow` exercises the matching detail
-action, while `detail-inferred` proves an inferred journey offers neither a pin
-nor an unpin action.
+`Stop trip`, while `detail-inferred` proves a guessed journey offers neither
+`Start trip` nor `Stop trip`. `home-started` taps `START TRIP` on the
+startable line and checks that `STOP TRIP` takes its place under the same
+thumb; `home-startable`, `home-leaves-later`, `home-started-after`,
+`home-guessed-stress` and `home-startable-ferry` are the other round 3b
+states, and `home-checking-arrival` and `home-over` the guarded and estimate
+endings.
+
+**Trap: the frozen network holds an overdue trip in `Checking arrival`.** A
+focus refresh in flight holds settlement as permission-pending, and the
+real-clock boot began the 45 s evidence wait a month ahead of the pinned
+clock, so a seeded trip past its estimate never settles on its own.
+`home-over` and `reverse-real-platforms` release both
+(`SETTLE_ESTIMATE`) and then tick, as an answered refresh would.
 Every `detail-*` state reaches the view by CLICKING a board row, so each one is
 also proof that the whole row is the tap target. Output defaults to the system
 temporary directory; use `--out` only for a deliberate comparison set:
@@ -892,8 +914,16 @@ no flags: the state carries its own size and the dark scheme is unsuffixed.
 | `home-412x732-change.png` | `home-change` | `--size 412x732` |
 | `home-390x844-inferred.png` | `home-inferred` | default |
 | `home-390x844-inferred-light.png` | `home-inferred` | `--media prefers-color-scheme:light` |
-| `home-390x844-inferred-a2.png` | `home-inferred-a2` | default |
-| `home-390x844-inferred-a2-light.png` | `home-inferred-a2` | `--media prefers-color-scheme:light` |
+| `home-390x844-guessed-stress.png` | `home-guessed-stress` | default |
+| `home-390x844-started.png` | `home-started` | default |
+| `home-390x844-started-light.png` | `home-started` | `--media prefers-color-scheme:light` |
+| `home-390x844-started-after.png` | `home-started-after` | default |
+| `home-390x844-started-after-light.png` | `home-started-after` | `--media prefers-color-scheme:light` |
+| `home-390x844-startable.png` | `home-startable` | default |
+| `home-390x844-startable-light.png` | `home-startable` | `--media prefers-color-scheme:light` |
+| `home-375x667-startable.png` | `home-startable` | `--size 375x667` |
+| `home-390x844-startable-ferry.png` | `home-startable-ferry` | default |
+| `home-390x844-leaves-later.png` | `home-leaves-later` | default |
 | `home-390x844-just-added.png` | `home-here-pair` | default |
 | `setup-390x844-origin.png` | `setup-origin` | default |
 
@@ -1047,7 +1077,7 @@ curl -sS -H "X-Analytics-Key: ${ANALYTICS_READ_KEY}" \
 
 The response's `window.counters` should contain the open's `shown_*` counter
 and any milestone due for that profile. Compute new-user hit rate, returning
-answer acceptance, milestone reach and A2/A3 strip correction with the exact
+answer acceptance, milestone reach, guess correction and wrong entries with the exact
 ratios and caveats in [the analytics contract](../docs/contracts/analytics.md#reading-the-counters).
 Never put the read key in a URL.
 

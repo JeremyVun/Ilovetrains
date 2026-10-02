@@ -80,9 +80,10 @@ function tailHtml(arrival) {
 </div>`;
 }
 
-/* A manually pinned service always offers a way to release it. */
+/* A trip the rider started always offers a way to stop it; a guessed one is
+   stopped from Home. */
 function railHtml(model) {
-  if (model.pinned) return `<div class="hm-bar detail-rail" data-footer-rail><button data-act="unpin">Unpin this ${esc(model.vehicle)}</button></div>`;
+  if (model.pinned) return '<div class="hm-bar detail-rail" data-footer-rail><button data-act="unpin">Stop trip</button></div>';
   if (model.cancelled || model.focused) return '';
-  return `<div class="hm-bar detail-rail" data-footer-rail><button data-act="focus">Pin this ${esc(model.vehicle)}</button></div>`;
+  return '<div class="hm-bar detail-rail" data-footer-rail><button data-act="focus">Start trip</button></div>';
 }

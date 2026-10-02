@@ -301,8 +301,7 @@ user's and an event must never rewrite `trains.v1`:
 
 ```json
 {"queue": [{"t": "shown_predicted",
-            "d": {"u": "6-10", "pl": "web", "pl.u": "web.6-10",
-                  "x.strip-placement": "a3"}, "n": 5}]}
+            "d": {"u": "6-10", "pl": "web", "pl.u": "web.6-10"}, "n": 5}]}
 ```
 
 - Written only while analytics is enabled; on any other origin nothing is
@@ -577,8 +576,9 @@ these rules and their presentation.
 
 Travel mode IS the focused journey, whichever way it was entered. Every rule
 above applies to both kinds: the header follows the service, with directions
-once it departs. Explicit choice is labelled `Pinned`; inference is not.
-The status describes the service, browsing another trip never replaces it, refresh
+once it departs. Neither kind is labelled: a started trip and a guessed one
+both read the service's own status (ui.md, Smart home), and only the
+trip-control line differs. The status describes the service, browsing another trip never replaces it, refresh
 re-matches the snapshot, expiry follows the shared final-arrival decision, and
 the way-back offer follows a completed journey.
 

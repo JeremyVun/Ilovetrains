@@ -3,7 +3,7 @@
 
 import { esc, figureHtml, shortName, fitStationNames } from './dom.js';
 import {
-  visibleFocus, directionsModel, focusStatus, journeyCancelled, composedJourney, recoveryModel
+  visibleFocus, directionsModel, focusStatus, journeyCancelled, composedJourney, recoveryModel, startable
 } from './focus.js';
 import { arrivalMs, departureMs, departureKey, journeyKey, legsOf, modeWords } from './journey.js';
 import { colourKey, lineFill } from './lines.js';
@@ -232,16 +232,20 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     stale: displayStale,
     over,
     lost: recovering && recovery.lost,
-    arrivalState: opts.arrivalDecision?.state,
-    moving: opts.arrivalDecision?.moving
+    arrivalState: opts.arrivalDecision?.state
   }) : null;
   const strip = activeFocus && activeFocus.by === 'inferred' ? {
     origin: selectedEnds.from,
     destination: selectedEnds.to,
     departureMs: departureMs(activeFocus.journey),
-    journeyKey: departureKey(activeFocus.journey),
-    slot: opts.stripVariant === 'a2' ? 'receipt' : 'below'
+    journeyKey: departureKey(activeFocus.journey)
   } : null;
+  const canStart = !activeFocus && startable(journey, nowMs);
+  // The trip-over offer owns that moment, so the line steps aside for it.
+  const tripLine = over ? null
+    : strip ? { kind: 'guessed' }
+      : activeFocus ? { kind: 'started' }
+        : canStart ? { kind: 'startable', depTime: directions.depTime } : null;
   const useFocusSource = Boolean(activeFocus && !candidateReplacement
     && (opts.focusBody || !sameFocusedPair));
   const followingSource = useFocusSource ? opts.focusSource : opts.candidateSource;
@@ -263,9 +267,11 @@ export function homeModel(doc, selection, body, nowMs, opts = {}) {
     ranked,
     home,
     strip,
+    tripLine,
+    startable: canStart,
     focus: activeFocus,
     status,
-    pinned: Boolean(activeFocus && activeFocus.by !== 'inferred' && !replacement),
+    arrivalConfirmed: over && opts.arrivalDecision?.basis !== 'estimate',
     following,
     changes: (directions.changes || []).map((change) => ({
       ...change, tight: change.tight && !journeyCancelled(journey)
@@ -325,14 +331,12 @@ export function homeHtml(model) {
       <span class="hm-sign${d.warn ? ' note' : d.act ? ' hm-act' : ''}">${d.allServicesOff
         ? 'Turn on a service in <button class="hm-empty-settings" data-act="settings" data-action="settings">Settings</button>'
         : `${esc(d.instruction || '—')}${d.settingsAction ? '<button class="hm-empty-settings" data-act="settings" data-action="settings">Change settings</button>' : ''}`}</span>
-      ${model.strip && model.strip.slot === 'receipt'
-        ? stripHtml('receipt')
-        : d.receipt ? `<span class="hm-rec">${esc(d.receipt)}</span>` : ''}
+      ${d.receipt ? `<span class="hm-rec">${esc(d.receipt)}</span>` : ''}
     </section>
     ${nextServiceHtml(model.following)}
     ${offerHtml(model)}
     <div class="hm-rule"></div>
-    ${model.strip && model.strip.slot === 'below' ? stripHtml('below') : ''}
+    ${tripLineHtml(model.tripLine)}
     <div class="hm-ix tl" data-t="trip-list" data-scroller>
       <div class="hm-anchor"><div class="l">My trips</div></div>
       ${model.ranked.map((entry) => tripRowHtml(entry, model)).join('')}
@@ -354,21 +358,6 @@ function nextServiceHtml(next) {
     <span class="hm-next-times"><time>${esc(next.depTime)}</time><span aria-hidden="true">→</span><time>${esc(next.arrTime)}</time></span>
     <span class="hm-next-go" aria-hidden="true">›</span>
   </button>`;
-}
-
-function pinHtml(word = true) {
-  return `<button data-act="unpin" aria-label="Unpin this service" title="Unpin this service" class="pin-status${word ? '' : ' pin-alone'}" data-pinned><svg class="pin-icon" aria-hidden="true" viewBox="0 0 16 16"><path d="M5 1h6v1l-1 1v3l3 3v1H9v5H7v-5H3V9l3-3V3L5 2z"/></svg>${word ? 'Pinned' : ''}</button>`;
-}
-
-function selectedStatusHtml(model) {
-  const status = model.status;
-  const onlyPin = model.pinned && model.directions.phase === 'pre' && status.kind === 'ordinary';
-  if (onlyPin) return pinHtml();
-  // Beside a lost connection an explicit pin is the icon alone (ui.md, smart home).
-  if (status.kind === 'lost') {
-    return statusHtml(status) + (model.pinned ? pinHtml(false) : '');
-  }
-  return statusHtml(status) + (model.pinned ? `<span class="pin-separator"> · </span>${pinHtml()}` : '');
 }
 
 export function emptyServicesHtml(modes) {
@@ -400,7 +389,7 @@ function statusHtml(status) {
 function topHtml(model) {
   const status = model.status;
   if (status) {
-    return `<span class="answer-kind${statusClass(status)}" data-focus-status data-late="${status.late}"><span class="answer-line">${selectedStatusHtml(model)}</span></span>`;
+    return `<span class="answer-kind${statusClass(status)}" data-focus-status data-late="${status.late}"><span class="answer-line">${statusHtml(status)}</span></span>`;
   }
   const top = model.top;
   const name = top.name
@@ -442,19 +431,31 @@ function tripRowHtml(entry, model) {
 function offerHtml(model) {
   if (model.over) {
     return `<div class="hm-offer"><div class="r"></div><span class="k">Trip over</span>
-      <p>You’ve arrived. The return trip is ready when you are.</p>
+      <p>${model.arrivalConfirmed ? 'You’ve arrived. ' : ''}The return trip is ready when you are.</p>
       <div class="hm-acts"><button data-act="way-back">Show the way back</button><button class="q" data-act="dismiss-offer">Not now</button></div></div>`;
   }
   return '';
 }
 
-/* The inferred header's only control, and its receipt: the app guessed this
-   trip, so the correction is one tap (design.md, ruling 7). */
-function stripHtml(slot) {
-  const tag = slot === 'receipt' ? 'span' : 'div';
-  const klass = slot === 'receipt' ? 'hm-rec hm-rec-strip' : 'hm-strip';
-  return `<${tag} class="${klass}" data-strip><span class="q">Going somewhere else?</span>`
-    + `<button data-act="change-destination" data-tap>Change</button></${tag}>`;
+const STOP_GLYPH = '<svg class="hm-strip-g" aria-hidden="true" viewBox="0 0 12 12"><rect x="1.5" y="1.5" width="9" height="9" rx="1.2"/></svg>';
+const START_GLYPH = '<svg class="hm-strip-g" aria-hidden="true" viewBox="0 0 12 12"><path d="M2.5 1.2 11 6 2.5 10.8z"/></svg>';
+
+/* The trip-control line under the heavy rule (ui.md, Smart home). Every action
+   stands in the right-hand column, so Stop trip appears under the thumb that
+   pressed Start trip. */
+function tripLineHtml(line) {
+  if (!line) return '';
+  if (line.kind === 'guessed') {
+    return '<div class="hm-strip guessed" data-tripline="guessed" data-strip><span class="q">Going somewhere else?</span>'
+      + '<button class="hm-strip-stop" data-act="stop-trip" data-tap>Stop trip</button><i class="hm-strip-div" aria-hidden="true"></i>'
+      + '<button data-act="change-destination" data-tap>Change</button></div>';
+  }
+  if (line.kind === 'started') {
+    return '<div class="hm-strip started" data-tripline="started">'
+      + `<button class="hm-strip-act" data-act="stop-trip" data-tap><span>${STOP_GLYPH}Stop trip</span></button></div>`;
+  }
+  return `<div class="hm-strip startable" data-tripline="startable"><span class="q">Taking the ${esc(line.depTime)}?</span>`
+    + `<button class="hm-strip-act" data-act="start-trip" data-tap><span>${START_GLYPH}Start trip</span></button></div>`;
 }
 
 function locationAskHtml() {
