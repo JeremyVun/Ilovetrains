@@ -305,7 +305,11 @@ stopping a trip, the return offer, deletion and expiry clear the record.
 Inference evaluates two records, and either may enter: the snapshot taken when
 this Home open began, before any write of this open, and the stored record.
 The web already infers from its `previousOpen` snapshot; that stays exactly
-as it is. Android and iOS gain the same snapshot, which is what fixes the
+as it is. Platform-sighted entry's "seen at the platform" condition is
+`D − at ≤ 15 min` with no lower bound on every client, as `client-storage.md`
+states and the web does. Both natives carried an extra `0 ≤ D − at`. Phase 2b
+found it, and the lead removed it on 2026-10-02 for parity: it only adds
+entries. Android and iOS gain the same snapshot, which is what fixes the
 open race on its own. The hold rule protects the stored record for an app that
 stays open. Keeping both is deliberate (ruling 13): today's working auto-start
 path is untouched, and the new rule can only add entries. The 60 s margin
