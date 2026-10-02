@@ -307,7 +307,7 @@ class ControllerParityInstrumentedTest {
         model.setUseLocation(false)
         model.arrivalLocation(Fix(primaryTrip.to.lat, primaryTrip.to.lon, System.currentTimeMillis(), 0.0, 10.0))
         assertTrue(model.state.value.focus?.arrivalGuard?.armed == true)
-        model.unpinJourney()
+        model.stopTrip()
         model.arrivalLocation(Fix(primaryTrip.to.lat, primaryTrip.to.lon, System.currentTimeMillis(), 0.0, 10.0))
         assertNull(model.state.value.focus)
         assertFalse(model.state.value.focusComplete)
@@ -398,7 +398,7 @@ class ControllerParityInstrumentedTest {
         assertEquals(Screen.Detail, model.state.value.screen)
         assertEquals(recommendationSource.generatedAt, model.state.value.board?.generatedAt)
         assertEquals(0, model.state.value.board?.fetchConstraint?.maxTransfers)
-        model.pinJourney(direct)
+        model.startTrip(direct)
         assertTrue(model.state.value.focus?.pinned == true)
         assertEquals(recommendationSource.generatedAt, model.state.value.focus?.board?.generatedAt)
 

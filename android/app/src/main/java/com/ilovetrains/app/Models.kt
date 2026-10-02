@@ -110,13 +110,17 @@ data class AppState(
     val selectedTrip get() = trips.find { it.id == selectedTripId }
     val shownBoard get() = if (screen == Screen.Home) homeBoard ?: board else board
     val awaitingAnswer get() = boardAnswerPending || focusAnswerPending && focus != null
+    /** What Home's Start trip would start: the header's train, while no trip mode runs and it leaves within 15 minutes. */
+    val startableJourney: Journey? get() = if (screen != Screen.Home || focus != null) null
+        else homeAnswer(homeBoard ?: board, null, now, enabledModes, transferLimit?.maxTransfers)?.journey?.takeIf { startable(it, now) }
 }
 interface UiActions {
     fun back()
     fun openTrip(id: String, reverse: Boolean = false)
     fun openJourney(journey: Journey)
-    fun pinJourney(journey: Journey)
-    fun unpinJourney()
+    fun boardRowTapped(journey: Journey)
+    fun startTrip(journey: Journey)
+    fun stopTrip()
     fun showReturn()
     fun newTrip()
     fun chooseSetupFrom(station: Station)

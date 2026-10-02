@@ -70,7 +70,7 @@ fun BoardScreen(state: AppState, actions: UiActions) {
             val viewport = maxHeight
             LazyColumn(Modifier.fillMaxSize().nestedScroll(pullAtTop).testTag("board-list"), state = listState) {
                 items(past, key = { it.key }) { journey ->
-                    BoardRow(journey, board, state.now, onClick = { actions.openJourney(journey) })
+                    BoardRow(journey, board, state.now, onClick = { actions.boardRowTapped(journey) })
                 }
                 // One item at least a screen tall, so NOW can rest at the top of a short board while rows arrive above.
                 item(key = "now") {
@@ -79,7 +79,7 @@ fun BoardScreen(state: AppState, actions: UiActions) {
                             Label("Now · ${clockTime(state.now)}", Modifier.padding(top = 9.dp), color = c.ink, size = 11)
                         }
                         future.forEach { journey ->
-                            key(journey.key) { BoardRow(journey, board, state.now, onClick = { actions.openJourney(journey) }) }
+                            key(journey.key) { BoardRow(journey, board, state.now, onClick = { actions.boardRowTapped(journey) }) }
                         }
                         if (visibleJourneys.isEmpty()) BoardEmpty(board, actions)
                         else BoardEnd(visibleJourneys, state.now)

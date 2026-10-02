@@ -15,6 +15,9 @@ import java.time.Instant
 import java.util.UUID
 import kotlin.math.roundToInt
 
+// Owner ruling 3: a quick app switch keeps the screen, a longer absence starts afresh.
+internal const val NewOpenAfterMillis = 10 * 60_000L
+
 class TrainViewModel private constructor(
     application: Application,
     private val undoWindowMillis: Long = UndoWindowMillis,
@@ -84,6 +87,8 @@ class TrainViewModel private constructor(
     private var trackerRefreshJob: Job? = null
     private var activityCallbacksOwner: Any? = null
     private var pendingTrackerOpen: TravelTrackerRevision? = null
+    private var pendingTrackerStop: TravelTrackerRevision? = null
+    private var backgroundedAt: Long? = null
     private var pendingWidgetOpen: Boolean? = null
     private var activityForeground = false
     private var arrivalWindow: ArrivalWindow? = null
@@ -131,6 +136,7 @@ class TrainViewModel private constructor(
             syncPersonal(); choosePrediction()
             mutable.value = mutable.value.copy(ready = true, screen = if (data.trips.isEmpty()) Screen.Setup else Screen.Home, stations = stations)
             syncTracker()
+            pendingTrackerStop?.let { revision -> pendingTrackerStop = null; stopTrackedTrip(revision) }
             pendingTrackerOpen?.let { revision -> pendingTrackerOpen = null; openTrackedJourney(revision) }
             pendingWidgetOpen?.let { setup -> pendingWidgetOpen = null; openFromWidget(setup) }
             if (activityForeground) startForegroundWork()
@@ -255,6 +261,7 @@ class TrainViewModel private constructor(
                 trackerNow() >= focus.composed.effectiveArrival) {
                 arrivalResumeWaitUntil = trackerNow() + ArrivalConstants.EvidenceWait
             }
+            reopenAfterAbsence()
         }
         trackerRefreshJob?.cancel()
         trackerPublicationGeneration++
@@ -349,6 +356,7 @@ class TrainViewModel private constructor(
         if (!tracker.accepts(revision)) return
         val focus = visibleFocus()?.takeIf { it.trackerIdentity == revision.identity } ?: return
         if (ends(focus.tripId, focus.reverse)?.let { it.first.id == focus.board.from.id && it.second.id == focus.board.to.id } != true) return
+        backgroundedAt = null
         explicit = true
         historyRecorded = false
         pastPages.reset()
@@ -369,17 +377,45 @@ class TrainViewModel private constructor(
     /** A widget tap lands on Home whatever screen the app was left on, or on setup when the widget had no trip. */
     fun openFromWidget(setup: Boolean) {
         if (!mutable.value.ready) { pendingWidgetOpen = setup; return }
+        reopenAfterAbsence()
         val screen = mutable.value.screen
         if (setup || data.trips.isEmpty()) { if (screen != Screen.Setup) newTrip(); return }
         if (screen == Screen.Home) return
+        leaveForHome(); homeOpened(); choosePrediction(); syncPersonal(); requestHomeFix(); refresh()
+    }
+
+    private fun leaveForHome() {
+        val screen = mutable.value.screen
         if (screen == Screen.Setup) { cancelSetupLocation(); redirect = null; redirectTargetId = null }
         historyJob?.cancel()
         mutable.value = mutable.value.copy(screen = Screen.Home, selectingHome = false, detail = null,
             feedbackSucceeded = if (screen == Screen.Settings) false else mutable.value.feedbackSucceeded)
-        historyRecorded = false; homeOpened(); choosePrediction(); syncPersonal(); requestHomeFix(); refresh()
+        historyRecorded = false
+    }
+
+    /** Rule 7: a return after ten minutes away is a new open, unless a tracker or widget tap already said where to land. */
+    private fun reopenAfterAbsence() {
+        val away = backgroundedAt?.let { trackerNow() - it } ?: return
+        backgroundedAt = null
+        if (away < NewOpenAfterMillis) return
+        leaveForHome()
+        explicit = false
+        redirect = null; redirectTargetId = null
+        settingsBack = Screen.Home
+        pastPages.reset()
+        mutable.value = mutable.value.copy(setupFrom = null, setupTo = null)
+        if (data.trips.isEmpty()) newTrip()
     }
 
     internal fun dismissTracker(revision: TravelTrackerRevision): Boolean = tracker.dismiss(revision)
+
+    /** The tracker's Stop trip action, honoured only for the revision it was posted with. */
+    internal fun stopTrackedTrip(revision: TravelTrackerRevision): Boolean {
+        if (!mutable.value.ready) { pendingTrackerStop = revision; return false }
+        if (!tracker.accepts(revision) || data.focus?.trackerIdentity != revision.identity) return false
+        stopTrip()
+        return true
+    }
 
     internal fun debugSetTrackerFocus(focus: FocusedJourney) {
         check(BuildConfig.DEBUG)
@@ -474,7 +510,10 @@ class TrainViewModel private constructor(
         return true
     }
     /** The activity left the screen for real, not for a configuration change: the next resume is a new open. */
-    fun backgrounded() { metrics.backgrounded() }
+    fun backgrounded() {
+        metrics.backgrounded()
+        backgroundedAt = trackerNow()
+    }
     private fun observeHome(shown: AppState) {
         val previous = observedScreen
         observedScreen = shown.screen
@@ -1049,11 +1088,6 @@ class TrainViewModel private constructor(
         metrics.enteredInferred()
     }
 
-    /** Stopping a guessed trip declines it, so the same guess cannot come straight back. */
-    internal fun declineInference(focus: FocusedJourney) {
-        data = data.declining(focus, trackerNow()); persist()
-    }
-
     override fun back() {
         if (mutable.value.screen == Screen.Setup) cancelSetupLocation()
         historyJob?.cancel()
@@ -1108,26 +1142,43 @@ class TrainViewModel private constructor(
         }
         recordHistory(); mutable.value = mutable.value.copy(screen = Screen.Detail, detail = journey)
     }
-    override fun pinJourney(journey: Journey) {
+    override fun boardRowTapped(journey: Journey) {
+        if (runningJourney(journey, mutable.value.now, data.modes, data.maxTransfers)) startTrip(journey) else openJourney(journey)
+    }
+    override fun startTrip(journey: Journey) {
         if (!journeyAllowed(journey, data.modes) || !journey.withinTransferCap(data.maxTransfers)) return
-        val id = mutable.value.selectedTripId ?: return; val board = mutable.value.board ?: return
-        val pair = ends(id, mutable.value.reverse) ?: return
+        val id = mutable.value.selectedTripId ?: return; val reverse = mutable.value.reverse
+        // Home's Start trip keeps the provenance Home showed, as opening that journey's detail would.
+        val board = (if (mutable.value.screen == Screen.Home) boardForOpenedJourney(null, mutable.value.homeBoard, mutable.value.board, journey)
+            else mutable.value.board) ?: return
+        val pair = ends(id, reverse) ?: return
         if (board.from.id != pair.first.id || board.to.id != pair.second.id) return
-        metrics.pinned(id, mutable.value.reverse, journey.key)
+        metrics.pinned(id, reverse, journey.key)
         val source = board.copy(journeys = (listOf(journey) + board.journeys).distinctBy { it.key })
-        var focus = FocusedJourney(id, mutable.value.reverse, journey, source)
-        if (!source.isLive(mutable.value.now) && (journey.realtime || journey.cancelled)) focus = focus.lastKnown()
-        data = data.copy(focus = focus)
+        var started = FocusedJourney(id, reverse, journey, source)
+        if (!source.isLive(mutable.value.now) && (journey.realtime || journey.cancelled)) started = started.lastKnown()
+        val restarted = data.focus?.sameService(started) == true
+        data = data.withTripStarted(started)
         forgetLastAnswer()
-        resetArrivalTracking()
+        if (!restarted) resetArrivalTracking()
         persist(); historyRecorded = false; mutable.value = mutable.value.copy(screen = Screen.Home, detail = null); syncPersonal(); refresh()
     }
-    override fun unpinJourney() {
+    override fun stopTrip() {
+        val stopped = data.focus ?: return
         metrics.released()
-        data = data.copy(focus = null); forgetLastAnswer(); resetArrivalTracking(); persist()
-        // Releasing a pin is not a trip choice: Home answers again from where the phone is.
-        if (mutable.value.screen == Screen.Home) { explicit = false; choosePrediction() }
-        syncPersonal(); refresh()
+        data = data.withTripStopped(trackerNow())
+        forgetLastAnswer(); focusJob?.cancel(); resetArrivalTracking(); persist()
+        if (!stopped.pinned) metrics.declinedInferred()
+        // Stopping is not a trip choice: Home answers again from where the phone is.
+        explicit = false
+        val elsewhere = mutable.value.screen != Screen.Home
+        if (elsewhere) leaveForHome()
+        mutable.value = mutable.value.copy(focusAnswerPending = false)
+        choosePrediction(); syncPersonal()
+        // From the lock screen the next resume runs the open path; a background refresh would be wasted.
+        if (!activityForeground) return
+        if (elsewhere) requestHomeFix()
+        refresh()
     }
     override fun showReturn() {
         val focus = data.focus ?: return

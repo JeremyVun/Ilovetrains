@@ -1047,7 +1047,7 @@ class TravelTrackerIntegrationTest {
 
     private fun clearFocus() {
         waitReady()
-        onMain { model.unpinJourney() }
+        onMain { model.stopTrip() }
         waitUntil("prior tracker did not stop") { model.trackerActiveRevision() == null && trackerNotification() == null }
     }
 

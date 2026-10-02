@@ -94,7 +94,7 @@ fun DetailScreen(state: AppState, actions: UiActions) {
         }
         if (pinned || !focused && !journey.cancelled) ActionRail(
             if (pinned) "Unpin this ${first.modeNameDetail()}" else "Pin this ${first.modeNameDetail()}",
-            if (pinned) actions::unpinJourney else ({ actions.pinJourney(journey) }),
+            if (pinned) actions::stopTrip else ({ actions.startTrip(journey) }),
             minHeight = 66.dp,
         )
     }

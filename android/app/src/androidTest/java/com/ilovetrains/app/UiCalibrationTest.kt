@@ -972,7 +972,8 @@ private class Fixtures {
 }
 private object NoActions : UiActions {
     override fun back() {} ; override fun openTrip(id: String, reverse: Boolean) {}
-    override fun openJourney(journey: Journey) {} ; override fun pinJourney(journey: Journey) {} ; override fun unpinJourney() {}
+    override fun openJourney(journey: Journey) {} ; override fun boardRowTapped(journey: Journey) {}
+    override fun startTrip(journey: Journey) {} ; override fun stopTrip() {}
     override fun showReturn() {} ; override fun newTrip() {} ; override fun chooseSetupFrom(station: Station) {}
     override fun clearSetupFrom() {} ; override fun chooseSetupTo(station: Station) {} ; override fun clearSetupTo() {}
     override fun saveTrip(from: Station, to: Station) {} ; override fun deleteTrip(id: String) {} ; override fun undoDelete() {} ; override fun openSettings() {}
