@@ -35,6 +35,13 @@ final class HomeStatusTests: XCTestCase {
         XCTAssertNil(tripControlLine(focus: started, startable: nil, over: true), "the trip-over offer replaces the line")
     }
 
+    func testPageMarginNarrowsOnPhonesUpTo375Wide() {
+        XCTAssertEqual(pageMargin(windowWidth: 320), 18)
+        XCTAssertEqual(pageMargin(windowWidth: 375), 18)
+        XCTAssertEqual(pageMargin(windowWidth: 390), 22)
+        XCTAssertEqual(pageMargin(windowWidth: 402), 22)
+    }
+
     func testExceptionalStatusesOutrankRunning() {
         let now: Millis = 1_000_000
         var cancelled = makeFocus(now: now)

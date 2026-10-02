@@ -32,14 +32,9 @@ iOS implementation requested on 2026-09-07.
   `ios-home-390x844-deleted.png` are the exemplars. iOS follows the web's
   ten-trip LRU policy, including history and cache cleanup on eviction,
   instead of Android's unlimited saved list.
-- iOS keeps its 22pt page margin at every width, where the web narrows to 18px
-  at 375px and below. The guessed trip-control line needs 337pt of a 331pt
-  track on a 375pt iPhone, so there its question `Going somewhere else?`
-  steps down to about 14.4pt instead of ellipsising, and its actions keep
-  their size; wider phones print it at 15pt as the exemplars do. SwiftUI
-  centres the line's words on their text frame, which sets them about 0.8pt
-  higher than the web exemplar's line box; each glyph stays centred on its
-  word's caps. The line exemplars are `assets/comps/latest/ios-home-guessed.png`,
+- SwiftUI centres the trip-control line's words on their text frame, which
+  sets them about 0.8pt higher than the web exemplar's line box; each glyph
+  stays centred on its word's caps. The line exemplars are `assets/comps/latest/ios-home-guessed.png`,
   `ios-home-started.png`, `ios-home-started-after.png`,
   `ios-home-startable.png` and its `-light` variant,
   `ios-home-startable-ferry.png`, `ios-home-leaves-later.png` (no line) and
