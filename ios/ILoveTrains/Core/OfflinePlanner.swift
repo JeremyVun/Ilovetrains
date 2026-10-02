@@ -2,6 +2,23 @@ import CryptoKit
 import Foundation
 import SQLite3
 
+/// One planner opens or installs at a time in a process. The unit-test host installs the bundled timetable as it
+/// launches, and a test's own planner on the same directory would otherwise extract over its files.
+private actor BundledInstall {
+    static let shared = BundledInstall()
+    private var tail: Task<Void, Never>?
+
+    func alone(_ work: @escaping @Sendable () async throws -> Void) async throws {
+        let previous = tail
+        let turn = Task {
+            await previous?.value
+            try await work()
+        }
+        tail = Task { _ = try? await turn.value }
+        try await turn.value
+    }
+}
+
 actor OfflinePlanner {
     private struct PackageInfo: Decodable, Sendable {
         var source: String
@@ -75,6 +92,11 @@ actor OfflinePlanner {
     }
 
     func initialize() async throws {
+        guard activePackage == nil else { return }
+        try await BundledInstall.shared.alone { try await self.openOrInstall() }
+    }
+
+    private func openOrInstall() throws {
         // A second caller must not reopen the database: that drops the schedule cache and cancels plans in flight.
         guard activePackage == nil else { return }
         try packageStore.prepareDirectory()

@@ -2,7 +2,7 @@ import Foundation
 import XCTest
 @testable import ILoveTrains
 
-/// Runs every hold and entry case of the web-authored inference.json in each section's `run` order.
+/// Runs every case of the web-authored inference.json in each section's `run` order.
 final class InferenceConformanceTests: XCTestCase {
     private var fixture: [String: Any]!
 
@@ -26,19 +26,21 @@ final class InferenceConformanceTests: XCTestCase {
 
     func testEntryCases() throws {
         let cases = try section("entryCases")
-        XCTAssertEqual(cases.count, 35)
+        XCTAssertEqual(cases.count, 47)
         for raw in cases {
             let name = try XCTUnwrap(raw["name"] as? String)
             let now = try number(raw["nowMs"])
             var data = try userData(dictionary(raw["doc"]))
+            var snapshot = try (raw["snapshot"] as? [String: Any]).map { try record($0) }
             for write in try (raw["writes"] as? [[String: Any]] ?? []) {
                 let at = try number(write["nowMs"])
                 let incoming = try record(dictionary(write["record"]), at: at)
-                if replacesLastAnswer(data: data, incoming: incoming, now: at, sightingAt: write["sightingAt"] as? Double) {
+                let sightingAt = write["sightingAt"] as? Double
+                if retiresSnapshot(data: data, snapshot: snapshot, incoming: incoming, sightingAt: sightingAt) { snapshot = nil }
+                if replacesLastAnswer(data: data, incoming: incoming, now: at, sightingAt: sightingAt) {
                     data.lastAnswer = incoming
                 }
             }
-            let snapshot = try (raw["snapshot"] as? [String: Any]).map { try record($0) }
             let fix = try self.fix(dictionary(raw["fix"]))
             let previousFix = try (raw["previousFix"] as? [String: Any]).map { try self.fix($0) }
             let cached = try journeys(raw["cached"])
@@ -70,6 +72,38 @@ final class InferenceConformanceTests: XCTestCase {
             XCTAssertEqual(entered?.focus.reverse, (expected["direction"] as? String) == "reverse", name)
             XCTAssertEqual(entered?.focus.pinned, false, name)
             XCTAssertEqual(entered?.focus.journey.key, try journeyKey(expected["journeyKey"]), name)
+        }
+    }
+
+    func testStopCases() throws {
+        let cases = try section("stopCases")
+        XCTAssertEqual(cases.count, 6)
+        for raw in cases {
+            let name = try XCTUnwrap(raw["name"] as? String)
+            let now = try number(raw["nowMs"])
+            var data = try userData(dictionary(raw["doc"]))
+            let focus = try dictionary(raw["focus"])
+            let journey = try TransitWire.journey(dictionary(focus["journey"]))
+            data.focus = FocusedJourney(
+                tripId: try XCTUnwrap(focus["tripId"] as? String), reverse: focus["direction"] as? String == "reverse",
+                journey: journey, board: board(journey), pinned: focus["by"] as? String != "inferred"
+            )
+            data.lastAnswer = data.lastAnswer ?? LastAnswer(tripId: "other", reverse: true, at: now, stationId: nil,
+                                                            board: board(journey), journey: journey)
+
+            let stopped = try XCTUnwrap(stoppedTrip(data, at: now), name)
+
+            XCTAssertNil(stopped.data.focus, name)
+            XCTAssertNil(stopped.data.lastAnswer, name)
+            XCTAssertEqual(stopped.declinedInferred, try XCTUnwrap(raw["expectedEvent"] as? Bool), name)
+            let expected = try (raw["expectedDecline"] as? [String: Any]).map { decline in
+                InferenceDecline(
+                    tripId: try XCTUnwrap(decline["tripId"] as? String), reverse: decline["direction"] as? String == "reverse",
+                    at: try number(decline["at"]), departure: try nativeDepartureKey(decline["departure"]),
+                    arrival: try number(decline["arrival"])
+                )
+            }
+            XCTAssertEqual(stopped.data.inferenceDeclined, expected, name)
         }
     }
 
@@ -130,17 +164,22 @@ final class InferenceConformanceTests: XCTestCase {
             )
         }
         if let decline = doc["inferenceDeclined"] as? [String: Any] {
-            let departure = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(try XCTUnwrap(decline["departure"] as? String).utf8)) as? [Any])
-            let leg = Leg(line: try XCTUnwrap(departure[0] as? String), mode: "train", headsign: "",
-                          from: Station(id: "", name: ""), to: Station(id: "", name: ""),
-                          departure: try XCTUnwrap(TransitWire.epoch(departure[1])), arrival: try XCTUnwrap(TransitWire.epoch(departure[1])))
             data.inferenceDeclined = InferenceDecline(
                 tripId: try XCTUnwrap(decline["tripId"] as? String), reverse: decline["direction"] as? String == "reverse",
-                at: try XCTUnwrap(TransitWire.epoch(decline["at"])), departure: Journey(legs: [leg]).departureKey,
+                at: try XCTUnwrap(TransitWire.epoch(decline["at"])), departure: try nativeDepartureKey(decline["departure"]),
                 arrival: try XCTUnwrap(TransitWire.epoch(decline["arrival"]))
             )
         }
         return data
+    }
+
+    /// The web's JSON `[line, scheduled]` departure key as the native `line:scheduledMillis`.
+    private func nativeDepartureKey(_ raw: Any?) throws -> String {
+        let departure = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(try XCTUnwrap(raw as? String).utf8)) as? [Any])
+        let leg = Leg(line: try XCTUnwrap(departure[0] as? String), mode: "train", headsign: "",
+                      from: Station(id: "", name: ""), to: Station(id: "", name: ""),
+                      departure: try XCTUnwrap(TransitWire.epoch(departure[1])), arrival: try XCTUnwrap(TransitWire.epoch(departure[1])))
+        return Journey(legs: [leg]).departureKey
     }
 
     private func record(_ raw: [String: Any], at: Millis? = nil) throws -> LastAnswer {
@@ -238,15 +277,18 @@ final class InferenceRuleTests: XCTestCase {
         XCTAssertFalse(inferenceDeclined(data, tripId: "rr", now: now))
     }
 
-    func testAPlatformSightingRecordedAfterTheTrainLeftStillEnters() {
+    func testAPlatformSightingRecordedAfterTheTrainLeftDoesNotEnter() {
         let departed = journey(departing: now - 300_000)
         var data = UserData(trips: [SavedTrip(id: "rt", from: rhodes, to: townHall)])
         data.useLocation = true
         let seenAfter = LastAnswer(tripId: "rt", reverse: false, at: departed.effectiveDeparture + 30_000, stationId: rhodes.id,
                                    board: board(departed), journey: departed)
         let riding = Fix(lat: -33.83914, lon: 151.111, at: now, speed: 14, accuracyMetres: 10)
-        XCTAssertEqual(inferredFocus(data: data, record: seenAfter, fix: riding, now: now)?.journey.key, departed.key,
-                       "seen at the platform is D - at <= 15 min with no lower bound, as on the web")
+        XCTAssertNil(inferredFocus(data: data, record: seenAfter, fix: riding, now: now),
+                     "a record written after its train left is a retained answer, not evidence of boarding")
+        var atDeparture = seenAfter
+        atDeparture.at = departed.effectiveDeparture
+        XCTAssertEqual(inferredFocus(data: data, record: atDeparture, fix: riding, now: now)?.journey.key, departed.key)
         var early = seenAfter
         early.at = departed.effectiveDeparture - travelSeen - 1
         XCTAssertNil(inferredFocus(data: data, record: early, fix: riding, now: now))

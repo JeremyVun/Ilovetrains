@@ -164,8 +164,11 @@ Keep the chronological board route and its existing limits. A separate
 recommendation result retains its own source in the planner/controller envelope
 so it is not lost by the board's prefix limit. Reuse loaded connections and
 realtime overlays; do not reload the timetable for each objective.
-Home recommends from the current time even when the chronological board starts
-15 minutes earlier to retain recently departed services.
+Home recommends from the current time. The offline board is two plans merged
+by journey key: the next 24 departures from now, and 24 from 15 minutes
+earlier to retain recently departed services (owner ruling 24, 2026-10-02).
+The earlier plan alone filled with trains that had left on a busy corridor:
+Central → Parramatta at 08:00 offered nothing after 07:59.
 
 The recommendation pass examines the first 72 distinct eligible origin
 services in effective-departure order, without the board pass's sparse hourly
@@ -447,7 +450,10 @@ join remains mandatory.
 The iOS controller paints a stored board, races local planning against the online
 Trip Planner, and then prefers the online result while retaining local scheduled
 past rows. Foreground refresh is every 30 seconds and resumes immediately;
-backgrounding cancels request publication and location work. It checks timetable
+backgrounding cancels request publication and location work. A tick whose
+realtime fetch fails, as every one does with no connection, still refreshes the
+board unless a followed journey's request is in flight; otherwise the offline
+board never moved on. It checks timetable
 versions at most every six hours while active, plus the explicit Settings action.
 The shared API required no change for the iOS port.
 
