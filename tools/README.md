@@ -3,7 +3,12 @@
 - `build-ios.sh` — build/test the native SwiftUI client, prepare a Release archive, or upload an internal TestFlight build (`--testflight`).
   `--unit [TestClass[/testMethod]...]` and `--ui [TestClass[/testMethod]...]`
   select a test target, optionally filtered, for iteration. `--test` retains
-  the full core + UI gate. Also supports `--simulator`, `--device` and `--unsigned-archive`; see
+  the full core + UI gate. Every test mode first deletes the built `*Tests.xctest`
+  bundles and uninstalls the app and UI runner from the simulator: incremental
+  rebuilds have run test code one or two edits old with no error. A direct
+  `xcodebuild test` keeps that trap, so run tests through the helper. The fresh
+  install also re-extracts the bundled timetable as the host app launches. Also
+  supports `--simulator`, `--device` and `--unsigned-archive`; see
   [iOS operations](../docs/operations/ios.md) for signing and installation.
 - `generate-ios-project.rb` — regenerate the checked-in Xcode project after adding
   files. Requires the `xcodeproj` Ruby gem and reads the canonical web version.

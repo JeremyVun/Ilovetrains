@@ -25,10 +25,12 @@ final class ReviewInferenceTests: XCTestCase {
     /// Lead suspect 1: a same-origin sighting 60 s after departure means the rider did not board, so the open's snapshot must not enter that train either.
     func testAPlatformSightingAfterDepartureRetiresTheDepartedTrainFromTheSnapshotToo() throws {
         let departed = record(t9(eight, eight + 27 * minute), at: eight - 2 * minute)
-        let snapshot = departed
+        var snapshot: LastAnswer? = departed
         var data = UserData(trips: [trip], lastAnswer: departed, useLocation: true)
         let sightingAt = eight + 70_000
         let next = record(t9(eight + 8 * minute, eight + 35 * minute), at: sightingAt)
+        // The controller's write step: the same sighting retires the snapshot before the hold rule writes.
+        if retiresSnapshot(data: data, snapshot: snapshot, incoming: next, sightingAt: sightingAt) { snapshot = nil }
         XCTAssertTrue(replacesLastAnswer(data: data, incoming: next, now: sightingAt, sightingAt: sightingAt),
                       "the hold rule replaces the stored record with the next train")
         data.lastAnswer = next
