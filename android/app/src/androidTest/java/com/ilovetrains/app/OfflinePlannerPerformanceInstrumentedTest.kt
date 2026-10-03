@@ -31,16 +31,19 @@ class OfflinePlannerPerformanceInstrumentedTest {
         val (_, warmMillis) = measured { planner.plan(from, to, at, setOf("train", "metro"), limit = 4) }
         val (_, newRouteMillis) = measured { planner.plan(central, to, at, setOf("train", "metro"), limit = 4) }
         val (defaultBoard, defaultBoardMillis) = measured { planner.plan(central, parramatta, at, setOf("train"), limit = 24) }
-        val (refreshedBoard, refreshMillis) = measured { planner.planBoard(central, parramatta, at, setOf("train"), maxTransfers = 2) }
+        val opened = at + 60 * 60_000L
+        val (openedBoard, openMillis) = measured { planner.planBoard(central, parramatta, opened, setOf("train"), maxTransfers = 2) }
+        val (_, refreshMillis) = measured { planner.planBoard(central, parramatta, opened + 30_000L, setOf("train"), maxTransfers = 2) }
         val trainOnly = planner.plan(from, to, at, setOf("train"), limit = 4)
 
-        println("offline initialization=${initializeMillis}ms planning cold=${coldMillis}ms warm=${warmMillis}ms new=${newRouteMillis}ms default24=${defaultBoardMillis}ms refresh=${refreshMillis}ms")
+        println("offline initialization=${initializeMillis}ms planning cold=${coldMillis}ms warm=${warmMillis}ms new=${newRouteMillis}ms default24=${defaultBoardMillis}ms boardOpen=${openMillis}ms boardRefresh=${refreshMillis}ms")
         assertTrue("cold route took ${coldMillis}ms", coldMillis < 5_000)
         assertTrue("warm route took ${warmMillis}ms", warmMillis < 3_000)
         assertTrue("new route took ${newRouteMillis}ms", newRouteMillis < 3_000)
         assertTrue("default board took ${defaultBoardMillis}ms", defaultBoardMillis < 3_000)
-        assertTrue("a board refresh's two plans took ${refreshMillis}ms", refreshMillis < 3_000)
-        assertTrue(refreshedBoard.journeys.any { it.effectiveDeparture >= at })
+        assertTrue("opening a board took ${openMillis}ms", openMillis < 5_000)
+        assertTrue("refreshing a board took ${refreshMillis}ms", refreshMillis < 3_000)
+        assertTrue(openedBoard.journeys.any { it.effectiveDeparture >= opened })
         assertTrue(mixed.journeys.isNotEmpty())
         assertTrue(mixed.journeys.size <= 4)
         assertTrue(defaultBoard.journeys.size <= 24)

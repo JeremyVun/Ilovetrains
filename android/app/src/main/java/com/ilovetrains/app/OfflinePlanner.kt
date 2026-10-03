@@ -99,8 +99,9 @@ class OfflinePlanner(
         planEnvelope(from, to, at, modes, limit, maxTransfers, includeRecommendation = true, recommendationAt)
 
     suspend fun planBoard(from: Station, to: Station, now: Long, modes: Set<String>, maxTransfers: Int): BoardData {
-        val upcoming = planWithRecommendation(from, to, now, modes, BoardPlanLimit, maxTransfers).board
+        // Planning the earlier window first lets the later plan reuse its cached connections.
         val recent = plan(from, to, now - BoardRecentMillis, modes, BoardPlanLimit, maxTransfers)
+        val upcoming = planWithRecommendation(from, to, now, modes, BoardPlanLimit, maxTransfers).board
         return mergeTimetablePlans(upcoming, recent)
     }
 

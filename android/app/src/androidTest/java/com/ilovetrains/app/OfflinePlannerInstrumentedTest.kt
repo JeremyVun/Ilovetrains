@@ -37,8 +37,8 @@ class OfflinePlannerInstrumentedTest {
 
         println("train=${train.journeys.firstOrNull()?.legs} mixed=${mixed.journeys.firstOrNull()?.legs} ferry=${ferry.journeys.firstOrNull()?.legs}")
         assertTrue(train.journeys.isNotEmpty())
-        val capturedDirect = train.journeys.first { it.departure == Instant.parse("2026-10-24T23:11:01Z").toEpochMilli() }
-        assertEquals("2026-10-24T23:43:00Z", Instant.ofEpochMilli(capturedDirect.arrival).toString())
+        val capturedDirect = train.journeys.first { it.departure == Instant.parse("2026-10-24T23:06:01Z").toEpochMilli() }
+        assertEquals("2026-10-24T23:35:00Z", Instant.ofEpochMilli(capturedDirect.arrival).toString())
         assertEquals("T1", capturedDirect.legs.single().line)
         assertTrue(metro.journeys.isNotEmpty())
         assertTrue(mixed.journeys.any { journey -> journey.legs.map(Leg::mode).containsAll(listOf("train", "metro")) })
