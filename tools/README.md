@@ -571,9 +571,11 @@ Traps:
   photograph of somebody else's build. Before believing an iOS `DIFF`, check
   that your `ios/build/.../ILoveTrains.app` is newer than the peer's drive and
   that the test log names the tests your branch added. The regression tool
-  never rebuilds that app: a stale one shoots old code with no error, and the
-  Settings frame's version string is the tell (2026-09-08: a 1.2.4 build shot
-  a 1.4.0 tree and reported the new row missing).
+  never rebuilds that app: a stale one shoots old code with no error
+  (2026-09-08: a 1.2.4 build shot a 1.4.0 tree and reported the new row
+  missing). No baseline catches it: the iPhone 17 Pro Settings frame masks the
+  version row, and Android's calibration prints a fixed `1.0.0`. Check the
+  built app's version instead.
 - The Android baselines are shot on a Pixel-profile AVD without a display
   cutout (`avdmanager create avd -d pixel`, `hw.lcd` 1024×2216 at 420 dpi,
   the API 36.1 image) in dark mode, which gives a 24 dp status bar and a
