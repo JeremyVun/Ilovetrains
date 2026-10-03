@@ -103,6 +103,9 @@ final class HomeWidgetSmokeTests: XCTestCase {
             Thread.sleep(forTimeInterval: 2)
         }
         // The gallery sheet stays open after a tap adds the widget; dragging it away uncovers the editor's Done.
+        // iOS 26.4 leaves the sheet on the app's page, whose close button steps back to the list that has the grabber.
+        let close = editorElement(["Close"], contains: false)
+        if close.exists { close.tap(); Thread.sleep(forTimeInterval: 2) }
         let grabber = posterBoard.buttons["Sheet Grabber"].firstMatch
         if grabber.exists {
             grabber.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
@@ -110,7 +113,7 @@ final class HomeWidgetSmokeTests: XCTestCase {
             Thread.sleep(forTimeInterval: 2)
         }
         let done = posterBoard.buttons["editing-done"].firstMatch
-        XCTAssertTrue(done.waitForExistence(timeout: 8), dump("done", in: posterBoard))
+        XCTAssertTrue(done.waitForExistence(timeout: 8), dump("done", in: posterBoard) + "\n" + dump("done"))
         done.tap()
         Thread.sleep(forTimeInterval: 3)
         print(dump("placed", in: posterBoard))
@@ -159,13 +162,17 @@ final class HomeWidgetSmokeTests: XCTestCase {
         }
     }
 
-    /// Unlocks to the home screen for `simctl io screenshot`.
+    /// Unlocks to the home screen, on page HOME_WIDGET_PAGE (default 1), for `simctl io screenshot`.
     @MainActor
     func testShowsHomeScreen() {
         XCUIDevice.shared.press(.home)
         Thread.sleep(forTimeInterval: 1)
         XCUIDevice.shared.press(.home)
         Thread.sleep(forTimeInterval: 2)
+        for _ in 1..<max(1, Int(ProcessInfo.processInfo.environment["HOME_WIDGET_PAGE"] ?? "1") ?? 1) {
+            springboard.swipeLeft()
+            Thread.sleep(forTimeInterval: 1)
+        }
     }
 
     private let posterBoard = XCUIApplication(bundleIdentifier: "com.apple.PosterBoard")
