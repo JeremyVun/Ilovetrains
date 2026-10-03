@@ -12,7 +12,7 @@ android {
         applicationId = "com.ilovetrains.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10
+        versionCode = 11
         versionName = Regex("VERSION = '([^']+)'").find(rootProject.file("../web/js/version.js").readText())!!.groupValues[1]
         testInstrumentationRunner = "com.ilovetrains.app.HermeticTestRunner"
         buildConfigField("String", "API_BASE", "\"https://ilovetrains.jeremyvun.com\"")
