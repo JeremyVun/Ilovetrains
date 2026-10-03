@@ -50,9 +50,8 @@ Monday, 12 October 2026 at 10:00 Sydney time. Debug builds accept
 UUID `ILOVETRAINS_TEST_DOMAIN`; Release builds always use the real clock.
 Update this fixture date with the bundled timetable, along with the dates
 pinned in `OfflinePlannerTests` and the commute-reliability controller tests
-(08:00 that Monday). The core test retains coverage of a captured Sunday
-trackwork gap (no train reaches Parramatta from Central on 18 October 2026)
-and extended search.
+(08:00 that Monday). A core test searches past the initial horizon from a
+Sunday without service: Balmain West Wharf has no weekend ferries.
 
 The checked-in project is ready to build. After adding files, regenerate it
 with `ruby tools/generate-ios-project.rb` (requires the `xcodeproj` Ruby gem).

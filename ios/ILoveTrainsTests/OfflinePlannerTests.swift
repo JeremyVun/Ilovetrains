@@ -52,8 +52,8 @@ final class OfflinePlannerTests: XCTestCase {
         )
 
         XCTAssertFalse(train.journeys.isEmpty)
-        let direct = try XCTUnwrap(train.journeys.first { $0.departure == isoMillis("2026-10-24T23:11:01Z") })
-        XCTAssertEqual(direct.arrival, isoMillis("2026-10-24T23:43:00Z"))
+        let direct = try XCTUnwrap(train.journeys.first { $0.departure == isoMillis("2026-10-24T22:56:01Z") })
+        XCTAssertEqual(direct.arrival, isoMillis("2026-10-24T23:28:00Z"))
         XCTAssertEqual(direct.legs.first?.line, "T1")
         XCTAssertFalse(metro.journeys.isEmpty)
         XCTAssertTrue(mixed.journeys.contains { Set($0.legs.map(\.mode)).isSuperset(of: ["train", "metro"]) })
@@ -62,23 +62,22 @@ final class OfflinePlannerTests: XCTestCase {
             .flatMap(\.legs).allSatisfy { $0.identity != nil })
     }
 
-    func testSundayTrackworkExtendsSearchAndCoverageIsEnforced() async throws {
+    func testMissingSundayServiceExtendsSearchAndCoverageIsEnforced() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
         let planner = OfflinePlanner(bundle: .main, directory: directory)
         try await planner.initialize()
-        // Trackwork closes Granville and Harris Park all Sunday, so no train reaches Parramatta from the city until Monday.
+        // Balmain West has no weekend ferries, so the first journey is Monday's, past the initial search horizon.
         let sunday = sydneyMillis(year: 2026, month: 10, day: 18, hour: 10)
         let board = try await planner.plan(
-            from: station("200060", "Central Station", "train"),
-            to: station("215020", "Parramatta Station", "train"),
+            from: station("204155", "Balmain West Wharf", "ferry"),
+            to: station("200020", "Circular Quay", "train", "ferry"),
             at: sunday,
-            modes: ["train"],
+            modes: ["ferry"],
             limit: 4
         )
-        XCTAssertFalse(board.journeys.isEmpty)
-        XCTAssertTrue(board.journeys.allSatisfy { $0.departure >= sunday })
-        XCTAssertTrue(board.journeys.allSatisfy { $0.arrival >= sydneyMillis(year: 2026, month: 10, day: 19, hour: 4) })
+        XCTAssertEqual(board.journeys.first?.departure, isoMillis("2026-10-18T19:06:00Z"))
+        XCTAssertTrue(board.journeys.allSatisfy { $0.departure >= sydneyMillis(year: 2026, month: 10, day: 19, hour: 6) })
 
         let unavailable = try await planner.plan(
             from: station("200060", "Central Station", "train"),
