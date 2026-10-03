@@ -310,7 +310,7 @@
   seeds the same scenario names through the `HomeWidgetScenarios`
   instrumentation: `adb shell am instrument -w -e class
   com.ilovetrains.app.HomeWidgetScenarios -e scenario <name>
-  com.ilovetrains.app.test/androidx.test.runner.AndroidJUnitRunner` (`refresh`
+  com.ilovetrains.app.test/com.ilovetrains.app.HermeticTestRunner` (`refresh`
   returns it to live data; install with `:app:installDebug
   :app:installDebugAndroidTest`, never `connectedDebugAndroidTest`, which
   uninstalls the app and its placed widgets).

@@ -8,7 +8,6 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
-import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -20,8 +19,6 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.net.ServerSocket
 import java.time.DayOfWeek
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.util.UUID
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -399,13 +396,10 @@ class CommuteReliabilityControllerTest {
 
     private fun morningDeparture(): Long = morningDirect().effectiveDeparture
 
-    /** A clock on the first weekday the bundled timetable covers. */
-    private fun weekday(hour: Int, minute: Int): Long {
-        val manifest = JSONObject(context.assets.open("timetable-manifest.json").bufferedReader().use { it.readText() })
-        var day = LocalDate.parse(manifest.getString("serviceDateFrom"), DateTimeFormatter.BASIC_ISO_DATE).plusDays(1)
-        while (day.dayOfWeek == DayOfWeek.SATURDAY || day.dayOfWeek == DayOfWeek.SUNDAY) day = day.plusDays(1)
-        return day.atTime(hour, minute).atZone(Sydney).toInstant().toEpochMilli()
-    }
+    /** A clock on the first ordinary weekday the bundled timetable covers. */
+    private fun weekday(hour: Int, minute: Int): Long =
+        // A Monday public holiday, such as Labour Day, runs the weekend timetable.
+        bundledDay(context, DayOfWeek.TUESDAY).atTime(hour, minute).atZone(Sydney).toInstant().toEpochMilli()
 
     /** The first direct T9 from Rhodes to Central after 07:50 on a weekday the bundled timetable covers. */
     private fun morningDirect(): Journey = runBlocking {

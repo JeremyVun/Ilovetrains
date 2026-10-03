@@ -23,7 +23,7 @@ import java.time.ZonedDateTime
  * `probe` logs (tag WidgetProbe) the view each placed widget draws at every size the launcher reports.
  * Skipped unless a scenario is named:
  * `adb shell am instrument -w -e class com.ilovetrains.app.HomeWidgetScenarios -e scenario late
- * com.ilovetrains.app.test/androidx.test.runner.AndroidJUnitRunner`.
+ * com.ilovetrains.app.test/com.ilovetrains.app.HermeticTestRunner`.
  */
 @RunWith(AndroidJUnit4::class)
 class HomeWidgetScenarios {
@@ -33,6 +33,7 @@ class HomeWidgetScenarios {
         val name = InstrumentationRegistry.getArguments().getString("scenario")
         assumeTrue(name != null)
         if (name == "refresh") {
+            testApiBase = null
             HomeWidgetWork.refresh(context)
             delay(10_000)
             return@runBlocking

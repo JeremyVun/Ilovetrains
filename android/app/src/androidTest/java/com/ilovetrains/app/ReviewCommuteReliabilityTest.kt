@@ -8,7 +8,6 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
-import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -19,8 +18,6 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.net.ServerSocket
 import java.time.DayOfWeek
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.util.UUID
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -177,10 +174,8 @@ class ReviewCommuteReliabilityTest {
 
     /** The first direct T9 from Rhodes to Central after 07:50 on a weekday the bundled timetable covers. */
     private fun morningDirect(): Journey = runBlocking {
-        val manifest = JSONObject(context.assets.open("timetable-manifest.json").bufferedReader().use { it.readText() })
-        var day = LocalDate.parse(manifest.getString("serviceDateFrom"), DateTimeFormatter.BASIC_ISO_DATE).plusDays(1)
-        while (day.dayOfWeek == DayOfWeek.SATURDAY || day.dayOfWeek == DayOfWeek.SUNDAY) day = day.plusDays(1)
-        val after = day.atTime(7, 50).atZone(Sydney).toInstant().toEpochMilli()
+        // A Monday public holiday, such as Labour Day, runs the weekend timetable.
+        val after = bundledDay(context, DayOfWeek.TUESDAY).atTime(7, 50).atZone(Sydney).toInstant().toEpochMilli()
         val planner = OfflinePlanner(context, File(root, "search-timetable")).apply { initialize() }
         planner.plan(rhodes, central, after, setOf("train"), 30, 2).journeys
             .filter { it.legs.size == 1 && it.effectiveDeparture >= after }.minBy { it.effectiveDeparture }

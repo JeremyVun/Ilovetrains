@@ -83,6 +83,11 @@ cd android
 ```
 
 Run on an Android emulator/device with no other instrumentation session.
+Instrumentation runs through `HermeticTestRunner`, which points the app's API
+at a closed loopback port: no test reads production's timetable packages,
+realtime or departures, so a run plans on the bundled timetable alone. Tests
+that need a timetable day derive it from the bundled manifest
+(`bundledDay`), or pin a date inside its coverage.
 `OfflinePlannerInstrumentedTest` verifies train, metro, mixed and ferry
 journeys, calendars, midnight/DST and bounded planning. The UI calibration
 test renders controlled states using the same Compose entry point as the
