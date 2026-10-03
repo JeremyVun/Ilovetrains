@@ -5,7 +5,7 @@ import XCTest
 final class TransferRecoveryConformanceTests: XCTestCase {
     private let keys = [
         "followedChanges", "composedChanges", "recoveryAnchor", "search", "candidate", "composed",
-        "status", "pinIcon", "changeLabels", "receipt", "instruction", "arrival", "figure",
+        "status", "startedLine", "changeLabels", "receipt", "instruction", "arrival", "figure",
         "provenance", "alert",
     ].sorted()
 
@@ -62,7 +62,7 @@ final class TransferRecoveryConformanceTests: XCTestCase {
                            expected["status"] as! String, name)
             // The shared field predates Start and Stop trip: a started trip stops from its line.
             XCTAssertEqual(tripControlLine(focus: settled, startable: nil, over: false) == .started,
-                           expected["pinIcon"] as! Bool, name)
+                           expected["startedLine"] as! Bool, name)
             XCTAssertEqual(
                 after.composed.legs.indices.dropLast().map {
                     axisChangeLabel(after.composed, index: $0, recoveryChangeIndex: after.recoveryChangeIndex)

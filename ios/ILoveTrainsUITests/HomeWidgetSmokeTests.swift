@@ -13,7 +13,9 @@ final class HomeWidgetSmokeTests: XCTestCase {
 
     @MainActor
     func testAddsHomeWidget() {
-        XCUIApplication().launch()
+        let app = XCUIApplication()
+        app.launchArguments = ["--offline"]
+        app.launch()
         Thread.sleep(forTimeInterval: 6)
         XCUIDevice.shared.press(.home)
         Thread.sleep(forTimeInterval: 1)

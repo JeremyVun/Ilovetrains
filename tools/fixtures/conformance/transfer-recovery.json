@@ -83,7 +83,7 @@
           }
         ],
         "status": "RUNNING",
-        "pinIcon": false,
+        "startedLine": false,
         "changeLabels": [
           "TOWN HALL"
         ],
@@ -174,7 +174,7 @@
           }
         ],
         "status": "RUNNING",
-        "pinIcon": false,
+        "startedLine": false,
         "changeLabels": [
           "TOWN HALL"
         ],
@@ -221,7 +221,7 @@
           }
         ],
         "status": "RUNNING LATE",
-        "pinIcon": false,
+        "startedLine": false,
         "changeLabels": [
           "TOWN HALL"
         ],
@@ -304,7 +304,7 @@
           }
         ],
         "status": "LATE · CONNECTION GONE",
-        "pinIcon": false,
+        "startedLine": false,
         "changeLabels": [
           "TOWN HALL · T4 10:08"
         ],
@@ -388,7 +388,7 @@
           }
         ],
         "status": "LATE · CONNECTION GONE",
-        "pinIcon": true,
+        "startedLine": true,
         "changeLabels": [
           "TOWN HALL · T4 10:08"
         ],
@@ -472,7 +472,7 @@
           }
         ],
         "status": "CONNECTION GONE",
-        "pinIcon": true,
+        "startedLine": true,
         "changeLabels": [
           "TOWN HALL · T4 10:08"
         ],
@@ -527,7 +527,7 @@
           }
         ],
         "status": "LATE · CONNECTION GONE",
-        "pinIcon": true,
+        "startedLine": true,
         "changeLabels": [
           "TOWN HALL"
         ],
@@ -610,7 +610,7 @@
           }
         ],
         "status": "LATE · CONNECTION GONE",
-        "pinIcon": false,
+        "startedLine": false,
         "changeLabels": [
           "TOWN HALL · T4 10:08"
         ],
@@ -698,7 +698,7 @@
           }
         ],
         "status": "LATE · CONNECTION GONE",
-        "pinIcon": false,
+        "startedLine": false,
         "changeLabels": [
           "TOWN HALL · T4 10:08"
         ],
@@ -838,7 +838,7 @@
           }
         ],
         "status": "LATE · CONNECTION GONE",
-        "pinIcon": false,
+        "startedLine": false,
         "changeLabels": [
           "TOWN HALL · T4 10:03"
         ],
@@ -991,7 +991,7 @@
           }
         ],
         "status": "LATE · CONNECTION GONE",
-        "pinIcon": false,
+        "startedLine": false,
         "changeLabels": [
           "TOWN HALL · T1 10:05",
           "CENTRAL · T4 10:19"
@@ -1116,7 +1116,7 @@
           }
         ],
         "status": "LATE · CONNECTION GONE",
-        "pinIcon": false,
+        "startedLine": false,
         "changeLabels": [
           "TOWN HALL · T1 10:05",
           "CENTRAL · T4 10:11"
@@ -1274,7 +1274,7 @@
           }
         ],
         "status": "LATE · CONNECTION GONE",
-        "pinIcon": false,
+        "startedLine": false,
         "changeLabels": [
           "STRATHFIELD",
           "TOWN HALL · T4 10:08"
@@ -1369,7 +1369,7 @@
           }
         ],
         "status": "RUNNING LATE",
-        "pinIcon": false,
+        "startedLine": false,
         "changeLabels": [
           "TOWN HALL"
         ],
@@ -1419,7 +1419,7 @@
           }
         ],
         "status": "CANCELLED",
-        "pinIcon": false,
+        "startedLine": false,
         "changeLabels": [
           "TOWN HALL"
         ],
@@ -1471,7 +1471,7 @@
           }
         ],
         "status": "RUNNING LATE",
-        "pinIcon": false,
+        "startedLine": false,
         "changeLabels": [
           "TOWN HALL"
         ],
@@ -1559,7 +1559,7 @@
           }
         ],
         "status": "RUNNING",
-        "pinIcon": false,
+        "startedLine": false,
         "changeLabels": [
           "TOWN HALL · T4 10:08"
         ],
@@ -1619,7 +1619,7 @@
           }
         ],
         "status": "RUNNING LATE",
-        "pinIcon": false,
+        "startedLine": false,
         "changeLabels": [
           "TOWN HALL"
         ],
@@ -1678,7 +1678,7 @@
           }
         ],
         "status": "RUNNING LATE",
-        "pinIcon": false,
+        "startedLine": false,
         "changeLabels": [
           "TOWN HALL"
         ],
@@ -1732,7 +1732,7 @@
           }
         ],
         "status": "RUNNING LATE",
-        "pinIcon": false,
+        "startedLine": false,
         "changeLabels": [
           "TOWN HALL"
         ],
@@ -1822,7 +1822,7 @@
           }
         ],
         "status": "LATE · CONNECTION GONE",
-        "pinIcon": false,
+        "startedLine": false,
         "changeLabels": [
           "TOWN HALL · T4 10:08"
         ],

@@ -314,7 +314,7 @@ final class CommuteReliabilityControllerTests: XCTestCase {
 
     /// A weekday morning inside the bundled timetable's coverage.
     private var mondayMorning: Millis {
-        ISO8601DateFormatter().date(from: "2026-09-07T08:00:00+10:00")!.timeIntervalSince1970 * 1_000
+        ISO8601DateFormatter().date(from: "2026-10-12T08:00:00+11:00")!.timeIntervalSince1970 * 1_000
     }
 
     func testStopTripOnAGuessedTripDeclinesItAndEndsTheTracker() async throws {

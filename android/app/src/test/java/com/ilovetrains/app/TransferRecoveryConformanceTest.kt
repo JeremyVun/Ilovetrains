@@ -9,7 +9,7 @@ import org.junit.Test
 class TransferRecoveryConformanceTest {
     private val keys = listOf(
         "followedChanges", "composedChanges", "recoveryAnchor", "search", "candidate", "composed",
-        "status", "pinIcon", "changeLabels", "receipt", "instruction", "arrival", "figure",
+        "status", "startedLine", "changeLabels", "receipt", "instruction", "arrival", "figure",
         "provenance", "alert",
     )
 
@@ -78,7 +78,7 @@ class TransferRecoveryConformanceTest {
             val header = focusHeader(focus, now)
             assertEquals("$name status", expected.getString("status"), header.status.text.uppercase())
             // The shared field outlives the pin until every client drops it; a started trip now stops from its line.
-            assertEquals("$name pinIcon", expected.getBoolean("pinIcon"), tripLine(focus, over = false, startable = null) == TripLine.Started)
+            assertEquals("$name startedLine", expected.getBoolean("startedLine"), tripLine(focus, over = false, startable = null) == TripLine.Started)
             assertEquals("$name changeLabels", strings(expected, "changeLabels"),
                 header.changeLabels.map { it.uppercase() })
             assertEquals("$name receipt", expected.getString("receipt"), header.receipt)

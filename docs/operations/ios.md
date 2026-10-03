@@ -40,12 +40,18 @@ cover the bundled timetable, calendars/DST, realtime identities and expiry,
 package recovery, persistent state and web-generated conformance. UI tests
 create and reopen a new Mascot–Kellyville trip with network transport disabled,
 then verify pinning, preferences and feedback-draft navigation.
+No test run reaches production. A Debug build hosting unit tests points the
+default API at `https://tests.invalid`, so neither the host app nor a test
+downloads production's daily timetable over the bundled one; UI and tracker
+tests launch with `--offline` or a seeded calibration.
 The offline creation test fixes the clock to the bundled timetable's covered
-Monday, 7 September 2026 at 10:00 Sydney time. Debug builds accept
+Monday, 12 October 2026 at 10:00 Sydney time. Debug builds accept
 `ILOVETRAINS_TEST_NOW` (epoch milliseconds) only with `--offline` and a valid
 UUID `ILOVETRAINS_TEST_DOMAIN`; Release builds always use the real clock.
-Update this fixture date with the bundled timetable. The separate core test
-retains coverage of the captured Sunday metro gap and extended search.
+Update this fixture date with the bundled timetable, along with the dates
+pinned in `OfflinePlannerTests` and the commute-reliability controller tests
+(08:00 that Monday). A core test searches past the initial horizon from a
+Sunday without service: Balmain West Wharf has no weekend ferries.
 
 The checked-in project is ready to build. After adding files, regenerate it
 with `ruby tools/generate-ios-project.rb` (requires the `xcodeproj` Ruby gem).

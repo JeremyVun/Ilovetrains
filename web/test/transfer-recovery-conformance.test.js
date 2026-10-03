@@ -13,7 +13,7 @@ const fixture = JSON.parse(readFileSync(
   new URL('../../tools/fixtures/conformance/transfer-recovery.json', import.meta.url), 'utf8'));
 
 const KEYS = ['followedChanges', 'composedChanges', 'recoveryAnchor', 'search', 'candidate', 'composed',
-  'status', 'pinIcon', 'changeLabels', 'receipt', 'instruction', 'arrival', 'figure', 'provenance', 'alert'];
+  'status', 'startedLine', 'changeLabels', 'receipt', 'instruction', 'arrival', 'figure', 'provenance', 'alert'];
 
 test('transfer recovery fixture states its arithmetic and every case carries the whole seam', () => {
   assert.match(fixture.notes, /printed clock minutes/);
@@ -141,10 +141,8 @@ for (const value of fixture.cases) {
     const directions = model.directions;
 
     assert.equal(model.status.text.toUpperCase(), expected.status, 'status');
-    // pinIcon stays in the shared fixture until the native clients drop the icon;
-    // on the web a started trip is marked by its Stop trip line instead (ruling 14).
     assert.doesNotMatch(html, /pin-icon|Pinned/, 'no pin beside the header status');
-    assert.equal(model.tripLine?.kind === 'started', expected.pinIcon, 'a started trip stops from its line');
+    assert.equal(model.tripLine?.kind === 'started', expected.startedLine, 'a started trip stops from its line');
     assert.deepEqual(model.changes.map((change) => change.label.toUpperCase()),
       expected.changeLabels, 'change labels');
     assert.equal(directions.receipt, expected.receipt, 'receipt');
