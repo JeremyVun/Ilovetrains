@@ -14,7 +14,7 @@ android {
         targetSdk = 36
         versionCode = 10
         versionName = Regex("VERSION = '([^']+)'").find(rootProject.file("../web/js/version.js").readText())!!.groupValues[1]
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "com.ilovetrains.app.HermeticTestRunner"
         buildConfigField("String", "API_BASE", "\"https://ilovetrains.jeremyvun.com\"")
     }
     val releaseKey = System.getenv("ILOVETRAINS_KEYSTORE")

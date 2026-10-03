@@ -61,7 +61,7 @@ test_apk="$project_dir/android/app/build/outputs/apk/androidTest/debug/app-debug
 # am instrument can exit zero even when JUnit fails. Never pull a partial green run.
 "$adb" shell am instrument -w \
   -e class "$instrument_class" ${instrument_args[@]+"${instrument_args[@]}"} \
-  com.ilovetrains.app.test/androidx.test.runner.AndroidJUnitRunner > "$out/instrumentation.log" 2>&1
+  com.ilovetrains.app.test/com.ilovetrains.app.HermeticTestRunner > "$out/instrumentation.log" 2>&1
 cat "$out/instrumentation.log"
 if ! grep -Eq '^OK \([0-9]+ tests?\)' "$out/instrumentation.log" || \
    grep -Eq 'FAILURES!!!|INSTRUMENTATION_FAILED|Process crashed' "$out/instrumentation.log"; then

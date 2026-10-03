@@ -14,7 +14,10 @@ import java.time.Instant
 
 const val FEEDBACK_ENDPOINT = "https://analytics.jeremyvun.com/feedback"
 
-class TransitApi(baseUrl: String = BuildConfig.API_BASE, private val feedbackUrl: String = FEEDBACK_ENDPOINT) {
+// Instrumented runs close the API so no test reads production's timetable, realtime or departures.
+@Volatile internal var testApiBase: String? = null
+
+class TransitApi(baseUrl: String = testApiBase.takeIf { BuildConfig.DEBUG } ?: BuildConfig.API_BASE, private val feedbackUrl: String = FEEDBACK_ENDPOINT) {
     val baseUrl = baseUrl.trimEnd('/')
     suspend fun departures(from: Station, to: Station, modes: Set<String>, at: Long? = null, transferLimit: Int? = null,
                            limit: Int = 10): BoardData = withContext(Dispatchers.IO) {

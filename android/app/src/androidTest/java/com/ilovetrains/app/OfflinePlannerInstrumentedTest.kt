@@ -8,6 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertThrows
+import org.junit.AfterClass
 import org.junit.BeforeClass
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,8 +37,8 @@ class OfflinePlannerInstrumentedTest {
 
         println("train=${train.journeys.firstOrNull()?.legs} mixed=${mixed.journeys.firstOrNull()?.legs} ferry=${ferry.journeys.firstOrNull()?.legs}")
         assertTrue(train.journeys.isNotEmpty())
-        val capturedDirect = train.journeys.first { it.departure == Instant.parse("2026-09-06T00:11:01Z").toEpochMilli() }
-        assertEquals("2026-09-06T00:43:00Z", Instant.ofEpochMilli(capturedDirect.arrival).toString())
+        val capturedDirect = train.journeys.first { it.departure == Instant.parse("2026-10-24T23:06:01Z").toEpochMilli() }
+        assertEquals("2026-10-24T23:35:00Z", Instant.ofEpochMilli(capturedDirect.arrival).toString())
         assertEquals("T1", capturedDirect.legs.single().line)
         assertTrue(metro.journeys.isNotEmpty())
         assertTrue(mixed.journeys.any { journey -> journey.legs.map(Leg::mode).containsAll(listOf("train", "metro")) })
@@ -55,13 +56,13 @@ class OfflinePlannerInstrumentedTest {
     fun ferryScheduleMatchesCapturedF1AndIncludesMff() = runBlocking {
         val circularQuay = station("200020", "Circular Quay", "train", "ferry")
         val manly = station("209573", "Manly Wharf", "ferry")
-        val capturedAt = LocalDateTime.of(2026, 9, 5, 21, 40).atZone(Sydney).toInstant().toEpochMilli()
+        val capturedAt = LocalDateTime.of(2026, 10, 24, 21, 40).atZone(Sydney).toInstant().toEpochMilli()
         val captured = planner.plan(circularQuay, manly, capturedAt, setOf("ferry"))
         val sunday = planner.plan(circularQuay, manly, at, setOf("ferry"))
 
-        val f1 = captured.journeys.first { it.departure == Instant.parse("2026-09-05T11:50:00Z").toEpochMilli() }
+        val f1 = captured.journeys.first { it.departure == Instant.parse("2026-10-24T10:50:00Z").toEpochMilli() }
         assertEquals("F1", f1.legs.single().line)
-        assertEquals("2026-09-05T12:12:00Z", Instant.ofEpochMilli(f1.arrival).toString())
+        assertEquals("2026-10-24T11:12:00Z", Instant.ofEpochMilli(f1.arrival).toString())
         assertTrue(sunday.journeys.any { it.legs.first().line == "MFF" })
     }
 
@@ -71,7 +72,7 @@ class OfflinePlannerInstrumentedTest {
         val board = planner.plan(
             station("202010", "Mascot Station", "train"),
             station("2155382", "Kellyville Station", "metro"),
-            at,
+            afterLastSundayMetro,
             setOf("train", "metro"),
             limit = 4,
         )
@@ -79,7 +80,7 @@ class OfflinePlannerInstrumentedTest {
 
         assertTrue("next-service search took ${elapsedMillis}ms", elapsedMillis < 12_000)
         assertTrue(board.journeys.isNotEmpty())
-        assertTrue(board.journeys.all { it.departure >= at })
+        assertTrue(board.journeys.all { it.departure >= afterLastSundayMetro })
     }
 
     @Test
@@ -138,16 +139,27 @@ class OfflinePlannerInstrumentedTest {
 
     companion object {
         private lateinit var planner: OfflinePlanner
-        private val at = LocalDateTime.of(2026, 9, 6, 10, 0).atZone(Sydney).toInstant().toEpochMilli()
-        private val metroAt = LocalDateTime.of(2026, 9, 7, 10, 0).atZone(Sydney).toInstant().toEpochMilli()
+        private lateinit var directory: File
+        private val at = LocalDateTime.of(2026, 10, 25, 10, 0).atZone(Sydney).toInstant().toEpochMilli()
+        private val metroAt = LocalDateTime.of(2026, 10, 26, 10, 0).atZone(Sydney).toInstant().toEpochMilli()
+        // Sunday's last metro has left Chatswood, and Monday's first reaches Kellyville at 05:46, past the six-hour window.
+        private val afterLastSundayMetro = LocalDateTime.of(2026, 10, 25, 23, 30).atZone(Sydney).toInstant().toEpochMilli()
 
         @JvmStatic
         @BeforeClass
         fun initialize() = runBlocking {
-            planner = OfflinePlanner(ApplicationProvider.getApplicationContext())
+            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+            directory = File(context.cacheDir, "offline-planner-${UUID.randomUUID()}")
+            planner = OfflinePlanner(context, directory)
             val (_, initializeMillis) = measured { planner.initialize() }
             println("offline initialization=${initializeMillis}ms")
-            assertEquals("5 Sep 2026–4 Oct 2026", planner.coverageDescription)
+            assertEquals("3 Oct 2026–1 Nov 2026", planner.coverageDescription)
+        }
+
+        @JvmStatic
+        @AfterClass
+        fun removeTimetable() {
+            directory.deleteRecursively()
         }
 
         private fun station(id: String, name: String, vararg modes: String) = Station(id, name, modes = modes.toSet())

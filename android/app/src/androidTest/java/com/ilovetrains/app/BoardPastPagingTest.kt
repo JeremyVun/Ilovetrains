@@ -17,7 +17,6 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
-import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -31,9 +30,8 @@ import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.URLDecoder
+import java.time.DayOfWeek
 import java.time.Instant
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
@@ -141,9 +139,7 @@ class BoardPastPagingTest {
         val from = stations.first { it.id == "200020" }
         val to = stations.first { it.id == "209573" }
         val planner = OfflinePlanner(context, File(root, "search-timetable")).apply { initialize() }
-        val manifest = JSONObject(context.assets.open("timetable-manifest.json").bufferedReader().use { it.readText() })
-        val day = LocalDate.parse(manifest.getString("serviceDateFrom"), DateTimeFormatter.BASIC_ISO_DATE).plusDays(1)
-        var at = day.atTime(17, 0).atZone(Sydney).toInstant().toEpochMilli()
+        var at = bundledDay(context, DayOfWeek.SUNDAY).atTime(17, 0).atZone(Sydney).toInstant().toEpochMilli()
         repeat(12) {
             val departures = planner.plan(from, to, at, modes, 30, 2).journeys.sortedBy { it.effectiveDeparture }
             for ((left, right) in departures.zipWithNext()) {

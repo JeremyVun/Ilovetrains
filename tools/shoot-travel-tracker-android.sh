@@ -11,7 +11,7 @@ schemes="${SCHEMES:-dark,light}"
 surfaces="${SURFACES:-shade,lock}"
 adb_bin="${ANDROID_HOME:-$HOME/Library/Android/sdk}/platform-tools/adb"
 package="com.ilovetrains.app"
-runner="$package.test/androidx.test.runner.AndroidJUnitRunner"
+runner="$package.test/com.ilovetrains.app.HermeticTestRunner"
 test_class="$package.TravelTrackerIntegrationTest"
 lock_dir="/tmp/ilovetrains-tracker-android-${serial}.lock"
 
