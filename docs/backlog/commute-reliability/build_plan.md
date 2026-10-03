@@ -814,3 +814,35 @@ Phase 5 iOS done: `f0f3ebb` on `cr-p5-ios`.
   `/tmp/ilt-cr-p5-ios-vr1` was 60/60 same, with nothing accepted.
 - For the owner: the bundle's T1 closures on 11 and 18 Oct make offline
   searches across them slow (81 s on the simulator), the known ROADMAP item.
+
+Phase 5 Android done: `209f686` on `cr-p5-android`.
+- Hermetic tests: `HermeticTestRunner` closes the app's API for every
+  instrumented run, and the planner tests use their own timetable directories.
+  Every date pin moved into 20261003-20261101, clear of the DST change and
+  Labour Day. The missing-metro test now searches after Sunday 25 Oct's last
+  metro (23:30), because the new bundle runs the Sunday metro.
+- `planBoard` plans the recent window first, so a board open reads the
+  timetable once (it read twice: 4.3 s against a 2.2 s cold plan).
+- Gates: `tools/build-android.sh` passed. The full instrumented run gave 84
+  tests and 1 failure: `missingSundayMetroUsesBoundedNextServiceSearch` took
+  17.1 s against its 12 s bound, with host load 14-43 from peer sessions. In
+  three alternating rounds on that load, the base build (old bundle) took
+  53.8/27.6/14.4 s and the final build 16.5/12.6/12.8 s, so it is contention,
+  not a regression. It has not yet passed on a quiet host.
+- `OfflinePlannerPerformanceInstrumentedTest` passed: initialization
+  767-1079 ms, cold 2088, warm 127, new pair 126, default 24 125, board open
+  2358, board refresh 354.
+- Visual regression `/tmp/ilt-cr-p5-android-vr1`: 62 same, 9 DIFF, re-shot
+  in `-vr2`. The lead judged every DIFF: `setup-location-*` is the keyboard
+  timing flake (the bottom bar sits above or below the keyboard), and the
+  tracker cards differ only in the shade's blurred backdrop. Nothing was
+  accepted.
+
+Lead integration: `cr-p5-ios` and `cr-p5-android` merged into main.
+- The iOS offline board ran its two plans concurrently on the planner actor,
+  so a cold open could read the timetable twice. It now plans the recent window
+  first, as Android does (`6b9e025`). `tools/build-ios.sh --unit` passed 313;
+  the UI suite was not rerun for this ordering change.
+- On main: `go test ./...` passes, web 637 pass, and the playtest exits 0.
+- Owner rulings 27 and 28: close and release now, and recapture the riding
+  widget exemplars during the close.
