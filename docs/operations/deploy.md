@@ -176,6 +176,38 @@ read-only container probe verified the actual environment key `prod` and a true
 `tiny_train` evaluation (`FALLTHROUGH`). No `.env` files were read or credentials
 printed; the probe used the container's existing process environment.
 
+Version `1.10.0` (source `766d8f88cf13`, service worker `v76`) deployed on
+2026-10-03 in job `2c417f9ab0bcc1e29832a60eaeb3b50b`, infra pin `5fb2e35`.
+Image digest:
+`sha256:caab1e4596fbb31cfaeec5fcbb72fbfd232ef06c7ba39f941dd12b2d93962ff1`.
+Public health and all 35 shell paths matched the release bytes, and
+`/js/main.js` and `/sw.js` keep `no-store`. The production open probe met the
+bar: warm cached paint 84 ms, live data 76 ms, worker controlling; cold live
+data 960 ms. It carries commute reliability: the trip-control line with Start
+trip and Stop trip in place of pinning, starting a running train from the
+board, on-board entry, trips that end at the arrival estimate, and the
+two-plan offline board. The phones bundle the 20261003–20261101 timetable, and
+the server's timetable refresh stages its files on `/data`. At deploy the live
+manifest still carried the 2026-10-02T23:00Z package: it was under a day old,
+so the restart did not refresh, and the next daily refresh is the first to run
+the new staging code.
+
+Go, 637 web tests, both recorded web journeys and the web visual regression
+(the seven Settings frames re-accepted for the version string) passed.
+Android Debug and signed Release gates passed (283 JVM tests), with 83 of 84
+instrumented tests: `missingSundayMetroUsesBoundedNextServiceSearch` took
+17.1 s against its 12 s bound under host load 14-43, where the 1.9.0 build
+took 14-54 s on the same emulator; it has not been rerun on a quiet host. Its
+visual regression matched 62 frames, with the setup-location keyboard frames
+and the tracker cards' shade backdrop excepted. iOS passed 313 core tests on
+the final sources and 26 UI tests (7 skipped) before the offline board's plan
+order changed; its 60 frames matched. The signed Android 1.10.0/code 11 APK is
+published at `/downloads/`; its SHA-256 is
+`b72d1c2b091aa799073630f5d286a7130a3528937d40823bcec379a889f70860`.
+iOS 1.10.0 (11) was archived, signed and uploaded to internal TestFlight at
+17:22 AEST on 2026-10-03. Processing and group assignment need App Store
+Connect sign-in and have not been confirmed.
+
 Version `1.9.0` (source `734e649cba18`, gated at `afeae4e5f678` with only docs
 changed since, service worker `v70`) deployed on 2026-09-26 in job
 `744e0f9ba3787d32a83ffb044e882fe8`, infra pin `ec180b3`. Image digest:
