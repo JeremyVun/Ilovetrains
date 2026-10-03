@@ -559,7 +559,10 @@ Traps:
   bounds attached by XCTest; full frames and AX evidence stay in the reported
   temporary source directory. Pixel review must confirm the intended fixture
   and all its content before accepting a crop. Large-text, Island, locked-device
-  and lifecycle checks remain separate lanes.
+  and lifecycle checks remain separate lanes. The simulator's default Dynamic
+  wallpaper changes colour with the time of day (teal before about 18:00,
+  purple after), and the crops include it at the card corners, so an evening
+  run can report corner-only differences that are the wallpaper.
 - One emulator, one simulator. A peer session mid-drive on either device puts
   its frames, or its display size, into yours; the tool polls for a running
   `shoot-android.sh`, `am instrument` or `shoot-ios.sh` and waits up to ten
