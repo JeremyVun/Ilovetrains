@@ -139,6 +139,15 @@ description the owner chose, or the owner's own words.
     and below (`web/app.css` `@media (max-width: 375px)`: Home figure column
     92, figure 56, wide figure 44, station names 15; the board title and bar
     rules), as ruling 25 did for the margin; 390 and above are unchanged.
+27. Closeout, asked 2026-10-03 as phase 5 Android finished: “Close and release
+    (Recommended)” — once Android phase 5 merges, run the close stage and
+    release at once: contracts, folder deletion, version bumps, the web image
+    and infra pin, the Android release APK and the iOS TestFlight upload.
+28. Stale widget exemplars, asked 2026-10-03: the nine
+    `assets/comps/latest/widgets/{ios,android}/*-riding-*` frames still show
+    `PINNED`. “Recapture in close (Recommended)” — an Opus visual agent
+    re-shoots both platforms' riding widgets during the close, after the
+    release.
 
 The owner's regression concern in ruling 13 is binding: automatic trip starts
 that work today must keep working. Every rule below only adds ways in, and the

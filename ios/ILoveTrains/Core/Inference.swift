@@ -308,11 +308,12 @@ func offlineBoard(
     maxTransfers: Int,
     recommendationAt: Millis? = nil
 ) async throws -> OfflinePlanResult {
-    async let recent = try? planner.plan(from: from, to: to, at: now - offlineBoardLookback, modes: modes,
+    // Planning the earlier window first lets the later plan reuse its cached connections.
+    let recent = try? await planner.plan(from: from, to: to, at: now - offlineBoardLookback, modes: modes,
                                          limit: offlineBoardLimit, maxTransfers: maxTransfers)
     var upcoming = try await planner.planResult(from: from, to: to, at: now, modes: modes, limit: offlineBoardLimit,
                                                 maxTransfers: maxTransfers, recommendationAt: recommendationAt,
                                                 includeRecommendation: recommendationAt != nil)
-    upcoming.board = mergedPage(online: upcoming.board, timetable: await recent) ?? upcoming.board
+    upcoming.board = mergedPage(online: upcoming.board, timetable: recent) ?? upcoming.board
     return upcoming
 }
