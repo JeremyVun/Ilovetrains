@@ -74,11 +74,6 @@ experiments. This is a shell deploy with a worker version bump, never remote
 configuration or server-side assignment. Queued entries that still carry a
 closed experiment's `x.*` dimension are obsolete and are dropped, not sent.
 
-`strip-placement` (A3, the inferred correction below the heavy rule, against
-A2, in the receipt slot) closed on 2026-10-02: the owner read it on the data
-so far and hard-coded A3, which became the trip-control line (ui.md, Smart
-home; owner ruling 15).
-
 ## Event vocabulary and ordering
 
 Header kinds are `predicted` (the no-location predictor), `focus` (hand-chosen
@@ -126,8 +121,8 @@ an equal identity key (every service leg's line and scheduled departure:
 and direction with another key. A same-trip pin when home displayed no lead
 journey emits nothing. Each start emits at most once; stopping a trip the
 rider started emits nothing, though it still writes the decline for a trip on
-a saved pair (owner ruling 23, [client-storage.md](client-storage.md)), and
-stopping a guessed trip emits only `declined_inferred`. The event stays
+a saved pair ([client-storage.md](client-storage.md)), and stopping a guessed
+trip emits only `declined_inferred`. The event stays
 guessed-only so the wrong-entry rate below counts only guesses. `rode_*` never fires for a correction of an existing ride
 or a legacy ride restored by migration; a withdrawn estimate ride recorded again counts
 again.

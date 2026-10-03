@@ -3,19 +3,19 @@
 This file records deliberate differences between the native Android app and the web reference.
 
 - System bars use Android edge-to-edge insets. The content starts below display cutouts and status icons and ends above gesture navigation rather than reproducing browser chrome or CSS safe-area behavior.
-- Location permission is requested only after an explicit setup or Settings action. Both native apps follow the setup location flow in [ui.md](ui.md#setup-and-station-search), including progress, accuracy-aware station choices and retry (owner ruling, 2026-09-08, superseding the automatic first-launch prompt). Android records `locationAsked` only for a non-empty permission result. Permission is blocked only when absent, a request has returned an answer, and `shouldShowRequestPermissionRationale(ACCESS_COARSE_LOCATION)` is false. A soft refusal or dismissed prompt remains retryable. Blocked permission opens `ACTION_APPLICATION_DETAILS_SETTINGS`; disabled device location opens `ACTION_LOCATION_SOURCE_SETTINGS`. Returning from Settings resumes the pending setup lookup if permission is granted. A foreground lookup listens to enabled network and GPS providers, stops after a useful fix, and ends within 15 seconds. Approximate fixes get up to two seconds for a more accurate provider before offering station choices. No web footer permission panel or background tracking is used.
+- Location permission is requested only after an explicit setup or Settings action. Both native apps follow the setup location flow in [ui.md](ui.md#setup-and-station-search), including progress, accuracy-aware station choices and retry (owner ruling, 2026-09-08, superseding the automatic first-launch prompt). Android records `locationAsked` only for a non-empty permission result. Permission is blocked only when absent, a request has returned an answer, and `shouldShowRequestPermissionRationale(ACCESS_COARSE_LOCATION)` is false. A soft refusal or dismissed prompt remains retryable. Blocked permission opens `ACTION_APPLICATION_DETAILS_SETTINGS`; disabled device location opens `ACTION_LOCATION_SOURCE_SETTINGS`. Returning from Settings resumes the pending setup lookup if permission is granted. A foreground lookup uses the provider choice under "Foreground arrival evidence", stops after a useful fix, and ends within 15 seconds. Approximate fixes get up to two seconds for a more accurate provider before offering station choices. No web footer permission panel or background tracking is used.
 - Android system Back performs the same navigation as each visible back control. The Compose screens do not add a second browser-style history mechanism.
 - Swiping a saved trip row towards the start edge deletes it: the Material dismiss pattern, uncovering Gmail's red (`#D93025`) with a white trash icon at the page margin, committing past half the row width or on a flick. The deletion is reversible for six seconds (extended by Android’s accessibility timeout) from the bottom message bar, which reads `{from} → {to} deleted` and whose label becomes `Undo`; the cached boards go when the window ends ([client-storage.md](client-storage.md#android-storage)). On Home, the bar reserves its own height above the fixed New trip / Settings footer, shortening the scrollable trip list without covering either action. Long-pressing the row still opens a native menu with a separate `Delete trip` choice, equally undoable, and TalkBack exposes the same menu as `Trip actions`; the menu is the TalkBack and fallback path because the swipe is not exposed to accessibility services. The ordinary row stays visually identical to the web composition.
 - Station search uses a native text field and keyboard action. Results and ranking remain local; the keyboard can resize the sheet rather than overlaying it as mobile browsers sometimes do.
 - Settings omits the offline timetable row. Automatic timetable updates and the Home error recovery action remain available.
 - New offline journeys use the bundled timetable and conservative transfers within a station or wharf hub. Routes may differ from the online Trip Planner; cross-hub walks such as Wynyard–Barangaroo require the online fallback. Coverage gaps and realtime identity limits are recorded in [native-data.md](native-data.md).
-- Release builds send the anonymous header, pin and ride counters in [analytics.md](analytics.md) with `pl: "android"`. The web-only setup, panel and strip-experiment events are not sent, and an open is a user-visible foreground entry rather than a page load. Debug builds never send.
+- Release builds send the anonymous header, pin and ride counters in [analytics.md](analytics.md) with `pl: "android"`. The web-only setup, location-panel, `back_*` and `change_inferred` events are not sent, and an open is a user-visible foreground entry rather than a page load. Debug builds never send.
 - A journey whose first leg departs on the timetable while a later leg carries a realtime estimate paints in the live register on Android, where `journey.realtime` is true for an estimate on any leg, and reads `SCHEDULED` on web, which looks only at the departure the rider acts on. The 40 minute live horizon rule in [ui.md](ui.md#past-stale-and-exceptional-data) does not close the gap: its predicate reads the first leg's departure estimate, so such a row is left exactly as it is today at any lead (owner ruling, 2026-09-11).
 - Android stores user state in app-private atomic files and excludes it from cloud backup and device transfer. The native trip list is not capped at the web client’s ten-trip LRU, and each trip has the explicit native deletion menu described above.
 
 ## Trip-control line
 
-- The line matches the round 3b Roboto exemplars at 360 and 412 dp to within a dp.
+- The line follows the web composition, rendered in Roboto, to within a dp at 360 and 412 dp.
   The question is 15 sp Light without the 0.5 sp tracking the app's body
   style otherwise inherits. The actions carry the CSS .14em tracking, which
   also follows the last letter. The glyphs are Material `Icons.Filled.Stop`
@@ -23,8 +23,8 @@ This file records deliberate differences between the native Android app and the 
   slot because Material fills about half its box. The stop square is the
   exemplar's 8 dp mark; the play triangle keeps Material's shape, 1 dp
   narrower than the exemplar's. Both sit on the cap height.
-- At 375 dp and narrower Android takes the web's whole narrow-phone rule
-  (owner rulings 25 and 26, 2026-10-03), read from the window width
+- At 375 dp and narrower Android takes the web's whole narrow-phone rule,
+  read from the window width
   (`NarrowPhone`): the 18 dp page margin on every screen; the Home header's
   92 dp figure column, 56 sp figure (44 sp wide) and 15 sp station names; the
   board title at 24 sp with a 36 dp connector; and, on board and detail rows,
@@ -44,8 +44,8 @@ This file records deliberate differences between the native Android app and the 
   label does.
 - The trip-over offer keeps the native `Need to get back?  SHOW THE WAY BACK`
   composition, which iOS shares, in place of the web's `Trip over` block. It
-  never claims `You’ve arrived`, so ruling 21 changes no Android copy. A
-  location-confirmed ending's sign reads `The journey has finished`.
+  never claims `You’ve arrived` after either ending. A location-confirmed
+  ending's sign reads `The journey has finished`.
 
 ## Home-screen widget
 
@@ -71,9 +71,14 @@ This file records deliberate differences between the native Android app and the 
 While a stored focus is under way, the existing foreground location owner can
 monitor it across Home, detail and Settings with already-granted permission.
 Provider updates target ten seconds; accepted evidence is at least five seconds
-apart. Setup lookups share the owner. Backgrounding, disabling location,
-permission loss, unpinning, deleting or replacing focus stops collection and
-clears the raw window; late callbacks cannot cross generations. No background
+apart. Setup lookups share the owner. Every request prefers the fused provider
+(API 31 and later) and otherwise listens to GPS and network, accepting a
+network fix only when no GPS fix arrived in the last 20 seconds, so fixes
+carry speed and bearing and network fixes cannot interleave into a contiguous
+evidence window. Setup lookups, single Home fixes and arrival monitoring each
+hold their own listener: cancelling a setup lookup never stops monitoring.
+Backgrounding, disabling location, permission loss, Stop trip, deleting or
+replacing focus stops collection and clears the raw window; late callbacks cannot cross generations. No background
 GPS or location payload is introduced. Persist only the identity-bound guard,
 retention checkpoint and optional completion basis/time described in
 [client-storage.md](client-storage.md#final-arrival-decision).

@@ -292,9 +292,10 @@ bounded to 24 hours and never cross station-pair or enabled-mode cache keys.
 
 A board's local plan is two timetable plans merged by journey key: the next 24
 departures from now, and 24 from 15 minutes earlier for the services that just
-left (owner ruling 24, 2026-10-02). A single plan from 15 minutes earlier
-filled with departed services on a busy corridor, Central–Parramatta at 08:00,
-and offered no train to take.
+left. A single plan from 15 minutes earlier can fill with departed services on
+a busy corridor (Central–Parramatta at 08:00) and offer no train to take. The
+earlier plan runs first and the later one reuses its cached connections, so a
+cold board open reads the timetable once.
 
 The native cache stores an optional `homeJourneyKey`. Offline Home preserves
 that answer, even after departure, until its last-known arrival plus 30 minutes.

@@ -45,15 +45,15 @@ iOS implementation requested on 2026-09-07.
   `detail-pinned`.
 - Home's trip-over offer is one line, `NEED TO GET BACK?  SHOW THE WAY BACK`,
   with no `Trip over` paragraph and no `Not now`, so it never says
-  `You’ve arrived.` after either ending; ruling 21 changes only the web's
-  paragraph. The estimate-ending sign above it wraps onto a second line.
+  `You’ve arrived.` after either ending. The estimate-ending sign above it
+  wraps onto a second line.
 - New offline trips route over the same bundled SQLite package as Android.
   Conservative same-hub transfers and no cross-hub walking graph can produce
   different routes from the online planner. The app uses online Trip Planner
   results when available and has scheduled local results while it waits.
 - Offline timetable coverage and a manual update action appear in Settings.
-  The bootstrap covers 5 September–4 October 2026. Its coverage is finite;
-  packages must be republished and downloaded to plan beyond that date.
+  The bundled package's coverage, recorded in its `timetable-manifest.json`,
+  is finite; packages must be republished and downloaded to plan beyond it.
 - Settings uses 72pt minimum personal rows with 10pt vertical padding. Service
   choices show only `On`/`Off`; appearance keeps the selected checkmark without
   an underline. The `Transfer limit` row, shown inside Services only while the
@@ -68,8 +68,8 @@ iOS implementation requested on 2026-09-07.
   shift to avoid overlap and stay within the device, while service-time coordinates
   stay proportional. Each transfer station sits beneath its dwell midpoint,
   clamped within the device and wrapped or stacked when names collide.
-- At 375pt and narrower iOS takes the web's narrow-phone sizes (owner ruling
-  26, 2026-10-03), so the Home header prints `Bondi Junction` on one line.
+- At 375pt and narrower iOS takes the web's narrow-phone sizes, so the Home
+  header prints `Bondi Junction` on one line.
   Three things stay native. The board title's arrow is a 44pt hairline and
   chevron, narrowed by the web's 4pt to 40pt, where the web draws 26px and
   22px. Journey-line pins have no minimum width above 375pt, so a `1` pin is
@@ -78,8 +78,7 @@ iOS implementation requested on 2026-09-07.
   sit 7.5pt further below the status line than the web's, and the figure,
   set in its full SwiftUI line box rather than the web's 0.84em, starts 10 to
   12pt below the names instead of level with them. The header is 8pt taller
-  than `home-guessed-375x667`, and 12pt taller at 402pt than the 390
-  exemplar.
+  than the web's at 375pt, and 12pt taller at 402pt than the 390 exemplar.
 - The promoted Detail row is plain content, not a disabled button. Its chips
   keep their full fill and text colours; cancellation fades the composited
   journey device once so underlying bars cannot bleed through the labels.
@@ -106,8 +105,8 @@ iOS implementation requested on 2026-09-07.
   than change what `journey.realtime` means.
 - Release builds send the anonymous header, pin and ride counters in
   [analytics.md](analytics.md) with `pl: "ios"`, as on Android: no web-only
-  setup, panel or strip-experiment events, an open is a user-visible
-  foreground entry, and debug builds never send. User-written
+  setup, location-panel, `back_*` or `change_inferred` events, an open is a
+  user-visible foreground entry, and debug builds never send. User-written
   feedback still sends only after tapping Send feedback. Drafts live in memory
   across navigation and clear after a successful submission. The success banner
   dismisses after four seconds; errors remain manually dismissible.

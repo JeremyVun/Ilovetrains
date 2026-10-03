@@ -347,9 +347,9 @@ read them in a different order:
 The explicit selection is the trip whose saved-trip row the user tapped. It
 lasts for the session and is never persisted, and it never writes `focus`.
 
-**A return after 10 minutes is a new open** on every client (owner ruling 3,
-2026-10-01). A return to the foreground after at least 10 minutes in the
-background lands on Home (setup when no trip is saved): it clears the explicit
+**A return after 10 minutes is a new open** on every client. A return to the
+foreground after at least 10 minutes in the background lands on Home (setup
+when no trip is saved): it clears the explicit
 selection, drops board, detail, setup and settings navigation state, and runs
 the normal open path (the open snapshot, prediction, silent fix and refresh).
 Background means web `document.hidden`, Android `onStop` without a
@@ -386,21 +386,21 @@ and deduplication.
 
 Keep explicit/inferred focus and the existing retained offline answer ahead
 of this selector. Choosing a different saved pair still follows existing
-selection rules. Merely recommending a service does not pin it or infer a ride.
+selection rules. Merely recommending a service does not start it or infer a ride.
 Cancellation replacements before departure use the same cost rule among
 eligible alternatives; preserve the cancelled-service explanation. Post-
 departure transfer recovery remains outside this item.
 
 The board retains its current row count, chronology, past paging and scroll
 behavior. Separate candidate data from board presentation. Home, its saved-trip
-status, `lastOpen`, opening detail and pinning must all refer to the actual
+status, `lastOpen`, opening detail and Start trip must all refer to the actual
 chosen candidate, even if it is outside the visible six web board rows.
 
 The pre-departure alternative rail uses the earliest catchable service with a
 different first-service identity. It may leave before the recommendation:
 label it `Earlier train` / `Earlier ferry` in that case, otherwise retain
 `Next train` / `Next ferry`. Use its own times and freshness. The rail opens
-that exact service; it must not silently pin another train. Preserve the
+that exact service; it must not silently start another train. Preserve the
 existing 44px rail composition and accessibility description.
 
 Persist up to two supplementary raw pages with the existing directed cache
@@ -416,7 +416,7 @@ native encoded equivalent; the bounded content and provenance are the seam.
 
 ## Focused journey
 
-The document may contain an optional `focus` field for a pinned or inferred service:
+The document may contain an optional `focus` field for a started or inferred service:
 
 ```json
 "focus": {
@@ -434,8 +434,8 @@ The document may contain an optional `focus` field for a pinned or inferred serv
   reads as `"focus"`; any other value drops the focus.
 - Written by Start trip and by inferred entry below; nothing else writes it.
   **Start trip** starts exactly the journey it is attached to, replacing any
-  focus, and returns Home (owner rulings 11-14, 2026-10-02): journey detail's
-  start action on that journey; Home's lead journey while it has not departed
+  focus, and returns Home: journey detail's start action on that journey;
+  Home's lead journey while it has not departed
   and leaves within 15 minutes and is not cancelled (`0 ≤ D − now ≤ 15 min`,
   the window auto-start uses for "seen at the platform"; never a later train or
   one that has left); and a departures-board row whose journey is on its way
@@ -452,9 +452,9 @@ The document may contain an optional `focus` field for a pinned or inferred serv
   Home that shows the stop answers again from the prediction, where the phone
   is now, rather than holding the stopped trip and direction as an explicit
   selection. It also writes `inferenceDeclined` for any stopped trip that
-  belongs to a saved trip, started or guessed (owner ruling 23, 2026-10-02):
-  otherwise a rider who stops a trip they started while still riding is
-  guessed back in by the next train-speed fix. A guessed focus names its saved
+  belongs to a saved trip, started or guessed: otherwise a rider who stops a
+  trip they started while still riding is guessed back in by the next
+  train-speed fix. A guessed focus names its saved
   trip and direction. A started focus belongs to the saved trip whose endpoints
   match its pair in either direction: `forward` when the trip runs from the
   pair's origin, `reverse` when it runs from the pair's destination. A started
@@ -525,7 +525,7 @@ anchor the search, or to claim the rider alighted or boarded.
 
 - The record is a sibling of `journey` on the focus and is never spliced into
   it. At most one exists; a new anchor replaces it. It is cleared with the
-  focus, on unpin or replacement, and on the first refresh where no change is
+  focus, on Stop trip or replacement, and on the first refresh where no change is
   lost. A malformed record is dropped and the focus survives it; nothing here
   may crash a client.
 - `changeIndex` is a change index of the composed journey below: an integer in
@@ -635,26 +635,26 @@ key), so evidence for another train survives.
 began, before any write of this open, and then the stored record; either may
 enter. A record sighted at the origin `O` of the snapshot's
 `leg(trip, direction)` by a fix taken at least 60 s after the snapshot
-journey's effective departure retires the snapshot for the rest of the visit,
-whether or not the hold rule lets that record replace the stored one: seen at
-the platform again, the rider did not board that train (owner ruling 2,
-2026-10-01). As in the hold rule the clock is the sighting fix's, not the
-write's, and the record may name any trip from `O`. Without this, a rider who
-let the shown train go and boarded the next after a return to the app was
+journey's effective departure retires the snapshot until the next Home open,
+return or back-to-Home takes a new one, whether or not the hold rule lets that
+record replace the stored one: seen at the platform again, the rider did not
+board that train. As in the hold rule the clock is the sighting fix's, not the
+write's, and the record may name any trip from `O`; an unsighted record, or a
+snapshot whose trip is gone, never retires it. Otherwise a rider who let the
+shown train go and boarded the next after a return to the app would be
 entered on the train they let go. Every client keeps the snapshot (web
 `previousOpen`), which on its own closes the race where an open's own
 refresh overwrites the record before the fix arrives; the hold rule protects
-the stored record for an app that stays open. Keeping both is deliberate
-(owner ruling 13, 2026-10-02): the working automatic start is untouched and
-the hold rule can only add entries. Inference uses the snapshot even when the
+the stored record for an app that stays open. Keeping both is deliberate:
+automatic starts that already work must keep working, and the hold rule can
+only add entries. Inference uses the snapshot even when the
 station index or fix arrives late. `tools/fixtures/conformance/inference.json`
 carries the hold-rule cases and today's passing automatic starts as
 regression cases.
 
 **Fixes while Home stays open.** While the app is foreground on Home,
 nothing is focused, the location preference is on and permission is granted,
-each 30-second refresh tick takes one fix when any of these holds (owner
-ruling 2, 2026-10-01):
+each 30-second refresh tick takes one fix when any of these holds:
 
 - a journey Home displayed as its lead during this foreground visit departed
   within the last 5 minutes (kept in memory, sighted or not);
@@ -690,11 +690,11 @@ destination of `leg(trip, record.direction)` on the saved trip:
 2. seen at the platform: `record.station.id == O.id` and
    `0 ≤ D − record.at ≤ 15 min`. A record written after its train left is a
    retained answer, not evidence of boarding: offline native Home keeps the
-   departed train as its lead until arrival + 30 min (native-data.md), and
-   without the lower bound a platform sighting 70 s after departure
-   re-recorded that train and entered it once the rider boarded the next. The
-   web never writes such a record, since its lead departs at or after now;
-   the bound is the same on every client;
+   departed train as its lead until arrival + 30 min (native-data.md) and can
+   record it again after departure, so without the lower bound a rider seen on
+   the platform who boards the next train would be entered on the departed
+   one. The web never writes such a record, since its lead departs at or after
+   now; the bound is the same on every client;
 3. moved toward: `distance(fix, O) ≥ 1 km` and
    `distance(fix, Z) ≤ distance(O, Z) − 1 km`;
    or instead of 3: the fix reports `speed ≥ 8 m/s` (about 30 km/h) and
@@ -715,9 +715,9 @@ unseen, or seen only while no record could be written (the web offline), and
 took the next one gets directions one service off: a known and accepted gap,
 not a defect.
 
-**On-board entry** (owner rulings 5 and 6, 2026-10-01) is evaluated on every
-Home fix when nothing is focused, after platform-sighted inference from both
-records has not entered, and only for a fix at train speed. Let `P` be the fix.
+**On-board entry** is evaluated on every Home fix when nothing is focused,
+after platform-sighted inference from both records has not entered, and only
+for a fix at train speed. Let `P` be the fix.
 
 1. *Candidate trips*: compatible saved trips whose endpoints both have
    coordinates, with `d(P, O) ≥ 1 km`, `d(P, Z) ≥ 1 km` and
@@ -738,11 +738,15 @@ records has not entered, and only for a fix at train speed. Let `P` be the fix.
    count; else 60 min), limit 10, under the current modes and cap. Native
    also plans the same window from the offline timetable (limit 30) and merges
    by journey key, online first. Keep journeys with `D ≤ now ≤ A`, not
-   cancelled, modes and cap allowed. `Δ` is not the longest duration: one
-   99-minute offline itinerary pushed the window back past everything ten
-   services could reach. On a very frequent line a rider a few minutes out can
-   fall after the tenth service; a later fix catches them as the train ages
-   into the window, and the native timetable plan of 30 covers it at once.
+   cancelled, modes and cap allowed. `Δ` is the median, not the longest
+   duration, because an offline plan can hold a 99-minute itinerary that would
+   push the window back past everything ten services reach. On a very frequent
+   line a rider a few minutes out can fall after the tenth service; a later fix
+   catches them as the train ages into the window, and the native timetable
+   plan of 30 covers it at once. The accepted cost: a rider more than
+   `Δ + 10 min` into an itinerary much longer than the median has a departure
+   before `at`, and no later fix brings it back; a running row on the board
+   still starts that trip.
 4. *Match*: time progress `f_t = (now − D) / (A − D)` and position progress
    `f_p = d(O, P) / (d(O, P) + d(P, Z))`; a journey matches when
    `|f_t − f_p| ≤ 0.25`. With trains eight minutes apart on a 25-minute ride,
@@ -801,7 +805,7 @@ Permission failure/denial permits the never-armed fallback, without prompting.
 
 Once armed, the trip ends by estimate three minutes after its arrival estimate
 unless fresh evidence shows the phone still moving at vehicle speed away from
-the destination (owner ruling, 2026-10-01). Loss of GPS, permission, app
+the destination. Loss of GPS, permission, app
 visibility or the location preference cannot hold it open. Turning location off immediately stops
 collection and clears all raw evidence; the guard's boolean remains. An
 already recorded legacy ride is not revoked merely by migration.
@@ -815,7 +819,7 @@ Use provider updates with a target interval of ten seconds; accept no more
 than one sample per five seconds. Keep at most 24 samples over 120 seconds.
 Use watchPosition/clearWatch on web and foreground update subscriptions on
 native. Keep one provider owner so setup lookups and monitoring do not race.
-Stop on background, replacement/unpin/deletion, completion, expiry or disabled
+Stop on background, replacement/Stop trip/deletion, completion, expiry or disabled
 permission/preference; reject callbacks from earlier generations. Resume with
 an empty window and a new generation. Never request background location.
 
@@ -865,8 +869,8 @@ turn. Failed/unmatched refresh retains its snapshot and honest freshness.
 
 Arrival unconfirmed therefore always means the phone is plainly still riding.
 A train stopped between stations with stale realtime ends three minutes after
-its last estimate; that is the accepted trade-off of the owner's ruling, and
-the estimate copy says the estimate passed, not that the rider arrived.
+its last estimate; that is an accepted trade-off, and the estimate copy says
+the estimate passed, not that the rider arrived.
 
 **Evidence wait.** The reducer's `resumeWaitUntil` input is the evidence wait:
 45 seconds from the moment foreground arrival monitoring starts for the focus
@@ -874,9 +878,10 @@ in a foreground visit, and from an open or a return to the foreground with a
 guarded, unsettled focus already past its estimate. Sustained movement needs
 three speed samples spanning 30 seconds and the first provider fix can take
 15 seconds, so without the wait a rider who opens the app on a late, still
-moving train would be settled before the evidence could show movement. A
-provider error that restarts sampling within the same visit does not restart
-the wait. The wait also holds an overdue expiry.
+moving train would be settled before the evidence could show movement. The
+wait starts once per focus identity and foreground visit: restarting
+monitoring within the visit, after a provider error or a preference change,
+does not restart it. The wait also holds an overdue expiry.
 
 ### Persisted metadata, expiry and correction
 
@@ -912,7 +917,7 @@ before applying an overdue expiry; only destination confirmation can pre-empt
 it. Expiry is silent removal, not “Arrived,” and no
 return offer. It records the followed journey as ridden with estimate basis
 (`recordAndExpire`) unless the journey is cancelled or a ride for it already
-exists (plain `expire`): a phone left in a pocket after a pin rode the train
+exists (plain `expire`): a phone left in a pocket after Start trip rode the train
 (owner ruling, 2026-09-23). Clear `lastOpen` when it names the expired trip,
 direction and journey, and the open snapshot, so it cannot immediately
 reinfer (see the hold rule under "Travel mode"). Completed/never-guarded
@@ -951,14 +956,14 @@ the saved trip ID, direction and ordered service-leg key; an updated estimate or
 platform does not create a new tracker.
 
 Entering travel mode starts a tracker session, subject to OS permission,
-whether it was inferred or pinned (owner ruling, 2026-09-23). Replacing focus
+whether it was inferred or started (owner ruling, 2026-09-23). Replacing focus
 during an active session replaces the tracker. Browsing another
 board has no effect. Temporary mode/cap hiding removes the system surface while
 retaining its session and suppression metadata; deleting the trip or removing
 focus ends it.
 
-Dismissal suppresses recreation for that exact focus without clearing focus,
-changing a pin or writing a ride. Completion ends the session without a retained
+Dismissal suppresses recreation for that exact focus without clearing or
+changing focus or writing a ride. Completion ends the session without a retained
 summary. A tracker clock reaching its endpoint never settles a ride; the existing
 refresh and location completion rules above retain sole authority. A stale
 surface tap or asynchronous update cannot restore a replaced focus. A valid tap
@@ -1060,11 +1065,11 @@ within 2 km; none. Saved endpoints use the index coordinates when available,
 falling back to the saved snapshot. The saved end outranks a nearer stranger
 so a user whose own origin is a kilometre away is not handed a station they
 have never used, and 400 m keeps a rider inside Town Hall's own footprint from
-being handed Gadigal, 152 m from Town Hall's point (owner ruling, 2026-10-01).
+being handed Gadigal, 152 m from Town Hall's point.
 Without the index, or without a fix, there is no `here`.
 
 Setup's location pick is not `here`: adding a trip asks where the user stands,
-not which saved trip they mean (owner ruling, 2026-10-02). It takes the
+not which saved trip they mean. It takes the
 nearest saved end within 200 m, else the nearest eligible index station within
 200 m, then `here`'s 2 km tiers, and it has no train-speed rule
 (`setupHere(doc, stations, fix)`).
@@ -1072,13 +1077,13 @@ nearest saved end within 200 m, else the nearest eligible index station within
 **Train speed.** A fix is at train speed when its reported speed is finite,
 non-negative and at least 8 m/s. A fix without a usable speed is at train
 speed when the previous Home fix, taken 15-120 s earlier with both accuracies
-known, is at least `8 m/s × Δt + accuracy₁ + accuracy₂` away: the bound
+known (finite and non-negative), is at least `8 m/s × Δt + accuracy₁ + accuracy₂` away: the bound
 subtracts the worst-case error of both positions, so GPS jitter cannot produce
 it. The previous Home fix lives in memory only and is cleared with the
 in-memory fix. A fix at train speed has no `here`: it casts no home vote,
 creates no pair, adds no location term, records no sighting, and does not
 re-run `locate` over the answer Home already shows. A passing station is never
-`here` (owner ruling, 2026-10-01).
+`here`.
 Wharves and railway stations follow the same rules. `stations.js` exposes
 `loadStations()` (one fetch per page, null on failure),
 `nearest(stations, fix, withinKm)` (`{station, km}` or null),
@@ -1156,7 +1161,7 @@ Without `here`, try a confident history winner, then the unique strongest
 location factor, then `lastViewed`, then the first saved trip `forward`.
 With `here`, compare only candidates originating there using their base score;
 if none confidently wins, retain the existing homeward/last-viewed/first fallback.
-Explicit taps and pins still take precedence in the controller. Ranking saved
+Explicit taps and started trips still take precedence in the controller. Ranking saved
 rows uses the same capped scores, with the header's selected trip first.
 
 ### Geolocation term

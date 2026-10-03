@@ -42,8 +42,7 @@ zone.
   journey is on its way (left but not arrived, not cancelled, modes and cap
   allowed) instead starts trip mode on it at once and lands on Home, replacing
   any current trip mode; that is how a wrong guess is corrected to the right
-  train (owner ruling 12, 2026-10-02). Upcoming and arrived rows still open
-  detail.
+  train. Upcoming and arrived rows still open detail.
 - `Start trip` starts trip mode on exactly the journey it is attached to: on
   journey detail that journey, and on Home the header's own train while it
   leaves within 15 minutes. A running board row starts its journey the same
@@ -162,10 +161,9 @@ When the flag is off, the trip line remains unchanged and does no animation work
   `TRIP OVER`. Only the header carries it; the focused saved-trip row does
   not repeat it (owner ruling, 2026-09-23). A started trip reads the service's
   own status exactly as a guessed one does, `RUNNING` before departure
-  included (owner rulings 14 and 20, 2026-10-02): the status line carries no
-  pin, no `PINNED` and no control. A cancellation replacement is not labelled
-  as the started service. No copy claims the rider is aboard. The trip grid
-  starts 14px below the status band.
+  included: the status line carries no pin, no `PINNED` and no control. A
+  cancellation replacement is not labelled as the started service. No copy
+  claims the rider is aboard. The trip grid starts 14px below the status band.
 - `RUNNING LATE` requires all three of: fresh data, neither stale nor offline;
   a realtime estimate on the relevant leg's departure or arrival; and a
   positive difference between the printed clock minutes of that estimate and
@@ -270,7 +268,7 @@ When the flag is off, the trip line remains unchanged and does no animation work
   departure. Keep its countdown visible for stale and offline data, using the
   candidate's own times and source freshness indication. No candidate means no rail, not a claim
   that no later service exists. The rail disappears once the lead departs.
-  Opening its detail never pins it; the detail action performs the pin.
+  Opening its detail never starts it; the detail's `Start trip` does.
   The detail's first paint retains the tapped rail's response and freshness;
   an older cache must not replace that source during navigation.
 - The header may fetch live data only for the selected trip, and, while the
@@ -283,8 +281,7 @@ When the flag is off, the trip line remains unchanged and does no animation work
 - The trip-control line sits between the heavy rule and `MY TRIPS`: 48px with
   a hairline below it, 49px in all, the page margin at both ends, question
   words at the left in the offer-paragraph type (`--ink-2`) and every action
-  at the right in the offer-button idiom with a 48px-high target (owner
-  rulings 9 and 15-19, 2026-10-02, the round 3b exemplars). Its states:
+  at the right in the offer-button idiom with a 48px-high target. Its states:
 
   | Home state | Line |
   | --- | --- |
@@ -715,10 +712,9 @@ when schedule-only, or `The last arrival estimate has passed. The return trip is
 when an estimate exists. That sign wraps onto a second line rather than
 cutting; on Home every instruction the app writes wraps, and only an upstream
 headsign may ellipsise. The trip-over offer below it then reads
-`The return trip is ready when you are.` without `You’ve arrived.` (owner
-ruling 21, 2026-10-02). Location-confirmed completion keeps the existing
-arrival/return composition and wording, `You’ve arrived. The return trip is
-ready when you are.`
+`The return trip is ready when you are.` without `You’ve arrived.`
+Location-confirmed completion keeps the existing arrival/return composition
+and wording, `You’ve arrived. The return trip is ready when you are.`
 
 The shared arrival state must override all repeated UI `now >= A` tests.
 Journey detail's final step does not become done solely from ETA for the
@@ -850,13 +846,13 @@ pointer device it was the one piece of chrome on a screen that is otherwise all
 hairlines (owner ruling, 2026-09-05).
 
 A phone's page margin is 22px. On phones 375px wide and narrower it is 18px on
-every screen and every client (owner ruling 25, 2026-10-03), which is what lets
-the guessed trip-control line print whole at 360px. The rest of the web's
-narrow-phone sizes apply on every client too (owner ruling 26): the Home
-header's 92px figure column, 56px figure (44px wide) and 15px station names,
-so a replaced arrival prints on one line beside the struck one; the board title
-at 24px with a 22px arrow and 7px gaps; and, outside the Home header, 6px
-boarding-cap padding and 4px platform pins at least 17px wide.
+every screen and every client, which is what lets the guessed trip-control
+line print whole at 360px. The rest of the web's narrow-phone sizes apply on
+every client too: the Home header's 92px figure column, 56px figure (44px
+wide) and 15px station names, so a replaced arrival prints on one line beside
+the struck one; the board title at 24px with a 22px arrow and 7px gaps; and,
+outside the Home header, 6px boarding-cap padding and 4px platform pins at
+least 17px wide.
 
 Dark is the primary scheme; light is a warm-paper printing of the same contrast
 hierarchy, not a colour inversion.
@@ -926,9 +922,8 @@ WidgetKit and Pixel launcher renderers.
   `T9 leaves in 2:24`, `Go to Platform 1`, `<destination> about 10:08`.
 - **Trip mode and under way:** the status line reads the service's own
   status, `RUNNING` (before departure included) or `CANCELLED`, for a started
-  or a guessed trip alike, with no pin (owner rulings 14 and 20, 2026-10-02);
-  once under way the widget shows journey detail's steps
-  (`GET OFF`, `BOARD T4`, `ARRIVE`). A widget never shows `RUNNING LATE` or
+  or a guessed trip alike, with no pin; once under way the widget shows
+  journey detail's steps (`GET OFF`, `BOARD T4`, `ARRIVE`). A widget never shows `RUNNING LATE` or
   `Trip over`: its data is never fresh enough to claim either.
 - **Freshness:** every home-screen widget always shows the Live Activity's
   wording, `Last updated HH:MM` as an absolute time, `Offline · Last updated
@@ -1002,12 +997,11 @@ graphics or caption stacks. The OS owns the container, so Android's templates
 and iOS's Island decide the actual geometry. Platform-number boxes on the line
 are an optional visual follow-up, not part of the accepted baseline. The
 Android card carries one action, `Stop trip`, which the system draws as plain
-text without an icon under the card in every state (owner ruling 16,
-2026-10-02). It stops trip mode exactly as Home's `Stop trip` does, for the
-card's current journey only: a tap on a replaced or dismissed card is ignored.
+text without an icon under the card in every state. It stops trip mode
+exactly as Home's `Stop trip` does, for the card's current journey only: a tap
+on a replaced or dismissed card is ignored.
 
-The lock screen carries `Stop trip` (owner ruling 16, 2026-10-02), with Stop
-trip's effects on Home. The iOS Live Activity card and expanded Island are at
+The lock screen carries `Stop trip`, with Stop trip's effects on Home. The iOS Live Activity card and expanded Island are at
 ActivityKit's 160 pt height limit, so the stop takes no row of its own. The
 card puts a worded `■ Stop trip` capsule (iOS's small bordered capsule, 28 pt,
 the tracker ink at 14%) at the trailing end of its headline row; a headline
@@ -1080,7 +1074,7 @@ Settings frames and two filtered-Home frames:
   variant are guessed trip mode carrying the `Going somewhere else?  STOP TRIP
   │ CHANGE` line; `home-390x844-just-added.png` is the open on which the app
   saved the pair it is showing, marked once in the sub line.
-- Trip-control line (the round 3b verdict exemplars): `inferred` above is the
+- Trip-control line: `inferred` above is the
   guessed line and `home-390x844-guessed-stress.png` the same line under a lost
   connection; `home-390x844-started.png` and `-started-after.png`, each with a
   `-light` variant, are the lone `■ STOP TRIP` before and after departure;
