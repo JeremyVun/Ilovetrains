@@ -18,7 +18,7 @@ app. It needs no API key, database, secrets or persistent volumes.
 
 ```sh
 GIT_REVISION="$(git rev-parse --short=12 HEAD)" \
-  ILOVETRAINSAPP_VERSION=1.0.2 docker buildx bake ilovetrainsapp --push
+  ILOVETRAINSAPP_VERSION=1.0.3 docker buildx bake ilovetrainsapp --push
 ```
 
 Set the matching numbered image tag in
@@ -47,11 +47,16 @@ Cloudflare from replacing email links with script-dependent obfuscation.
 [Website contract](../contracts/app-website.md)
 records copy, privacy and screenshot requirements.
 
-Latest website release: **1.0.2**, 10 September 2026, source `78d5153d849f`,
-infra pin `28823e5`. Deployment job `0c62b138ac0af9ebfb9b95bcdabc19a6`
+Latest website release: **1.0.3**, 4 October 2026, source `35028d02ebe9`,
+infra pin `3421775`. Deployment job `f68f9c81e8e86dac337803f5eb0e620a`
 succeeded on syd1. The multi-architecture manifest digest is
-`sha256:123f4f4bb68cf09f7bbbe5e69c94cc425b9c0e224edb4a70434e09db598c535c`.
-Public verification matched 21 pages/assets/health paths to the release.
+`sha256:aec616e5761d37a930a41b8df7ad5ec6b10bfaf9d2016f02eea5e633eb88b51a`.
+It shows app 1.10.0's Start trip and Stop trip in the hero, journey detail,
+F1 tracker and Live Activity screenshots, and the privacy page names the
+started-trip counts. The Live Activity was shot on the simulator's purple
+wallpaper; the default wallpaper's colour changes on its own, so check it
+before re-shooting. The packaged image passed all 356 pre-release checks, and
+the public pages, health and all nine screenshots matched the release bytes.
 Cloudflare preserves HTML no-cache/no-transform but applies `max-age=14400`
 to static assets; verify their bytes on the public origin after each release.
 
