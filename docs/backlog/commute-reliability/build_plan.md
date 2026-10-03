@@ -795,3 +795,22 @@ Owner, 2026-10-03: “Bundle the fresh package (Recommended)”.
     visual-regression matrix.
 - The lead runs `go test`, the web suite, the playtest and web visual
   regression on the merged result. Then comes the close stage.
+
+Phase 5 iOS done: `f0f3ebb` on `cr-p5-ios`.
+- Hermetic tests: in a Debug build hosting XCTest, the default
+  `TransitAPI.baseURL` is `https://tests.invalid` (`ios/Shared/TransitAPI.swift`),
+  guarded by `OfflinePlannerTests.testTheTestHostKeepsTheBundledTimetable`.
+- Bundle-dated tests moved:
+  - the Monday tests to Mon 2026-10-12 08:00 +11 (5 Oct is the Labour Day
+    timetable);
+  - the Sunday tests to 25 Oct (11 and 18 Oct have T1 closures);
+  - the extended-search test to the Balmain West ferry on Sun 18 Oct;
+  - the out-of-coverage check to 2 Nov.
+  `docs/operations/ios.md` carries the new fixture dates.
+- Gates: `tools/build-ios.sh --test` gave 313 unit tests with 1 failure. That
+  was a test expectation: the new bundle has more Sunday departures, so the
+  test now expects the 09:56:01 direct. The rerun `--unit OfflinePlannerTests`
+  passed 7/7. UI: 26 passed, 0 failed, 7 skipped. Visual regression
+  `/tmp/ilt-cr-p5-ios-vr1` was 60/60 same, with nothing accepted.
+- For the owner: the bundle's T1 closures on 11 and 18 Oct make offline
+  searches across them slow (81 s on the simulator), the known ROADMAP item.
