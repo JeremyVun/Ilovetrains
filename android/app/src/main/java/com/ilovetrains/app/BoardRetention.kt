@@ -4,7 +4,7 @@ private const val PAST_RETENTION = 24 * 60 * 60_000L
 const val BoardPlanLimit = 24
 const val BoardRecentMillis = 15 * 60_000L
 
-// Ruling 24: a single plan from 15 minutes ago filled with departed rows on a busy corridor and offered no train to take.
+// A single plan from 15 minutes ago can fill with departed rows on a busy corridor and offer no train to take.
 internal fun mergeTimetablePlans(upcoming: BoardData, recent: BoardData): BoardData {
     val rows = linkedMapOf<String, Journey>()
     (recent.journeys + upcoming.journeys).forEach { rows[it.key] = it }

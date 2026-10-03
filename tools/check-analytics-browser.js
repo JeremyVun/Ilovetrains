@@ -187,7 +187,6 @@ async function runScenario(ws, body, scenario) {
       return {
         hostname: location.hostname,
         events: t.analytics.events,
-        variant: t.analytics.variant('strip-placement'),
         storage,
         outbound: window.__analyticsOutbound
       };
@@ -206,10 +205,6 @@ async function runScenario(ws, body, scenario) {
         || telemetry.bucket < 0 || telemetry.bucket > 99) {
         throw new Error(`${scenario.name}: bad first-open telemetry ${JSON.stringify(telemetry)}`);
       }
-      const expectedVariant = telemetry.bucket % 2 ? 'a2' : 'a3';
-      if (result.variant !== expectedVariant) {
-        throw new Error(`${scenario.name}: bucket ${telemetry.bucket} resolved ${result.variant}`);
-      }
       if (result.outbound.length !== 1 || result.outbound[0].kind !== 'fetch') {
         throw new Error(`${scenario.name}: outbound capture ${JSON.stringify(result.outbound)}`);
       }
@@ -219,22 +214,19 @@ async function runScenario(ws, body, scenario) {
       }
       for (const event of payload) {
         const keys = Object.keys(event.d).sort().join(',');
-        const expectedKeys = ['pl', 'pl.u', 'u', 'x.strip-placement', ...(event.t === 'opened' ? ['m'] : [])]
-          .sort().join(',');
+        const expectedKeys = ['pl', 'pl.u', 'u', ...(event.t === 'opened' ? ['m'] : [])].sort().join(',');
         if (event.p !== 'ilovetrains' || event.n !== 1 || event.d.u !== '1'
-          || event.d.pl !== 'web' || event.d['pl.u'] !== 'web.1' || keys !== expectedKeys
-          || event.d['x.strip-placement'] !== expectedVariant) {
+          || event.d.pl !== 'web' || event.d['pl.u'] !== 'web.1' || keys !== expectedKeys) {
           throw new Error(`${scenario.name}: invalid payload event ${JSON.stringify(event)}`);
         }
       }
     } else {
-      if (result.variant !== 'a3') throw new Error(`${scenario.name}: privacy control did not force A3`);
       if (result.outbound.length) throw new Error(`${scenario.name}: sent ${JSON.stringify(result.outbound)}`);
       if (result.storage && (result.storage.doc.telemetry || result.storage.queue !== null)) {
         throw new Error(`${scenario.name}: wrote analytics state ${JSON.stringify(result.storage)}`);
       }
     }
-    console.log(`${scenario.name}: ${names.join(' → ')}; ${scenario.enabled ? 'captured locally' : 'transport silent'}; ${result.variant}`);
+    console.log(`${scenario.name}: ${names.join(' → ')}; ${scenario.enabled ? 'captured locally' : 'transport silent'}`);
   } finally {
     await ws.send('Target.closeTarget', { targetId });
   }

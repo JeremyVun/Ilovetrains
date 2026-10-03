@@ -1024,7 +1024,7 @@ private class Fixtures {
     val lostDwellState = lostState(lostCandidate.effectiveDeparture - 6 * 60_000, lostRecovery)
     val lostNoneState = lostState(lostFollowed.legs[0].effectiveArrival - 13 * 60_000, null)
 
-    // The round 3b exemplar clocks: the 09:24 at 09:16 (8 min out) and at 08:59 (25 min out).
+    // Exemplar clocks: the 09:24 at 09:16 (8 min out) and at 08:59 (25 min out).
     private fun transferAt(now: Long, started: Boolean): AppState {
         val board = transferBoard.copy(generatedAt = now)
         return activePinnedState.copy(now = now, board = board, homeBoard = board,

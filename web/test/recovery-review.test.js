@@ -273,8 +273,8 @@ function scenarios() {
   ].map(([name, doc, now, opts]) => [name, doc, body, now, opts]);
 }
 
-// Everything above the heavy rule: the trip-control line below it was redrawn
-// by commute reliability's rulings 9-19.
+// Everything above the heavy rule: the trip-control line below it is not
+// the base commit's.
 const headerOf = (html) => html.slice(0, html.indexOf('<div class="hm-rule">'));
 const withoutTopLine = (html) => html.replace(/<div class="hm-top">[\s\S]*?<section/, '<section');
 
@@ -291,7 +291,7 @@ test('the home header is byte-identical to the base commit on every non-lost jou
   }
   assert.deepEqual(differences,
     ['pre-departure pinned', 'riding pinned', 'riding, arrival-only delay (documented exception)']);
-  // A started trip's status line lost PINNED (rulings 14 and 20); nothing else moved.
+  // A started trip's status line lost PINNED; nothing else moved.
   assert.deepEqual(statusOnly, ['pre-departure pinned', 'riding pinned']);
 });
 

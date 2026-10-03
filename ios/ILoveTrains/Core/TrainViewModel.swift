@@ -1060,7 +1060,7 @@ final class TrainViewModel: ObservableObject {
         beginArrivalMonitoring()
     }
 
-    /// Rule 5's search: each candidate's running services online and from the timetable, then one progress match.
+    /// On-board entry: each candidate's running services online and from the timetable, then one progress match.
     private func enterOnBoard(_ fix: Fix, at now: Millis) {
         let previous = previousFix
         let candidates = onBoardRequests(data: data, now: now, fix: fix, previousFix: previous)

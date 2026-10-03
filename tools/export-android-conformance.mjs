@@ -49,8 +49,8 @@ const cases = [
   { name: 'three first-open votes infer home', doc: { ...base, homeVotes: ['2026-09-02', '2026-09-03', '2026-09-04'].map(day => ({ day, station: bondi })) }, fix: rhodes.location },
   { name: 'weekend midnight uses circular hour proximity', now: '2026-09-06T00:10:00+10:00', doc: { ...base, history: [{ tripId: 'b', direction: 'reverse', t: '2026-09-05T23:50:00+10:00' }] }, fix: null },
 ];
-/* Rule 2 of commute-reliability, on the index's own points: Gadigal is 152 m
-   from Town Hall. Each case declares its intended place and answer. */
+/* `here`, the sighting and train speed on the index's own points: Gadigal is
+   152 m from Town Hall. Each case declares its intended place and answer. */
 const townHall = station('200070', 'Town Hall Station', -33.873596, 151.206899);
 const gadigal = { ...station('200066', 'Gadigal Station', -33.873866, 151.208509), modes: ['metro'] };
 const rhodesPoint = station('213820', 'Rhodes Station', -33.83053, 151.087032);
@@ -165,9 +165,9 @@ const calibration = {
 };
 writeFileSync(new URL('./fixtures/conformance/calibration.json', import.meta.url), JSON.stringify(calibration, null, 2) + '\n');
 
-/* inference.json: commute-reliability rules 3, 5 and 6. Inputs are built here;
-   every expected value is declared by hand from design.md and only checked,
-   never copied, against the web implementation. */
+/* inference.json: the hold rule, inferred entry and Stop trip. Inputs are built
+   here; every expected value is declared by hand from client-storage.md and
+   only checked, never copied, against the web implementation. */
 const sydney = (hhmmss) => `2026-10-01T${hhmmss.length === 5 ? hhmmss + ':00' : hhmmss}+10:00`;
 const ms = (hhmmss) => Date.parse(sydney(hhmmss));
 const place = (id, name, lat, lon) => ({ id, name, location: { lat, lon } });
@@ -418,7 +418,7 @@ const onBoardCases = [
 ].map((value) => ({ doc: commuteDoc(), snapshot: null, writes: [], previousFix: null, cached: {}, nowMs: ms('08:10'), ...value }));
 entryCases.push(...onBoardCases);
 for (const value of entryCases) assert.deepEqual(enteredBy(value), value.expected, value.name);
-/* Stop trip on a guessed trip declines it (rule 6). departure is the web
+/* Stop trip on a guessed trip declines it. departure is the web
    departureKey: the JSON-encoded [line name, scheduled departure] of the
    declined journey's first service leg. */
 const declined = (tripId, at, journey, direction = 'forward') => ({
@@ -481,8 +481,8 @@ for (const value of runningCases) {
   assert.equal(runningJourney(value.journey, value.nowMs, value.enabledModes || ['train', 'metro', 'ferry']), value.expectedRunning, value.name);
 }
 
-/* Stop trip (rule 6, ruling 23). A started focus's pair is its journey's first
-   service leg origin to its last service leg destination. */
+/* A started focus's pair is its journey's first service leg origin to its
+   last service leg destination. */
 const stopFocus = (by, journey, { tripId = 'rt', direction = 'forward' } = {}) =>
   ({ tripId, direction, focusedAt: sydney('07:55'), by, journey });
 const older = declined('rr', '07:30', t9('07:00', REDFERN));
@@ -524,8 +524,9 @@ for (const value of stopCases) {
 }
 
 const inference = {
-  description: 'commute-reliability rules 3, 5 and 6, shared by web, Android and iOS. Inputs are built by '
-    + 'tools/export-android-conformance.mjs; every expected value is declared by hand from the design and only '
+  description: 'The hold rule, inferred entry and Stop trip (client-storage.md, Travel mode and Focused journey), '
+    + 'shared by web, Android and iOS. Inputs are built by '
+    + 'tools/export-android-conformance.mjs; every expected value is declared by hand from the contract and only '
     + 'checked against the web implementation. Never regenerate an expectation from the code under test.',
   encoding: 'Top-level times (nowMs, sightingAt, writes[].nowMs, fix.at, previousFix.at) are integer epoch '
     + 'milliseconds. Inside doc, records and journeys, times are ISO 8601 strings exactly as the web document and '

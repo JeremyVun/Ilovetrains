@@ -1172,7 +1172,7 @@ async function states() {
       focus: transferJourneys()[0],
       expect: { status: 'Checking arrival', tripline: 'started', copy: ['Checking arrival at Bondi Junction.'] }
     }),
-    // The estimate ending (ruling 21): the sign wraps, the offer claims no arrival.
+    // The estimate ending: the sign wraps, the offer claims no arrival.
     home('home-over', transferJourneys(), {
       now: Date.parse('2026-09-01T10:11:00+10:00'),
       generatedAt: '2026-09-01T10:11:00+10:00',

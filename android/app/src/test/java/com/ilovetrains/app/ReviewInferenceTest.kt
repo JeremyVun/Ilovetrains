@@ -8,8 +8,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Adversarial probes for commute-reliability rules 3, 5 and 6 on the pure Android logic. Each test states what
- * design.md and client-storage.md require; a failure is a defect or a contract contradiction (REVIEW.md).
+ * Adversarial probes of the hold rule, on-board entry and the decline on the pure Android logic. Each test states
+ * what client-storage.md requires; a failure is a defect or a contract contradiction.
  */
 class ReviewInferenceTest {
     private val rhodes = Station("213820", "Rhodes Station", -33.83053, 151.087032)
@@ -25,7 +25,7 @@ class ReviewInferenceTest {
     private fun record(journey: Journey, at: Long, station: Station? = rhodes) =
         LastAnswer(trip.id, false, at, station?.id, BoardData(rhodes, townHall, listOf(journey), at), journey)
 
-    /** Lead suspect 1: a same-origin sighting 60 s after departure means the rider did not board, so the open's snapshot must not enter that train either. */
+    /** A same-origin sighting 60 s after departure means the rider did not board, so the open's snapshot must not enter that train either. */
     @Test fun aPlatformSightingAfterDepartureRetiresTheDepartedTrainFromTheSnapshotToo() {
         val departed = record(t9(eight, eight + 27 * minute), at = eight - 2 * minute)
         var data = UserData(trips = listOf(trip), lastAnswer = departed, useLocation = true)
@@ -72,7 +72,7 @@ class ReviewInferenceTest {
         assertEquals(probe.journey.key, probe.enter()?.journey?.key)
     }
 
-    /** Fixture gap 1: no shared case is held by the decline's hour alone. */
+    /** The decline's hour alone still holds entry. */
     @Test fun theDeclineHourAloneHoldsEntryOnceTheDeclinedArrivalPlusThirtyHasPassed() {
         val probe = onBoardAt(0.02)
         val declined = InferenceDecline(trip.id, false, probe.now - 59 * minute, "T9:${eight - 70 * minute}", probe.now - 40 * minute)

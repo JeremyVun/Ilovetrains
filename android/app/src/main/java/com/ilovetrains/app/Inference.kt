@@ -91,7 +91,7 @@ fun replacesLastAnswer(data: UserData, incomingStationId: String?, now: Long, si
 const val ShownDepartureFixMillis = 5 * 60_000L
 const val MovingFixFreshMillis = 2 * 60_000L
 
-/** Rule 4: whether a refresh tick with Home open takes a fix, given the departures of leads Home showed this visit. */
+/** Whether a refresh tick with Home open takes a fix, given the departures of leads Home showed this visit. */
 fun tickNeedsFix(data: UserData, now: Long, shownDepartures: Collection<Long>, fix: Fix?, previousFix: Fix?): Boolean {
     if (shownDepartures.any { now >= it && now - it <= ShownDepartureFixMillis }) return true
     val stored = data.lastAnswer
@@ -103,7 +103,7 @@ fun tickNeedsFix(data: UserData, now: Long, shownDepartures: Collection<Long>, f
 fun UserData.withLastAnswer(record: LastAnswer, sightingAt: Long?): UserData =
     if (replacesLastAnswer(this, record.stationId, record.at, sightingAt)) copy(lastAnswer = record) else this
 
-// Ruling 2: seen at the origin a minute after the snapshot's train left, the rider did not board it.
+// Seen at the origin a minute after the snapshot's train left, the rider did not board it.
 fun retiresSnapshot(data: UserData, snapshot: LastAnswer?, incomingStationId: String?, sightingAt: Long?): Boolean {
     val trip = snapshot?.let { data.trips.find { trip -> trip.id == it.tripId } } ?: return false
     return incomingStationId != null && incomingStationId == trip.ends(snapshot.reverse).first.id &&
@@ -141,7 +141,7 @@ fun savedLeg(data: UserData, from: Station, to: Station): TripDirection? = data.
 
 fun UserData.withTripStopped(now: Long): UserData {
     val stopped = focus ?: return this
-    // Ruling 23: otherwise the next train-speed fix guesses a rider still riding back in.
+    // Started trips decline too: the next train-speed fix would guess them back in.
     val owner = if (stopped.pinned) savedLeg(this, stopped.board.from, stopped.board.to) else TripDirection(stopped.tripId, stopped.reverse)
     val cleared = copy(focus = null)
     return owner?.let { cleared.declining(stopped.copy(tripId = it.tripId, reverse = it.reverse), now) } ?: cleared
@@ -155,7 +155,7 @@ fun UserData.withFocusExpired(expired: FocusedJourney): UserData = copy(focus = 
 fun rideRecorded(data: UserData, tripId: String, reverse: Boolean, journey: Journey): Boolean =
     data.rides.any { it.tripId == tripId && it.reverse == reverse && it.departure == journey.departure }
 
-// Owner ruling 13: the open's snapshot, unchanged, and then the stored record may each enter.
+// Snapshot first keeps the proven auto-start intact; the stored record only adds entries.
 fun inferFromRecords(data: UserData, snapshot: LastAnswer?, now: Long, fix: Fix): FocusedJourney? =
     listOfNotNull(snapshot, data.lastAnswer).firstNotNullOfOrNull { record ->
         if (inferenceDeclined(data, record.tripId, now, record.journey) || !record.journey.withinTransferCap(data.maxTransfers)) null

@@ -1,9 +1,9 @@
 # Offline through-running: stay seated at Central
 
 Stage: diagnosed, design not started. The owner asked on 2026-10-02 for this to
-be investigated separately from `commute-reliability`, after phases 2b and 3a
-both found that the bundled timetable never offers a direct Rhodes → Town Hall
-train offline.
+be investigated separately from the trip-mode reliability work, after its
+Android and iOS builds both found that the bundled timetable never offers a
+direct Rhodes → Town Hall train offline.
 
 ## Symptom
 
@@ -43,9 +43,10 @@ terminal turnbacks, not through-running.
 
 - The owner's offline Rhodes → Town Hall board shows changes that do not exist,
   and arrival estimates follow the wrong itinerary.
-- Offline on-board entry (`commute-reliability` rule 5) matches against those
-  multi-leg journeys, so a guessed trip on the direct T9 shows a phantom change
-  at Central.
+- Offline on-board entry
+  ([client-storage.md](../../contracts/client-storage.md#travel-mode))
+  matches against those multi-leg journeys, so a guessed trip on the direct
+  T9 shows a phantom change at Central.
 
 ## Open before design
 

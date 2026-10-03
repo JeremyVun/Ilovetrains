@@ -72,8 +72,8 @@ test('a pinned header takes its next service and freshness from its own pair', (
   assert.match(html, /data-transfer-station[^>]*>Town Hall</);
 });
 
-/* Rulings 14 and 20: a started trip reads the service's own status, and its
-   only control is the line's Stop trip. */
+/* A started trip reads the service's own status, and its only control is the
+   line's Stop trip. */
 test('a started trip shows its service status and Stop trip, never PINNED', () => {
   const journey = transferJourneys()[0];
   for (const by of ['focus', undefined, 'inferred']) {
@@ -801,7 +801,7 @@ test('the guessed line is the inferred header\'s own: question, Stop trip, Chang
     transferBody(), at('09:33'), {}).strip, null);
 });
 
-/* Ruling 15 closed strip-placement: nothing of the line ever enters the header. */
+/* Nothing of the line ever enters the header. */
 test('the trip-control line has one place, under the heavy rule', () => {
   const journey = transferJourneys()[0];
   const doc = homeDoc(journey);
@@ -811,8 +811,8 @@ test('the trip-control line has one place, under the heavy rule', () => {
   assert.ok(html.indexOf('data-tripline') > html.indexOf('hm-rule'));
 });
 
-/* Rulings 13, 18 and 19: Start trip names the header's train, and only while it
-   leaves within 15 minutes. */
+/* Start trip names the header's train, and only while it leaves within 15
+   minutes. */
 test('the startable line names the header train and starts nothing further off', () => {
   const [lead] = transferJourneys();
   const line = (nowMs) => homeModel(homeDoc(), HOME_SELECTION, transferBody(), nowMs).tripLine;
@@ -854,7 +854,7 @@ test('a fix at the destination ends the trip before its timetable does', () => {
   assert.equal(model({ arrived: true }).tripLine, null, 'the offer owns the trip-over moment');
 });
 
-/* Ruling 21: an estimate ending claims nothing about the rider. */
+/* An estimate ending claims nothing about the rider. */
 test('an estimate ending offers the way back without saying you arrived', () => {
   const journey = transferJourneys()[0];
   const doc = homeDoc(journey);

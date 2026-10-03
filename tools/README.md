@@ -56,11 +56,9 @@
   by estimate, a 9-minute return keeping the board while a 10-minute return
   lands on Home, running-row starts and Stop trip (declining a started trip
   silently and a guessed one with `declined_inferred`), Home left open
-  through boarding, a platform
-  sighting after the shown train left retiring the open snapshot so boarding
-  the next train enters it (`snapshot`, the adversarial review's real-stack
-  probe, kept here as a permanent regression), and on-board entry. Each check
-  states which guard it proves. The clock, permission,
+  through boarding, a platform sighting after the shown train left retiring
+  the open snapshot so boarding the next train enters it (`snapshot`), and
+  on-board entry. Each check states which guard it proves. The clock, permission,
   geolocation provider and visibility are page-side adapters; the refresh tick
   is shortened only in the boarding check. Trap: the stub serves fixtures
   verbatim and the server refuses an `at` older than 24 hours, so the checker
@@ -794,9 +792,9 @@ passing-station pair. `detail-unpin-flow` exercises the matching detail
 `Start trip` nor `Stop trip`. `home-started` taps `START TRIP` on the
 startable line and checks that `STOP TRIP` takes its place under the same
 thumb; `home-startable`, `home-leaves-later`, `home-started-after`,
-`home-guessed-stress` and `home-startable-ferry` are the other round 3b
-states, and `home-checking-arrival` and `home-over` the guarded and estimate
-endings.
+`home-guessed-stress` and `home-startable-ferry` are the other trip-control
+line states, and `home-checking-arrival` and `home-over` the guarded and
+estimate endings.
 
 **Trap: the frozen network holds an overdue trip in `Checking arrival`.** A
 focus refresh in flight holds settlement as permission-pending, and the
@@ -1086,8 +1084,8 @@ It maps `ilovetrains.jeremyvun.com` to the local static server inside Chrome,
 maps the analytics host to loopback as a backstop, and captures attempted
 analytics fetches in the page. It proves a first enabled open assigns a bucket,
 emits `opened` before `shown_predicted`, and builds only the approved payload.
-Separate fresh targets prove DNT and denied storage force A3 without a
-telemetry write, queue or request, and that GPC alone leaves analytics on. No synthetic event leaves the machine.
+Separate fresh targets prove DNT and denied storage leave no telemetry write,
+queue or request, and that GPC alone leaves analytics on. No synthetic event leaves the machine.
 
 After deployment, open the real production app once in an ordinary browser,
 then read the collector with the operator-held key in the header:

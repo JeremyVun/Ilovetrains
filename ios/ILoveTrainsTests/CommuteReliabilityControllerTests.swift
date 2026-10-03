@@ -2,7 +2,7 @@ import ActivityKit
 import XCTest
 @testable import ILoveTrains
 
-/// The commute-reliability controller paths, driven offline the way the owner rides:
+/// The trip-mode controller paths, driven offline the way the owner rides:
 /// every request fails and the bundled timetable answers, at a clock it covers.
 @MainActor
 final class CommuteReliabilityControllerTests: XCTestCase {
@@ -143,7 +143,7 @@ final class CommuteReliabilityControllerTests: XCTestCase {
     }
 
     func testABusyCorridorsOfflineBoardStillOffersTrainsThatHaveNotLeft() async throws {
-        // Central → Parramatta at 08:00: a quarter hour's plan alone held only trains that had left (ruling 24).
+        // Central → Parramatta at 08:00: a quarter hour's plan alone holds only trains that have left.
         let clock = TestClock(mondayMorning)
         let (_, model) = try await model(UserData(trips: [commute]), clock: clock, location: ScriptedLocation())
         model.resume()

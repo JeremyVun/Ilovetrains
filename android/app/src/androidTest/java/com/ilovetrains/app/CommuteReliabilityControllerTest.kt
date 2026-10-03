@@ -25,7 +25,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Commute-reliability rules 1 and 3-7 through the real view model with no network: every request fails, and
+ * Trip-mode paths through the real view model with no network: every request fails, and
  * the bundled timetable plans every board, as on the owner's offline rides.
  */
 @RunWith(AndroidJUnit4::class)
@@ -192,7 +192,7 @@ class CommuteReliabilityControllerTest {
         assertNull("the declined trip was guessed again one fix later", model.state.value.focus)
     }
 
-    /** Ruling 23: a rider who stops a trip they started while still riding is not guessed back in by the next fix. */
+    /** A rider who stops a trip they started while still riding is not guessed back in by the next fix. */
     @Test fun aStartedTripStoppedOfflineIsDeclinedUnreportedAndTheNextFixCannotGuessItAgain() {
         val running = morningDirect()
         val now = running.effectiveDeparture + (running.effectiveArrival - running.effectiveDeparture) / 2
@@ -311,7 +311,7 @@ class CommuteReliabilityControllerTest {
         assertEquals(trip.id, model.state.value.selectedTripId)
     }
 
-    /** Ruling 24: at the peak on a busy corridor the last 15 minutes alone fill a plan of 24, and the board still offers trains to take. */
+    /** At the peak on a busy corridor the last 15 minutes alone fill a plan of 24, and the board still offers trains to take. */
     @Test fun aBusyCorridorAtThePeakOffersUpcomingTrainsOffline() {
         val parramatta = stations.first { it.id == "215020" }
         val peak = weekday(8, 0)

@@ -5,10 +5,9 @@
  *
  * Builds the TfNSW stub and the server into a temporary directory, boots both
  * on free loopback ports with no API key (fixtures only), and drives this
- * checkout's web client in headless Chrome through the commute-reliability
- * rules: the board's first past page, a guarded trip settling by estimate, the
- * ten-minute new open, running-row starts and Stop trip, Home left open
- * through boarding, the open snapshot retired by a platform sighting after its
+ * checkout's web client in headless Chrome through trip mode: the board's
+ * first past page, a guarded trip settling by estimate, the ten-minute new
+ * open, running-row starts and Stop trip, Home left open through boarding, the open snapshot retired by a platform sighting after its
  * train left, and on-board entry. Screens land in --out.
  *
  * The clock, location permission, geolocation provider and page visibility are
@@ -226,7 +225,7 @@ async function fixtureJourney(base, departure) {
   return journey;
 }
 
-/* (a) The first past page asks from 30 minutes ago for ten services and the
+/* The first past page asks from 30 minutes ago for ten services and the
    board shows the services that left in that half hour above NOW. */
 async function checkPast(base) {
   await withPage(async (page) => {
@@ -253,11 +252,11 @@ async function checkPast(base) {
     await evaluate(page, () => { document.querySelector('[data-t="timeline"]').scrollTop = 0; });
     await sleep(200);
     await shoot(page, 'past-scrolled-up');
-    console.log(`PASS (a) first past page at=${result.first.at} limit=${result.first.limit}; past rows ${result.rows.join(', ')}`);
+    console.log(`PASS past: first page at=${result.first.at} limit=${result.first.limit}; past rows ${result.rows.join(', ')}`);
   });
 }
 
-/* (b) A guarded trip ten minutes past its estimate reads Checking arrival for
+/* A guarded trip ten minutes past its estimate reads Checking arrival for
    the 45 s evidence wait, then settles by estimate with the estimate copy. */
 async function checkArrival(base) {
   const journey = await fixtureJourney(base, '22:48:00');
@@ -296,11 +295,11 @@ async function checkArrival(base) {
       throw new Error(`estimate settlement wrong: ${JSON.stringify(settled)}`);
     }
     await shoot(page, 'arrival-settled');
-    console.log('PASS (b) overdue armed focus: Checking arrival through the 45 s wait, then the estimate copy and one ride');
+    console.log('PASS arrival: overdue armed focus: Checking arrival through the 45 s wait, then the estimate copy and one ride');
   });
 }
 
-/* (c) Ten minutes in the background is a new open on Home; nine is not. */
+/* Ten minutes in the background is a new open on Home; nine is not. */
 async function checkReopen(base) {
   await withPage(async (page) => {
     await open(page, base, { now: at('23:00:00'), doc: documentWith(),
@@ -328,13 +327,13 @@ async function checkReopen(base) {
     }
     if (result.hash !== '#/' || !result.predicted) throw new Error(`the new open is not Home's own answer: ${JSON.stringify(result)}`);
     await shoot(page, 'reopen-home');
-    console.log('PASS (c) a 9-minute return kept the board; a 10-minute return landed on Home with a fresh fix');
+    console.log('PASS reopen: a 9-minute return kept the board; a 10-minute return landed on Home with a fresh fix');
   });
 }
 
-/* Rule 6: a running row starts the trip at once, an upcoming row opens detail,
-   and Stop trip declines a started trip silently (ruling 23) and a guessed one
-   with declined_inferred. */
+/* A running row starts the trip at once, an upcoming row opens detail, and
+   Stop trip declines a started trip silently and a guessed one with
+   declined_inferred. */
 async function checkStart(base) {
   await withPage(async (page) => {
     await open(page, base, { now: at('23:20:00'), doc: documentWith(), hash: '#/board' });
@@ -382,15 +381,15 @@ async function checkStart(base) {
     if (stopped.declined?.tripId !== TRIP.id || !stopped.events.includes('declined_inferred') || stopped.rides) {
       throw new Error(`stopping a guessed trip did not decline it: ${JSON.stringify(stopped)}`);
     }
-    console.log('PASS rule 6: running row started the 23:18; upcoming row opened detail; Stop trip declined a '
+    console.log('PASS start: running row started the 23:18; upcoming row opened detail; Stop trip declined a '
       + `started trip silently, and sent declined_inferred and ${JSON.stringify(stopped.declined)} on a guessed one`);
   });
 }
 
-/* Rules 3 and 4: Home stays open at Central while the 23:03 leaves. A refresh
-   after departure, its platform fix now stale, cannot replace the record; the
-   tick then takes a fix on the moving train and that held record enters trip
-   mode, with no on-board search needed. */
+/* Home stays open at Central while the 23:03 leaves. A refresh after
+   departure, its platform fix now stale, cannot replace the record; the tick
+   then takes a fix on the moving train and that held record enters trip mode,
+   with no on-board search needed. */
 async function checkBoarding(base) {
   await withPage(async (page) => {
     await open(page, base, { now: at('23:00:30'), doc: documentWith(), fastRefresh: 400,
@@ -422,16 +421,15 @@ async function checkBoarding(base) {
       throw new Error(`boarding with Home open: ${JSON.stringify(result)}`);
     }
     await shoot(page, 'boarding-entered');
-    console.log(`PASS rules 3-4: the record held through a refresh after the 23:03 left; ${result.tickFixes} tick fix(es); `
+    console.log(`PASS boarding: the record held through a refresh after the 23:03 left; ${result.tickFixes} tick fix(es); `
       + 'the held platform record entered it without an on-board search');
   });
 }
 
-/* Rule 3 and ruling 2 (the adversarial review's finding 1): Home opens on
-   Central's platform before the 23:03 and a quick app switch snapshots that
-   record. Still on the platform 70 s after the 23:03 left, the rider did not
-   board it: the refresh records the next train and retires the snapshot, so
-   boarding that train enters it rather than the departed 23:03. */
+/* Home opens on Central's platform before the 23:03 and a quick app switch
+   snapshots that record. Still on the platform 70 s after the 23:03 left, the
+   rider did not board it: the refresh records the next train and retires the
+   snapshot, so boarding that train enters it rather than the departed 23:03. */
 async function checkSnapshot(base) {
   await withPage(async (page) => {
     await open(page, base, { now: at('23:00:30'), doc: documentWith(), fastRefresh: 400,
@@ -469,11 +467,11 @@ async function checkSnapshot(base) {
       throw new Error(`entered the departed ${result.entered}, not the boarded ${result.stored}: ${JSON.stringify(result)}`);
     }
     await shoot(page, 'snapshot-retired-entered');
-    console.log(`PASS rule 3 snapshot: seen at Central 70 s after the 23:03 left, the snapshot retired and boarding entered the ${result.stored}`);
+    console.log(`PASS snapshot: seen at Central 70 s after the 23:03 left, the snapshot retired and boarding entered the ${result.stored}`);
   });
 }
 
-/* Rule 5: opened on a moving train with no record, 10.75 km from Central and
+/* Opened on a moving train with no record, 10.75 km from Central and
    9.16 km from Parramatta (position progress 0.54), the fix matches the 23:12
    (time progress 0.54) over the 23:03 (0.71) and the 23:18 (0.24). */
 async function checkOnBoard(base) {
@@ -494,7 +492,7 @@ async function checkOnBoard(base) {
       throw new Error(`on-board entry: ${JSON.stringify(result)}`);
     }
     await shoot(page, 'onboard-entered');
-    console.log(`PASS rule 5: one request ${JSON.stringify(result.asked[0])}; entered the ${result.focus.line} at 23:12`);
+    console.log(`PASS onboard: one request ${JSON.stringify(result.asked[0])}; entered the ${result.focus.line} at 23:12`);
   });
 }
 

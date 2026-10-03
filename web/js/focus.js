@@ -150,7 +150,7 @@ function savedLeg(doc, ends) {
   return null;
 }
 
-// Ruling 23: any stop on a saved pair declines it, or the next train-speed fix guesses a rider still riding back in.
+// Any stop on a saved pair declines it, or the next train-speed fix guesses a rider still riding back in.
 export function stoppedTrip(doc, focus, ends, nowMs) {
   const guessed = focus.by === 'inferred';
   const owner = guessed ? { tripId: focus.tripId, direction: focus.direction } : savedLeg(doc, ends);
@@ -209,7 +209,7 @@ export function writeLastOpen(doc, record, nowMs, sightingAtMs = null) {
   return replacesLastOpen(doc, record, nowMs, sightingAtMs) ? recordLastOpen(doc, record, nowMs) : doc;
 }
 
-// Ruling 2: seen at the origin a minute after the snapshot's train left, the rider did not board it.
+// Seen at the origin a minute after the snapshot's train left, the rider did not board it.
 export function retiresSnapshot(doc, snapshot, incoming, sightingAtMs = null) {
   const trip = snapshot && findTrip(doc, snapshot.tripId);
   const departure = trip ? departureMs(snapshot.journey) : null;
@@ -225,7 +225,7 @@ export function tickNeedsFix(doc, nowMs, shownLeadDepartures, fix, previousFix) 
   return Boolean(fix) && nowMs - fix.at <= MOVING_FIX_FRESH_MS && trainSpeed(fix, previousFix);
 }
 
-// Owner ruling 13: the open's snapshot, unchanged, and then the stored record may each enter.
+// Snapshot first keeps the proven auto-start intact; the stored record only adds entries.
 export function inferFromRecords(doc, snapshot, nowMs, fix) {
   const focus = focusOf(doc);
   if (focus && !focusExpired(focus, nowMs)) return null;

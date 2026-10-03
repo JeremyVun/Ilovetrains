@@ -78,7 +78,7 @@ export function here(doc, stations, fix, previousFix = null) {
   return standing ? { station: standing.station, tier: 1 } : farther(saved, stations, fix);
 }
 
-// Adding a trip asks where the user stands, not which saved trip they mean (ruling 22).
+// Adding a trip asks where the user stands, not which saved trip they mean.
 export function setupHere(doc, stations, fix) {
   if (!stations || !fix) return null;
   const saved = savedEnds(doc, stations);

@@ -1,6 +1,6 @@
-/* The adversarial review's probes for commute-reliability rules 3, 5 and 6
-   (pure focus.js), kept as regressions. Each states what design.md and
-   client-storage.md require. */
+/* Adversarial probes of the hold rule, on-board entry and the decline (pure
+   focus.js), kept as regressions. Each states what client-storage.md
+   requires. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -36,11 +36,11 @@ const record = (journey, station = RHODES) => ({
   station: station && { id: station.id, name: station.name }, tripId: 'rt', direction: 'forward', journey
 });
 
-/* Lead suspect 1 (build_plan.md Execution). Ruling 2: being seen at the platform
-   again after the shown train left "means you didn't board it". A same-origin
-   sighting 60 s after D therefore replaces the stored record (hold rule), and
-   the snapshot this Home visit began with must not enter that departed train
-   when the rider boards the next one. */
+/* Being seen at the platform again after the shown train left means the
+   rider did not board it. A same-origin sighting 60 s after D therefore
+   replaces the stored record (hold rule), and the snapshot this Home visit
+   began with must not enter that departed train when the rider boards the
+   next one. */
 test('review: a platform sighting after departure retires the departed train from the snapshot too', () => {
   const base = caseNamed('regression: the stored record alone enters');
   const departed = base.doc.lastOpen;
@@ -63,8 +63,7 @@ test('review: a platform sighting after departure retires the departed train fro
     `entered the departed ${entered.journey.departure.scheduled} instead of the boarded ${doc.lastOpen.journey.departure.scheduled}`);
 });
 
-/* Fixture gap 2 (lead's suspect): the nearest miss in inference.json is 0.36 off,
-   so any window below that passes every case. These pin the 0.25 boundary. */
+/* These pin the 0.25 progress window from both sides. */
 function onBoardAt(gapFromTime, now = ms('2026-10-01T08:10:00+10:00')) {
   const base = caseNamed('on board: a heading toward the city decides forward and the closest progress wins');
   const doc = clone(base.doc);
@@ -97,9 +96,7 @@ test('review: a service 0.249 off the position progress matches (the window is i
   assert.equal(result && journeyKey(result.journey), journeyKey(journey));
 });
 
-/* Fixture gap 1: no shared case is held by the decline's hour alone (every held
-   case also has arrival + 30 min ahead). Here arrival + 30 min has passed and
-   only the hour holds. */
+/* Here the declined arrival + 30 min has passed and only the hour holds. */
 test('review: the decline hour alone holds entry once the declined arrival plus 30 min has passed', () => {
   const now = ms('2026-10-01T08:10:00+10:00');
   const probe = onBoardAt(0.02, now);

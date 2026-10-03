@@ -59,7 +59,7 @@ func replacesLastAnswer(data: UserData, incoming: LastAnswer, now: Millis, sight
     return now < departure || (sightingAt.map { $0 >= departure + holdSightingAfter } ?? false)
 }
 
-// Ruling 2: seen at the origin a minute after the snapshot's train left, the rider did not board it.
+// Seen at the origin a minute after the snapshot's train left, the rider did not board it.
 func retiresSnapshot(data: UserData, snapshot: LastAnswer?, incoming: LastAnswer, sightingAt: Millis?) -> Bool {
     guard let snapshot, let trip = data.trips.first(where: { $0.id == snapshot.tripId }),
           let sightingAt, incoming.stationId == origin(trip, reverse: snapshot.reverse).id else { return false }
@@ -94,7 +94,7 @@ private func savedLeg(_ data: UserData, from: String, to: String) -> (tripId: St
     return nil
 }
 
-// Ruling 23: any stop on a saved pair declines it, or the next train-speed fix guesses a rider still riding back in.
+// Any stop on a saved pair declines it, or the next train-speed fix guesses a rider still riding back in.
 private func stopDecline(data: UserData, focus: FocusedJourney, at now: Millis) -> InferenceDecline? {
     var owned = focus
     if focus.pinned {
@@ -163,7 +163,7 @@ func onItsWay(_ journey: Journey, now: Millis, data: UserData) -> Bool {
         && journeyAllowed(journey, modes: data.modes) && data.withinTransferLimit(journey)
 }
 
-// Owner ruling 13: the open's snapshot, unchanged, and then the stored record may each enter.
+// Snapshot first keeps the proven auto-start intact; the stored record only adds entries.
 func inferFromRecords(data: UserData, snapshot: LastAnswer?, fix: Fix, now: Millis) -> FocusedJourney? {
     for record in [snapshot, data.lastAnswer] {
         if let entered = inferredFocus(data: data, record: record, fix: fix, now: now) { return entered }
@@ -297,7 +297,7 @@ func mergedPage(online: BoardData?, timetable: BoardData?) -> BoardData? {
     return merged
 }
 
-/// Ruling 24: the next departures from now joined by the last quarter hour's, because a busy corridor's quarter hour
+/// The next departures from now joined by the last quarter hour's, because a busy corridor's quarter hour
 /// alone can fill the whole plan with trains that already left.
 func offlineBoard(
     _ planner: OfflinePlanner,

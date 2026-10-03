@@ -24,8 +24,8 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Adversarial probes for commute-reliability rules 1 and 3 through the real view model with no network, as the owner
- * rides. Each test states what design.md and client-storage.md require; a failure is a defect (REVIEW.md).
+ * Adversarial probes of the evidence wait and the hold rule through the real view model with no network, as the owner
+ * rides. Each test states what client-storage.md requires; a failure is a defect.
  */
 @RunWith(AndroidJUnit4::class)
 class ReviewCommuteReliabilityTest {
@@ -47,10 +47,10 @@ class ReviewCommuteReliabilityTest {
     }
 
     /**
-     * Findings 1 and 2. Ruling 2: seen at the platform again after the shown train left means the rider did not board
-     * it. That sighting retires the snapshot the visit began with, and offline it re-records the departed train after
-     * its departure, which the 0 <= D - at bound keeps from entering. Neither record enters the departed train when
-     * the rider boards the next one; on-board entry finds that one.
+     * Seen at the platform again after the shown train left, the rider did not board it. That sighting retires the
+     * snapshot the visit began with, and offline it re-records the departed train after its departure, which the
+     * 0 <= D - at bound keeps from entering. Neither record enters the departed train when the rider boards the next
+     * one; on-board entry finds that one.
      */
     @Test fun aPlatformSightingAfterDepartureRetiresTheDepartedTrainFromTheSnapshotToo() {
         val model = open(UserData(trips = listOf(trip), modes = setOf("train"), useLocation = true), morningDeparture() - 2 * minute)
@@ -98,7 +98,7 @@ class ReviewCommuteReliabilityTest {
             ?.minByOrNull { it.effectiveDeparture }) { "the board offers no direct train after the departed one" }
 
     /**
-     * Rule 1: the evidence wait starts once per focus and foreground visit; a restart within the visit does not extend
+     * The evidence wait starts once per focus and foreground visit; a restart within the visit does not extend
      * it. A service toggle in Settings restarts monitoring and must not hold Checking arrival another 45 s.
      */
     @Test fun aPreferenceChangeWithinTheVisitDoesNotExtendTheEvidenceWait() {

@@ -2,9 +2,9 @@ import ActivityKit
 import XCTest
 @testable import ILoveTrains
 
-/// Adversarial probes for commute-reliability rule 3 and inferred entry through the real controller, driven offline
-/// the way the owner rides: every request fails and the bundled timetable answers. Each test states what design.md
-/// and client-storage.md require; a failure is a defect (REVIEW.md).
+/// Adversarial probes of the hold rule and inferred entry through the real controller, driven offline the way the
+/// owner rides: every request fails and the bundled timetable answers. Each test states what client-storage.md
+/// requires; a failure is a defect.
 @MainActor
 final class ReviewCommuteReliabilityControllerTests: XCTestCase {
     private var models: [TrainViewModel] = []
@@ -27,9 +27,9 @@ final class ReviewCommuteReliabilityControllerTests: XCTestCase {
         try await super.tearDown()
     }
 
-    /// Lead suspect 1 (build_plan.md Execution). Ruling 2: seen at the platform again after the shown train left means
-    /// the rider did not board it. The hold rule replaces the stored record; the snapshot the visit began with must
-    /// not enter that departed train when the rider boards the next one.
+    /// Seen at the platform again after the shown train left, the rider did not board it. The hold rule replaces the
+    /// stored record; the snapshot the visit began with must not enter that departed train when the rider boards the
+    /// next one.
     func testAPlatformSightingAfterDepartureRetiresTheDepartedTrainFromTheSnapshotToo() async throws {
         let planner = OfflinePlanner()
         let boarded = try await firstDirect(planner, at: mondayMorning)

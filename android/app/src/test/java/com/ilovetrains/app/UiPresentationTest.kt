@@ -55,7 +55,7 @@ class UiPresentationTest {
         assertEquals("Running", focusStatus(focus.copy(journey = journey.copy(retained = true)), now, false).text)
         assertEquals("Cancelled", focusStatus(focus.copy(journey = journey.copy(legs = listOf(first.copy(cancelled = true), second))), now, false).text)
         assertEquals("Trip over", focusStatus(focus, now, complete = true).text)
-        // A started trip reads its service's status before departure too (rulings 14 and 20).
+        // A started trip reads its service's status before departure too.
         assertEquals("Running", focusStatus(focus.copy(journey = Journey(listOf(second.copy(estimatedDeparture = null)))), now, false).text)
         val unconfirmed = ArrivalResult(ArrivalState.ArrivalUnconfirmed, null, null, ArrivalWindow("trip", emptyList()),
             away = true, moving = true, action = ArrivalAction.None)

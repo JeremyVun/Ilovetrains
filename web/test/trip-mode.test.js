@@ -1,5 +1,5 @@
-/* commute-reliability rules 4-7: the pure parts of when Home looks, how a trip
-   starts and stops, and what counts as a new open. */
+/* The pure parts of when Home looks, how a trip starts and stops, and what
+   counts as a new open. */
 process.env.TZ = 'Australia/Sydney';
 
 import test from 'node:test';

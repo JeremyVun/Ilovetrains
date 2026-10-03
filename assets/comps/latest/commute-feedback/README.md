@@ -5,9 +5,9 @@ the same lower contrast after the transfer.”
 
 The transfer before/during/after and checking-arrival frames are verified web
 client captures for 1.9.0 (service worker v73), replacing their illustrative
-targets. They carry the started trip's `■ STOP TRIP` line and no `PINNED`
-(commute reliability, owner rulings 14-20). Reproduce them with `tools/check-commute-feedback.js` against a local
-server; see [tools instructions](../../../../tools/README.md).
+targets. They carry the started trip's `■ STOP TRIP` line and no `PINNED`.
+Reproduce them with `tools/check-commute-feedback.js` against a local server;
+see [tools instructions](../../../../tools/README.md).
 Both phone sizes (390×844 and 412×732) and schemes are captured at 2× resolution.
 `verification.json` records current frame hashes and distinguishes built
 captures from the remaining direct/overdue illustrative targets. The latter
@@ -29,8 +29,9 @@ The before/during/after transfer frames move a synthetic clock through the same
 journey. The checking-arrival captures drive the real controller's guarded
 arrival state three minutes past the estimate, inside the evidence wait; the
 overdue target's marker remains illustrative, and as a comp target it predates
-the trip-control line. Arrival
-thresholds live in the [storage contract](../../../../docs/contracts/client-storage.md#final-arrival-decision).
+the trip-control line. The direct target predates it too and still reads
+`Running · Pinned`; it calibrates the progress line, not the status words.
+Arrival thresholds live in the [storage contract](../../../../docs/contracts/client-storage.md#final-arrival-decision).
 
 Lost connections and their recovery are time-only and live in the
 [storage contract](../../../../docs/contracts/client-storage.md#recovery); the

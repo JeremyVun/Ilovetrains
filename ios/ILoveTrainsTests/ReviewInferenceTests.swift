@@ -1,8 +1,8 @@
 import XCTest
 @testable import ILoveTrains
 
-/// Adversarial probes for commute-reliability rules 3, 5 and 6 on the pure iOS logic. Each test states what
-/// design.md and client-storage.md require; a failure is a defect or a contract contradiction (REVIEW.md).
+/// Adversarial probes of the hold rule, on-board entry and the decline on the pure iOS logic. Each test states
+/// what client-storage.md requires; a failure is a defect or a contract contradiction.
 final class ReviewInferenceTests: XCTestCase {
     private let rhodes = Station(id: "213820", name: "Rhodes Station", lat: -33.83053, lon: 151.087032)
     private let townHall = Station(id: "200070", name: "Town Hall Station", lat: -33.873596, lon: 151.206899)
@@ -22,7 +22,7 @@ final class ReviewInferenceTests: XCTestCase {
                    board: BoardData(from: rhodes, to: townHall, journeys: [journey], generatedAt: at), journey: journey)
     }
 
-    /// Lead suspect 1: a same-origin sighting 60 s after departure means the rider did not board, so the open's snapshot must not enter that train either.
+    /// A same-origin sighting 60 s after departure means the rider did not board, so the open's snapshot must not enter that train either.
     func testAPlatformSightingAfterDepartureRetiresTheDepartedTrainFromTheSnapshotToo() throws {
         let departed = record(t9(eight, eight + 27 * minute), at: eight - 2 * minute)
         var snapshot: LastAnswer? = departed
@@ -79,7 +79,7 @@ final class ReviewInferenceTests: XCTestCase {
         XCTAssertEqual(probe.enter()?.journey.key, probe.journey.key)
     }
 
-    /// Fixture gap 1: no shared case is held by the decline's hour alone.
+    /// The decline's hour alone still holds entry.
     func testTheDeclineHourAloneHoldsEntryOnceTheDeclinedArrivalPlusThirtyHasPassed() {
         var probe = onBoardAt(0.02)
         let earlier = t9(eight - 70 * minute, eight - 43 * minute)

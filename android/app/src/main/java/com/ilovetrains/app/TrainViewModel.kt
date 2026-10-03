@@ -15,7 +15,7 @@ import java.time.Instant
 import java.util.UUID
 import kotlin.math.roundToInt
 
-// Owner ruling 3: a quick app switch keeps the screen, a longer absence starts afresh.
+// A quick app switch keeps the screen; a longer absence starts afresh.
 internal const val NewOpenAfterMillis = 10 * 60_000L
 
 class TrainViewModel private constructor(
@@ -393,7 +393,7 @@ class TrainViewModel private constructor(
         historyRecorded = false
     }
 
-    /** Rule 7: a return after ten minutes away is a new open, unless a tracker or widget tap already said where to land. */
+    /** A return after ten minutes away is a new open, unless a tracker or widget tap already said where to land. */
     private fun reopenAfterAbsence() {
         val away = backgroundedAt?.let { trackerNow() - it } ?: return
         backgroundedAt = null
@@ -499,7 +499,7 @@ class TrainViewModel private constructor(
         if (!tickFix() && boardJob?.isActive != true) refresh()
         readFlags()
     }
-    /** Rule 4: Home left open around a departure takes a fix each tick, and that fix's handling refreshes in its place. */
+    /** Home left open around a departure takes a fix each tick, and that fix's handling refreshes in its place. */
     private fun tickFix(): Boolean {
         val stalled = tickFixPending
         tickFixPending = false
@@ -1046,7 +1046,7 @@ class TrainViewModel private constructor(
         if (inferred == null && moving) enterOnBoard(value, previous)
     }
 
-    /** Rule 5: a fix at train speed between a saved trip's ends looks for the running service it matches. */
+    /** A fix at train speed between a saved trip's ends looks for the running service it matches. */
     private fun enterOnBoard(value: Fix, previous: Fix?) {
         val at = mutable.value.now
         val candidates = onBoardRequests(data, at, value, previous, emptyMap())

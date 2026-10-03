@@ -2,7 +2,7 @@
 
 These are real Android system notification cards, reviewed on 2026-09-08. The
 API 36.1 sets were recaptured on 2026-10-03 with the `Stop trip` action the
-system draws under every card (owner ruling 16); the API 35 set predates it.
+system draws under every card; the API 35 set predates it.
 Each PNG is cropped to the notification row's observed accessibility bounds;
 no product text or geometry is altered. The folder name records API version,
 logical phone size and font scale. `device.txt` records the actual emulator.

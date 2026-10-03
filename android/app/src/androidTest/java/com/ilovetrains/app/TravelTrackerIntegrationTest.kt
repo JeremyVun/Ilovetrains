@@ -235,7 +235,7 @@ class TravelTrackerIntegrationTest {
         assertServiceStopped()
     }
 
-    /** Ruling 23 from the lock screen: Stop trip on a started trip declines its saved trip, and only a guessed stop is reported. */
+    /** From the lock screen, Stop trip on a started trip declines its saved trip, and only a guessed stop is reported. */
     @Test fun theStopTripActionOnAStartedTripDeclinesItUnreported() {
         grantNotifications()
         launchActivity()
