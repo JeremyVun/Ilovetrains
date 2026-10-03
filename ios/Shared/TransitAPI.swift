@@ -1,7 +1,16 @@
 import Foundation
 
+#if DEBUG
+// Unit tests run inside the app, whose launch would otherwise fetch production's live data and replace the bundled timetable.
+private let hostingUnitTests = ["XCTestConfigurationFilePath", "XCTestBundlePath", "XCTestSessionIdentifier"]
+    .contains { ProcessInfo.processInfo.environment[$0] != nil }
+private let defaultBaseURL = hostingUnitTests ? "https://tests.invalid" : "https://ilovetrains.jeremyvun.com"
+#else
+private let defaultBaseURL = "https://ilovetrains.jeremyvun.com"
+#endif
+
 struct TransitAPI: Sendable {
-    var baseURL = "https://ilovetrains.jeremyvun.com"
+    var baseURL = defaultBaseURL
     var session: URLSession = .shared
     var clientVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
 

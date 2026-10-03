@@ -2,16 +2,27 @@ import XCTest
 @testable import ILoveTrains
 
 final class OfflinePlannerTests: XCTestCase {
+    private let bundledCoverage = "3 Oct 2026–1 Nov 2026"
+
+    /// The host app shares the default timetable directory with the controller tests' planners.
+    func testTheTestHostKeepsTheBundledTimetable() async throws {
+        XCTAssertEqual(TransitAPI().baseURL, "https://tests.invalid")
+        let planner = OfflinePlanner()
+        try await planner.initialize()
+        let coverage = await planner.coverageDescription
+        XCTAssertEqual(coverage, bundledCoverage)
+    }
+
     func testBundledPackageRoutesTrainMetroMixedAndFerry() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
         let planner = OfflinePlanner(bundle: .main, directory: directory)
         try await planner.initialize()
         let coverage = await planner.coverageDescription
-        XCTAssertEqual(coverage, "5 Sep 2026–4 Oct 2026")
+        XCTAssertEqual(coverage, bundledCoverage)
 
-        let sunday = sydneyMillis(year: 2026, month: 9, day: 6, hour: 10)
-        let monday = sydneyMillis(year: 2026, month: 9, day: 7, hour: 10)
+        let sunday = sydneyMillis(year: 2026, month: 10, day: 25, hour: 10)
+        let monday = sydneyMillis(year: 2026, month: 10, day: 12, hour: 10)
         let trainResult = try await planner.planResult(
             from: station("200060", "Central Station", "train", "metro"),
             to: station("215020", "Parramatta Station", "train"),
@@ -41,8 +52,8 @@ final class OfflinePlannerTests: XCTestCase {
         )
 
         XCTAssertFalse(train.journeys.isEmpty)
-        let direct = try XCTUnwrap(train.journeys.first { $0.departure == isoMillis("2026-09-06T00:11:01Z") })
-        XCTAssertEqual(direct.arrival, isoMillis("2026-09-06T00:43:00Z"))
+        let direct = try XCTUnwrap(train.journeys.first { $0.departure == isoMillis("2026-10-24T23:11:01Z") })
+        XCTAssertEqual(direct.arrival, isoMillis("2026-10-24T23:43:00Z"))
         XCTAssertEqual(direct.legs.first?.line, "T1")
         XCTAssertFalse(metro.journeys.isEmpty)
         XCTAssertTrue(mixed.journeys.contains { Set($0.legs.map(\.mode)).isSuperset(of: ["train", "metro"]) })
@@ -51,26 +62,28 @@ final class OfflinePlannerTests: XCTestCase {
             .flatMap(\.legs).allSatisfy { $0.identity != nil })
     }
 
-    func testMissingSundayMetroExtendsSearchAndCoverageIsEnforced() async throws {
+    func testSundayTrackworkExtendsSearchAndCoverageIsEnforced() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
         let planner = OfflinePlanner(bundle: .main, directory: directory)
         try await planner.initialize()
-        let sunday = sydneyMillis(year: 2026, month: 9, day: 6, hour: 10)
+        // Trackwork closes Granville and Harris Park all Sunday, so no train reaches Parramatta from the city until Monday.
+        let sunday = sydneyMillis(year: 2026, month: 10, day: 18, hour: 10)
         let board = try await planner.plan(
-            from: station("202010", "Mascot Station", "train"),
-            to: station("2155382", "Kellyville Station", "metro"),
+            from: station("200060", "Central Station", "train"),
+            to: station("215020", "Parramatta Station", "train"),
             at: sunday,
-            modes: ["train", "metro"],
+            modes: ["train"],
             limit: 4
         )
         XCTAssertFalse(board.journeys.isEmpty)
         XCTAssertTrue(board.journeys.allSatisfy { $0.departure >= sunday })
+        XCTAssertTrue(board.journeys.allSatisfy { $0.arrival >= sydneyMillis(year: 2026, month: 10, day: 19, hour: 4) })
 
         let unavailable = try await planner.plan(
             from: station("200060", "Central Station", "train"),
             to: station("215020", "Parramatta Station", "train"),
-            at: sydneyMillis(year: 2026, month: 11, day: 1, hour: 10),
+            at: sydneyMillis(year: 2026, month: 11, day: 2, hour: 10),
             modes: ["train"]
         )
         XCTAssertEqual(unavailable.error, "The offline timetable does not cover this date")
@@ -92,7 +105,7 @@ final class OfflinePlannerTests: XCTestCase {
         let recovered = OfflinePlanner(bundle: .main, directory: directory)
         try await recovered.initialize()
         let coverage = await recovered.coverageDescription
-        XCTAssertEqual(coverage, "5 Sep 2026–4 Oct 2026")
+        XCTAssertEqual(coverage, bundledCoverage)
     }
 
     /// The unit-test host installs the bundled timetable as it launches while a test's own planner installs beside it.
@@ -106,7 +119,7 @@ final class OfflinePlannerTests: XCTestCase {
         async let secondInstalled: Void = second.initialize()
         _ = try await (firstInstalled, secondInstalled)
 
-        let monday = sydneyMillis(year: 2026, month: 9, day: 7, hour: 10)
+        let monday = sydneyMillis(year: 2026, month: 10, day: 12, hour: 10)
         for planner in [first, second] {
             let board = try await planner.plan(from: station("200060", "Central Station", "train", "metro"),
                                                to: station("215020", "Parramatta Station", "train"), at: monday, modes: ["train"])
@@ -119,7 +132,7 @@ final class OfflinePlannerTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: directory) }
         let planner = OfflinePlanner(bundle: .main, directory: directory)
         let (_, initializeMillis) = try await timed { try await planner.initialize() }
-        let monday = sydneyMillis(year: 2026, month: 9, day: 7, hour: 10)
+        let monday = sydneyMillis(year: 2026, month: 10, day: 12, hour: 10)
         let mascot = station("202010", "Mascot Station", "train")
         let kellyville = station("2155382", "Kellyville Station", "metro")
         let central = station("200060", "Central Station", "train", "metro")

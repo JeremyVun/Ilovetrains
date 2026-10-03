@@ -147,9 +147,8 @@ final class AppFlowTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--offline"]
         app.launchEnvironment["ILOVETRAINS_TEST_DOMAIN"] = UUID().uuidString
-        // Match OfflinePlannerTests' covered Monday; the captured Sunday metro
-        // gap exercises the separate extended-search integration test.
-        let fixtureDate = ISO8601DateFormatter().date(from: "2026-09-07T00:00:00Z")!
+        // A Monday 10:00 the bundled timetable covers, as in OfflinePlannerTests.
+        let fixtureDate = ISO8601DateFormatter().date(from: "2026-10-12T10:00:00+11:00")!
         app.launchEnvironment["ILOVETRAINS_TEST_NOW"] = String(fixtureDate.timeIntervalSince1970 * 1_000)
         app.launch()
         let origin = app.textFields["from-station-search"]
