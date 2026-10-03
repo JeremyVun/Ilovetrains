@@ -754,3 +754,44 @@ visual agent, on branches from main. Each ports every remaining
 Android also removes the detail line cap. Each verifies on its narrow device
 (360×780 and `ilt-cr-ios-se`) against the exemplars, especially the stress
 and lost states, and visual regression at 390/402 must stay unchanged.
+
+Phase 4e done:
+- Android `2841e65` and iOS `20f607c` are merged into main.
+- Android: at 360 the replaced arrival time prints on one line, guarded by
+  `assertReplacedArrivalPrintsOnOneLine`, which was proven to bite. "Bondi
+  Junction" fits, and detail shows the full `PLATFORM 13` and `SIDE B` (both
+  3-line caps removed).
+- iOS: at 375 "Bondi Junction" sits on one line; `PhoneSizes` holds every
+  narrow value from one `<= 375` threshold.
+- Visual regression at the baseline sizes is unchanged on both: Android 69
+  same plus 2 keyboard flakes, iOS 40 same.
+- Noted, not changed: Android and iOS sit 10-18 dp/pt lower in the header's
+  vertical rhythm than the exemplars at every width. On Android the stress
+  receipt wraps `09:58.` because body text inherits 0.5 sp letter-spacing.
+  Both are recorded in the deviation contracts.
+- The iOS unit gate failed only because the test app downloaded production's
+  fresh timetable (20261003-20261101), so the tests pinned to 2026-09-07 can no
+  longer plan. Phase 5 makes native tests hermetic.
+
+## Phase 5 — as run
+
+Owner, 2026-10-03: “Bundle the fresh package (Recommended)”.
+- Branch `cr-bundle` (worktree `/private/tmp/ilt-cr-bundle`, from main
+  `b4f6369` plus the 4e merges) carries the bundle:
+  - `d819ad5` puts production package `a101a8d9…` (20278838 bytes, verified
+    against the live manifest, 20261003-20261101) into the Android assets and
+    the iOS Resources.
+  - The server bootstrap stays on 2026-09-05: its trip index is not published,
+    and a server refreshes at start.
+- `5712aeb` renames the transfer-recovery fixture's `pinIcon` to
+  `startedLine` across the three clients' tests.
+- 5-android (`cr-p5-android`) and 5-ios (`cr-p5-ios`), both from `cr-bundle`,
+  each:
+  - make the native tests hermetic, with no live timetable or realtime
+    download in a test run;
+  - move date-pinned tests into the new coverage, avoiding the 2026-10-04 DST
+    changeover;
+  - run the platform's full gates once on final sources, plus its full
+    visual-regression matrix.
+- The lead runs `go test`, the web suite, the playtest and web visual
+  regression on the merged result. Then comes the close stage.
